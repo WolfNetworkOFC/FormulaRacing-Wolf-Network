@@ -41,10 +41,10 @@ commands:
     description: Começe uma TimeTrial
     usage: /timetrial
     aliases: [ tt, timett ]
-  frlanguage:
+  language:
     description: Muda a linguagem do FormulaRacing
-    usage: /frlanguage
-    aliases: [ frlang, frl, formularacinglanguage ]
+    usage: /language
+    aliases: [ lang, l]
   reset:
     description: Reseta sua timetrial.
     usage: /reset

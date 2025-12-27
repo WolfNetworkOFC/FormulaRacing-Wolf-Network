@@ -133,7 +133,7 @@
         private void registerCommands(DuelCommandHandler duelHandler) {
             try {
                 // Tab Completers
-                Objects.requireNonNull(this.getCommand("frlanguage")).setTabCompleter(new dev.EfraGroup.formulaRacing.TabCompleter.FRLanguageTabCompleter(this));
+                Objects.requireNonNull(this.getCommand("language")).setTabCompleter(new dev.EfraGroup.formulaRacing.TabCompleter.FRLanguageTabCompleter(this));
                 Objects.requireNonNull(this.getCommand("timetrial")).setTabCompleter(new TimeTrialTabCompleter(dm));
                 Objects.requireNonNull(this.getCommand("trackedit")).setTabCompleter(new TrackEditorTabCompleter(dm));
                 Objects.requireNonNull(this.getCommand("voterace")).setTabCompleter(new VoteRaceTabCompleter(dm));
@@ -161,7 +161,7 @@
                 Objects.requireNonNull(this.getCommand("timetrialcancel")).setExecutor(new TimeTrialCancelCommandHandler(timerUtils));
                 Objects.requireNonNull(this.getCommand("timetrialrandom")).setExecutor(new TimeTrialRandomCommandHandler(dm, this, packetSender, timerUtils, api, stt));
                 Objects.requireNonNull(this.getCommand("reset")).setExecutor(new ResetCommandHandler(this, dm, timerUtils, api));
-                Objects.requireNonNull(this.getCommand("frlanguage")).setExecutor(new FRLanguageCommandHandler(this, fileManager, dm));
+                Objects.requireNonNull(this.getCommand("language")).setExecutor(new FRLanguageCommandHandler(this, fileManager, dm));
                 Objects.requireNonNull(this.getCommand("timetrial")).setExecutor(new TimeTrialCommandHandler(dm, this, packetSender, timerUtils, rcl, api, stt, ev));
                 Objects.requireNonNull(this.getCommand("debug")).setExecutor(new DebugCommandHandler(this));
                 Objects.requireNonNull(this.getCommand("formularacingreload")).setExecutor(new FormulaRacingReloadCommandHandler(fileManager, dm));

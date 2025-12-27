@@ -100,7 +100,7 @@ public class TimeTrialCommandHandler implements CommandExecutor {
                 NocolManager.setCollisionMode(player, false);
                 timerUtils.stopTimer(player, lastTrack);
             }
-
+        }
             if (mysql.trackHaveBoatUtils(trackName) && !FormulaRacing.hasOpenBoatUtilsMod(player)) {
                 player.sendMessage("§c " + plugin.getDirectTranslation("does_not_have_boatutils", lang_code));
                 return true;
@@ -135,8 +135,7 @@ public class TimeTrialCommandHandler implements CommandExecutor {
 
             return true;
         }
-        return false;
-    }
+
     private String formatTime(double time) {
         int minutes = (int) (time / 60);
         int seconds = (int) (time % 60);

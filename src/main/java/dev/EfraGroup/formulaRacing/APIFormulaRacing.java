@@ -95,7 +95,7 @@ public class APIFormulaRacing {
         }
 
         if (trail) {
-            trailManager.setTrail(boat);
+            //trailManager.setTrail(boat);
         }
 
         if (player.getGameMode() == GameMode.SPECTATOR) {
@@ -115,7 +115,7 @@ public class APIFormulaRacing {
 
     public void deleteBoat(Entity boat) {
         if (boat instanceof Boat) {
-            trailManager.removeTrail((Boat) boat);
+            //trailManager.removeTrail((Boat) boat);
 
             lockedBoats.values().removeIf(as -> {
                 if (as.getPassengers().contains(boat)) {

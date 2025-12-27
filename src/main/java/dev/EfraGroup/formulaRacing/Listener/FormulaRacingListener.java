@@ -55,7 +55,7 @@ public class FormulaRacingListener implements Listener {
                     plugin.getLogger().info("[FormulaRacing] Limpeza: " + removedCount + " barcos abandonados foram removidos.");
                 }
             }
-        }.runTaskTimer(plugin, 1200L, 2000L); // 1200L (1 min delay inicial) | 6000L (Roda a cada 5 minutos)
+        }.runTaskTimer(plugin, 0L, 200L); // 1200L (1 min delay inicial) | 6000L (Roda a cada 5 minutos)
     }
 
     @EventHandler

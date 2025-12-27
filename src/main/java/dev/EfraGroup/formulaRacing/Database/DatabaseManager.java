@@ -939,59 +939,65 @@ public class DatabaseManager {
    /* =======================================================
           LEADERBOARD, GRIDS, CÂMERAS E CONFIGS
 ======================================================= */
+   public synchronized List<PlayerTime> getLeaderboard(String trackName) {
+       List<PlayerTime> leaderboard = new ArrayList<>();
+       String trackWS = trackName.replace(" ", "");
 
-    public synchronized List<PlayerTime> getLeaderboard(String trackName) {
-        List<PlayerTime> leaderboard = new ArrayList<>();
-        String trackWS = trackName.replace(" ", "");
+       try {
+           int totalCheckpoints = getCheckpointCount(trackWS);
 
-        try {
-            // Resolve o total de checkpoints (usa o método que já corrigimos antes)
-            int totalCheckpoints = getCheckpointCount(trackWS);
-
-            String sql = """
-        SELECT player_uuid, player_name, bestTime, checkpointsReached, finished 
-        FROM (
-            SELECT *, ROW_NUMBER() OVER (
-                PARTITION BY player_uuid 
-                ORDER BY finished DESC, 
-                CASE WHEN finished = 1 THEN bestTime END ASC, 
-                CASE WHEN finished = 0 THEN checkpointsReached END DESC, 
+           // SQL Refatorado para garantir a ordem correta:
+           // 1. Quem terminou (finished = 1) vem antes de quem não terminou (finished = 0).
+           // 2. Entre os que terminaram: Menor tempo vence.
+           // 3. Entre os que NÃO terminaram: Mais checkpoints vencem.
+           // 4. Se empatarem em checkpoints: Menor tempo vence.
+           String sql = """
+            SELECT player_uuid, player_name, bestTime, checkpointsReached, finished 
+            FROM (
+                SELECT *, ROW_NUMBER() OVER (
+                    PARTITION BY player_uuid 
+                    ORDER BY 
+                        finished DESC, 
+                        CASE WHEN finished = 1 THEN bestTime ELSE 999999 END ASC, 
+                        checkpointsReached DESC, 
+                        bestTime ASC
+                ) as rn 
+                FROM fr_player_times 
+                WHERE trackNameWS = ?
+            ) t 
+            WHERE rn = 1 
+            ORDER BY 
+                finished DESC, 
+                CASE WHEN finished = 1 THEN bestTime ELSE 999999 END ASC, 
+                checkpointsReached DESC, 
                 bestTime ASC
-            ) as rn 
-            FROM fr_player_times 
-            WHERE trackNameWS = ?
-        ) t 
-        WHERE rn = 1 
-        ORDER BY finished DESC, 
-        CASE WHEN finished = 1 THEN bestTime END ASC 
-        LIMIT 10
-        """;
+            LIMIT 10
+            """;
 
-            Connection conn = getOrConnect();
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setString(1, trackWS);
-                try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        String uuidString = rs.getString("player_uuid");
-                        UUID playerUuid = (uuidString != null) ? UUID.fromString(uuidString) : null;
+           Connection conn = getOrConnect();
+           try (PreparedStatement ps = conn.prepareStatement(sql)) {
+               ps.setString(1, trackWS);
+               try (ResultSet rs = ps.executeQuery()) {
+                   while (rs.next()) {
+                       String uuidString = rs.getString("player_uuid");
+                       UUID playerUuid = (uuidString != null) ? UUID.fromString(uuidString) : null;
 
-                        leaderboard.add(new PlayerTime(
-                                playerUuid,
-                                rs.getString("player_name"),
-                                rs.getDouble("bestTime"),
-                                rs.getInt("checkpointsReached"),
-                                totalCheckpoints,
-                                rs.getBoolean("finished")
-                        ));
-                    }
-                }
-            }
-        } catch (SQLException e) {
-            handleSqlError(e);
-            plugin.getLogger().warning("Falha no leaderboard da pista " + trackName + ": " + e.getMessage());
-        }
-        return leaderboard;
-    }
+                       leaderboard.add(new PlayerTime(
+                               playerUuid,
+                               rs.getString("player_name"),
+                               rs.getDouble("bestTime"),
+                               rs.getInt("checkpointsReached"),
+                               totalCheckpoints,
+                               rs.getBoolean("finished")
+                       ));
+                   }
+               }
+           }
+       } catch (SQLException e) {
+           handleSqlError(e);
+       }
+       return leaderboard;
+   }
 
     public synchronized void setLonelyModePlayer(UUID uuid, boolean lonelyMode) {
         String sql = "UPDATE fr_players SET lonelyMode = ? WHERE uuid = ?";
