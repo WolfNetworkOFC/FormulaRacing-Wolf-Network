@@ -21,6 +21,12 @@ public class TimerUtils {
     // Jogadores ativos: UUID -> (TrackName -> PlayerTimerData)
     private final Map<UUID, Map<String, PlayerTimerData>> activeTimers = new ConcurrentHashMap<>();
 
+    // Cache de avisos para evitar spam de logs
+    private final Set<UUID> warnedPlayersNoCheckpoints = ConcurrentHashMap.newKeySet();
+
+    // Timestamp do último warning por checkpoint (Key: "UUID:checkpointId")
+    private final Map<String, Long> lastWarningTime = new ConcurrentHashMap<>();
+
     public TimerUtils(FormulaRacing plugin, DatabaseManager databaseManager) {
         this.plugin = plugin;
         this.databaseManager = databaseManager;
@@ -149,6 +155,36 @@ public class TimerUtils {
         return null;
     }
 
+    /**
+     * Recarrega o cache de PB e checkpoints após salvar um tempo.
+     * Útil quando o jogador completa uma volta e inicia outra sem sair do servidor.
+     */
+    public void reloadCacheAsync(Player player, String trackName) {
+        UUID uuid = player.getUniqueId();
+        String playerName = player.getName();
+
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            Object[] pb = databaseManager.getPlayerBestTime(playerName, trackName);
+            Map<Integer, Double> cp = databaseManager.getCheckpointTimes(uuid, trackName);
+            RaceSessionCache newCache = new RaceSessionCache(pb, cp);
+
+            // Se conseguiu carregar checkpoints, limpa os warnings
+            int cpCount = newCache.getCpTimes() != null ? newCache.getCpTimes().size() : 0;
+            if (cpCount > 0) {
+                warnedPlayersNoCheckpoints.remove(uuid);
+                // Limpa warnings de checkpoints específicos
+                lastWarningTime.entrySet().removeIf(entry -> entry.getKey().startsWith(uuid.toString() + ":"));
+            }
+
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                PlayerTimerData data = getTimerData(player, trackName);
+                if (data != null) {
+                    data.setSessionCache(newCache);
+                }
+            });
+        });
+    }
+
     /* ======================== ELAPSED ======================== */
 
     public double getPlayerElapsedTime(Player player, String trackName) {
@@ -261,6 +297,18 @@ public class TimerUtils {
                 }
                 data.setLastDelta(delta);
             }
+        } else {
+            // Só avisa UMA VEZ por jogador a cada 30 segundos para evitar spam
+            if (lastCp != null && (dbCheckpointTimes == null || dbCheckpointTimes.isEmpty())) {
+                String warningKey = uuid.toString() + ":noCache";
+                long now = System.currentTimeMillis();
+                Long lastWarn = lastWarningTime.get(warningKey);
+
+                if (lastWarn == null || (now - lastWarn) > 30000) {
+                    plugin.getLogger().warning(String.format("[FormulaRacing] %s não tem checkpoints salvos. Complete uma volta para estabelecer um PB.", player.getName()));
+                    lastWarningTime.put(warningKey, now);
+                }
+            }
         }
 
         // 3. LOGICA DO PB (Usando o valor passado pelo parâmetro)
@@ -282,13 +330,18 @@ public class TimerUtils {
         player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(hud));
     }
 
-
     public void stopTimer(Player player, String trackName) {
-        Map<String, PlayerTimerData> map = activeTimers.get(player.getUniqueId());
+        UUID uuid = player.getUniqueId();
+        Map<String, PlayerTimerData> map = activeTimers.get(uuid);
         if (map == null) return;
 
         map.remove(trackName);
-        if (map.isEmpty()) activeTimers.remove(player.getUniqueId());
+        if (map.isEmpty()) {
+            activeTimers.remove(uuid);
+            warnedPlayersNoCheckpoints.remove(uuid);
+            // Limpa warnings de checkpoints específicos
+            lastWarningTime.entrySet().removeIf(entry -> entry.getKey().startsWith(uuid.toString() + ":"));
+        }
     }
 
     // Método para adicionar checkpoint temporário

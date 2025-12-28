@@ -236,20 +236,43 @@ public class RegionListener implements Listener {
                         // Usamos um valor muito alto (Double.MAX_VALUE) caso o array seja nulo (sem recorde)
                         double personalBest = (bestData != null && bestData.length > 0) ? (double) bestData[0] : Double.MAX_VALUE;
 
-                        // 3. Salva a volta atual no banco
+                        // 3. Determina se é PB ANTES de salvar (para feedback imediato)
+                        boolean isNewPB = (rawElapsed <= personalBest || personalBest == Double.MAX_VALUE);
+
+                        // 4. Salva a volta atual no banco
                         database.saveFullTime(uuid, player.getName(), track, rawElapsed, checkpoints);
 
-                        // 4. Agora a comparação funciona: double vs double
-                        if (rawElapsed <= personalBest) {
-
+                        // 5. Sempre mostra o tempo da volta
+                        String lapTimeMessage;
+                        if ("pt_BR".equals(lang_code) || "pt_PT".equals(lang_code)) {
+                            lapTimeMessage = "§6🏁 §fTempo da volta: §b" + formatTime(rawElapsed);
                         } else {
-                            if (lang_code == "pt_BR"){
-                                player.sendMessage("§fMelhor Tempo Pessoal! §dVocê terminou §f" + track + "§dem" +formatTime(rawElapsed));
-                            } else if (lang_code == "en_US"){
-                                player.sendMessage("§fPersonal Best! §dYou Finished §f" + track + "§din" +formatTime(rawElapsed));
+                            lapTimeMessage = "§6🏁 §fLap time: §b" + formatTime(rawElapsed);
+                        }
+                        player.sendMessage(lapTimeMessage);
 
+                        // 6. Mostra feedback adicional se bateu PB
+                        if (isNewPB) {
+                            // ✅ NOVO PB!
+                            String pbMessage;
+                            if ("pt_BR".equals(lang_code) || "pt_PT".equals(lang_code)) {
+                                pbMessage = "§a§l✓ §fMelhor Tempo Pessoal!";
+                            } else {
+                                // Inglês ou qualquer outro idioma
+                                pbMessage = "§a§l✓ §fPersonal Best!";
                             }
+                            player.sendMessage(pbMessage);
                             player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+                        } else {
+                            // Mostra a diferença para o PB
+                            double delta = rawElapsed - personalBest;
+                            String deltaMessage;
+                            if ("pt_BR".equals(lang_code) || "pt_PT".equals(lang_code)) {
+                                deltaMessage = "§7(PB: §b" + formatTime(personalBest) + " §7| §c+" + formatTime(delta) + "§7)";
+                            } else {
+                                deltaMessage = "§7(PB: §b" + formatTime(personalBest) + " §7| §c+" + formatTime(delta) + "§7)";
+                            }
+                            player.sendMessage(deltaMessage);
                         }
                     } else if (checkpoints > 0) {
                         player.sendMessage("§c"+plugin.getDirectTranslation("checkpoints", lang_code));
