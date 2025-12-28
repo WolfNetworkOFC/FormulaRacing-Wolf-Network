@@ -1,7 +1,7 @@
 # Formula Racing
 
-[![Build Status](https://github.com/WolfNetworkOFC/FormulaRacing-Wolf-Network/actions/workflows/build.yml/badge.svg)](https://github.com/SEU_USUARIO/FormulaRacing-Wolf-Network/actions/workflows/build.yml)
-[![Release](https://img.shields.io/github/v/release/SEU_USUARIO/FormulaRacing-Wolf-Network)](https://github.com/SEU_USUARIO/FormulaRacing-Wolf-Network/releases)
+[![Build Status](https://github.com/WolfNetworkOFC/FormulaRacing-Wolf-Network/actions/workflows/build.yml/badge.svg)](https://github.com/WolfNetworkOFC/FormulaRacing-Wolf-Network/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/WolfNetworkOFC/FormulaRacing-Wolf-Network)](https://github.com/WolfNetworkOFC/FormulaRacing-Wolf-Network/releases)
 
 🏎️ Plugin de corrida de barcos no gelo usado no servidor WolfNetwork (Spigot/Paper)
 
@@ -12,8 +12,8 @@ Este projeto usa GitHub Actions para compilação automática. A cada push, o pl
 **[📖 Ver instruções detalhadas de CI/CD](.github/CI_CD_INSTRUCTIONS.md)**
 
 ### Download Rápido
-- **Builds automáticos:** [Actions](https://github.com/SEU_USUARIO/FormulaRacing-Wolf-Network/actions) → Artifacts
-- **Releases oficiais:** [Releases](https://github.com/SEU_USUARIO/FormulaRacing-Wolf-Network/releases)
+- **Builds automáticos:** [Actions](https://github.com/WolfNetworkOFC/FormulaRacing-Wolf-Network/actions) → Artifacts
+- **Releases oficiais:** [Releases](https://github.com/WolfNetworkOFC/FormulaRacing-Wolf-Network/releases)
 
 
 
