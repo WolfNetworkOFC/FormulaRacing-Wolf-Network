@@ -425,7 +425,6 @@ public class DatabaseManager {
 
     public synchronized boolean playerExists(UUID uuid) {
         // Debug inicial
-        plugin.getLogger().info("[DEBUG-DB] Verificando existência do jogador: " + uuid.toString());
 
         String sql = "SELECT 1 FROM fr_players WHERE uuid = ?";
 
@@ -434,7 +433,6 @@ public class DatabaseManager {
 
             // Debug de conexão
             if (conn == null || conn.isClosed()) {
-                plugin.getLogger().severe("[DEBUG-DB] ERRO: A conexão com o banco de dados está nula ou fechada!");
                 return false;
             }
 
@@ -443,12 +441,10 @@ public class DatabaseManager {
 
                 try (ResultSet rs = ps.executeQuery()) {
                     boolean exists = rs.next();
-                    plugin.getLogger().info("[DEBUG-DB] Resultado para " + uuid.toString() + ": " + (exists ? "Existe" : "Não existe"));
                     return exists;
                 }
             }
         } catch (SQLException e) {
-            plugin.getLogger().severe("[DEBUG-DB] ERRO SQL em playerExists: " + e.getMessage());
             // Aqui o handleSqlError provavelmente vai mostrar o erro de "unsupported format"
             handleSqlError(e);
             return false;
