@@ -768,26 +768,17 @@ public class DatabaseManager {
     public synchronized Map<Integer, Double> getCheckpointTimes(UUID playerUUID, String trackName) {
         Map<Integer, Double> checkpointTimes = new HashMap<>();
 
-        // 🔴 CORREÇÃO CRÍTICA: Busca os checkpoints do MELHOR TEMPO (PB) do jogador
-        // Antes estava pegando TODOS os checkpoints, causando delta incorreto!
-        // Usa subquery para pegar o timetrial_id do melhor tempo completo
-        String sql = "SELECT ct.checkpointId, ct.time " +
-                     "FROM fr_checkpoint_times ct " +
-                     "WHERE ct.timetrial_id = (" +
-                     "    SELECT pt.id FROM fr_player_times pt " +
-                     "    WHERE pt.player_uuid = ? AND pt.trackNameWS = ? " +
-                     "    AND pt.finished = 1 " +
-                     "    ORDER BY pt.bestTime ASC LIMIT 1" +
-                     ") " +
-                     "AND ct.player_uuid = ? AND ct.trackNameWS = ?";
+        // 🔹 EXPLICAÇÃO: A tabela fr_checkpoint_times usa PK (player_uuid, trackNameWS, checkpointId)
+        // com INSERT OR REPLACE, então sempre mantém apenas OS ÚLTIMOS checkpoints salvos.
+        // O método saveCheckpointTimes só salva quando newIsBetter = true, então os dados
+        // aqui são SEMPRE do melhor tempo que foi salvo (completo ou parcial).
+        String sql = "SELECT checkpointId, time FROM fr_checkpoint_times WHERE player_uuid = ? AND trackNameWS = ?";
 
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, playerUUID.toString());
                 ps.setString(2, trackName.replace(" ", ""));
-                ps.setString(3, playerUUID.toString());
-                ps.setString(4, trackName.replace(" ", ""));
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         checkpointTimes.put(rs.getInt("checkpointId"), rs.getDouble("time"));

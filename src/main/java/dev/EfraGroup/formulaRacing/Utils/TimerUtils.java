@@ -221,15 +221,18 @@ public class TimerUtils {
         // Cálculo de tempo usando nanoTime para precisão total
         double elapsedSeconds = (System.nanoTime() - data.getStartNanoTime()) / 1_000_000_000.0;
 
-        int lastCheckpoint = data.getCheckpointsReached().size();
+        int checkpointCount = data.getCheckpointsReached().size();
         int totalCheckpoints = data.getTotalCheckpoints();
 
-        // 1. Busca checkpoint atual na memória temporária para o cálculo do Delta
+        // 1. Busca o ÚLTIMO checkpoint registrado (o mais recente)
         List<CheckpointData> temp = getTempCheckpoints(uuid);
         CheckpointData lastCp = null;
-        if (temp != null) {
-            for (CheckpointData cp : temp) {
-                if (cp.getTrack().equalsIgnoreCase(trackName) && cp.getId() == lastCheckpoint) {
+
+        if (temp != null && !temp.isEmpty()) {
+            // Percorre de trás para frente para pegar o checkpoint mais recente desta track
+            for (int i = temp.size() - 1; i >= 0; i--) {
+                CheckpointData cp = temp.get(i);
+                if (cp.getTrack().equalsIgnoreCase(trackName)) {
                     lastCp = cp;
                     break;
                 }
@@ -239,10 +242,12 @@ public class TimerUtils {
         String deltaStr = "";
         String deltaColor = "§e";
 
-        // 2. CÁLCULO DO DELTA (Usando o mapa passado pelo parâmetro)
-        if (lastCp != null && lastCheckpoint > 0 && dbCheckpointTimes != null) {
-            if (dbCheckpointTimes.containsKey(lastCheckpoint)) {
-                double delta = Math.round((lastCp.getTime() - dbCheckpointTimes.get(lastCheckpoint)) * 1000.0) / 1000.0;
+        // 2. CÁLCULO DO DELTA (compara o checkpoint atual com o PB do mesmo checkpoint)
+        if (lastCp != null && dbCheckpointTimes != null && !dbCheckpointTimes.isEmpty()) {
+            int cpId = lastCp.getId();
+
+            if (dbCheckpointTimes.containsKey(cpId)) {
+                double delta = Math.round((lastCp.getTime() - dbCheckpointTimes.get(cpId)) * 1000.0) / 1000.0;
 
                 if (Math.abs(delta) < 0.0009) {
                     deltaStr = " +0.000";
@@ -268,7 +273,7 @@ public class TimerUtils {
 
         // 4. FORMATAÇÃO E EXIBIÇÃO
         String timeStr = formatTime(elapsedSeconds, hasPB, worstTime);
-        String hud = timeStr + " §7(CP " + lastCheckpoint + "/" + totalCheckpoints + ")";
+        String hud = timeStr + " §7(CP " + checkpointCount + "/" + totalCheckpoints + ")";
 
         if (!deltaStr.isEmpty()) {
             hud += " " + deltaColor + " " + deltaStr.trim();
