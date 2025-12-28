@@ -29,12 +29,15 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: FormulaRacing-Plugin
-        path: target/*.jar
+        path: target/formularacing-*.jar
         retention-days: 30
+      continue-on-error: false
 
     - name: Informações do Build
       run: |
         echo "✅ Build concluído com sucesso!"
         echo "📦 Arquivos gerados:"
         ls -lh target/*.jar
+        echo ""
+        echo "📤 Arquivo principal (com dependências): formularacing-0.2.jar"
 

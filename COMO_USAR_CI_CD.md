@@ -20,7 +20,9 @@ git push
 1. Na aba **Actions**, clique no workflow concluído
 2. Role até a seção **Artifacts**
 3. Clique em **FormulaRacing-Plugin** para baixar
-4. Extraia o ZIP e copie o `.jar` para a pasta `plugins` do servidor
+4. Extraia o ZIP e copie o arquivo `formularacing-0.2.jar` para a pasta `plugins` do servidor
+   - ⚠️ **IMPORTANTE:** Use o arquivo `formularacing-0.2.jar` (contém todas as dependências)
+   - ❌ **NÃO USE** o arquivo `original-formularacing-0.2.jar` (versão sem dependências)
 
 ---
 
@@ -72,4 +74,26 @@ A partir de agora, toda vez que você fizer push para o repositório:
 3. Você não precisa mais compilar localmente! 🎉
 
 Para releases oficiais, basta criar uma tag `vX.Y.Z` e enviar.
+
+---
+
+## 📦 Entendendo os Arquivos JAR Gerados
+
+O Maven Shade Plugin gera dois arquivos durante a compilação:
+
+1. **`formularacing-0.2.jar`** ✅
+   - JAR principal com **todas as dependências incluídas** (shaded)
+   - **Este é o arquivo que você deve usar no servidor**
+   - Contém: FastBoard, Adventure API, e outras libs necessárias
+
+2. **`original-formularacing-0.2.jar`** ❌
+   - JAR original **sem as dependências**
+   - Apenas para referência/debug
+   - **NÃO funciona sozinho no servidor**
+
+### Por que isso importa?
+- O servidor precisa das bibliotecas (FastBoard, Adventure API) para o plugin funcionar
+- O arquivo principal já inclui tudo automaticamente
+- Não é necessário instalar nenhuma dependência adicional no servidor
+
 
