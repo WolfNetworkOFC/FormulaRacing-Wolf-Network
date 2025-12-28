@@ -67,6 +67,18 @@ public class RegionListener implements Listener {
     @EventHandler
     public void onTeleport(PlayerTeleportEvent event) {
         Player player = event.getPlayer();
+
+        // PROTEÇÃO: Impede teleporte durante duelo (exceto teleportes do sistema)
+        if (database.isPlayerInActiveDuel(player.getUniqueId())) {
+            // Permite apenas teleportes causados pelo plugin (ex: teleporte para largada)
+            if (event.getCause() != PlayerTeleportEvent.TeleportCause.PLUGIN &&
+                event.getCause() != PlayerTeleportEvent.TeleportCause.COMMAND) {
+                event.setCancelled(true);
+                player.sendMessage("§c§lDUELO §8» §7Você não pode se teleportar durante um duelo!");
+                return;
+            }
+        }
+
         lastLocation.put(player.getUniqueId(), event.getTo()); // reseta "previous"
         markJustTeleported(player); // protege contra disparos falsos
     }
