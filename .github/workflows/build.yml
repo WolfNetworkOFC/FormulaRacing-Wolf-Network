@@ -1,0 +1,40 @@
+name: Build FormulaRacing Plugin
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+
+    - name: Configurar JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Compilar com Maven
+      run: mvn clean package -DskipTests
+
+    - name: Upload do JAR como Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: FormulaRacing-Plugin
+        path: target/*.jar
+        retention-days: 30
+
+    - name: Informações do Build
+      run: |
+        echo "✅ Build concluído com sucesso!"
+        echo "📦 Arquivos gerados:"
+        ls -lh target/*.jar
+
