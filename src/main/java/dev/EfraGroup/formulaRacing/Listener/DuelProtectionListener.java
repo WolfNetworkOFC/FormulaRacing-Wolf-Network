@@ -77,19 +77,5 @@ public class DuelProtectionListener implements Listener {
             }
         }
     }
-
-    /**
-     * Impede que jogadores dropem itens durante o duelo
-     * (caso o servidor permita itens no inventário)
-     */
-    @EventHandler
-    public void onDropItemDuringDuel(PlayerDropItemEvent event) {
-        Player player = event.getPlayer();
-
-        if (databaseManager.isPlayerInActiveDuel(player.getUniqueId())) {
-            event.setCancelled(true);
-            player.sendMessage("§c§lDUELO §8» §7Você não pode dropar itens durante um duelo!");
-        }
-    }
 }
 
