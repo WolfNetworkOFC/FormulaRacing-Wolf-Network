@@ -63,25 +63,24 @@ public class FormulaRacingListener implements Listener {
         if (!(event.getVehicle() instanceof Boat boat)) return;
         if (!(event.getExited() instanceof Player player)) return;
 
-        // 1. Verifica se o player que está saindo é o motorista (primeiro passageiro)
-        if (boat.getPassengers().isEmpty() || !boat.getPassengers().get(0).equals(player)) {
-            return;
-        }
+        // 1. Verifica se o player que está saindo é de fato o MOTORISTA (passageiro 0)
+        // Usamos getPassengers().stream().findFirst() para segurança total
+        boolean isDriver = !boat.getPassengers().isEmpty() && boat.getPassengers().get(0).equals(player);
 
-        // 2. Verifica se o jogador está em um duelo ativo
-        // Se estiver em duelo, cancelamos a saída do barco
+        if (!isDriver) return; // Se for passageiro, não fazemos nada
+
+        // verificamos no banco se ele está em um duelo ativo
         if (db.isPlayerInActiveDuel(player.getUniqueId())) {
             event.setCancelled(true);
-            // Opcional: avisar o jogador que ele não pode sair durante o duelo
-            // player.sendMessage("§cVocê não pode sair do barco durante um duelo!");
+            player.sendMessage("§c§lDUELO §8» §7Você não pode sair do barco durante um duelo!");
+            player.sendMessage("§7Use §f/duel sair §7para abandonar a corrida.");
             return;
         }
 
-        // 3. Se não for duelo, segue a lógica normal de deletar o barco e parar o timer solo
+        // 3. TimeTrial
         api.deleteBoat(boat);
         timerUtils.stopTimer(player);
     }
-
     // Caso o barco seja destruído ou suma por outro motivo (ex: explosão ou dano)
     @EventHandler
     public void onVehicleDestroy(org.bukkit.event.vehicle.VehicleDestroyEvent event) {
