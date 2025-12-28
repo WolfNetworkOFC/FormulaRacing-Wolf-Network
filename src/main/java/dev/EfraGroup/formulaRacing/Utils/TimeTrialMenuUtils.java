@@ -54,7 +54,15 @@ public class TimeTrialMenuUtils implements Listener {
             if (!mysql.isTrackOpen(trackName)) continue;
 
             String iconName = mysql.getIcon(trackName);
-            Double bestTime = mysql.getBestTime(trackName);
+            Double worldRecordTime = mysql.getBestTime(trackName);
+
+            // Buscar o PB do jogador
+            Object[] playerBestData = mysql.getPlayerBestTime(player.getName(), trackName);
+            Double playerBestTime = null;
+            if (playerBestData != null) {
+                playerBestTime = (Double) playerBestData[0];
+            }
+
             List<DatabaseManager.PlayerTime> leaderboard = mysql.getLeaderboard(trackName);
             int playerPos = -1;
             for (int i = 0; i < leaderboard.size(); i++) {
@@ -79,7 +87,8 @@ public class TimeTrialMenuUtils implements Listener {
                 List<String> loreList = new ArrayList<>();
                 loreList.add(ChatColor.YELLOW + "Owner: " + ChatColor.WHITE + trackData.getOwnerName());
                 loreList.add("");
-                loreList.add(ChatColor.YELLOW + "PB Time: " + ChatColor.WHITE + (bestTime != null ? formatTime(bestTime) : "(-)"));
+                loreList.add(ChatColor.YELLOW + "Your PB: " + ChatColor.WHITE + (playerBestTime != null ? formatTime(playerBestTime) : "(-)"));
+                loreList.add(ChatColor.YELLOW + "World Record: " + ChatColor.WHITE + (worldRecordTime != null ? formatTime(worldRecordTime) : "(-)"));
                 loreList.add(ChatColor.YELLOW + "Position: " + ChatColor.WHITE + (playerPos != -1 ? "#" + playerPos : "(-)"));
                 meta.setLore(loreList);
                 item.setItemMeta(meta);

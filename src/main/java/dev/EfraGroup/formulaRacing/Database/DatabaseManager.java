@@ -1771,7 +1771,7 @@ public class DatabaseManager {
     }
 
     public synchronized Double getBestTime(String trackName) {
-        String sql = "SELECT bestTime FROM fr_player_times WHERE trackNameWS = ? ORDER BY bestTime ASC LIMIT 1";
+        String sql = "SELECT bestTime FROM fr_player_times WHERE trackNameWS = ? AND finished = TRUE ORDER BY bestTime ASC LIMIT 1";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
