@@ -1,0 +1,58 @@
+name: Release FormulaRacing Plugin
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Exemplo: v0.2.0, v1.0.0
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+
+    - name: Configurar JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Compilar com Maven
+      run: mvn clean package -DskipTests
+
+    - name: Obter nome da versão
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Criar Release no GitHub
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          target/formularacing-*.jar
+        body: |
+          ## 🏎️ FormulaRacing Plugin ${{ steps.get_version.outputs.VERSION }}
+          
+          ### 📦 Download
+          Baixe o arquivo `.jar` abaixo e coloque na pasta `plugins` do seu servidor.
+          
+          ### 🚀 Instalação
+          1. Baixe o arquivo `formularacing-X.X.jar` (não o arquivo `original-*`)
+          2. Coloque na pasta `plugins` do servidor
+          3. Reinicie o servidor
+          
+          ### ℹ️ Informações
+          - O JAR principal já contém todas as dependências necessárias
+          - Não é necessário baixar bibliotecas adicionais
+          - **Nota:** O arquivo `original-formularacing-*.jar` NÃO deve ser usado no servidor
+          
+          ---
+          **Build automático via GitHub Actions**
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

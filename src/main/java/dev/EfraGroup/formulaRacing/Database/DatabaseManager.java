@@ -162,21 +162,36 @@ public class DatabaseManager {
 
             // 3. BoatUtils e Checkpoints
             stmt.executeUpdate("""
-        CREATE TABLE IF NOT EXISTS fr_boatutils (
-            trackNameWS TEXT PRIMARY KEY,
-            stepHeight REAL DEFAULT 1.25, defaultSlipperiness REAL DEFAULT 0.6,
-            fallDamage BOOLEAN DEFAULT TRUE, waterElevation BOOLEAN DEFAULT TRUE,
-            airControl BOOLEAN DEFAULT TRUE, jumpForce REAL DEFAULT 0.36,
-            gravity DOUBLE DEFAULT -0.03999999910593033, yawAcceleration REAL DEFAULT 1.0,
-            forwardAcceleration REAL DEFAULT 0.04, backwardAcceleration REAL DEFAULT 0.005,
-            turningForwardAcceleration REAL DEFAULT 0.005, allowAccelerationStacking BOOLEAN DEFAULT TRUE,
-            underwaterControl BOOLEAN DEFAULT TRUE, surfaceWaterControl BOOLEAN DEFAULT TRUE,
-            coyoteTime INT DEFAULT 0, waterJumping BOOLEAN DEFAULT TRUE,
-            swimForce REAL DEFAULT 0.0, collisionMode SMALLINT DEFAULT 0,
-            airStepping BOOLEAN DEFAULT FALSE, tenStepInterpolation BOOLEAN DEFAULT FALSE,
-            collisionResolution TINYINT DEFAULT 5, customSlipperiness TEXT DEFAULT NULL,
-            perBlockSetting TEXT DEFAULT NULL
-        )""");
+    CREATE TABLE IF NOT EXISTS fr_boatutils (
+        trackNameWS TEXT PRIMARY KEY,
+        stepHeight REAL DEFAULT 1.25,
+        defaultSlipperiness REAL DEFAULT 0.6,
+        fallDamage BOOLEAN DEFAULT TRUE,
+        waterElevation BOOLEAN DEFAULT TRUE,
+        airControl BOOLEAN DEFAULT TRUE,
+        jumpForce REAL DEFAULT 0.36,
+        gravity DOUBLE DEFAULT -0.03999999910593033,
+        yawAcceleration REAL DEFAULT 1.0,
+        forwardAcceleration REAL DEFAULT 0.04,
+        backwardAcceleration REAL DEFAULT 0.005,
+        turningForwardAcceleration REAL DEFAULT 0.005,
+        allowAccelerationStacking BOOLEAN DEFAULT TRUE,
+        underwaterControl BOOLEAN DEFAULT TRUE,
+        surfaceWaterControl BOOLEAN DEFAULT TRUE,
+        coyoteTime INT DEFAULT 0,
+        waterJumping BOOLEAN DEFAULT TRUE,
+        swimForce REAL DEFAULT 0.0,
+        collisionMode SMALLINT DEFAULT 0,
+        airStepping BOOLEAN DEFAULT FALSE,
+        tenStepInterpolation BOOLEAN DEFAULT FALSE,
+        collisionResolution TINYINT DEFAULT 5,
+        exclusiveMode BOOLEAN DEFAULT FALSE,
+        customSlipperiness TEXT DEFAULT NULL,
+        perBlockSetting TEXT DEFAULT NULL
+    )""");
+            try {
+                stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN exclusiveMode BOOLEAN DEFAULT FALSE;");
+            } catch (SQLException ignored) {}
 
             stmt.executeUpdate("""
         CREATE TABLE IF NOT EXISTS fr_checkpoint (
@@ -197,9 +212,9 @@ public class DatabaseManager {
             time REAL NOT NULL,
             PRIMARY KEY (player_uuid, trackNameWS, checkpointId)
         )""");
-            stmt.executeUpdate("DROP TABLE fr_timetrial_duels");
-            stmt.executeUpdate("DROP TABLE fr_timetrial_dueltimes");
-            stmt.executeUpdate("DROP TABLE fr_timetrial_duel_players");
+            stmt.executeUpdate("DROP TABLE IF EXISTS fr_timetrial_duels");
+            stmt.executeUpdate("DROP TABLE IF EXISTS fr_timetrial_dueltimes");
+            stmt.executeUpdate("DROP TABLE IF EXISTS fr_timetrial_duel_players");
 
             stmt.executeUpdate("""
         CREATE TABLE IF NOT EXISTS fr_timetrial_duels_checkpoint_times (
@@ -376,7 +391,7 @@ public class DatabaseManager {
 
     public synchronized Map<UUID, Long> getBestTimesForDuel(int duelId) {
         Map<UUID, Long> times = new HashMap<>();
-        String sql = "SELECT player_uuid, MIN(time_millis) as best_time FROM duel_results WHERE duel_id = ? GROUP BY player_uuid";
+        String sql = "SELECT playerName as player_uuid, MIN(time) as best_time FROM fr_timetrial_dueltimes WHERE duel_id = ? GROUP BY playerName";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -690,7 +705,7 @@ public class DatabaseManager {
         String sqlBoatUtils = "INSERT INTO fr_boatutils (trackNameWS, stepHeight, defaultSlipperiness, fallDamage, " +
                 "waterElevation, airControl, jumpForce, gravity, yawAcceleration, forwardAcceleration, " +
                 "backwardAcceleration, turningForwardAcceleration, allowAccelerationStacking, underwaterControl, " +
-                "surfaceWaterControl, exclusiveMode, coyoteTime, waterJumping, swimForce, collisionMode, " +
+                "surfaceWaterControl, coyoteTime, waterJumping, swimForce, collisionMode, " +
                 "airStepping, tenStepInterpolation, collisionResolution) " +
                 "VALUES (?, 0.0, 0.6, 1, 1, 0, 0.0, -0.04, 1.0, 0.04, 0.005, 0.005, 1, 0, 0, 0, 0, 0, 0.0, 0, 0, 0, 5)";
 
@@ -1572,7 +1587,7 @@ public class DatabaseManager {
         if (trackName == null || trackName.isBlank()) return cameras;
 
         String trackNameWS = trackName.replace(" ", "");
-        String sql = "SELECT x, y, z FROM fr_cameras WHERE trackName = ?";
+        String sql = "SELECT x, y, z FROM fr_cameras WHERE trackNameWS = ?";
 
         try {
             Connection conn = getOrConnect();

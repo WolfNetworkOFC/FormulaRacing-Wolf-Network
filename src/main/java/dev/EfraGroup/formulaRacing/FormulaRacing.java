@@ -127,6 +127,9 @@
 
             // CORREÇÃO: Usando a variável única para eventos
             Bukkit.getPluginManager().registerEvents(duelHandler, this);
+
+            // Proteção de duelos contra comandos e ações não permitidas
+            Bukkit.getPluginManager().registerEvents(new dev.EfraGroup.formulaRacing.Listener.DuelProtectionListener(this, dm), this);
         }
 
         // -------------------- Comandos --------------------
