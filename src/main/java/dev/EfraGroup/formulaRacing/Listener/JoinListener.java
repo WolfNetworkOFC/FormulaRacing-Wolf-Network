@@ -8,6 +8,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -30,46 +31,42 @@ public class JoinListener implements Listener {
         this.packetSender = packetSender;
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
+        String playerName = player.getName();
 
-        // Mensagem de join
+        // 1. Mensagem de Join Customizada (Corrigida e limpa)
         if (plugin.getConfig().getBoolean("message-when-enter", true)) {
-            event.setJoinMessage(ChatColor.DARK_GRAY + "["
-                    + ChatColor.GREEN + "+"
-                    + ChatColor.DARK_GRAY + "] "
-                    + ChatColor.GREEN + player.getName());
+            event.setJoinMessage("§8[§a+§8] §a" + playerName);
         } else {
-            event.setJoinMessage(null); // desativa msg padrão
+            event.setJoinMessage(null);
         }
 
-    mysql.setSelectedEvent(player.getUniqueId(), null);
-
-        // Primeira vez no servidor
+        // 2. Primeira vez no servidor
         if (!player.hasPlayedBefore()) {
-            Bukkit.broadcastMessage(ChatColor.YELLOW + player.getName() + " entrou pela primeira vez no servidor!");
+            Bukkit.broadcastMessage("§e" + playerName + " entrou pela primeira vez no servidor!");
         }
 
-        // Inserir no banco de dados apenas se ainda não existir
-        if (!mysql.playerExists(player.getUniqueId())) {
-            boolean success = mysql.insertPlayer(player.getUniqueId(), player.getName());
-            if (success) {
-                plugin.getLogger().info("Jogador " + player.getName() + " inserido na tabela fr_players.");
-            } else {
-                plugin.getLogger().warning("Falha ao inserir jogador " + player.getName() + " na tabela fr_players.");
+        // 3. Processamento de Banco de Dados (Assíncrono)
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                if (!mysql.playerExists(uuid)) {
+                    mysql.insertPlayer(uuid, playerName);
+                }
+                // Reseta o estado do evento selecionado ao entrar
+                mysql.setSelectedEvent(uuid, null);
+            } catch (Exception e) {
+                plugin.getLogger().severe("Erro no banco ao processar join de " + playerName + ": " + e.getMessage());
             }
-        }
+        });
 
-        // Checar e colocar bota de couro que não pode ser removida
-        ItemStack boots = player.getInventory().getBoots();
-        if (boots == null || boots.getType() != Material.LEATHER_BOOTS) {
-            ItemStack lockedBoots = new ItemStack(Material.LEATHER_BOOTS);
-            ItemMeta meta = lockedBoots.getItemMeta();
-            if (meta != null) {
-                lockedBoots.setItemMeta(meta);
-            }
-            player.getInventory().setBoots(lockedBoots);
+        // 4. Equipamento (Bota de Couro)
+        try {
+            player.getInventory().setBoots(new ItemStack(Material.LEATHER_BOOTS));
+        } catch (Exception e) {
+            plugin.getLogger().warning("Não foi possível entregar as botas para " + playerName);
         }
     }
 
@@ -77,42 +74,35 @@ public class JoinListener implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
+        String playerName = player.getName();
 
-        // =================================================================
-        // 1. LIMPEZA DE MEMÓRIA (ESSENCIAL PARA EVITAR OS 15GB)
-        // =================================================================
-
-        // Remove o jogador do loop e deleta o Cache (RaceSessionCache)
+        // 1. LIMPEZA DE MEMÓRIA (Imediato - Main Thread)
         plugin.getTimerUtils().stopTimer(player);
-
-        // Limpa os HashMaps temporários de Checkpoint
         plugin.getTimerUtils().clearTempCheckpoints(uuid);
 
-        // (Opcional) Se ele sair no meio da corrida, deleta o barco para não lagar o mapa
         if (player.isInsideVehicle()) {
             player.getVehicle().remove();
         }
-        try {
-            // Verifica se o jogador tem party
-            if (mysql.hasParty(uuid)) { // Usei a variavel uuid que criei ali em cima
 
-                UUID owner = mysql.getOwner(uuid);
-
-                // Se ele for o dono da party, dissolve
-                if (owner != null && owner.equals(uuid)) {
-                    mysql.disbandParty(owner);
+        // 3. OPERAÇÕES DE BANCO DE DADOS (Assíncrono para evitar LAG)
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                // Verifica se o jogador está em uma party e se é o dono
+                if (mysql.hasParty(uuid)) {
+                    UUID owner = mysql.getOwner(uuid);
+                    if (owner != null && owner.equals(uuid)) {
+                        mysql.disbandParty(owner);
+                        // plugin.getLogger().info("Party de " + playerName + " dissolvida (saída do servidor).");
+                    }
                 }
+            } catch (SQLException e) {
+                plugin.getLogger().warning("Erro ao processar party de " + playerName + " no quit: " + e.getMessage());
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        });
 
-        // Mensagem de saída
+        // 4. MENSAGEM DE SAÍDA (Corrigida para bater com o estilo do Join)
         if (plugin.getConfig().getBoolean("message-when-enter", true)) {
-            event.setQuitMessage(ChatColor.DARK_GRAY + "["
-                    + ChatColor.RED + "-"
-                    + ChatColor.DARK_GRAY + "] "
-                    + ChatColor.RED + player.getName());
+            event.setQuitMessage("§8[§c-§8] §c" + playerName);
         } else {
             event.setQuitMessage(null);
         }

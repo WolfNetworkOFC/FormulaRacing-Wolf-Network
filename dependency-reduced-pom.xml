@@ -25,6 +25,7 @@
               <goal>shade</goal>
             </goals>
             <configuration>
+              <finalName>${project.artifactId}-${project.version}</finalName>
               <relocations>
                 <relocation>
                   <pattern>fr.mrmicky.fastboard</pattern>

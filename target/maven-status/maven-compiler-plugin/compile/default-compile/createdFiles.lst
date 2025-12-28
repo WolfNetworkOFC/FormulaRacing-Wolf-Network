@@ -14,6 +14,7 @@ dev\EfraGroup\formulaRacing\CommandHandler\PartyCommandHandler.class
 dev\EfraGroup\formulaRacing\Utils\TimeTrialDuelsAction$1.class
 dev\EfraGroup\formulaRacing\CommandHandler\TrackEditorCommandHandler$BoatUtilsGroupMode.class
 dev\EfraGroup\formulaRacing\TabCompleter\TrackEditorTabCompleter$CommandHandler.class
+dev\EfraGroup\formulaRacing\Listener\DuelProtectionListener.class
 dev\EfraGroup\formulaRacing\Listener\FormulaRacingListener$1.class
 dev\EfraGroup\formulaRacing\CommandHandler\DuelCommandHandler.class
 dev\EfraGroup\formulaRacing\Duels\TimeTrialDuels$1.class
