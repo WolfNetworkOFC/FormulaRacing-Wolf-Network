@@ -61,12 +61,25 @@ public class FormulaRacingListener implements Listener {
     @EventHandler
     public void onBoatExit(VehicleExitEvent event) {
         if (!(event.getVehicle() instanceof Boat boat)) return;
+        if (!(event.getExited() instanceof Player player)) return;
 
-        // Se o passageiro que saiu era um Player, deletamos o barco imediatamente.
-        if (event.getExited() instanceof Player player) {
-            api.deleteBoat(boat);
-            timerUtils.stopTimer(player);
+        // 1. Verifica se o player que está saindo é o motorista (primeiro passageiro)
+        if (boat.getPassengers().isEmpty() || !boat.getPassengers().get(0).equals(player)) {
+            return;
         }
+
+        // 2. Verifica se o jogador está em um duelo ativo
+        // Se estiver em duelo, cancelamos a saída do barco
+        if (db.isPlayerInActiveDuel(player.getUniqueId())) {
+            event.setCancelled(true);
+            // Opcional: avisar o jogador que ele não pode sair durante o duelo
+            // player.sendMessage("§cVocê não pode sair do barco durante um duelo!");
+            return;
+        }
+
+        // 3. Se não for duelo, segue a lógica normal de deletar o barco e parar o timer solo
+        api.deleteBoat(boat);
+        timerUtils.stopTimer(player);
     }
 
     // Caso o barco seja destruído ou suma por outro motivo (ex: explosão ou dano)
