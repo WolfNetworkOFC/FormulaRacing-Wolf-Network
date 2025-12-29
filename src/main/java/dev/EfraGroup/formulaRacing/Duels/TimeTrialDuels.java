@@ -54,9 +54,7 @@ public class TimeTrialDuels implements Listener {
             dm.createDuel(p1, participants, trackNameWS, laps, timeLimit, lonely);
         });
 
-        // 2. Aplicar NBT/Tags dos barcos
-        packet.applyBoatUtilsToPlayer(p1, trackNameWS);
-        packet.applyBoatUtilsToPlayer(p2, trackNameWS);
+
 
         // 3. Ativar Visuais de HUD (Action Bar & Scoreboard Automatizada)
         int tempDuelId = 0; // Se possível, obtenha o ID real do duelo aqui
@@ -70,12 +68,18 @@ public class TimeTrialDuels implements Listener {
         scoreboardDuelsUtils.applyDuelBoard(p1, tempDuelId, laps, trackName);
         scoreboardDuelsUtils.applyDuelBoard(p2, tempDuelId, laps, trackName);
 
+        // 2. Aplicar NBT/Tags dos barcos
+        packet.applyBoatUtilsToPlayer(p1, trackNameWS);
+        packet.applyBoatUtilsToPlayer(p2, trackNameWS);
         // 4. Lógica Lonely (Esconder jogadores)
         if (lonely) {
-            p1.hidePlayer(plugin, p2);
-            p2.hidePlayer(plugin, p1);
+            packet.applyLonelyToPlayer(p1, true);
+            packet.applyLonelyToPlayer(p2, true);
             p1.sendMessage("§d§lLONELY §8» §fModo fantasma ativado! Oponentes ocultos.");
             p2.sendMessage("§d§lLONELY §8» §fModo fantasma ativado! Oponentes ocultos.");
+        } else {
+            packet.applyLonelyToPlayer(p1, false);
+            packet.applyLonelyToPlayer(p2, false);
         }
 
         // 5. Posicionamento no Grid

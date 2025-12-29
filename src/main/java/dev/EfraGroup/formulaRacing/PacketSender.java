@@ -8,17 +8,17 @@ import org.bukkit.entity.Player;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.text.Normalizer;
+import java.util.*;
 
 public class PacketSender {
 
     private final DatabaseManager db;
+    private final FormulaRacing plugin;
 
-    public PacketSender(DatabaseManager db) {
+    public PacketSender(DatabaseManager db, FormulaRacing plugin) {
         this.db = db;
+        this.plugin = plugin;
     }
 
     public void sendBoatSetting(Player player, int packetId, Object... values) {
@@ -272,6 +272,58 @@ public class PacketSender {
             float value = Float.parseFloat(pieces[1]);
             String blocks = pieces.length > 2 ? pieces[2] : "";
             sendBoatSetting(player, (short)26, settingId, value, blocks);
+        }
+    }
+
+    // Conjunto para rastrear quem está no modo Lonely (pode ser movido para a classe principal ou Database)
+    private final java.util.Set<UUID> lonelyPlayers = new java.util.HashSet<>();
+
+    public void applyLonelyToPlayer(Player player, boolean lonelyActive) {
+        UUID uuid = player.getUniqueId();
+        boolean hasMod = FormulaRacing.hasOpenBoatUtilsMod(player);
+        boolean isAlreadyLonely = lonelyPlayers.contains(uuid);
+
+        // Se o pedido é para ATIVAR e já está ATIVO, ou DESATIVAR e já está DESATIVO, ignoramos.
+        if (lonelyActive == isAlreadyLonely) return;
+
+        if (lonelyActive) {
+            // --- ATIVAR MODO LONELY ---
+            lonelyPlayers.add(uuid);
+
+            if (hasMod) {
+                // Packet 27, Valor 4: Sem colisão com barcos e players (conforme documentação técnica)
+                sendBoatSetting(player, (short) 27, (short) 4);
+                Bukkit.getLogger().info("[FormulaRacing] Modo Lonely ATIVADO via pacotes para: " + player.getName());
+            } else {
+                // Fallback: Invisibilidade para evitar colisões no servidor/cliente vanilla
+                for (Player other : Bukkit.getOnlinePlayers()) {
+                    if (other.equals(player)) continue;
+                    other.hidePlayer(FormulaRacing.getInstance(), player);
+                    if (player.getVehicle() != null) {
+                        other.hideEntity(FormulaRacing.getInstance(), player.getVehicle());
+                    }
+                }
+                Bukkit.getLogger().info("[FormulaRacing] Modo Lonely ATIVADO via invisibilidade para: " + player.getName());
+            }
+        } else {
+            // --- DESATIVAR MODO LONELY ---
+            lonelyPlayers.remove(uuid);
+
+            if (hasMod) {
+                // Packet 27, Valor 0: Retorna ao modo de colisão Vanilla
+                sendBoatSetting(player, (short) 27, (short) 0);
+                Bukkit.getLogger().info("[FormulaRacing] Modo Lonely DESATIVADO via pacotes para: " + player.getName());
+            } else {
+                // Torna o player e o barco visíveis novamente
+                for (Player other : Bukkit.getOnlinePlayers()) {
+                    if (other.equals(player)) continue;
+                    other.showPlayer(FormulaRacing.getInstance(), player);
+                    if (player.getVehicle() != null) {
+                        other.showEntity(FormulaRacing.getInstance(), player.getVehicle());
+                    }
+                }
+                Bukkit.getLogger().info("[FormulaRacing] Modo Lonely DESATIVADO via visibilidade para: " + player.getName());
+            }
         }
     }
 

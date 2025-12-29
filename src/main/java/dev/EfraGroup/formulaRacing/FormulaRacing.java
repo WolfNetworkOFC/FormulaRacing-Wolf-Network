@@ -64,7 +64,7 @@
                 this.dcu = new DiscordUtils();
                 // ========== ETAPA 3: Utils que dependem de DB ==========
                 this.stt = new ScoreboardTimeTrialUtils(dm);
-                this.packetSender = new PacketSender(dm);
+                this.packetSender = new PacketSender(dm, this);
                 this.timerUtils = new TimerUtils(this, dm);
                 this.cu = new CamUtils(dm);
                 this.lonelyController = new LonelyController(dm, this);
@@ -76,7 +76,7 @@
                 this.ttd = new TimeTrialDuels(this, dm, packetSender, ttda, new ScoreboardDuelsTimeUtils(this, dm, ttda));
 
                 // CRIANDO A INSTÂNCIA ÚNICA DO HANDLER
-                DuelCommandHandler duelHandler = new DuelCommandHandler(this, dm, ttd, ttda);
+                DuelCommandHandler duelHandler = new DuelCommandHandler(this, dm, ttd, ttda, packetSender);
 
                 this.rcl = new RegionListener(this, dm, timerUtils, packetSender, stt, ev, ttda);
 

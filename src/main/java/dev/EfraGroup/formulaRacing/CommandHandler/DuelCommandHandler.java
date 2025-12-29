@@ -3,6 +3,7 @@ package dev.EfraGroup.formulaRacing.CommandHandler;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.PacketSender;
 import dev.EfraGroup.formulaRacing.Utils.TimeTrialDuelsAction;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
@@ -26,6 +27,7 @@ public class DuelCommandHandler implements CommandExecutor, Listener {
 
     private final FormulaRacing plugin;
     private final DatabaseManager databaseManager;
+    private final PacketSender packet;
 
     private final Map<UUID, String> searchingPlayers = new HashMap<>();
     private final String GUI_SETUP = "§8Configurar Duelo";
@@ -45,11 +47,12 @@ public class DuelCommandHandler implements CommandExecutor, Listener {
     private final TimeTrialDuelsAction ttda;
 
     // Atualize o construtor
-    public DuelCommandHandler(FormulaRacing plugin, DatabaseManager databaseManager, TimeTrialDuels timeTrialDuels, TimeTrialDuelsAction ttda) {
+    public DuelCommandHandler(FormulaRacing plugin, DatabaseManager databaseManager, TimeTrialDuels timeTrialDuels, TimeTrialDuelsAction ttda, PacketSender packetSender) {
         this.plugin = plugin;
         this.databaseManager = databaseManager;
         this.timeTrialDuels = timeTrialDuels; // Recebe a classe de duelo
         this.ttda = ttda;
+        this.packet = packet;
     }
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -295,10 +298,14 @@ public class DuelCommandHandler implements CommandExecutor, Listener {
         int duelId = databaseManager.getActiveDuelId(playerUUID);
         if (duelId == -1) return;
 
+        // --- DESATIVAÇÃO DO MODO LONELY (QUEM SAIU) ---
+        // Removemos o modo de colisão/invisibilidade imediatamente ao sair do duelo.
+        packet.applyLonelyToPlayer(player, false);
+
         // Pegamos a lista de todos os participantes originais
         List<UUID> participants = databaseManager.getActivePlayersInDuel(duelId);
 
-        // Removemos o jogador que está saindo da lista de "ativos" (lógica em memória para este cálculo)
+        // Removemos o jogador que está saindo da lista de "ativos"
         participants.remove(playerUUID);
 
         // LÓGICA DE VITÓRIA (1v1 ou ÚLTIMO SOBREVIVENTE)
@@ -313,24 +320,23 @@ public class DuelCommandHandler implements CommandExecutor, Listener {
                 winner.sendMessage("§a§lVITÓRIA! §fVocê venceu porque os outros oponentes saíram.");
                 winner.sendTitle("§a§lVENCEU!", "§fTodos desistiram", 10, 70, 20);
                 winner.playSound(winner.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1f);
-                ttda.stopAll(player);
-                // Aqui chamaremos a limpeza para o vencedor
-                // timeTrialDuels.cleanupDuel(winner);
+
+                // --- DESATIVAÇÃO DO MODO LONELY (VENCEDOR) ---
+                // O vencedor também precisa ter sua colisão restaurada ao fim do duelo.
+                packet.applyLonelyToPlayer(winner, false);
+
+                ttda.stopAll(winner);
             }
         } else if (participants.size() > 1) {
             // Se ainda restam 2 ou mais pessoas, a corrida CONTINUA
-            // Apenas marcamos no banco (ou log) que este jogador específico saiu/desistiu
             player.sendMessage("§cVocê abandonou a corrida. Os outros continuam!");
-
-            // Futuro: databaseManager.markPlayerAsRetired(duelId, playerUUID);
         } else {
-            // Se não sobrou ninguém (ex: o último cara deu /sair)
+            // Se não sobrou ninguém (ex: o último jogador saiu)
             databaseManager.setDuelState(duelId, "FINISHED");
         }
 
         // Limpeza para quem saiu
         player.sendMessage("§7Você saiu do duelo.");
-        // timeTrialDuels.cleanupDuel(player);
     }
 
     @EventHandler
