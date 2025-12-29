@@ -123,6 +123,13 @@ public class TimeTrialCommandHandler implements CommandExecutor {
 
             // ================= TELEPORTA E INICIA =================
             timerUtils.stopTimer(player);
+
+            // 🚤 Remove o barco antigo ANTES de teleportar para evitar barcos fantasmas
+            if (player.getVehicle() instanceof org.bukkit.entity.Boat oldBoat) {
+                player.leaveVehicle(); // Força o jogador a sair do barco
+                api.deleteBoat(oldBoat); // Remove o barco antigo
+            }
+
             player.teleport(loc);
             player.sendMessage(plugin.getTranslation("timetrial_teleport", lang_code, "{track}", trackName));
 

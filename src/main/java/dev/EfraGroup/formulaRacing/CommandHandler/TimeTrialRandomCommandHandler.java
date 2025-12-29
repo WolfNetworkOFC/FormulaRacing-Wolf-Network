@@ -100,9 +100,16 @@ public class TimeTrialRandomCommandHandler implements CommandExecutor {
         timerUtils.stopTimer(player);
         stt.setPlayerTrack(player, trackName);
         stt.show(player,trackName);
+
+        // 🚤 Remove o barco antigo ANTES de teleportar para evitar barcos fantasmas
+        if (player.getVehicle() instanceof org.bukkit.entity.Boat oldBoat) {
+            player.leaveVehicle(); // Força o jogador a sair do barco
+            api.deleteBoat(oldBoat); // Remove o barco antigo
+        }
+
         player.teleport(loc);
         String lang_code = mysql.getPlayerLanguage(player.getUniqueId());
-        player.sendMessage("§e" + plugin.getDirectTranslation("timetrial_teleport", lang_code) +"[§f" + trackName + "§e]");
+        player.sendMessage(plugin.getTranslation("timetrial_teleport", lang_code, "{track}", trackName));
 
         api.spawnBoat(player, false, false, false);
         plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);

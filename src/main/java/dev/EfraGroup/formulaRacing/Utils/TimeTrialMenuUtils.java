@@ -193,6 +193,13 @@ public class TimeTrialMenuUtils implements Listener {
                     player.sendMessage(plugin.getDirectTranslation("boatutils_required", langCode));
                     return;
                 }
+
+                // 🚤 Remove o barco antigo ANTES de teleportar para evitar barcos fantasmas
+                if (player.getVehicle() instanceof org.bukkit.entity.Boat oldBoat) {
+                    player.leaveVehicle(); // Força o jogador a sair do barco
+                    api.deleteBoat(oldBoat); // Remove o barco antigo
+                }
+
                 ps.sendBoatSetting(player, 0);
                 ps.applyBoatUtilsToPlayer(player, trackName);
 
