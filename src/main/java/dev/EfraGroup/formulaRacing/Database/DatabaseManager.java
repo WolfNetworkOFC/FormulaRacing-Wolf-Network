@@ -1043,6 +1043,7 @@ public class DatabaseManager {
                 CASE WHEN finished = 1 THEN bestTime ELSE 999999 END ASC, 
                 checkpointsReached DESC, 
                 bestTime ASC
+            LIMIT 10
             """;
 
            Connection conn = getOrConnect();
