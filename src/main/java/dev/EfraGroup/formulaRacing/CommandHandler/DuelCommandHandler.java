@@ -52,7 +52,7 @@ public class DuelCommandHandler implements CommandExecutor, Listener {
         this.databaseManager = databaseManager;
         this.timeTrialDuels = timeTrialDuels; // Recebe a classe de duelo
         this.ttda = ttda;
-        this.packet = packet;
+        this.packet = packetSender;
     }
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
