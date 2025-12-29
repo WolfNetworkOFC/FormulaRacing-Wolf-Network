@@ -124,7 +124,7 @@ public class TimeTrialCommandHandler implements CommandExecutor {
             // ================= TELEPORTA E INICIA =================
             timerUtils.stopTimer(player);
             player.teleport(loc);
-            player.sendMessage("§e" + plugin.getDirectTranslation("timetrial_teleport", lang_code) + "[§f" + trackName + "§e]");
+            player.sendMessage(plugin.getTranslation("timetrial_teleport", lang_code, "{track}", trackName));
 
             api.spawnBoat(player, false, false, false);
             timerUtils.stopTimer(player);
