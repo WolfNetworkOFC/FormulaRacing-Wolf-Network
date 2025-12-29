@@ -203,9 +203,6 @@ public class DatabaseManager {
             max_x REAL NOT NULL, max_y REAL NOT NULL, max_z REAL NOT NULL
         )""");
 
-            stmt.executeUpdate("DROP TABLE IF EXISTS fr_checkpoint_times");
-
-
             stmt.executeUpdate("""
         CREATE TABLE IF NOT EXISTS fr_checkpoint_times (
             timetrial_id INTEGER NOT NULL,
@@ -215,6 +212,7 @@ public class DatabaseManager {
             time REAL NOT NULL,
             PRIMARY KEY (player_uuid, trackNameWS, checkpointId)
         )""");
+
             stmt.executeUpdate("DROP TABLE IF EXISTS fr_timetrial_duels");
             stmt.executeUpdate("DROP TABLE IF EXISTS fr_timetrial_dueltimes");
             stmt.executeUpdate("DROP TABLE IF EXISTS fr_timetrial_duel_players");
