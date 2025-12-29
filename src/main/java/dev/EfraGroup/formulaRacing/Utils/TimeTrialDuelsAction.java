@@ -97,7 +97,7 @@ public class TimeTrialDuelsAction {
                     } else {
                         // MODO ESPERA: Visual ON, mas timer ainda não começou
                         // Mostra a barra com 00:00.000 ou "Aguardando..."
-                        sendDuelActionBar(player, "§f§l-º PLACE", "00:00.000", "§7Carregando...");
+                        sendDuelActionBar(player, "§f§l-º PLACE", "00:00.000", "§7--:--.---");
                     }
                 });
             }

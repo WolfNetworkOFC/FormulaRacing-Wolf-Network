@@ -3,6 +3,7 @@ package dev.EfraGroup.formulaRacing.Duels;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.PacketSender;
+import dev.EfraGroup.formulaRacing.Utils.ScoreboardDuelsTimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimeTrialDuelsAction;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -23,15 +24,18 @@ public class TimeTrialDuels implements Listener {
     private final DatabaseManager dm;
     private final PacketSender packet;
     private final TimeTrialDuelsAction ttda;
+    private final ScoreboardDuelsTimeUtils scoreboardDuelsUtils;
 
-    public TimeTrialDuels(FormulaRacing plugin, DatabaseManager dm, PacketSender packet, TimeTrialDuelsAction ttda) {
+    public TimeTrialDuels(FormulaRacing plugin, DatabaseManager dm, PacketSender packet, TimeTrialDuelsAction ttda, ScoreboardDuelsTimeUtils scoreboardDuelsUtils) {
         this.plugin = plugin;
         this.dm = dm;
         this.packet = packet;
         this.ttda = ttda;
+        this.scoreboardDuelsUtils = scoreboardDuelsUtils;
+
     }
 
-    public void startDuelPreparation(Player p1, Player p2, String trackName, int laps, int timeLimit) {
+    public void startDuelPreparation(Player p1, Player p2, String trackName, int laps, int timeLimit, boolean lonely) {
         Location spawnLoc = dm.getTrackSpawn(trackName);
 
         if (spawnLoc == null) {
@@ -43,30 +47,42 @@ public class TimeTrialDuels implements Listener {
         String trackNameWS = trackName.replace(" ", "");
         List<Player> participants = Arrays.asList(p1, p2);
 
-        // 1. Registro no Banco de Dados
-        // Se o seu dm.createDuel retornar o ID do duelo, você deve capturá-lo.
-        // Se ele for void, precisaremos de uma forma de identificar o duelo ativo.
+        // 1. Registro no Banco de Dados (Async)
+        // Dica: Se o seu createDuel retornar o ID, você deve passar ele para o Scoreboard.
+        // Por enquanto, usaremos 0 ou o ID retornado se disponível.
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            dm.createDuel(p1, participants, trackNameWS, laps, timeLimit);
+            dm.createDuel(p1, participants, trackNameWS, laps, timeLimit, lonely);
         });
 
         // 2. Aplicar NBT/Tags dos barcos
         packet.applyBoatUtilsToPlayer(p1, trackNameWS);
         packet.applyBoatUtilsToPlayer(p2, trackNameWS);
 
-        // 3. Ativar Visuais (Action Bar em modo espera)
-        // CORREÇÃO: Agora passa o duelId. Se você não tiver o ID real ainda por ser async,
-        // pode passar um ID genérico ou garantir que o createDuel seja síncrono para obter o ID.
-        int tempDuelId = 0; // Substitua pelo ID real se o seu DB retornar um
+        // 3. Ativar Visuais de HUD (Action Bar & Scoreboard Automatizada)
+        int tempDuelId = 0; // Se possível, obtenha o ID real do duelo aqui
+
+        // Action Bar (Gerenciado pelo ttda)
         ttda.toggleVisuals(p1, tempDuelId, true);
         ttda.toggleVisuals(p2, tempDuelId, true);
 
-        // 4. Posicionamento no Grid
+        // Scoreboard (Agora com contexto para a Auto-Update Task)
+        // Isso já inicia a Scoreboard e ela passa a atualizar sozinha a cada 2 ticks.
+        scoreboardDuelsUtils.applyDuelBoard(p1, tempDuelId, laps, trackName);
+        scoreboardDuelsUtils.applyDuelBoard(p2, tempDuelId, laps, trackName);
+
+        // 4. Lógica Lonely (Esconder jogadores)
+        if (lonely) {
+            p1.hidePlayer(plugin, p2);
+            p2.hidePlayer(plugin, p1);
+            p1.sendMessage("§d§lLONELY §8» §fModo fantasma ativado! Oponentes ocultos.");
+            p2.sendMessage("§d§lLONELY §8» §fModo fantasma ativado! Oponentes ocultos.");
+        }
+
+        // 5. Posicionamento no Grid
         setupPlayerInGrid(p1, spawnLoc.clone());
         setupPlayerInGrid(p2, spawnLoc.clone());
 
-        // 5. Inicia a sequência de contagem
-        // Dentro deste método, quando a contagem chegar em 0, você deve chamar ttda.toggleTimer
+        // 6. Inicia a sequência de contagem
         startFullCountdownSequence(p1, p2);
     }
 

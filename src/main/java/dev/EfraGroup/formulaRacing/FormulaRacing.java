@@ -73,7 +73,7 @@
                 this.ev = new EventsManager(this, fileManager, dm);
                 this.ttda = new TimeTrialDuelsAction(this, dm);
 
-                this.ttd = new TimeTrialDuels(this, dm, packetSender, ttda);
+                this.ttd = new TimeTrialDuels(this, dm, packetSender, ttda, new ScoreboardDuelsTimeUtils(this, dm, ttda));
 
                 // CRIANDO A INSTÂNCIA ÚNICA DO HANDLER
                 DuelCommandHandler duelHandler = new DuelCommandHandler(this, dm, ttd, ttda);

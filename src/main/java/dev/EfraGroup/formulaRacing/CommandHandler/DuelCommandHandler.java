@@ -37,7 +37,7 @@ public class DuelCommandHandler implements CommandExecutor, Listener {
     private final NamespacedKey KEY_TIME = new NamespacedKey("formula", "time");
     private final NamespacedKey KEY_LAPS = new NamespacedKey("formula", "laps");
     private final NamespacedKey KEY_MODE = new NamespacedKey("formula", "mode");
-
+    private final NamespacedKey KEY_LONELY = new NamespacedKey("formula", "lonely");
     private final Map<UUID, UUID> pendingInvites = new HashMap<>();
 
     // Adicione este campo no topo da classe DuelCommandHandler
@@ -126,16 +126,25 @@ public class DuelCommandHandler implements CommandExecutor, Listener {
         int laps = player.getPersistentDataContainer().getOrDefault(KEY_LAPS, PersistentDataType.INTEGER, 3);
         String mode = player.getPersistentDataContainer().getOrDefault(KEY_MODE, PersistentDataType.STRING, "CORRIDA");
 
-        inv.setItem(10, createItem(Material.MAP, "§b§lPista", "§7Selecionada: §f" + track, "", "§eClique para alterar"));
-// Formata o tempo atual para exibição (ex: 70s -> 01:10)
-        String formattedTime = formatTime(time);
+        // Adicionado: Lógica do campo Lonely (0 = false, 1 = true)
+        int lonelyInt = player.getPersistentDataContainer().getOrDefault(KEY_LONELY, PersistentDataType.INTEGER, 0);
+        String lonelyStatus = (lonelyInt == 1) ? "§aATIVADO" : "§cDESATIVADO";
+        Material lonelyMaterial = (lonelyInt == 1) ? Material.ENDER_EYE : Material.ENDER_PEARL;
 
-        inv.setItem(11, createItem(Material.CLOCK, "§e§lTempo Limite",
-                "§7Atual: §f" + formattedTime,
+        inv.setItem(10, createItem(Material.MAP, "§b§lPista", "§7Selecionada: §f" + track, "", "§eClique para alterar"));
+
+        String formattedTime = formatTime(time);
+        inv.setItem(11, createItem(Material.CLOCK, "§e§lTempo Limite", "§7Atual: §f" + formattedTime, "", "§7Esq: §a+10s §8| §7Dir: §c-10s", "§7Shift: §f+/- 1min"));
+        inv.setItem(12, createItem(Material.REPEATER, "§f§lVoltas", "§7Atual: §f" + laps, "", "§7Esq: §a+1 §8| §7Dir: §c-1"));
+        inv.setItem(13, createItem(Material.COMPASS, "§d§lModo", "§7Atual: §f" + mode, "", "§eClique para alternar"));
+
+        // NOVO ITEM: LONELY
+        inv.setItem(14, createItem(lonelyMaterial, "§5§lModo Lonely",
+                "§7Status: " + lonelyStatus,
                 "",
-                "§7Esq: §a+10s §8| §7Dir: §c-10s",
-                "§7Shift: §f+/- 1min"));        inv.setItem(12, createItem(Material.REPEATER, "§f§lVoltas", "§7Atual: §f" + laps, "", "§7Esq: §a+1 §8| §7Dir: §c-1"));
-        inv.setItem(13, createItem(Material.COMPASS, "§d§lModo", "§7Atual: §f" + mode, "", "§eClique para alternar", "§8(Time Trial v2 em breve)"));
+                "§7Jogadores ficam invisíveis",
+                "§7uns para os outros.",
+                "", "§eClique para alternar"));
 
         inv.setItem(15, createItem(Material.LIME_CONCRETE, "§a§lENVIAR CONVITE", "§7Enviar para: §e" + target.getName()));
         inv.setItem(16, createItem(Material.BARRIER, "§c§lFECHAR"));
@@ -211,6 +220,14 @@ public class DuelCommandHandler implements CommandExecutor, Listener {
                 player.getPersistentDataContainer().set(KEY_MODE, PersistentDataType.STRING, mode);
                 openSetupGUI(player, target);
                 playSound(player, Sound.BLOCK_NOTE_BLOCK_CHIME, 1.0f);
+            }
+            case 14 -> { // LONELY (NOVO)
+                // 0 = false, 1 = true
+                int current = player.getPersistentDataContainer().getOrDefault(KEY_LONELY, PersistentDataType.INTEGER, 0);
+                int next = (current == 0) ? 1 : 0;
+                player.getPersistentDataContainer().set(KEY_LONELY, PersistentDataType.INTEGER, next);
+                openSetupGUI(player, target);
+                playSound(player, Sound.ENTITY_ENDERMAN_TELEPORT, 1.2f);
             }
             case 15 -> {
                 sendInvite(player, target);
@@ -423,7 +440,7 @@ public class DuelCommandHandler implements CommandExecutor, Listener {
         UUID responderUUID = responder.getUniqueId();
         UUID challengerUUID = challenger.getUniqueId();
 
-        // 2. DEBUG DO MAPA (A chave para entender o silêncio)
+        // 2. DEBUG DO MAPA
         if (!pendingInvites.containsKey(responderUUID)) {
             responder.sendMessage("§c§lERRO §8» §7O mapa não contém convites para você.");
             plugin.getLogger().warning("[DEBUG] Mapa pendingInvites não contém a chave do responder: " + responderUUID);
@@ -460,12 +477,16 @@ public class DuelCommandHandler implements CommandExecutor, Listener {
         pendingInvites.remove(responderUUID);
         plugin.getLogger().info("[DEBUG] Convite removido da memória. Processando configurações...");
 
-        // 5. Configurações
+        // 5. Recuperação das Configurações (Incluindo Lonely)
         String track = challenger.getPersistentDataContainer().getOrDefault(KEY_TRACK, PersistentDataType.STRING, "Nenhuma");
         int laps = challenger.getPersistentDataContainer().getOrDefault(KEY_LAPS, PersistentDataType.INTEGER, 3);
         int timeLimit = challenger.getPersistentDataContainer().getOrDefault(KEY_TIME, PersistentDataType.INTEGER, 60);
 
-        plugin.getLogger().info("[DEBUG] Pista: " + track + " | Voltas: " + laps + " | Tempo: " + timeLimit);
+        // Adicionado: Leitura do modo Lonely (0 = false, 1 = true)
+        int lonelyInt = challenger.getPersistentDataContainer().getOrDefault(KEY_LONELY, PersistentDataType.INTEGER, 0);
+        boolean isLonely = (lonelyInt == 1);
+
+        plugin.getLogger().info("[DEBUG] Pista: " + track + " | Voltas: " + laps + " | Tempo: " + timeLimit + " | Lonely: " + isLonely);
 
         if (track.equals("Nenhuma")) {
             responder.sendMessage("§c§lERRO §8» §7O desafiante não selecionou uma pista válida.");
@@ -479,7 +500,9 @@ public class DuelCommandHandler implements CommandExecutor, Listener {
             playSound(responder, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f);
             playSound(challenger, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f);
 
-            timeTrialDuels.startDuelPreparation(challenger, responder, track, laps, timeLimit);
+            // Adicionado o parâmetro isLonely na chamada
+            timeTrialDuels.startDuelPreparation(challenger, responder, track, laps, timeLimit, isLonely);
+
             plugin.getLogger().info("[DEBUG] Sucesso: startDuelPreparation executado.");
         } catch (Exception e) {
             plugin.getLogger().severe("[DEBUG] ERRO NO STARTDUEL: " + e.getMessage());
@@ -487,7 +510,6 @@ public class DuelCommandHandler implements CommandExecutor, Listener {
             responder.sendMessage("§c§lERRO §8» §7Falha crítica ao iniciar o duelo.");
         }
     }
-
     private void openDuelConfirmGUI(Player p1, Player p2) {
         Inventory inv = Bukkit.createInventory(null, 45, GUI_DUEL);
         p1.openInventory(inv);

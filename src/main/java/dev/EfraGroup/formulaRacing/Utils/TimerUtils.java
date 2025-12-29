@@ -298,17 +298,8 @@ public class TimerUtils {
                 data.setLastDelta(delta);
             }
         } else {
-            // Só avisa UMA VEZ por jogador a cada 30 segundos para evitar spam
-            if (lastCp != null && (dbCheckpointTimes == null || dbCheckpointTimes.isEmpty())) {
-                String warningKey = uuid.toString() + ":noCache";
-                long now = System.currentTimeMillis();
-                Long lastWarn = lastWarningTime.get(warningKey);
-
-                if (lastWarn == null || (now - lastWarn) > 30000) {
-                    plugin.getLogger().warning(String.format("[FormulaRacing] %s não tem checkpoints salvos. Complete uma volta para estabelecer um PB.", player.getName()));
-                    lastWarningTime.put(warningKey, now);
-                }
-            }
+            return ;
+            //#Isso tava flodando o console :crying a lot:
         }
 
         // 3. LOGICA DO PB (Usando o valor passado pelo parâmetro)

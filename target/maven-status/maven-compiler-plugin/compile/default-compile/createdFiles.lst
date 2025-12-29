@@ -4,7 +4,9 @@ dev\EfraGroup\formulaRacing\Listener\RegionListener$1.class
 dev\EfraGroup\formulaRacing\Listener\FormulaRacingListener.class
 dev\EfraGroup\formulaRacing\TabCompleter\FRLanguageTabCompleter.class
 dev\EfraGroup\formulaRacing\Utils\TimeTrialDuelsAction.class
+dev\EfraGroup\formulaRacing\Utils\ScoreboardDuelsTimeUtils$1.class
 dev\EfraGroup\formulaRacing\Utils\TimeTrialDuelsAction$DuelSession.class
+dev\EfraGroup\formulaRacing\Utils\ScoreboardDuelsTimeUtils$DuelContext.class
 dev\EfraGroup\formulaRacing\Utils\TimerUtils$RaceSessionCache.class
 dev\EfraGroup\formulaRacing\CommandHandler\EventCommandHandler$1.class
 dev\EfraGroup\formulaRacing\Duels\TimeTrialDuels.class
@@ -18,3 +20,4 @@ dev\EfraGroup\formulaRacing\Listener\DuelProtectionListener.class
 dev\EfraGroup\formulaRacing\Listener\FormulaRacingListener$1.class
 dev\EfraGroup\formulaRacing\CommandHandler\DuelCommandHandler.class
 dev\EfraGroup\formulaRacing\Duels\TimeTrialDuels$1.class
+dev\EfraGroup\formulaRacing\Utils\ScoreboardDuelsTimeUtils.class

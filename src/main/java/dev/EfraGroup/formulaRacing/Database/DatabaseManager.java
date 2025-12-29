@@ -203,6 +203,9 @@ public class DatabaseManager {
             max_x REAL NOT NULL, max_y REAL NOT NULL, max_z REAL NOT NULL
         )""");
 
+            stmt.executeUpdate("DROP TABLE IF EXISTS fr_checkpoint_times");
+
+
             stmt.executeUpdate("""
         CREATE TABLE IF NOT EXISTS fr_checkpoint_times (
             timetrial_id INTEGER NOT NULL,
@@ -215,6 +218,7 @@ public class DatabaseManager {
             stmt.executeUpdate("DROP TABLE IF EXISTS fr_timetrial_duels");
             stmt.executeUpdate("DROP TABLE IF EXISTS fr_timetrial_dueltimes");
             stmt.executeUpdate("DROP TABLE IF EXISTS fr_timetrial_duel_players");
+
 
             stmt.executeUpdate("""
         CREATE TABLE IF NOT EXISTS fr_timetrial_duels_checkpoint_times (
@@ -2781,8 +2785,8 @@ public class DatabaseManager {
            MÉTODOS DE DUELO E BOAT UTILS
 ======================================================= */
 
-    public synchronized void createDuel(Player owner, List<Player> participants, String trackNameWS, int laps, int timeLimit) {
-        String sqlDuel = "INSERT INTO fr_timetrial_duels (owner, trackNameWS, laps, time_limit, state) VALUES (?, ?, ?, ?, 'STARTED')";
+    public synchronized void createDuel(Player owner, List<Player> participants, String trackNameWS, int laps, int timeLimit, boolean lonely) {
+        String sqlDuel = "INSERT INTO fr_timetrial_duels (owner, trackNameWS, laps, time_limit, lonely, state ) VALUES (?, ?, ?, ?, ?, 'STARTED')";
         String sqlPlayers = "INSERT INTO fr_timetrial_duel_players (duel_id, players) VALUES (?, ?)";
 
         String playersString = participants.stream()
@@ -2800,6 +2804,8 @@ public class DatabaseManager {
                 psDuel.setString(2, trackNameWS);
                 psDuel.setInt(3, laps);
                 psDuel.setDouble(4, (double) timeLimit);
+                psDuel.setBoolean(5, lonely);
+
                 psDuel.executeUpdate();
 
                 try (ResultSet rs = psDuel.getGeneratedKeys()) {
@@ -3398,28 +3404,7 @@ public class DatabaseManager {
         return null;
     }
 
-    public void saveDuelTime(int duelId, Player player, double time, int checkpoints, boolean finished) {
-        String uuidStr = player.getUniqueId().toString();
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            synchronized (this) { // Garante que a escrita assíncrona não quebre o ponteiro
-                String sql = "INSERT INTO fr_timetrial_dueltimes (duel_id, playerName, time, checkpointsReached, finished) VALUES (?, ?, ?, ?, ?)";
-                try {
-                    Connection conn = this.getOrConnect();
-                    try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                        pstmt.setInt(1, duelId);
-                        pstmt.setString(2, uuidStr);
-                        pstmt.setDouble(3, time);
-                        pstmt.setInt(4, checkpoints);
-                        pstmt.setBoolean(5, finished);
-                        pstmt.executeUpdate();
-                    }
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                    handleSqlError(e);
-                }
-            }
-        });
-    }
+
 
     private void handleSqlError(SQLException e) {
         if (e.getMessage().toLowerCase().contains("closed") || e.getMessage().toLowerCase().contains("pointer")) {
