@@ -347,6 +347,24 @@ public class DatabaseManager {
     }
 
     /**
+     * Busca o nome da pista vinculada a um Duelo específico
+     */
+    public String getTrackNameFromDuelId(int duelId) {
+        String sql = "SELECT trackNameWS FROM fr_timetrial_duels WHERE id = ?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setInt(1, duelId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("track_name");
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().severe("[DB] Erro ao buscar track do duelo " + duelId + ": " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
      * Busca o idioma do jogador diretamente do banco de dados.
      * @param uuid UUID do jogador.
      * @return Código da língua ou o padrão definido na config.
@@ -1464,6 +1482,7 @@ public class DatabaseManager {
 
     public synchronized void saveFullTime(UUID playerUUID, String playerName, String trackName, double time, int checkpointsReached) {
         String trackNameWS = trackName.replace(" ", "");
+        // Arredondamento para os ticks do Minecraft (20 TPS = 0.05s)
         double roundedTime = Math.round(time / 0.05) * 0.05;
 
         try {
@@ -1471,9 +1490,12 @@ public class DatabaseManager {
 
             // --- LÓGICA DE RECORDE (DISCORD) ---
             String prevBestPlayer = null;
-            double prevBestTime = 0.0;
+            double prevBestTime = Double.MAX_VALUE;
             boolean isNewGlobalRecord = false;
 
+            // BUSCA O MELHOR TEMPO GLOBAL (EXCLUINDO O JOGADOR ATUAL PARA COMPARAR CORRETAMENTE)
+            // Se quisermos saber se ele bateu o recorde de OUTRA pessoa: use AND player_uuid != ?
+            // Se quisermos saber se ele superou o recorde GERAL (incluindo o dele antigo):
             String globalRecordSql = "SELECT player_name, bestTime FROM fr_player_times WHERE trackNameWS = ? ORDER BY bestTime ASC LIMIT 1";
 
             try (PreparedStatement psCheck = conn.prepareStatement(globalRecordSql)) {
@@ -1482,17 +1504,23 @@ public class DatabaseManager {
                     if (rs.next()) {
                         prevBestTime = rs.getDouble("bestTime");
                         prevBestPlayer = rs.getString("player_name");
-                        if (roundedTime < prevBestTime) isNewGlobalRecord = true;
+
+                        // Otimização: Usamos um pequeno delta para evitar problemas de precisão de ponto flutuante
+                        if (roundedTime < (prevBestTime - 0.001)) {
+                            isNewGlobalRecord = true;
+                        }
                     } else {
+                        // Se não existe nenhum tempo na pista, o primeiro tempo já é o recorde!
                         isNewGlobalRecord = true;
                     }
                 }
             }
 
+            // Envia para o Discord ANTES de salvar no banco para garantir que o "prev" seja o antigo
             if (isNewGlobalRecord) {
-                DiscordUtils.sendRecordMessage(playerName, roundedTime, prevBestPlayer, prevBestTime, trackName);
+                // Se prevBestPlayer for nulo, significa que é o primeiro recorde da pista
+                DiscordUtils.sendRecordMessage(playerName, roundedTime, prevBestPlayer, (prevBestTime == Double.MAX_VALUE ? 0 : prevBestTime), trackName);
             }
-
             // --- TRANSAÇÃO DE ESCRITA ---
             try {
                 conn.setAutoCommit(false);
