@@ -6,7 +6,6 @@ import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
-import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -21,7 +20,7 @@ public class TimeTrialDuelsAction {
     private final DatabaseManager dm;
 
     private final Map<UUID, DuelSession> activeTimers = new ConcurrentHashMap<>();
-    private final Map<UUID, Boolean> activeVisuals = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> activeVisuals = new ConcurrentHashMap<>(); // Armazena o duelId no visual
 
     private static final String ICON_TIMER = "§b§l⌚";
     private static final String ICON_RECORD = "§6§l✪";
@@ -34,25 +33,26 @@ public class TimeTrialDuelsAction {
     }
 
     /**
-     * Liga/Desliga a Action Bar.
+     * Liga a Action Bar para o jogador, mesmo antes da largada.
      */
-    public void toggleVisuals(Player player, boolean active) {
+    public void toggleVisuals(Player player, int duelId, boolean active) {
         UUID uuid = player.getUniqueId();
         if (active) {
-            activeVisuals.put(uuid, true);
+            activeVisuals.put(uuid, duelId);
         } else {
             activeVisuals.remove(uuid);
+            activeTimers.remove(uuid);
             player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(""));
         }
     }
 
     /**
-     * Liga o cronômetro APENAS se os visuais estiverem ativos (conforme sua regra).
+     * Inicia apenas a contagem do tempo (cronômetro).
      */
     public void toggleTimer(Player player, int duelId, boolean active) {
         UUID uuid = player.getUniqueId();
         if (active) {
-            // REGRA: Só ativa o timer se o visual já estiver ligado para este jogador
+            // Se o visual estiver ligado, iniciamos a sessão de tempo
             if (activeVisuals.containsKey(uuid)) {
                 activeTimers.put(uuid, new DuelSession(uuid, duelId));
                 player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1f);
@@ -73,20 +73,18 @@ public class TimeTrialDuelsAction {
         new BukkitRunnable() {
             @Override
             public void run() {
-                // O loop agora foca em quem tem VISUAL ativo.
-                // Pois se o visual tá desligado, o timer (pela sua regra) não deve rodar/aparecer.
-                activeVisuals.keySet().forEach(uuid -> {
+                activeVisuals.forEach((uuid, duelId) -> {
                     Player player = Bukkit.getPlayer(uuid);
                     if (player == null || !player.isOnline()) {
-                        activeTimers.remove(uuid);
                         activeVisuals.remove(uuid);
+                        activeTimers.remove(uuid);
                         return;
                     }
 
                     DuelSession session = activeTimers.get(uuid);
 
-                    // Se houver uma sessão de timer ativa para este visual:
                     if (session != null) {
+                        // MODO CORRIDA: Timer rodando
                         if (session.shouldUpdateData()) {
                             updateDataAsync(player, session);
                         }
@@ -95,23 +93,25 @@ public class TimeTrialDuelsAction {
                             spawnLeaderParticles(player);
                         }
 
-                        // Envia a barra com o tempo correndo
-                        sendDuelActionBar(player, session);
+                        sendDuelActionBar(player, session.getCachedPosition(), session.getFormattedTime(), session.getPersonalBest());
                     } else {
-                        // Se o visual está ON mas o timer está OFF,
-                        // podemos mostrar uma barra neutra ou apenas limpar.
-                        // player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent("§eAguardando largada..."));
+                        // MODO ESPERA: Visual ON, mas timer ainda não começou
+                        // Mostra a barra com 00:00.000 ou "Aguardando..."
+                        sendDuelActionBar(player, "§f§l-º PLACE", "00:00.000", "§7Carregando...");
                     }
                 });
             }
         }.runTaskTimer(plugin, 0L, 1L);
     }
 
-    private void sendDuelActionBar(Player player, DuelSession session) {
+    /**
+     * Método centralizado para enviar a Action Bar
+     */
+    private void sendDuelActionBar(Player player, String position, String time, String pb) {
         String message = String.format("%s %s %s §f%s %s §8| %s §ePB: §7%s",
-                BRACKET, session.getCachedPosition(), BRACKET,
-                session.getFormattedTime(), ICON_TIMER,
-                ICON_RECORD, session.getPersonalBest());
+                BRACKET, position, BRACKET,
+                time, ICON_TIMER,
+                ICON_RECORD, pb);
 
         player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(message));
     }
@@ -134,10 +134,7 @@ public class TimeTrialDuelsAction {
         });
     }
 
-    public long getPlayerTimeMillis(Player player) {
-        DuelSession session = activeTimers.get(player.getUniqueId());
-        return (session != null) ? session.getCurrentTimeMillis() : 0L;
-    }
+    // ... (Métodos formatPosition, formatTime e spawnLeaderParticles permanecem iguais)
 
     private String formatPosition(int pos) {
         return switch (pos) {

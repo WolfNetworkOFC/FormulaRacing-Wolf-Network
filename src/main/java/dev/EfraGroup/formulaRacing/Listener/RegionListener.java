@@ -210,7 +210,7 @@ public class RegionListener implements Listener {
 
         // 1. CHECAGEM DE MEMÓRIA: Verifica o que já está rodando agora
         boolean isRunningSolo = timerUtils.isTimerRunning(player, track);
-        boolean isRunningDuel = DuelsTimer.getPlayerTimeMillis(player) > 0;
+        boolean isRunningDuel = database.isPlayerInActiveDuel(uuid);
 
         // Evita repetição de processamento no mesmo bloco (Debounce)
         String lastState = playerRegion.get(uuid);

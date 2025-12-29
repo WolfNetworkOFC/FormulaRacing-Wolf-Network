@@ -43,21 +43,30 @@ public class TimeTrialDuels implements Listener {
         String trackNameWS = trackName.replace(" ", "");
         List<Player> participants = Arrays.asList(p1, p2);
 
-        // Registro assíncrono para não travar a main thread
+        // 1. Registro no Banco de Dados
+        // Se o seu dm.createDuel retornar o ID do duelo, você deve capturá-lo.
+        // Se ele for void, precisaremos de uma forma de identificar o duelo ativo.
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             dm.createDuel(p1, participants, trackNameWS, laps, timeLimit);
         });
 
+        // 2. Aplicar NBT/Tags dos barcos
         packet.applyBoatUtilsToPlayer(p1, trackNameWS);
         packet.applyBoatUtilsToPlayer(p2, trackNameWS);
 
-        ttda.toggleVisuals(p1.getPlayer(), true);
-        ttda.toggleVisuals(p2.getPlayer(), true);
+        // 3. Ativar Visuais (Action Bar em modo espera)
+        // CORREÇÃO: Agora passa o duelId. Se você não tiver o ID real ainda por ser async,
+        // pode passar um ID genérico ou garantir que o createDuel seja síncrono para obter o ID.
+        int tempDuelId = 0; // Substitua pelo ID real se o seu DB retornar um
+        ttda.toggleVisuals(p1, tempDuelId, true);
+        ttda.toggleVisuals(p2, tempDuelId, true);
 
+        // 4. Posicionamento no Grid
         setupPlayerInGrid(p1, spawnLoc.clone());
         setupPlayerInGrid(p2, spawnLoc.clone());
 
-        // Inicia a sequência de contagem
+        // 5. Inicia a sequência de contagem
+        // Dentro deste método, quando a contagem chegar em 0, você deve chamar ttda.toggleTimer
         startFullCountdownSequence(p1, p2);
     }
 
