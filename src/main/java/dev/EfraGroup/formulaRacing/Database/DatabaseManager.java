@@ -767,18 +767,55 @@ public class DatabaseManager {
 
     public synchronized Map<Integer, Double> getCheckpointTimes(UUID playerUUID, String trackName) {
         Map<Integer, Double> checkpointTimes = new HashMap<>();
-        String sql = "SELECT checkpointId, time FROM fr_checkpoint_times WHERE player_uuid = ? AND trackNameWS = ?";
+        String trackNameWS = trackName.replace(" ", "");
+
+        // 🔹 CORREÇÃO CRÍTICA: Busca checkpoints do timetrial_id com o MELHOR TEMPO COMPLETO
+        // Primeiro encontra o ID do melhor tempo completo, depois busca TODOS os checkpoints desse ID
+        // Isso evita que checkpoints de voltas parciais apareçam no cache
+        String sql = "SELECT ct.checkpointId, ct.time " +
+                     "FROM fr_checkpoint_times ct " +
+                     "WHERE ct.player_uuid = ? AND ct.trackNameWS = ? " +
+                     "AND ct.timetrial_id = (" +
+                     "    SELECT id FROM fr_player_times " +
+                     "    WHERE player_uuid = ? AND trackNameWS = ? AND finished = 1 " +
+                     "    ORDER BY bestTime ASC LIMIT 1" +
+                     ")";
+
         try {
             Connection conn = getOrConnect();
+
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, playerUUID.toString());
-                ps.setString(2, trackName.replace(" ", ""));
+                ps.setString(2, trackNameWS);
+                ps.setString(3, playerUUID.toString());
+                ps.setString(4, trackNameWS);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         checkpointTimes.put(rs.getInt("checkpointId"), rs.getDouble("time"));
                     }
                 }
             }
+
+            // 🔹 FALLBACK: Se não encontrou checkpoints para o melhor tempo, busca de qualquer tempo completo
+            // Isso resolve casos onde o PB foi salvo antes das correções do sistema de delta
+            if (checkpointTimes.isEmpty()) {
+                String fallbackSql = "SELECT ct.checkpointId, ct.time " +
+                                   "FROM fr_checkpoint_times ct " +
+                                   "INNER JOIN fr_player_times pt ON ct.timetrial_id = pt.id " +
+                                   "WHERE ct.player_uuid = ? AND ct.trackNameWS = ? AND pt.finished = 1 " +
+                                   "ORDER BY pt.bestTime ASC LIMIT 100";
+
+                try (PreparedStatement psFallback = conn.prepareStatement(fallbackSql)) {
+                    psFallback.setString(1, playerUUID.toString());
+                    psFallback.setString(2, trackNameWS);
+                    try (ResultSet rsFallback = psFallback.executeQuery()) {
+                        while (rsFallback.next()) {
+                            checkpointTimes.put(rsFallback.getInt("checkpointId"), rsFallback.getDouble("time"));
+                        }
+                    }
+                }
+            }
+
         } catch (SQLException e) {
             handleSqlError(e);
         }
@@ -1300,16 +1337,22 @@ public class DatabaseManager {
             double roundedNewTime = Math.round(newTime * 1000.0) / 1000.0;
 
             List<TimerUtils.CheckpointData> newCheckpoints = plugin.getTimerUtils().getTempCheckpoints(playerUUID);
-            if (newCheckpoints == null || newCheckpoints.isEmpty()) return;
 
-            // --- LÓGICA DE COMPARAÇÃO (Mantida conforme original) ---
+            if (newCheckpoints == null || newCheckpoints.isEmpty()) {
+                return;
+            }
+
+            // --- LÓGICA DE COMPARAÇÃO ---
+            // 🔹 CORREÇÃO: Busca o melhor tempo COMPLETO (finished=1) para comparação
+            // Tempos parciais não devem ser usados como referência para newIsBetter
             Integer oldTimetrialId = null;
             double oldTime = Double.MAX_VALUE;
             int oldCheckpoints = 0;
             boolean oldFinished = false;
 
             String sqlQueryOld = "SELECT id, bestTime, checkpointsReached, finished FROM fr_player_times " +
-                    "WHERE player_uuid = ? AND trackNameWS = ? ORDER BY bestTime ASC LIMIT 1";
+                    "WHERE player_uuid = ? AND trackNameWS = ? AND finished = 1 " +
+                    "ORDER BY bestTime ASC LIMIT 1";
 
             try (PreparedStatement ps = conn.prepareStatement(sqlQueryOld)) {
                 ps.setString(1, playerUUID.toString());
@@ -1326,10 +1369,13 @@ public class DatabaseManager {
 
             boolean newIsBetter = (oldTimetrialId == null) ||
                     (!oldFinished && newFinished) ||
-                    (oldFinished && newFinished && roundedNewTime < oldTime) ||
-                    (!oldFinished && !newFinished && (newCheckpointsCount > oldCheckpoints || (newCheckpointsCount == oldCheckpoints && roundedNewTime < oldTime)));
+                    (oldFinished && newFinished && roundedNewTime <= oldTime) ||
+                    (!oldFinished && !newFinished && (newCheckpointsCount > oldCheckpoints || (newCheckpointsCount == oldCheckpoints && roundedNewTime <= oldTime)));
 
-            if (!newIsBetter) return;
+            if (!newIsBetter) {
+                return;
+            }
+
             String sqlInsert = "INSERT OR REPLACE INTO fr_checkpoint_times (timetrial_id, player_uuid, checkpointId, time, trackNameWS) VALUES (?, ?, ?, ?, ?)";
 
             try {
@@ -1725,7 +1771,7 @@ public class DatabaseManager {
     }
 
     public synchronized Double getBestTime(String trackName) {
-        String sql = "SELECT bestTime FROM fr_player_times WHERE trackNameWS = ? ORDER BY bestTime ASC LIMIT 1";
+        String sql = "SELECT bestTime FROM fr_player_times WHERE trackNameWS = ? AND finished = TRUE ORDER BY bestTime ASC LIMIT 1";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
