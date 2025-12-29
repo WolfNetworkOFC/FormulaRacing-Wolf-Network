@@ -131,7 +131,18 @@ public class TimeTrialMenuUtils implements Listener {
         }
         clickCooldown.put(player.getUniqueId(), now);
 
-        String trackName = ChatColor.stripColor(clicked.getItemMeta().getDisplayName());
+        // Remove todas as formatações de cor e itálico do nome da pista
+        String trackName = ChatColor.stripColor(clicked.getItemMeta().getDisplayName()).trim();
+
+        // Validação: trackName não pode estar vazio
+        if (trackName.isEmpty()) {
+            plugin.getLogger().warning("Track name is empty after strip colors! Display name was: " + clicked.getItemMeta().getDisplayName());
+            player.sendMessage("§cErro: Nome da pista inválido.");
+            return;
+        }
+
+        // Fecha o inventário para evitar cliques duplicados
+        player.closeInventory();
 
         if (!mysql.isTrackOpen(trackName)) {
             String langCode = mysql.getPlayerLanguage(player.getUniqueId());
@@ -190,8 +201,12 @@ public class TimeTrialMenuUtils implements Listener {
                 plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);
                 stt.setPlayerTrack(player, trackName);
 
-                player.sendMessage(plugin.getTranslation("timetrial_teleport", langCode, "{track}", trackName));
+                // Envia mensagem de teleporte com placeholder
+                String teleportMsg = plugin.getTranslation("timetrial_teleport", langCode, "{track}", trackName);
+                plugin.getLogger().info("Sending teleport message to " + player.getName() + ": " + teleportMsg);
+                player.sendMessage(teleportMsg);
 
+                // Envia informações da pista
                 DatabaseManager.TrackData trackData = mysql.getTrackData(trackName);
                 if (trackData != null) {
                     player.sendMessage(plugin.getTranslation("track_owner_info", langCode, "{owner}", trackData.getOwnerName()));
