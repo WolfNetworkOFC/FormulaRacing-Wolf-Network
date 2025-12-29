@@ -274,7 +274,7 @@ public class RegionListener implements Listener {
             stt.setPlayerTrack(player, regionTrack);
             timerUtils.startTimer(player, regionTrack);
             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1.2f);
-        }
+            }
 
         // 3. Marca como processado
         playerRegion.put(uuid, regionTrack + "_" + type + "_DONE");
