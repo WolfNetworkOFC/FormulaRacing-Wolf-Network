@@ -72,8 +72,9 @@ public class FormulaRacingListener implements Listener {
         // verificamos no banco se ele está em um duelo ativo
         if (db.isPlayerInActiveDuel(player.getUniqueId())) {
             event.setCancelled(true);
-            player.sendMessage("§c§lDUELO §8» §7Você não pode sair do barco durante um duelo!");
-            player.sendMessage("§7Use §f/duel sair §7para abandonar a corrida.");
+            String langCode = db.getPlayerLanguage(player.getUniqueId());
+            player.sendMessage(plugin.getDirectTranslation("duel_cannot_dismount", langCode));
+            player.sendMessage(plugin.getDirectTranslation("duel_use_quit", langCode));
             return;
         }
 

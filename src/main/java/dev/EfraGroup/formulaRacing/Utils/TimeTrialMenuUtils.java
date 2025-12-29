@@ -125,7 +125,8 @@ public class TimeTrialMenuUtils implements Listener {
         long now = System.currentTimeMillis();
         long lastClick = clickCooldown.getOrDefault(player.getUniqueId(), 0L);
         if (now - lastClick < 500) {
-            player.sendMessage(ChatColor.RED + "Aguarde meio segundo antes de clicar novamente!");
+            String langCode = mysql.getPlayerLanguage(player.getUniqueId());
+            player.sendMessage(plugin.getDirectTranslation("wait_before_click", langCode));
             return;
         }
         clickCooldown.put(player.getUniqueId(), now);
@@ -133,7 +134,8 @@ public class TimeTrialMenuUtils implements Listener {
         String trackName = ChatColor.stripColor(clicked.getItemMeta().getDisplayName());
 
         if (!mysql.isTrackOpen(trackName)) {
-            player.sendMessage(ChatColor.RED + "Esta pista foi fechada e não pode ser usada no momento!");
+            String langCode = mysql.getPlayerLanguage(player.getUniqueId());
+            player.sendMessage(plugin.getDirectTranslation("track_is_closed", langCode));
             return;
         }
 
@@ -157,8 +159,10 @@ public class TimeTrialMenuUtils implements Listener {
 
                     if (shouldSave) {
                         mysql.savePartialTime(player.getUniqueId(), player.getName(), lastTrack, currentTime, checkpoints);
-                        player.sendMessage("§aTempo parcial da pista anterior §e" + lastTrack + " §afoi salvo: §e" +
-                                formatTime(currentTime) + " §acom §e" + checkpoints + " checkpoints");
+                        String langCode = mysql.getPlayerLanguage(player.getUniqueId());
+                        String formattedTime = formatTime(currentTime);
+                        player.sendMessage(plugin.getTranslation("partial_time_saved", langCode,
+                            "{track}", lastTrack, "{time}", formattedTime + " com " + checkpoints + " checkpoints"));
                     }
                 }
                 timerUtils.stopTimer(player, lastTrack);
@@ -171,10 +175,11 @@ public class TimeTrialMenuUtils implements Listener {
                 // 🚫 Impedir entrar em pista que usa BoatUtils se o jogador não tem o mod
                 boolean playerHasBoatUtils = FormulaRacing.hasOpenBoatUtilsMod(player);
                 boolean trackUsesBoatUtils = mysql.trackHaveBoatUtils(trackName);
+                String langCode = mysql.getPlayerLanguage(player.getUniqueId());
 
                 if (trackUsesBoatUtils && !playerHasBoatUtils) {
-                    player.sendMessage("§cEsta pista usa configurações especiais de BoatUtils, mas você não está com o mod!");
-                    player.sendMessage("§cUse o BoatUtils Mod para entrar nesta pista.");
+                    player.sendMessage(plugin.getDirectTranslation("does_not_have_boatutils", langCode));
+                    player.sendMessage(plugin.getDirectTranslation("boatutils_required", langCode));
                     return;
                 }
                 ps.sendBoatSetting(player, 0);
@@ -185,15 +190,16 @@ public class TimeTrialMenuUtils implements Listener {
                 plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);
                 stt.setPlayerTrack(player, trackName);
 
-                player.sendMessage("§eTeleportado para [§f" + trackName + "§e]");
+                player.sendMessage(plugin.getTranslation("timetrial_teleport", langCode, "{track}", trackName));
 
                 DatabaseManager.TrackData trackData = mysql.getTrackData(trackName);
                 if (trackData != null) {
-                    player.sendMessage(ChatColor.AQUA + "Dono: " + trackData.getOwnerName());
-                    player.sendMessage(ChatColor.AQUA + "Mundo: " + trackData.getWorldName());
+                    player.sendMessage(plugin.getTranslation("track_owner_info", langCode, "{owner}", trackData.getOwnerName()));
+                    player.sendMessage(plugin.getTranslation("track_world_info", langCode, "{world}", trackData.getWorldName()));
                 }
             } else {
-                player.sendMessage(ChatColor.RED + "Localização da pista não encontrada!");
+                String langCode = mysql.getPlayerLanguage(player.getUniqueId());
+                player.sendMessage(plugin.getDirectTranslation("track_location_not_found", langCode));
             }
 
         }

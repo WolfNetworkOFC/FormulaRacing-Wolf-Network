@@ -71,8 +71,9 @@ public class DuelProtectionListener implements Listener {
         for (String blocked : BLOCKED_COMMANDS) {
             if (command.equals(blocked)) {
                 event.setCancelled(true);
-                player.sendMessage("§c§lDUELO §8» §7Este comando está bloqueado durante duelos!");
-                player.sendMessage("§7Use §f/duel sair §7para abandonar a corrida.");
+                String langCode = databaseManager.getPlayerLanguage(player.getUniqueId());
+                player.sendMessage(plugin.getDirectTranslation("duel_command_blocked", langCode));
+                player.sendMessage(plugin.getDirectTranslation("duel_use_quit", langCode));
                 return;
             }
         }

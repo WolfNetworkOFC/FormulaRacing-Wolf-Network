@@ -1,4 +1,109 @@
-lang_set: "[BoatWolf] Seu idioma foi alterado para: "
-welcome_first_time: "entrou pela primeira vez no servidor!"
+# ==========================================
+# FormulaRacing - Português (Brasil) Language File
+# ==========================================
 
-track_not_found: "Não existe pista com esse nome."
+# Mensagens Gerais
+lang_set: "&a[FormulaRacing] Seu idioma foi alterado para: "
+welcome_first_time: "&aentrou pela primeira vez no servidor!"
+no_permission: "&cVocê não tem permissão para usar este comando."
+player_not_found: "&cJogador não encontrado ou nunca jogou antes."
+command_only_players: "&cEste comando só pode ser executado por jogadores."
+invalid_number: "&cNúmero inválido. Use apenas números."
+wait_before_click: "&cAguarde meio segundo antes de clicar novamente!"
+
+# Mensagens de Time Trial
+timetrial_teleport: "&eTeleportado para [&f{track}&e]"
+track_not_found: "&cNão existe pista com esse nome."
+track_is_closed: "&cEsta pista está fechada e não pode ser usada no momento!"
+does_not_have_boatutils: "&cEsta pista usa configurações especiais de BoatUtils, mas você não está com o mod!"
+boatutils_required: "&cUse o BoatUtils Mod para entrar nesta pista."
+partial_time_saved: "&aTempo parcial da pista anterior &e{track} &afoi salvo: &e{time}"
+timetrial_cancelled: "&cTime trial cancelado."
+
+# Comandos de Pista
+track_usage: "&eUse: &a/track <times|mytimes|deletebesttime|deletealltimes|deleteallplayertimes>"
+track_times_usage: "&cUso correto: /track times <pista> [página]"
+track_mytimes_usage: "&cUso correto: /track mytimes <pista> [página]"
+track_no_times: "&7Nenhum tempo encontrado para a pista &e{track}&7."
+track_no_personal_times: "&7Você ainda não registrou tempos na pista &e{track}&7."
+track_times_title: "&f📜 &3Tempos da pista &f{track} &3(Página {page})&f:"
+track_mytimes_title: "&f📜 &3Seus tempos na pista &f{track} &3(Página {page})&f:"
+track_deletebesttime_usage: "&cUso correto: /track deletebesttime <pista> <jogador>"
+track_besttime_deleted: "&aMelhor tempo de &e{player} &ana pista &e{track} &afoi removido com sucesso!"
+track_besttime_not_found: "&cNenhum tempo encontrado para &e{player} &cna pista &e{track}&c."
+track_deletealltimes_usage: "&cUso correto: /track deletealltimes <pista> [jogador]"
+track_alltimes_deleted_player: "&aTodos os tempos de &e{player} &ana pista &e{track} &aforam removidos!"
+track_alltimes_deleted: "&aTodos os tempos da pista &e{track} &aforam removidos!"
+track_deleteallplayertimes_usage: "&cUso correto: /track deleteallplayertimes <jogador>"
+track_allplayertimes_deleted: "&aTodos os tempos de &e{player} &aforam removidos com sucesso!"
+track_player_no_times: "&cNenhum tempo encontrado para o jogador &e{player}&c."
+track_owner_info: "&bDono: {owner}"
+track_world_info: "&bMundo: {world}"
+track_location_not_found: "&cLocalização da pista não encontrada!"
+
+# Mensagens de Duelo
+duel_command_blocked: "&c&lDUELO &8» &7Este comando está bloqueado durante duelos!"
+duel_use_quit: "&7Use &f/duel sair &7para abandonar a corrida."
+duel_cannot_dismount: "&c&lDUELO &8» &7Você não pode sair do barco durante um duelo!"
+duel_cannot_teleport: "&c&lDUELO &8» &7Você não pode se teleportar durante um duelo!"
+
+# Comandos de Câmera
+cam_started_following: "&aVocê começou a seguir &e{player} &a(modo normal)."
+cam_stopped_following: "&cVocê parou de seguir (modo normal)."
+
+# Comandos de Idioma
+lang_help_title: "&6&lFormula Racing Language"
+lang_help_list: "&e/frlang list &7- Lista idiomas disponíveis."
+lang_help_set: "&e/frlang set <id> &7- Altera seu idioma."
+lang_help_reload: "&e/frlang reload &7- Recarrega configurações."
+lang_not_found: "&cIdioma '{lang}' não encontrado em lang/. Use /frlang list"
+lang_set_usage: "&cUse: /frlang set <idioma>"
+lang_list_title: "&8&m      &6 [ Idiomas Disponíveis ] &8&m      "
+lang_list_empty: "&7Nenhum arquivo .yml encontrado na pasta /lang."
+lang_list_current: " &e• &f{lang} &a(Atual) ✅"
+lang_list_available: " &e• &7{lang} &8- /frlang set {lang}"
+lang_list_footer: "&8&m                                       "
+lang_reload_success: "&a[FormulaRacing] Configurações de idioma validadas!"
+lang_no_permission_reload: "&cSem permissão."
+
+# Comando Reload
+reload_success: "&a[FormulaRacing] Plugin recarregado com sucesso!"
+reload_error: "&c[FormulaRacing] Erro ao recarregar o plugin. Verifique o console."
+
+# Menu de Configurações
+settings_menu_title: "&6&lConfigurações"
+
+# Mensagens de Party
+party_created: "&aParty criada!"
+party_disbanded: "&cParty desfeita."
+party_invite_sent: "&aConvite enviado para &e{player}&a!"
+party_invite_received: "&e{player} &atelhe convidou para a party!"
+party_joined: "&aVocê entrou na party de &e{player}&a!"
+party_left: "&cVocê saiu da party."
+party_kicked: "&cVocê foi expulso da party."
+party_not_in_party: "&cVocê não está em uma party."
+party_already_in_party: "&cVocê já está em uma party."
+
+# Mensagens de Heat
+heat_created: "&aHeat criada com sucesso!"
+heat_started: "&aHeat iniciada!"
+heat_finished: "&aHeat finalizada!"
+heat_not_found: "&cHeat não encontrada."
+
+# Mensagens de Evento
+event_created: "&aEvento criado com sucesso!"
+event_started: "&aEvento iniciado!"
+event_finished: "&aEvento finalizado!"
+event_not_found: "&cEvento não encontrado."
+
+# Mensagens de Round
+round_created: "&aRound criado com sucesso!"
+round_started: "&aRound iniciado!"
+round_finished: "&aRound finalizado!"
+round_not_found: "&cRound não encontrado."
+
+# Mensagens de Erro
+error_generic: "&cOcorreu um erro. Tente novamente."
+error_database: "&cErro no banco de dados. Contate um administrador."
+error_file_not_found: "&cArquivo de configuração não encontrado."
+

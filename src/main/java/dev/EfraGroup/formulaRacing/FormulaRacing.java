@@ -66,7 +66,7 @@
                 this.stt = new ScoreboardTimeTrialUtils(dm);
                 this.packetSender = new PacketSender(dm);
                 this.timerUtils = new TimerUtils(this, dm);
-                this.cu = new CamUtils(dm);
+                this.cu = new CamUtils(dm, this);
                 this.lonelyController = new LonelyController(dm, this);
                 this.api = new APIFormulaRacing(this, dm);
                 this.tetc = new TrackEditorCommandHandler(dm, packetSender, worldEditSelect, this);
@@ -155,7 +155,7 @@
                 // CORREÇÃO: Usando a variável única para o comando executor
                 Objects.requireNonNull(this.getCommand("duel")).setExecutor(duelHandler);
 
-                Objects.requireNonNull(this.getCommand("track")).setExecutor(new TrackCommandHandler(dm));
+                Objects.requireNonNull(this.getCommand("track")).setExecutor(new TrackCommandHandler(dm, this));
                 Objects.requireNonNull(this.getCommand("settings")).setExecutor(new SettingsCommandHandler(this, dm));
                 Objects.requireNonNull(this.getCommand("lonely")).setExecutor(new LonelyCommandHandler(dm));
                 Objects.requireNonNull(this.getCommand("round")).setExecutor(new RoundCommandHandler(ev, dm, this));
@@ -167,7 +167,7 @@
                 Objects.requireNonNull(this.getCommand("language")).setExecutor(new FRLanguageCommandHandler(this, fileManager, dm));
                 Objects.requireNonNull(this.getCommand("timetrial")).setExecutor(new TimeTrialCommandHandler(dm, this, packetSender, timerUtils, rcl, api, stt, ev));
                 Objects.requireNonNull(this.getCommand("debug")).setExecutor(new DebugCommandHandler(this));
-                Objects.requireNonNull(this.getCommand("formularacingreload")).setExecutor(new FormulaRacingReloadCommandHandler(fileManager, dm));
+                Objects.requireNonNull(this.getCommand("formularacingreload")).setExecutor(new FormulaRacingReloadCommandHandler(fileManager, dm, this));
                 Objects.requireNonNull(this.getCommand("boat")).setExecutor(new BoatCommandHandler(api));
                 Objects.requireNonNull(this.getCommand("trackedit")).setExecutor(new TrackEditorCommandHandler(dm, packetSender, worldEditSelect, this));
 
@@ -203,6 +203,40 @@
 
             // Traduz as cores (& para §)
             return org.bukkit.ChatColor.translateAlternateColorCodes('&', message);
+        }
+
+        /**
+         * Busca uma tradução com suporte a placeholders
+         * @param key A chave no arquivo (ex: "track_not_found")
+         * @param langCode O código da linguagem (ex: "pt_BR")
+         * @param placeholders Array de pares chave-valor para substituir (ex: "{track}", "MinhaTrack")
+         * @return A mensagem formatada com placeholders substituídos
+         */
+        public String getTranslation(String key, String langCode, String... placeholders) {
+            String message = getDirectTranslation(key, langCode);
+
+            // Substitui placeholders
+            if (placeholders != null && placeholders.length > 0) {
+                for (int i = 0; i < placeholders.length - 1; i += 2) {
+                    String placeholder = placeholders[i];
+                    String value = placeholders[i + 1];
+                    message = message.replace(placeholder, value);
+                }
+            }
+
+            return message;
+        }
+
+        /**
+         * Helper method para enviar uma mensagem traduzida para um jogador
+         * @param player O jogador que receberá a mensagem
+         * @param key A chave de tradução
+         * @param placeholders Placeholders opcionais para substituir
+         */
+        public void sendMessage(org.bukkit.entity.Player player, String key, String... placeholders) {
+            String langCode = dm.getPlayerLanguage(player.getUniqueId());
+            String message = getTranslation(key, langCode, placeholders);
+            player.sendMessage(message);
         }
 
         // -------------------- Leaderboards --------------------

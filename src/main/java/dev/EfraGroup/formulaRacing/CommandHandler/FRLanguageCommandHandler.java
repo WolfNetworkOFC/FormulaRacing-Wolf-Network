@@ -40,7 +40,7 @@ public class FRLanguageCommandHandler implements CommandExecutor {
             case "list" -> handleList(player);
             case "reload" -> handleReload(player);
             default -> {
-                // Se o usuário digitar apenas /lang pt-BR, ele tenta dar o set direto
+                // Se o usuário digitar apenas /frlang pt_BR, ele tenta dar o set direto
                 if (args.length == 1) {
                     handleSet(player, new String[]{"set", args[0]});
                 } else {
@@ -54,15 +54,17 @@ public class FRLanguageCommandHandler implements CommandExecutor {
 
     private void handleSet(Player player, String[] args) {
         if (args.length < 2) {
-            player.sendMessage("§cUse: /frlang set <idioma>");
+            String langCode = db.getPlayerLanguage(player.getUniqueId());
+            player.sendMessage(plugin.getDirectTranslation("lang_set_usage", langCode));
             return;
         }
 
-        String langCode = args[1]; // Mantém o case original para bater com o arquivo (ex: pt-BR)
+        String langCode = args[1]; // Mantém o case original para bater com o arquivo (ex: pt_BR)
         File langFile = new File(plugin.getDataFolder(), "lang/" + langCode + ".yml");
 
         if (!langFile.exists()) {
-            player.sendMessage("§cIdioma '" + langCode + "' não encontrado em lang/. Use /frlang list");
+            String currentLang = db.getPlayerLanguage(player.getUniqueId());
+            player.sendMessage(plugin.getTranslation("lang_not_found", currentLang, "{lang}", langCode));
             return;
         }
 
@@ -81,14 +83,15 @@ public class FRLanguageCommandHandler implements CommandExecutor {
 
     private void handleList(Player player) {
         File langDir = new File(plugin.getDataFolder(), "lang");
+        String langCode = db.getPlayerLanguage(player.getUniqueId());
 
         // Lista todos os .yml na pasta lang/
         File[] files = langDir.listFiles((dir, name) -> name.endsWith(".yml"));
 
-        player.sendMessage("§8§m      §6 [ Idiomas Disponíveis ] §8§m      ");
+        player.sendMessage(plugin.getDirectTranslation("lang_list_title", langCode));
 
         if (files == null || files.length == 0) {
-            player.sendMessage("§7Nenhum arquivo .yml encontrado na pasta /lang.");
+            player.sendMessage(plugin.getDirectTranslation("lang_list_empty", langCode));
             return;
         }
 
@@ -99,32 +102,36 @@ public class FRLanguageCommandHandler implements CommandExecutor {
             String code = f.getName().substring(0, f.getName().length() - 4);
 
             if (code.equalsIgnoreCase(current)) {
-                player.sendMessage(" §e• §f" + code + " §a(Atual) ✅");
+                player.sendMessage(plugin.getTranslation("lang_list_current", langCode, "{lang}", code));
             } else {
-                player.sendMessage(" §e• §7" + code + " §8- /frlang set " + code);
+                player.sendMessage(plugin.getTranslation("lang_list_available", langCode, "{lang}", code));
             }
         }
-        player.sendMessage("§8§m                                       ");
+        player.sendMessage(plugin.getDirectTranslation("lang_list_footer", langCode));
     }
 
     private void handleReload(Player player) {
+        String langCode = db.getPlayerLanguage(player.getUniqueId());
+
         if (!player.hasPermission("formularacing.admin")) {
-            player.sendMessage("§cSem permissão.");
+            player.sendMessage(plugin.getDirectTranslation("lang_no_permission_reload", langCode));
             return;
         }
 
         // Como não há manager, o reload aqui seria apenas uma confirmação visual
         // ou você pode adicionar um db.reloadSettings() se tiver algo em memória
-        player.sendMessage("§a[FormulaRacing] Configurações de idioma validadas!");
+        player.sendMessage(plugin.getDirectTranslation("lang_reload_success", langCode));
     }
 
     private void sendHelp(Player player) {
+        String langCode = db.getPlayerLanguage(player.getUniqueId());
+
         player.sendMessage("");
-        player.sendMessage("§6§lFormula Racing Language");
-        player.sendMessage("§e/frlang list §7- Lista idiomas.");
-        player.sendMessage("§e/frlang set <id> §7- Altera seu idioma.");
+        player.sendMessage(plugin.getDirectTranslation("lang_help_title", langCode));
+        player.sendMessage(plugin.getDirectTranslation("lang_help_list", langCode));
+        player.sendMessage(plugin.getDirectTranslation("lang_help_set", langCode));
         if (player.hasPermission("formularacing.admin")) {
-            player.sendMessage("§e/frlang reload §7- Recarrega.");
+            player.sendMessage(plugin.getDirectTranslation("lang_help_reload", langCode));
         }
         player.sendMessage("");
     }

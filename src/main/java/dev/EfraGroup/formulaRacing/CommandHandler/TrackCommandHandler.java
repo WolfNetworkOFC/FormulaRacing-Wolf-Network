@@ -1,6 +1,7 @@
 package dev.EfraGroup.formulaRacing.CommandHandler;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.FormulaRacing;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -13,9 +14,11 @@ import java.util.UUID;
 public class TrackCommandHandler implements CommandExecutor {
 
     private final DatabaseManager dbManager;
+    private final FormulaRacing plugin;
 
-    public TrackCommandHandler(DatabaseManager dbManager) {
+    public TrackCommandHandler(DatabaseManager dbManager, FormulaRacing plugin) {
         this.dbManager = dbManager;
+        this.plugin = plugin;
     }
 
     @Override
@@ -25,8 +28,10 @@ public class TrackCommandHandler implements CommandExecutor {
             return true;
         }
 
+        String langCode = dbManager.getPlayerLanguage(player.getUniqueId());
+
         if (args.length == 0) {
-            player.sendMessage("§eUse: §a/track <times|mytimes|deletebesttime|deletealltimes|deleteallplayertimes>");
+            player.sendMessage(plugin.getDirectTranslation("track_usage", langCode));
             return true;
         }
 
@@ -39,7 +44,7 @@ public class TrackCommandHandler implements CommandExecutor {
             // ========================
             case "times": {
                 if (args.length < 2) {
-                    player.sendMessage("§cUso correto: /track times <pista> [página]");
+                    player.sendMessage(plugin.getDirectTranslation("track_times_usage", langCode));
                     return true;
                 }
 
@@ -50,7 +55,7 @@ public class TrackCommandHandler implements CommandExecutor {
                     try {
                         page = Math.max(1, Integer.parseInt(args[2]));
                     } catch (NumberFormatException e) {
-                        player.sendMessage("§cNúmero de página inválido. Use apenas números.");
+                        player.sendMessage(plugin.getDirectTranslation("invalid_number", langCode));
                         return true;
                     }
                 }
@@ -58,11 +63,12 @@ public class TrackCommandHandler implements CommandExecutor {
                 List<Map<String, Object>> times = dbManager.getAllTimesOnTrack(trackName, page);
 
                 if (times.isEmpty()) {
-                    player.sendMessage("§7Nenhum tempo encontrado para a pista §e" + trackName + "§7.");
+                    player.sendMessage(plugin.getTranslation("track_no_times", langCode, "{track}", trackName));
                     return true;
                 }
 
-                player.sendMessage("§f📜 §3Tempos da pista §f" + trackName + " §3(Página " + page + ")§f:");
+                player.sendMessage(plugin.getTranslation("track_times_title", langCode,
+                    "{track}", trackName, "{page}", String.valueOf(page)));
                 for (Map<String, Object> entry : times) {
                     int pos = (int) entry.get("pos");
                     String pname = (String) entry.get("player");
@@ -84,7 +90,7 @@ public class TrackCommandHandler implements CommandExecutor {
             // ========================
             case "mytimes": {
                 if (args.length < 2) {
-                    player.sendMessage("§cUso correto: /track mytimes <pista> [página]");
+                    player.sendMessage(plugin.getDirectTranslation("track_mytimes_usage", langCode));
                     return true;
                 }
 
@@ -95,7 +101,7 @@ public class TrackCommandHandler implements CommandExecutor {
                     try {
                         page = Math.max(1, Integer.parseInt(args[2]));
                     } catch (NumberFormatException e) {
-                        player.sendMessage("§cNúmero de página inválido. Use apenas números.");
+                        player.sendMessage(plugin.getDirectTranslation("invalid_number", langCode));
                         return true;
                     }
                 }
@@ -103,11 +109,12 @@ public class TrackCommandHandler implements CommandExecutor {
                 List<Map<String, Object>> times = dbManager.getAllTimesOnTrackByPlayer(trackName, player.getName(), page);
 
                 if (times.isEmpty()) {
-                    player.sendMessage("§7Você ainda não registrou tempos na pista §e" + trackName + "§7.");
+                    player.sendMessage(plugin.getTranslation("track_no_personal_times", langCode, "{track}", trackName));
                     return true;
                 }
 
-                player.sendMessage("§f📜 §3Seus tempos na pista §f" + trackName + " §3(Página " + page + ")§f:");
+                player.sendMessage(plugin.getTranslation("track_mytimes_title", langCode,
+                    "{track}", trackName, "{page}", String.valueOf(page)));
                 for (Map<String, Object> entry : times) {
                     int pos = (int) entry.get("pos");
                     double time = (double) entry.get("time");
@@ -129,12 +136,12 @@ public class TrackCommandHandler implements CommandExecutor {
             // ========================
             case "deletebesttime": {
                 if (!player.hasPermission("formularacing.admin")) {
-                    player.sendMessage("§cVocê não tem permissão para usar este comando.");
+                    player.sendMessage(plugin.getDirectTranslation("no_permission", langCode));
                     return true;
                 }
 
                 if (args.length < 3) {
-                    player.sendMessage("§cUso correto: /track deletebesttime <pista> <jogador>");
+                    player.sendMessage(plugin.getDirectTranslation("track_deletebesttime_usage", langCode));
                     return true;
                 }
 
@@ -143,9 +150,11 @@ public class TrackCommandHandler implements CommandExecutor {
 
                 boolean success = dbManager.deletePlayerBestTimeOnTrack(track, targetPlayer);
                 if (success) {
-                    player.sendMessage("§aMelhor tempo de §e" + targetPlayer + " §ana pista §e" + track + " §afoi removido com sucesso!");
+                    player.sendMessage(plugin.getTranslation("track_besttime_deleted", langCode,
+                        "{player}", targetPlayer, "{track}", track));
                 } else {
-                    player.sendMessage("§cNenhum tempo encontrado para §e" + targetPlayer + " §cna pista §e" + track + "§c.");
+                    player.sendMessage(plugin.getTranslation("track_besttime_not_found", langCode,
+                        "{player}", targetPlayer, "{track}", track));
                 }
                 return true;
             }
@@ -155,12 +164,12 @@ public class TrackCommandHandler implements CommandExecutor {
             // ========================
             case "deletealltimes": {
                 if (!player.hasPermission("formularacing.admin")) {
-                    player.sendMessage("§cVocê não tem permissão para usar este comando.");
+                    player.sendMessage(plugin.getDirectTranslation("no_permission", langCode));
                     return true;
                 }
 
                 if (args.length < 2) {
-                    player.sendMessage("§cUso correto: /track deletealltimes <pista> [jogador]");
+                    player.sendMessage(plugin.getDirectTranslation("track_deletealltimes_usage", langCode));
                     return true;
                 }
 
@@ -170,11 +179,13 @@ public class TrackCommandHandler implements CommandExecutor {
 
                 if (success) {
                     if (targetPlayer != null)
-                        player.sendMessage("§aTodos os tempos de §e" + targetPlayer + " §ana pista §e" + track + " §aforam removidos!");
+                        player.sendMessage(plugin.getTranslation("track_alltimes_deleted_player", langCode,
+                            "{player}", targetPlayer, "{track}", track));
                     else
-                        player.sendMessage("§aTodos os tempos da pista §e" + track + " §aforam removidos!");
+                        player.sendMessage(plugin.getTranslation("track_alltimes_deleted", langCode,
+                            "{track}", track));
                 } else {
-                    player.sendMessage("§cNenhum tempo encontrado para a pista §e" + track + "§c.");
+                    player.sendMessage(plugin.getTranslation("track_no_times", langCode, "{track}", track));
                 }
                 return true;
             }
@@ -184,12 +195,12 @@ public class TrackCommandHandler implements CommandExecutor {
             // ========================
             case "deleteallplayertimes": {
                 if (!player.hasPermission("formularacing.admin")) {
-                    player.sendMessage("§cVocê não tem permissão para usar este comando.");
+                    player.sendMessage(plugin.getDirectTranslation("no_permission", langCode));
                     return true;
                 }
 
                 if (args.length < 2) {
-                    player.sendMessage("§cUso correto: /track deleteallplayertimes <jogador>");
+                    player.sendMessage(plugin.getDirectTranslation("track_deleteallplayertimes_usage", langCode));
                     return true;
                 }
 
@@ -197,15 +208,17 @@ public class TrackCommandHandler implements CommandExecutor {
                 boolean success = dbManager.deletePlayerAllTimes(targetPlayer);
 
                 if (success) {
-                    player.sendMessage("§aTodos os tempos de §e" + targetPlayer + " §aforam removidos com sucesso!");
+                    player.sendMessage(plugin.getTranslation("track_allplayertimes_deleted", langCode,
+                        "{player}", targetPlayer));
                 } else {
-                    player.sendMessage("§cNenhum tempo encontrado para o jogador §e" + targetPlayer + "§c.");
+                    player.sendMessage(plugin.getTranslation("track_player_no_times", langCode,
+                        "{player}", targetPlayer));
                 }
                 return true;
             }
 
             default:
-                player.sendMessage("§cSubcomando desconhecido. Use: /track <times|mytimes|deletebesttime|deletealltimes|deleteallplayertimes>");
+                player.sendMessage(plugin.getDirectTranslation("track_usage", langCode));
                 return true;
         }
     }

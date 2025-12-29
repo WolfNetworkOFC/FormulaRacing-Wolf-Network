@@ -1,6 +1,7 @@
 package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.FormulaRacing;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -14,9 +15,11 @@ public class CamUtils {
     private final Map<UUID, Location> lastCameraNormal = new HashMap<>();
 
     private final DatabaseManager mysql;
+    private final FormulaRacing plugin;
 
-    public CamUtils(DatabaseManager mysql) {
+    public CamUtils(DatabaseManager mysql, FormulaRacing plugin) {
         this.mysql = mysql;
+        this.plugin = plugin;
     }
 
     // ======================
@@ -33,7 +36,8 @@ public class CamUtils {
             lastCameraNormal.put(follower.getUniqueId(), nearest);
         }
 
-        follower.sendMessage("§aVocê começou a seguir §e" + target.getName() + " §a(modo normal).");
+        String langCode = mysql.getPlayerLanguage(follower.getUniqueId());
+        follower.sendMessage(plugin.getTranslation("cam_started_following", langCode, "{player}", target.getName()));
     }
 
     public boolean stopFollowingNormal(Player follower) {
@@ -41,7 +45,8 @@ public class CamUtils {
         if (followingNormal.containsKey(uuid)) {
             followingNormal.remove(uuid);
             lastCameraNormal.remove(uuid);
-            follower.sendMessage("§cVocê parou de seguir (modo normal).");
+            String langCode = mysql.getPlayerLanguage(follower.getUniqueId());
+            follower.sendMessage(plugin.getDirectTranslation("cam_stopped_following", langCode));
             return true;
         }
         return false;

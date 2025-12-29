@@ -75,7 +75,8 @@ public class RegionListener implements Listener {
             if (event.getCause() != PlayerTeleportEvent.TeleportCause.PLUGIN &&
                 event.getCause() != PlayerTeleportEvent.TeleportCause.COMMAND) {
                 event.setCancelled(true);
-                player.sendMessage("§c§lDUELO §8» §7Você não pode se teleportar durante um duelo!");
+                String langCode = database.getPlayerLanguage(player.getUniqueId());
+                player.sendMessage(plugin.getDirectTranslation("duel_cannot_teleport", langCode));
                 return;
             }
         }
