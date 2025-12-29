@@ -369,7 +369,7 @@ public class DatabaseManager {
      */
     public synchronized String getPlayerLanguage(UUID uuid) {
         String sql = "SELECT lang FROM fr_players WHERE uuid = ?";
-        String defaultLang = "en";
+        String defaultLang = "en_US";
 
         try {
             Connection conn = getOrConnect();

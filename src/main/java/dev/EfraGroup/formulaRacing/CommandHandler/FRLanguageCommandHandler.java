@@ -55,6 +55,13 @@ public class FRLanguageCommandHandler implements CommandExecutor {
     private void handleSet(Player player, String[] args) {
         if (args.length < 2) {
             String langCode = db.getPlayerLanguage(player.getUniqueId());
+
+            // Verifica se o arquivo de idioma existe, senão usa en_US como fallback
+            File checkFile = new File(plugin.getDataFolder(), "lang/" + langCode + ".yml");
+            if (!checkFile.exists()) {
+                langCode = "en_US";
+            }
+
             player.sendMessage(plugin.getDirectTranslation("lang_set_usage", langCode));
             return;
         }
@@ -64,6 +71,13 @@ public class FRLanguageCommandHandler implements CommandExecutor {
 
         if (!langFile.exists()) {
             String currentLang = db.getPlayerLanguage(player.getUniqueId());
+
+            // Verifica se o arquivo do idioma atual existe, senão usa en_US como fallback
+            File checkFile = new File(plugin.getDataFolder(), "lang/" + currentLang + ".yml");
+            if (!checkFile.exists()) {
+                currentLang = "en_US";
+            }
+
             player.sendMessage(plugin.getTranslation("lang_not_found", currentLang, "{lang}", langCode));
             return;
         }
@@ -84,6 +98,12 @@ public class FRLanguageCommandHandler implements CommandExecutor {
     private void handleList(Player player) {
         File langDir = new File(plugin.getDataFolder(), "lang");
         String langCode = db.getPlayerLanguage(player.getUniqueId());
+
+        // Verifica se o arquivo de idioma existe, senão usa en_US como fallback
+        File langFile = new File(plugin.getDataFolder(), "lang/" + langCode + ".yml");
+        if (!langFile.exists()) {
+            langCode = "en_US";
+        }
 
         // Lista todos os .yml na pasta lang/
         File[] files = langDir.listFiles((dir, name) -> name.endsWith(".yml"));
@@ -113,6 +133,12 @@ public class FRLanguageCommandHandler implements CommandExecutor {
     private void handleReload(Player player) {
         String langCode = db.getPlayerLanguage(player.getUniqueId());
 
+        // Verifica se o arquivo de idioma existe, senão usa en_US como fallback
+        File langFile = new File(plugin.getDataFolder(), "lang/" + langCode + ".yml");
+        if (!langFile.exists()) {
+            langCode = "en_US";
+        }
+
         if (!player.hasPermission("formularacing.admin")) {
             player.sendMessage(plugin.getDirectTranslation("lang_no_permission_reload", langCode));
             return;
@@ -125,6 +151,12 @@ public class FRLanguageCommandHandler implements CommandExecutor {
 
     private void sendHelp(Player player) {
         String langCode = db.getPlayerLanguage(player.getUniqueId());
+
+        // Verifica se o arquivo de idioma existe, senão usa en_US como fallback
+        File langFile = new File(plugin.getDataFolder(), "lang/" + langCode + ".yml");
+        if (!langFile.exists()) {
+            langCode = "en_US";
+        }
 
         player.sendMessage("");
         player.sendMessage(plugin.getDirectTranslation("lang_help_title", langCode));
