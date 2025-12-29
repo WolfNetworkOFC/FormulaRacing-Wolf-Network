@@ -59,7 +59,6 @@ public class TimerUtils {
         UUID uuid = player.getUniqueId();
         String playerName = player.getName();
 
-        plugin.getLogger().info("§e[TIMER-DEBUG] §fTentando iniciar timer para: " + playerName + " na pista: " + trackName);
 
         // 1. REGISTRO IMEDIATO (Síncrono)
         long now = System.currentTimeMillis();
@@ -72,18 +71,14 @@ public class TimerUtils {
         PlayerTimerData data = new PlayerTimerData(now, nowNano, initialCPs, attemptId);
         activeTimers.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>()).put(trackName, data);
 
-        plugin.getLogger().info("§a[TIMER-DEBUG] §fRegistro síncrono concluído. activeTimers size: " + activeTimers.size());
 
         // Garante que o loop esteja rodando
         if (!globalLoopRunning) {
-            plugin.getLogger().info("§b[TIMER-DEBUG] §fGlobal Loop não estava rodando. Iniciando agora...");
             startGlobalLoop();
-        } else {
-            plugin.getLogger().info("§b[TIMER-DEBUG] §fGlobal Loop já está operacional.");
         }
 
+
         // 2. CARREGAMENTO DE DADOS PESADOS (Assíncrono)
-        plugin.getLogger().info("§d[TIMER-DEBUG] §fDisparando busca assíncrona de PB/Checkpoints...");
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
                 // Busca os dados do banco
@@ -102,13 +97,10 @@ public class TimerUtils {
                         // IMPORTANTE: Adicione um setter para totalCheckpoints na sua classe PlayerTimerData se não tiver
                         // existingData.setTotalCheckpoints(realTotalCPs);
 
-                        plugin.getLogger().info("§d[TIMER-DEBUG] §aCache injetado com sucesso! PB: " + (pb != null ? pb[0] : "Nenhum") + " | TotalCPs: " + realTotalCPs);
-                    } else {
-                        plugin.getLogger().warning("§c[TIMER-DEBUG] §fErro: O jogador parou o timer antes dos dados do banco chegarem.");
                     }
+
                 });
             } catch (Exception e) {
-                plugin.getLogger().severe("§c[TIMER-DEBUG] §fErro crítico na busca assíncrona: " + e.getMessage());
                 e.printStackTrace();
             }
         });
@@ -117,50 +109,27 @@ public class TimerUtils {
         if (globalLoopRunning) return;
         globalLoopRunning = true;
 
-        plugin.getLogger().info("§b[LOOP-DEBUG] Tentando iniciar BukkitRunnable...");
 
         new BukkitRunnable() {
-            private int tickCounter = 0;
-
             @Override
             public void run() {
-                tickCounter++;
-
                 if (activeTimers.isEmpty()) {
-                    plugin.getLogger().info("§c[LOOP-DEBUG] Loop encerrado: activeTimers está vazio.");
                     globalLoopRunning = false;
                     this.cancel();
                     return;
                 }
-
-                // Log de batida de coração a cada 2 segundos (40 ticks)
-                if (tickCounter % 40 == 0) {
-                    plugin.getLogger().info("§7[LOOP-DEBUG] Rodando... Ativos: " + activeTimers.size());
-                }
-
                 for (Map.Entry<UUID, Map<String, PlayerTimerData>> playerEntry : activeTimers.entrySet()) {
                     UUID uuid = playerEntry.getKey();
                     Player player = Bukkit.getPlayer(uuid);
-
-                    if (player == null || !player.isOnline()) {
-                        if (tickCounter % 40 == 0) plugin.getLogger().warning("§c[LOOP-DEBUG] Player " + uuid + " não encontrado ou offline.");
-                        continue;
-                    }
-
                     for (Map.Entry<String, PlayerTimerData> trackEntry : playerEntry.getValue().entrySet()) {
                         String trackName = trackEntry.getKey();
                         PlayerTimerData data = trackEntry.getValue();
                         RaceSessionCache cache = data.getSessionCache();
 
-                        // Se chegar aqui, o código ESTÁ tentando enviar a mensagem
-                        if (tickCounter % 40 == 0) {
-                            plugin.getLogger().info("§a[LOOP-DEBUG] Enviando HUD para " + player.getName() + " | Cache: " + (cache != null));
-                        }
-
                         Double pb = (cache != null) ? cache.getPbTime() : null;
                         Map<Integer, Double> cpTimes = (cache != null) ? cache.getCpTimes() : null;
 
-                        updateHUD(player, trackName, pb, cpTimes);
+                        updateHUD(player, trackName, pb, cpTimes, databaseManager.getCheckpointCount(trackName));
                     }
                 }
             }
@@ -273,7 +242,7 @@ public class TimerUtils {
         databaseManager.resetAllTrackTimes(trackName);
     }
 
-    public void updateHUD(Player player, String trackName, Double pbTime, Map<Integer, Double> dbCheckpointTimes) {
+    public void updateHUD(Player player, String trackName, Double pbTime, Map<Integer, Double> dbCheckpointTimes, int checkpointcount) {
         PlayerTimerData data = getTimerData(player, trackName);
         if (data == null) return;
 
@@ -281,7 +250,7 @@ public class TimerUtils {
         double elapsedSeconds = (System.nanoTime() - data.getStartNanoTime()) / 1_000_000_000.0;
 
         int checkpointCount = data.getCheckpointsReached().size();
-        int totalCheckpoints = data.getTotalCheckpoints();
+        int totalCheckpoints =   data.getTotalCheckpoints();
 
         // 1. Busca o ÚLTIMO checkpoint registrado
         List<CheckpointData> temp = getTempCheckpoints(uuid);
@@ -328,11 +297,7 @@ public class TimerUtils {
 
         // 4. FORMATAÇÃO E EXIBIÇÃO
         String timeStr = formatTime(elapsedSeconds, hasPB, worstTime);
-
-        // Se o totalCheckpoints ainda for 0 (banco não carregou), vamos mostrar algo amigável
-        String cpStatus = (totalCheckpoints > 0) ? checkpointCount + "/" + totalCheckpoints : String.valueOf(checkpointCount);
-
-        String hud = timeStr + " §7(CP " + cpStatus + ")";
+        String hud = timeStr + " §7(CP "  + checkpointCount + "/" + checkpointcount + ")";
 
         if (!deltaStr.isEmpty()) {
             hud += " " + deltaColor + deltaStr;
@@ -356,9 +321,6 @@ public class TimerUtils {
             warnedPlayersNoCheckpoints.remove(uuid);
             // Limpa warnings de checkpoints específicos
             lastWarningTime.entrySet().removeIf(entry -> entry.getKey().startsWith(uuid.toString() + ":"));
-
-            // Log para confirmar que o sistema limpou tudo
-            plugin.getLogger().info("§7[TIMER-DEBUG] Cache totalmente limpo para " + player.getName());
         }
     }
 

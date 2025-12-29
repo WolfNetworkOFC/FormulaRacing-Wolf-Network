@@ -158,50 +158,44 @@ public class RegionListener implements Listener {
 
         // 3. Detecção de START / END
         RegionData region = getRegionAtLine(previous, current, worldRegions);
-
         if (region != null) {
             String regionTrack = region.getTrackName();
             String type = region.getType().toUpperCase();
-
-            // Criamos uma chave única: "Pista_Tipo" (ex: "London_START")
             String currentKey = regionTrack + "_" + type;
             String lastKey = playerRegion.get(uuid);
 
-            // Se a chave mudou, processamos o novo bloco
             if (!Objects.equals(currentKey, lastKey)) {
-                // Salvamos a chave atual para evitar repetições no mesmo bloco
                 playerRegion.put(uuid, currentKey);
-
-                // Dispara a lógica principal (Timer, Banco, etc)
                 handleRegion(player, region);
             }
         } else {
-            // Se saiu de qualquer região, limpamos o cache para permitir re-entrada
             if (playerRegion.containsKey(uuid)) {
                 playerRegion.remove(uuid);
             }
         }
 
-        // 4. Detecção de Checkpoints (Lógica de Linha Fina)
+        // 4. Detecção de Checkpoints com VALIDAÇÃO SEQUENCIAL
         String activeTrack = timerUtils.getActiveTrack(player);
         if (activeTrack != null) {
+            // Obter checkpoints ordenados por ID (ou ordem de criação)
             List<RegionData> checkpoints = database.getCheckpoints(activeTrack);
             TimerUtils.PlayerTimerData data = timerUtils.getTimerData(player, activeTrack);
 
             if (data != null) {
-                for (RegionData cp : checkpoints) {
-                    // Se já passou nesse CP nesta volta, ignora
-                    if (data.getCheckpointsReached().contains(cp.getId())) continue;
+                // Pegamos a quantidade de CPs já coletados para saber qual é o próximo esperado
+                // Se coletou 0, o próximo esperado é o index 0 da lista.
+                int nextExpectedIndex = data.getCheckpointsReached().size();
 
-                    if (intersectsRegion(previous, current, cp)) {
-                        // Registra o checkpoint síncronamente
-                        timerUtils.addCheckpoint(player, cp.getId());
+                if (nextExpectedIndex < checkpoints.size()) {
+                    RegionData nextCp = checkpoints.get(nextExpectedIndex);
 
-                        // Salva no cache de deltas (HUD)
+                    if (intersectsRegion(previous, current, nextCp)) {
+                        // REGISTRA APENAS O PRÓXIMO DA FILA
+                        timerUtils.addCheckpoint(player, nextCp.getId());
+
                         double elapsed = timerUtils.getPlayerElapsedTime(player);
-                        timerUtils.addTempCheckpoint(uuid, cp.getId(), elapsed, activeTrack);
+                        timerUtils.addTempCheckpoint(uuid, nextCp.getId(), elapsed, activeTrack);
 
-                        // Som de feedback
                         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6f, 1.5f);
                     }
                 }
@@ -215,60 +209,73 @@ public class RegionListener implements Listener {
 
         UUID uuid = player.getUniqueId();
         String regionTrack = region.getTrackName();
-        String type = region.getType().toUpperCase();
+        String type = region.getType().toUpperCase(); // "START" ou "END"
         String lang_code = database.getPlayerLanguage(uuid);
 
-        // 1. DEBOUNCE: Impede que o mesmo bloco dispare várias vezes enquanto o jogador está em cima dele
+        // 1. DEBOUNCE
         String lastState = playerRegion.get(uuid);
         if (Objects.equals(lastState, regionTrack + "_" + type + "_DONE")) return;
 
-        // Só processamos blocos de START ou END
         if (!type.equals("START") && !type.equals("END")) return;
 
-        plugin.getLogger().info("§e[DEBUG-REGION] §fPlayer: " + player.getName() + " | Bloco: " + type + " | Pista: " + regionTrack);
 
-        // --- 🏁 PASSO 1: FINALIZAÇÃO (Se já estiver correndo e passar no START ou END) ---
-        // Em circuitos, tanto o bloco START quanto o END podem finalizar a volta anterior.
-        if (timerUtils.isTimerRunning(player, regionTrack)) {
+        int activeDuelId = database.getActiveDuelId(uuid);
+        boolean isRunningDuel = (activeDuelId != -1);
+        boolean isRunningSolo = timerUtils.isTimerRunning(player, regionTrack);
+
+        // --- 🏁 FASE 1: FINALIZAÇÃO (STOP) ---
+
+        // Lógica de DUELO: Desliga apenas se passar no "END"
+        if (isRunningDuel && type.equals("END")) {
+            DuelsTimer.toggleTimer(player, activeDuelId, false);
+            player.sendMessage("§e🏁 Linha de chegada cruzada (Duelo)!");
+            plugin.getLogger().info("§6[DUEL] §fTimer parado no END.");
+        }
+
+        // Lógica SOLO: Finaliza em qualquer um (START ou END) para permitir voltas contínuas
+        if (isRunningSolo && !isRunningDuel) {
             TimerUtils.PlayerTimerData data = timerUtils.getTimerData(player, regionTrack);
             if (data != null) {
                 double rawElapsed = timerUtils.getPlayerElapsedTime(player, regionTrack);
                 int checkpoints = data.getCheckpointsReached().size();
-                int totalCheckpoints = data.getTotalCheckpoints();
+                int totalCheckpoints = database.getCheckpointCount(regionTrack);
 
-                // Só finaliza se tiver os CPs necessários
                 if (checkpoints >= totalCheckpoints && totalCheckpoints > 0) {
                     database.saveFullTime(uuid, player.getName(), regionTrack, rawElapsed, checkpoints);
-
                     String msg = (lang_code.startsWith("pt")) ? "§6🏁 §fTempo: §b" : "§6🏁 §fTime: §b";
                     player.sendMessage(msg + formatTime(rawElapsed));
                     player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1.2f);
-                } else {
-                    plugin.getLogger().warning("§c[DEBUG-FINISH] Volta anulada: CPs insuficientes (" + checkpoints + "/" + totalCheckpoints + ")");
                 }
             }
-            // Para o timer antigo antes de começar o novo
             timerUtils.stopTimer(player, regionTrack);
         }
 
-        // --- 🚀 PASSO 2: INÍCIO (Sempre inicia uma nova volta ao passar no START ou END) ---
-        // Se o jogador estiver com o modo Time Trial ativo, iniciamos uma nova volta imediatamente.
-        if (database.getTimeTrialEnabled(uuid)) {
+        // --- 🚀 FASE 2: INÍCIO / RESTART (START) ---
+
+        // Lógica de DUELO: Inicia apenas se passar no "START"
+        if (isRunningDuel && type.equals("START")) {
+            String duelTrack = database.getTrackNameFromDuelId(activeDuelId);
+            if (regionTrack.equalsIgnoreCase(duelTrack)) {
+                DuelsTimer.toggleTimer(player, activeDuelId, true);
+                player.sendTitle("", "§e§l⚔ VOLTA INICIADA", 0, 15, 5);
+                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 2f);
+                plugin.getLogger().info("§a[DUEL] §fTimer iniciado no START.");
+            }
+        }
+        // Lógica SOLO: Inicia no START (ou reinicia em circuitos)
+        else if (!isRunningDuel && database.getTimeTrialEnabled(uuid) && type.equals("START")) {
             String soloTrack = plugin.getLastTimeTrialTrack(uuid);
 
-            // Ajuste automático de pista (Ex: Londres)
             if (soloTrack == null || !regionTrack.equalsIgnoreCase(soloTrack)) {
                 plugin.setLastTimeTrialTrack(uuid, regionTrack);
             }
-
-            plugin.getLogger().info("§a[DEBUG-START] Iniciando nova volta para: " + regionTrack);
 
             stt.setPlayerTrack(player, regionTrack);
             timerUtils.startTimer(player, regionTrack);
             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1.2f);
         }
 
-        // 2. Marca como processado para o debounce
+        // 3. Marca como processado
         playerRegion.put(uuid, regionTrack + "_" + type + "_DONE");
     }
     public double roundTime(double sec) {

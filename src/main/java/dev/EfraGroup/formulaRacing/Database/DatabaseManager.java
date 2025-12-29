@@ -355,7 +355,7 @@ public class DatabaseManager {
             ps.setInt(1, duelId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return rs.getString("track_name");
+                    return rs.getString("trackNameWS");
                 }
             }
         } catch (SQLException e) {
@@ -1061,7 +1061,6 @@ public class DatabaseManager {
                 CASE WHEN finished = 1 THEN bestTime ELSE 999999 END ASC, 
                 checkpointsReached DESC, 
                 bestTime ASC
-            LIMIT 10
             """;
 
            Connection conn = getOrConnect();
