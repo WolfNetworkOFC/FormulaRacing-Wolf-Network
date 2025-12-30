@@ -9,8 +9,8 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Listener.RegionListener;
 import dev.EfraGroup.formulaRacing.PacketSender;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardTimeTrialUtils;
+import dev.EfraGroup.formulaRacing.Utils.TimeTrialMenuUtilsV2;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
-import dev.EfraGroup.formulaRacing.Utils.TimeTrialMenuUtils;
 import org.bukkit.Location;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -32,6 +32,9 @@ public class TimeTrialCommandHandler implements CommandExecutor {
     private final ScoreboardTimeTrialUtils stt;
     private final EventsManager ev;
 
+    // ✅ Instância única do menu (reutilizada)
+    private final TimeTrialMenuUtilsV2 menuUtils;
+
     public TimeTrialCommandHandler(DatabaseManager mysql, FormulaRacing plugin, PacketSender packetsender, TimerUtils timerUtils, RegionListener rcl, APIFormulaRacing api, ScoreboardTimeTrialUtils stt, EventsManager ev) {
         this.mysql = mysql;
         this.plugin = plugin;
@@ -41,6 +44,9 @@ public class TimeTrialCommandHandler implements CommandExecutor {
         this.api = api;
         this.stt = stt;
         this.ev = ev;
+
+        // ✅ Cria UMA ÚNICA instância do menu (registra listener apenas 1 vez)
+        this.menuUtils = new TimeTrialMenuUtilsV2(plugin, mysql, api, packetsender, timerUtils, stt);
     }
 
     @Override
@@ -64,7 +70,7 @@ public class TimeTrialCommandHandler implements CommandExecutor {
 
         // O código original continua abaixo...
         if (args.length == 0) {
-            new TimeTrialMenuUtils(plugin, mysql, api, packetsender, timerUtils, stt).open(player);
+            menuUtils.open(player); // ✅ Usa a instância única
             return true;
         }
 

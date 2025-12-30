@@ -28,8 +28,8 @@ public class TimeTrialMenuUtils implements Listener {
     private final ScoreboardTimeTrialUtils stt;
     private final String INVENTORY_TITLE = ChatColor.GREEN + "Escolha uma pista";
 
-    // 🕒 Controle de cliques: <UUID, último clique em ms>
-    private final Map<UUID, Long> clickCooldown = new HashMap<>();
+    // 🔒 Lock de processamento: Map com timestamp do último clique
+    private final Map<UUID, Long> lastClickTime = new java.util.concurrent.ConcurrentHashMap<>();
 
     public TimeTrialMenuUtils(FormulaRacing plugin, DatabaseManager mysql, APIFormulaRacing api, PacketSender ps, TimerUtils timerUtils, ScoreboardTimeTrialUtils stt) {
         this.plugin = plugin;
@@ -39,7 +39,8 @@ public class TimeTrialMenuUtils implements Listener {
         this.timerUtils = timerUtils;
         this.stt = stt;
 
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        // ⚠️ DESABILITADO: Usando TimeTrialMenuUtilsV2 agora
+        // Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
     public void open(Player player) {
@@ -110,26 +111,24 @@ public class TimeTrialMenuUtils implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST, ignoreCancelled = false)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!event.getView().getTitle().equals(INVENTORY_TITLE)) return;
+
+        // Cancela IMEDIATAMENTE antes de qualquer processamento
         event.setCancelled(true);
 
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || clicked.getType() == Material.AIR) return;
         if (!clicked.hasItemMeta() || clicked.getItemMeta().getDisplayName() == null) return;
 
-        Player player = (Player) event.getWhoClicked();
-
-        // 🕒 Limite de um clique a cada 0.5s (500ms)
-        long now = System.currentTimeMillis();
-        long lastClick = clickCooldown.getOrDefault(player.getUniqueId(), 0L);
-        if (now - lastClick < 500) {
-            String langCode = mysql.getPlayerLanguage(player.getUniqueId());
-            player.sendMessage(plugin.getDirectTranslation("wait_before_click", langCode));
+        // Só processa LEFT clicks
+        if (!event.isLeftClick()) {
             return;
         }
-        clickCooldown.put(player.getUniqueId(), now);
+
+        Player player = (Player) event.getWhoClicked();
+        UUID uuid = player.getUniqueId();
 
         // Remove todas as formatações de cor e itálico do nome da pista
         String trackName = ChatColor.stripColor(clicked.getItemMeta().getDisplayName()).trim();
@@ -141,16 +140,46 @@ public class TimeTrialMenuUtils implements Listener {
             return;
         }
 
-        // Fecha o inventário para evitar cliques duplicados
-        player.closeInventory();
-
         if (!mysql.isTrackOpen(trackName)) {
-            String langCode = mysql.getPlayerLanguage(player.getUniqueId());
+            String langCode = mysql.getPlayerLanguage(uuid);
             player.sendMessage(plugin.getDirectTranslation("track_is_closed", langCode));
             return;
         }
 
-        if (event.isLeftClick()) {
+        // 🔒 SOLUÇÃO DEFINITIVA: Usa putIfAbsent para bloquear todos exceto o primeiro
+        long now = System.currentTimeMillis();
+        Long previousTimestamp = lastClickTime.putIfAbsent(uuid, now);
+
+        // Se previousTimestamp NÃO é null, significa que já existia um timestamp
+        if (previousTimestamp != null) {
+            long diff = now - previousTimestamp;
+            if (diff < 3000) { // 3 segundos de cooldown
+                // Bloqueia silenciosamente
+                return;
+            }
+            // Passou o cooldown, atualiza para o novo timestamp
+            lastClickTime.put(uuid, now);
+        }
+
+        // Se chegou aqui, é o PRIMEIRO evento ou já passou o cooldown
+        plugin.getLogger().info("[DEBUG] Click ACCEPTED for " + player.getName() + " to " + trackName);
+
+        // Fecha o inventário IMEDIATAMENTE
+        player.closeInventory();
+
+        // 🚀 Executa o teleporte de forma ASSÍNCRONA
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+
+            try {
+                processTeleport(player, trackName);
+            } catch (Exception e) {
+                plugin.getLogger().warning("[ERROR] Error processing teleport: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }, 1L); // Delay mínimo de 1 tick
+    }
+
+    private void processTeleport(Player player, String trackName) {
 
             // 🔹 Salva tempo parcial da pista anterior antes de trocar
             String lastTrack = plugin.getLastTimeTrialTrack(player.getUniqueId());
@@ -210,7 +239,6 @@ public class TimeTrialMenuUtils implements Listener {
 
                 // Envia mensagem de teleporte com placeholder
                 String teleportMsg = plugin.getTranslation("timetrial_teleport", langCode, "{track}", trackName);
-                plugin.getLogger().info("Sending teleport message to " + player.getName() + ": " + teleportMsg);
                 player.sendMessage(teleportMsg);
 
                 // Envia informações da pista
@@ -223,7 +251,5 @@ public class TimeTrialMenuUtils implements Listener {
                 String langCode = mysql.getPlayerLanguage(player.getUniqueId());
                 player.sendMessage(plugin.getDirectTranslation("track_location_not_found", langCode));
             }
-
-        }
     }
 }

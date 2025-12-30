@@ -13,6 +13,12 @@ wait_before_click: "&cWait half a second before clicking again!"
 
 # Time Trial Messages
 timetrial_teleport: "&eTeleported to [&f{track}&e]"
+timetrial_menu_title: "&aChoose a track"
+timetrial_menu_owner: "&eOwner: &f{owner}"
+timetrial_menu_pb: "&eYour PB: &f{time}"
+timetrial_menu_wr: "&eWorld Record: &f{time}"
+timetrial_menu_position: "&ePosition: &f{position}"
+timetrial_menu_no_time: "(-)"
 track_not_found: "&cTrack not found with that name."
 track_is_closed: "&cThis track is closed and cannot be used at the moment!"
 does_not_have_boatutils: "&cThis track uses special BoatUtils settings, but you don't have the mod!"

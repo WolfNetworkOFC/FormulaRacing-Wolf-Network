@@ -13,6 +13,12 @@ wait_before_click: "&cAguarde meio segundo antes de clicar novamente!"
 
 # Mensagens de Time Trial
 timetrial_teleport: "&eTeleportado para [&f{track}&e]"
+timetrial_menu_title: "&aEscolha uma pista"
+timetrial_menu_owner: "&eDono: &f{owner}"
+timetrial_menu_pb: "&eSeu PB: &f{time}"
+timetrial_menu_wr: "&eRecorde Mundial: &f{time}"
+timetrial_menu_position: "&ePosição: &f{position}"
+timetrial_menu_no_time: "(-)"
 track_not_found: "&cNão existe pista com esse nome."
 track_is_closed: "&cEsta pista está fechada e não pode ser usada no momento!"
 does_not_have_boatutils: "&cEsta pista usa configurações especiais de BoatUtils, mas você não está com o mod!"
