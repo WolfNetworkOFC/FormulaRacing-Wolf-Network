@@ -1,8 +1,0 @@
-<component name="ArtifactManager">
-  <artifact type="jar" name="formularacing:jar">
-    <output-path>$PROJECT_DIR$/out/artifacts/formularacing_jar</output-path>
-    <root id="archive" name="formularacing.jar">
-      <element id="module-output" name="formularacing" />
-    </root>
-  </artifact>
-</component>
