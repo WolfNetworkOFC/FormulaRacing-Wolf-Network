@@ -291,14 +291,14 @@ public class PacketSender {
                 sendBoatSetting(player, (short) 27, (short) 4);
                 Bukkit.getLogger().info("[FormulaRacing] Lonely ON (Packet) para: " + player.getName());
             } else {
-                // Fallback: Esconder o jogador "lonely" de todos os outros jogadores
+                // Fallback: O jogador "lonely" para de ver os outros (não o contrário!)
                 for (Player other : Bukkit.getOnlinePlayers()) {
                     if (other.equals(player)) continue;
 
-                    // Os OUTROS param de ver quem ativou o modo lonely
-                    other.hidePlayer(FormulaRacing.getInstance(), player);
-                    if (player.getVehicle() != null) {
-                        other.hideEntity(FormulaRacing.getInstance(), player.getVehicle());
+                    // QUEM ATIVOU lonely deixa de ver os outros
+                    player.hidePlayer(FormulaRacing.getInstance(), other);
+                    if (other.getVehicle() != null) {
+                        player.hideEntity(FormulaRacing.getInstance(), other.getVehicle());
                     }
                 }
                 Bukkit.getLogger().info("[FormulaRacing] Lonely ON (Invisibilidade) para: " + player.getName());
@@ -312,13 +312,13 @@ public class PacketSender {
                 sendBoatSetting(player, (short) 27, (short) 0);
                 Bukkit.getLogger().info("[FormulaRacing] Lonely OFF (Packet) para: " + player.getName());
             } else {
-                // Tornar o jogador "lonely" visível novamente para todos
+                // O jogador "lonely" volta a ver os outros jogadores
                 for (Player other : Bukkit.getOnlinePlayers()) {
                     if (other.equals(player)) continue;
 
-                    other.showPlayer(FormulaRacing.getInstance(), player);
-                    if (player.getVehicle() != null) {
-                        other.showEntity(FormulaRacing.getInstance(), player.getVehicle());
+                    player.showPlayer(FormulaRacing.getInstance(), other);
+                    if (other.getVehicle() != null) {
+                        player.showEntity(FormulaRacing.getInstance(), other.getVehicle());
                     }
                 }
                 Bukkit.getLogger().info("[FormulaRacing] Lonely OFF (Visibilidade) para: " + player.getName());

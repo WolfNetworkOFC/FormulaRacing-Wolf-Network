@@ -3,6 +3,7 @@ package dev.EfraGroup.formulaRacing.Listener;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager.RegionData;
 import dev.EfraGroup.formulaRacing.Database.EventsManager;
+import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 //import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.PacketSender;
@@ -31,6 +32,7 @@ public class RegionListener implements Listener {
     private final ScoreboardTimeTrialUtils stt;
     private final EventsManager ev;
     private final TimeTrialDuelsAction DuelsTimer;
+    private final TimeTrialDuels timeTrialDuels;
 
 
     private final Map<UUID, String> playerRegion = new HashMap<>();
@@ -38,10 +40,13 @@ public class RegionListener implements Listener {
     private final Set<String> warnedWorlds = new HashSet<>();
     private final Map<UUID, Location> lastLocation = new HashMap<>();
 
+    // 🔹 Controle de debounce para START/FINISH
+    private final Map<UUID, Long> lastRegionCrossTime = new ConcurrentHashMap<>();
+
     // 🔹 Jogadores ignorados após teleporte
     private final Set<UUID> justTeleported = new HashSet<>();
 
-    public RegionListener(FormulaRacing plugin, DatabaseManager database, TimerUtils timerUtils, PacketSender packetSender, ScoreboardTimeTrialUtils stt, EventsManager ev, TimeTrialDuelsAction DuelsTimer) {
+    public RegionListener(FormulaRacing plugin, DatabaseManager database, TimerUtils timerUtils, PacketSender packetSender, ScoreboardTimeTrialUtils stt, EventsManager ev, TimeTrialDuelsAction DuelsTimer, TimeTrialDuels timeTrialDuels) {
         this.plugin = plugin;
         this.database = database;
         this.timerUtils = timerUtils;
@@ -49,6 +54,7 @@ public class RegionListener implements Listener {
         this.stt = stt;
         this.ev = ev;
         this.DuelsTimer = DuelsTimer;
+        this.timeTrialDuels = timeTrialDuels;
 
 
         startRegionLoader();
@@ -162,17 +168,16 @@ public class RegionListener implements Listener {
         if (region != null) {
             String regionTrack = region.getTrackName();
             String type = region.getType().toUpperCase();
-            String currentKey = regionTrack + "_" + type;
-            String lastKey = playerRegion.get(uuid);
 
-            if (!Objects.equals(currentKey, lastKey)) {
-                playerRegion.put(uuid, currentKey);
-                handleRegion(player, region);
+            // Debounce: Ignora se cruzou a mesma linha há menos de 2 segundos
+            Long lastCross = lastRegionCrossTime.get(uuid);
+            long now = System.currentTimeMillis();
+            if (lastCross != null && (now - lastCross) < 2000) {
+                return;
             }
-        } else {
-            if (playerRegion.containsKey(uuid)) {
-                playerRegion.remove(uuid);
-            }
+
+            lastRegionCrossTime.put(uuid, now);
+            handleRegion(player, region);
         }
 
         // 4. Detecção de Checkpoints com VALIDAÇÃO SEQUENCIAL
@@ -213,9 +218,6 @@ public class RegionListener implements Listener {
         String type = region.getType().toUpperCase(); // "START" ou "END"
         String lang_code = database.getPlayerLanguage(uuid);
 
-        // 1. DEBOUNCE
-        String lastState = playerRegion.get(uuid);
-        if (Objects.equals(lastState, regionTrack + "_" + type + "_DONE")) return;
 
         if (!type.equals("START") && !type.equals("END")) return;
 
@@ -224,16 +226,28 @@ public class RegionListener implements Listener {
         boolean isRunningDuel = (activeDuelId != -1);
         boolean isRunningSolo = timerUtils.isTimerRunning(player, regionTrack);
 
-        // --- 🏁 FASE 1: FINALIZAÇÃO (STOP) ---
+        // --- 🏁 LÓGICA DE DUELO ---
+        if (isRunningDuel) {
+            String duelTrack = database.getTrackNameFromDuelId(activeDuelId);
 
-        // Lógica de DUELO: Desliga apenas se passar no "END"
-        if (isRunningDuel && type.equals("END")) {
-            DuelsTimer.toggleTimer(player, activeDuelId, false);
-            player.sendMessage("§e🏁 Linha de chegada cruzada (Duelo)!");
-            plugin.getLogger().info("§6[DUEL] §fTimer parado no END.");
+            // Só processa se estiver na pista correta do duelo
+            if (regionTrack.equalsIgnoreCase(duelTrack)) {
+                if (type.equals("START")) {
+                    // Jogador cruzou a linha de START
+                    timeTrialDuels.onPlayerCrossStart(player, activeDuelId);
+                    plugin.getLogger().info("§a[DUEL] " + player.getName() + " cruzou START no duelo #" + activeDuelId);
+                } else if (type.equals("END")) {
+                    // Jogador cruzou a linha de FINISH
+                    timeTrialDuels.onPlayerCrossFinish(player, activeDuelId);
+                    plugin.getLogger().info("§a[DUEL] " + player.getName() + " cruzou FINISH no duelo #" + activeDuelId);
+                }
+            }
+            return;
         }
 
-        // Lógica SOLO: Finaliza em qualquer um (START ou END) para permitir voltas contínuas
+        // --- 🏁 LÓGICA SOLO (TIME TRIAL) ---
+
+        // FINALIZAÇÃO (STOP)
         if (isRunningSolo && !isRunningDuel) {
             TimerUtils.PlayerTimerData data = timerUtils.getTimerData(player, regionTrack);
             if (data != null) {
@@ -251,19 +265,7 @@ public class RegionListener implements Listener {
             timerUtils.stopTimer(player, regionTrack);
         }
 
-        // --- 🚀 FASE 2: INÍCIO / RESTART (START) ---
-
-        // Lógica de DUELO: Inicia apenas se passar no "START"
-        if (isRunningDuel && type.equals("START")) {
-            String duelTrack = database.getTrackNameFromDuelId(activeDuelId);
-            if (regionTrack.equalsIgnoreCase(duelTrack)) {
-                DuelsTimer.toggleTimer(player, activeDuelId, true);
-                player.sendTitle("", "§e§l⚔ VOLTA INICIADA", 0, 15, 5);
-                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 2f);
-                plugin.getLogger().info("§a[DUEL] §fTimer iniciado no START.");
-            }
-        }
-        // Lógica SOLO: Inicia no START (ou reinicia em circuitos)
+        // INÍCIO / RESTART (START)
         else if (!isRunningDuel && database.getTimeTrialEnabled(uuid) && type.equals("START")) {
             String soloTrack = plugin.getLastTimeTrialTrack(uuid);
 
@@ -274,10 +276,7 @@ public class RegionListener implements Listener {
             stt.setPlayerTrack(player, regionTrack);
             timerUtils.startTimer(player, regionTrack);
             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1.2f);
-            }
-
-        // 3. Marca como processado
-        playerRegion.put(uuid, regionTrack + "_" + type + "_DONE");
+        }
     }
     public double roundTime(double sec) {
         return Math.round(sec * 100.0) / 100.0; // arredonda para 0.01

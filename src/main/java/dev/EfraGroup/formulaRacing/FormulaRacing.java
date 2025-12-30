@@ -73,12 +73,17 @@
                 this.ev = new EventsManager(this, fileManager, dm);
                 this.ttda = new TimeTrialDuelsAction(this, dm);
 
-                this.ttd = new TimeTrialDuels(this, dm, packetSender, ttda, new ScoreboardDuelsTimeUtils(this, dm, ttda));
+                ScoreboardDuelsTimeUtils scoreboardDuelsUtils = new ScoreboardDuelsTimeUtils(this, dm, ttda, null); // Passa null temporariamente
+                this.ttd = new TimeTrialDuels(this, dm, packetSender, ttda, scoreboardDuelsUtils);
+
+                // Configura as referências circulares após a criação
+                ttda.setTimeTrialDuels(ttd);
+                scoreboardDuelsUtils.setTimeTrialDuels(ttd);
 
                 // CRIANDO A INSTÂNCIA ÚNICA DO HANDLER
                 DuelCommandHandler duelHandler = new DuelCommandHandler(this, dm, ttd, ttda, packetSender);
 
-                this.rcl = new RegionListener(this, dm, timerUtils, packetSender, stt, ev, ttda);
+                this.rcl = new RegionListener(this, dm, timerUtils, packetSender, stt, ev, ttda, ttd);
 
                 // ========== ETAPA 6: Scoreboard auto-update ==========
                 stt.startAutoUpdate();

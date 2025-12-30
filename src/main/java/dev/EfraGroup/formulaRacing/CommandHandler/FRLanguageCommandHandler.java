@@ -3,6 +3,7 @@ package dev.EfraGroup.formulaRacing.CommandHandler;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FileManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Gui.LanguageGui;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -15,10 +16,12 @@ public class FRLanguageCommandHandler implements CommandExecutor {
 
     private final DatabaseManager db;
     private final FormulaRacing plugin;
+    private final LanguageGui languageGui;
 
     public FRLanguageCommandHandler(FormulaRacing plugin, FileManager fileManager, DatabaseManager db) {
         this.plugin = plugin;
         this.db = db;
+        this.languageGui = new LanguageGui(db, plugin);
     }
 
     @Override
@@ -29,7 +32,8 @@ public class FRLanguageCommandHandler implements CommandExecutor {
         }
 
         if (args.length == 0) {
-            sendHelp(player);
+            // Abre o menu GUI diretamente
+            handleMenu(player);
             return true;
         }
 
@@ -39,8 +43,10 @@ public class FRLanguageCommandHandler implements CommandExecutor {
             case "set" -> handleSet(player, args);
             case "list" -> handleList(player);
             case "reload" -> handleReload(player);
+            case "menu" -> handleMenu(player);
+            case "help", "ajuda" -> sendHelp(player);
             default -> {
-                // Se o usuário digitar apenas /frlang pt_BR, ele tenta dar o set direto
+                // Se o usuário digitar apenas /lang pt_BR, ele tenta dar o set direto
                 if (args.length == 1) {
                     handleSet(player, new String[]{"set", args[0]});
                 } else {
@@ -149,6 +155,10 @@ public class FRLanguageCommandHandler implements CommandExecutor {
         player.sendMessage(plugin.getDirectTranslation("lang_reload_success", langCode));
     }
 
+    private void handleMenu(Player player) {
+        languageGui.open(player);
+    }
+
     private void sendHelp(Player player) {
         String langCode = db.getPlayerLanguage(player.getUniqueId());
 
@@ -160,8 +170,10 @@ public class FRLanguageCommandHandler implements CommandExecutor {
 
         player.sendMessage("");
         player.sendMessage(plugin.getDirectTranslation("lang_help_title", langCode));
+        player.sendMessage(plugin.getDirectTranslation("lang_help_menu", langCode));
         player.sendMessage(plugin.getDirectTranslation("lang_help_list", langCode));
         player.sendMessage(plugin.getDirectTranslation("lang_help_set", langCode));
+        player.sendMessage(plugin.getDirectTranslation("lang_help_help", langCode));
         if (player.hasPermission("formularacing.admin")) {
             player.sendMessage(plugin.getDirectTranslation("lang_help_reload", langCode));
         }

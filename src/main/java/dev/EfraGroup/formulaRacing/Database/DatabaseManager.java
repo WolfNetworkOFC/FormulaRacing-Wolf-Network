@@ -1848,6 +1848,8 @@ public class DatabaseManager {
                         );
                     }
                 }
+            } catch (SQLException e) {
+                handleSqlError(e);
             }
         } catch (SQLException e) {
             handleSqlError(e);
@@ -1881,6 +1883,8 @@ public class DatabaseManager {
                         );
                     }
                 }
+            } catch (SQLException e) {
+                handleSqlError(e);
             }
         } catch (SQLException e) {
             handleSqlError(e);
@@ -3429,7 +3433,81 @@ public class DatabaseManager {
         return null;
     }
 
+    /**
+     * Salva o tempo de uma volta específica de um jogador no duelo.
+     * Usado para registrar PB e histórico de voltas.
+     */
+    public synchronized void saveDuelLapTime(UUID playerUUID, String playerName, int duelId, int lapNumber, double lapTime, String trackName) {
+        String sql = "INSERT INTO fr_timetrial_dueltimes (playerName, duel_id, time, checkpointsReached, finished) VALUES (?, ?, ?, ?, ?)";
 
+        try {
+            Connection conn = this.getOrConnect();
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, playerUUID.toString());
+                pstmt.setInt(2, duelId);
+                pstmt.setDouble(3, lapTime);
+                pstmt.setInt(4, 0); // Checkpoints não são usados em duelos de volta
+                pstmt.setBoolean(5, false); // Marca como não finalizado (é apenas uma volta)
+
+                pstmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            Bukkit.getLogger().severe("[FormulaRacing] Erro ao salvar tempo de volta do duelo: " + e.getMessage());
+            handleSqlError(e);
+        }
+    }
+
+    /**
+     * Salva o tempo total final de um jogador no duelo.
+     * Este é o tempo usado para o PB (Personal Best).
+     */
+    public synchronized void saveDuelFinalTime(UUID playerUUID, String playerName, int duelId, double totalTime, String trackName) {
+        String sql = "INSERT INTO fr_timetrial_dueltimes (playerName, duel_id, time, checkpointsReached, finished) VALUES (?, ?, ?, ?, ?)";
+
+        try {
+            Connection conn = this.getOrConnect();
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, playerUUID.toString());
+                pstmt.setInt(2, duelId);
+                pstmt.setDouble(3, totalTime);
+                pstmt.setInt(4, 0); // Checkpoints não são usados em duelos
+                pstmt.setBoolean(5, true); // Marca como finalizado (tempo total)
+
+                pstmt.executeUpdate();
+                Bukkit.getLogger().info("[FormulaRacing] Tempo final salvo para " + playerName + " no duelo #" + duelId + ": " + String.format("%.3f", totalTime) + "s");
+            }
+        } catch (SQLException e) {
+            Bukkit.getLogger().severe("[FormulaRacing] Erro ao salvar tempo final do duelo: " + e.getMessage());
+            handleSqlError(e);
+        }
+    }
+
+    /**
+     * Busca o melhor tempo de volta do jogador no duelo atual (apenas voltas não finalizadas)
+     * Retorna null se não houver nenhuma volta registrada ainda
+     */
+    public synchronized Double getPlayerBestLapTimeInDuel(UUID playerUUID, int duelId) {
+        String sql = "SELECT MIN(time) FROM fr_timetrial_dueltimes WHERE playerName = ? AND duel_id = ? AND finished = 0";
+
+        try {
+            Connection conn = this.getOrConnect();
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, playerUUID.toString());
+                pstmt.setInt(2, duelId);
+
+                ResultSet rs = pstmt.executeQuery();
+                if (rs.next()) {
+                    double time = rs.getDouble(1);
+                    // Se retornar 0, significa que não há registros (MIN retorna 0 em vez de NULL em alguns casos)
+                    return (time > 0) ? time : null;
+                }
+            }
+        } catch (SQLException e) {
+            Bukkit.getLogger().severe("[FormulaRacing] Erro ao buscar melhor volta no duelo: " + e.getMessage());
+            handleSqlError(e);
+        }
+        return null;
+    }
 
     private void handleSqlError(SQLException e) {
         if (e.getMessage().toLowerCase().contains("closed") || e.getMessage().toLowerCase().contains("pointer")) {
@@ -3638,5 +3716,4 @@ public class DatabaseManager {
 
 
 }
-
 

@@ -298,45 +298,11 @@ public class DuelCommandHandler implements CommandExecutor, Listener {
         int duelId = databaseManager.getActiveDuelId(playerUUID);
         if (duelId == -1) return;
 
-        // --- DESATIVAÇÃO DO MODO LONELY (QUEM SAIU) ---
-        // Removemos o modo de colisão/invisibilidade imediatamente ao sair do duelo.
-        packet.applyLonelyToPlayer(player, false);
+        // Usa o método do TimeTrialDuels para remover o jogador corretamente
+        timeTrialDuels.removePlayerFromDuel(playerUUID, duelId);
 
-        // Pegamos a lista de todos os participantes originais
-        List<UUID> participants = databaseManager.getActivePlayersInDuel(duelId);
-
-        // Removemos o jogador que está saindo da lista de "ativos"
-        participants.remove(playerUUID);
-
-        // LÓGICA DE VITÓRIA (1v1 ou ÚLTIMO SOBREVIVENTE)
-        if (participants.size() == 1) {
-            // Se sobrou apenas 1, ele é o vencedor
-            UUID winnerUUID = participants.get(0);
-            databaseManager.setDuelStateWithWinner(duelId, "FINISHED", winnerUUID);
-
-            Player winner = Bukkit.getPlayer(winnerUUID);
-            if (winner != null && winner.isOnline()) {
-                winner.sendMessage(" ");
-                winner.sendMessage("§a§lVITÓRIA! §fVocê venceu porque os outros oponentes saíram.");
-                winner.sendTitle("§a§lVENCEU!", "§fTodos desistiram", 10, 70, 20);
-                winner.playSound(winner.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1f);
-
-                // --- DESATIVAÇÃO DO MODO LONELY (VENCEDOR) ---
-                // O vencedor também precisa ter sua colisão restaurada ao fim do duelo.
-                packet.applyLonelyToPlayer(winner, false);
-
-                ttda.stopAll(winner);
-            }
-        } else if (participants.size() > 1) {
-            // Se ainda restam 2 ou mais pessoas, a corrida CONTINUA
-            player.sendMessage("§cVocê abandonou a corrida. Os outros continuam!");
-        } else {
-            // Se não sobrou ninguém (ex: o último jogador saiu)
-            databaseManager.setDuelState(duelId, "FINISHED");
-        }
-
-        // Limpeza para quem saiu
         player.sendMessage("§7Você saiu do duelo.");
+        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1f, 0.5f);
     }
 
     @EventHandler

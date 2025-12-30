@@ -24,7 +24,7 @@ public class FRLanguageTabCompleter implements TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         // Subcomandos principais no primeiro argumento
         if (args.length == 1) {
-            List<String> subcommands = Arrays.asList("set", "list", "reload");
+            List<String> subcommands = Arrays.asList("set", "list", "reload", "menu", "gui");
             return subcommands.stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());

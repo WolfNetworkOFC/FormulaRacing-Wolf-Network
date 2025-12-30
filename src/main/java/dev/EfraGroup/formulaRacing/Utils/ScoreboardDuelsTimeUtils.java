@@ -1,6 +1,7 @@
 package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import fr.mrmicky.fastboard.FastBoard;
 import org.bukkit.Bukkit;
@@ -16,16 +17,25 @@ public class ScoreboardDuelsTimeUtils {
     private final FormulaRacing plugin;
     private final DatabaseManager mysql;
     private final TimeTrialDuelsAction ttda; // Necessário para pegar o tempo real
+    private TimeTrialDuels timeTrialDuels; // Para calcular posição em tempo real
     private final Map<UUID, FastBoard> boards = new ConcurrentHashMap<>();
 
     // Armazena dados contextuais para a task saber o que exibir
     private final Map<UUID, DuelContext> duelContexts = new ConcurrentHashMap<>();
 
-    public ScoreboardDuelsTimeUtils(FormulaRacing plugin, DatabaseManager mysql, TimeTrialDuelsAction ttda) {
+    public ScoreboardDuelsTimeUtils(FormulaRacing plugin, DatabaseManager mysql, TimeTrialDuelsAction ttda, TimeTrialDuels timeTrialDuels) {
         this.plugin = plugin;
         this.mysql = mysql;
         this.ttda = ttda;
+        this.timeTrialDuels = timeTrialDuels;
         startAutoUpdateTask();
+    }
+
+    /**
+     * Define a referência do TimeTrialDuels (usado quando há dependência circular)
+     */
+    public void setTimeTrialDuels(TimeTrialDuels timeTrialDuels) {
+        this.timeTrialDuels = timeTrialDuels;
     }
 
     /**
@@ -44,9 +54,9 @@ public class ScoreboardDuelsTimeUtils {
                         continue;
                     }
 
-                    // Pega o tempo milissegundos do cronômetro real no TTDA
-                    //long currentMillis = ttda.getPlayerTimeMillis(player);
-                    String formattedTime = formatTimeFromMillis(13223);
+                    // Pega o tempo real do cronômetro do jogador
+                    double elapsedSeconds = ttda.getPlayerElapsedSeconds(player);
+                    String formattedTime = formatTime(elapsedSeconds);
 
                     // Chama o update (que já lida com o banco de forma async internamente)
                     update(player, ctx.duelId, formattedTime, ctx.currentLap, ctx.totalLaps, ctx.trackName);
@@ -77,30 +87,62 @@ public class ScoreboardDuelsTimeUtils {
         if (board == null) return;
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            int pos = mysql.getplayerpositiononduel(duelId, player);
-            Object[] data = mysql.getPlayerBestTimeOnDuel(player.getUniqueId(), duelId);
+            // Obtém o idioma do jogador
+            String langCode = mysql.getPlayerLanguage(player.getUniqueId());
+
+            // Usa a posição em tempo real calculada pelo TimeTrialDuels
+            int pos = timeTrialDuels.getPlayerPosition(duelId, player.getUniqueId());
+
+            // Busca o melhor tempo de volta (não o tempo total)
+            Double bestLap = mysql.getPlayerBestLapTimeInDuel(player.getUniqueId(), duelId);
 
             String pbDisplay = "§7--:--.---";
-            if (data != null) {
-                pbDisplay = "§f" + formatTime((double) data[0]);
+            if (bestLap != null && bestLap > 0) {
+                pbDisplay = "§f" + formatTime(bestLap);
+            }
+
+            // Obtém o tempo restante do duelo
+            int timeRemaining = timeTrialDuels.getTimeRemaining(duelId);
+            String timeRemainingDisplay = "";
+            if (timeRemaining >= 0) {
+                timeRemainingDisplay = " §fTempo Restante: §c" + formatTimeRemaining(timeRemaining);
             }
 
             final String finalPB = pbDisplay;
-            final String posDisplay = formatPosition(pos);
+            final String posDisplay = formatPosition(pos, langCode);
+            final String finalTimeRemaining = timeRemainingDisplay;
 
             Bukkit.getScheduler().runTask(plugin, () -> {
-                board.updateLines(
-                        "§8------------------",
-                        " §fPosição: " + posDisplay,
-                        " §fVolta: §b" + lap + "§7/§b" + totalLaps,
-                        "",
-                        " §fTempo: §e" + currentFormattedTime,
-                        " §fRecorde: " + finalPB,
-                        "",
-                        " §fPista: §a" + trackName,
-                        "§8------------------",
-                        "§ewolfnetwork.com.br"
-                );
+                if (timeRemaining >= 0) {
+                    // Com limite de tempo
+                    board.updateLines(
+                            "§8------------------",
+                            " §fPosição: " + posDisplay,
+                            " §fVolta: §b" + lap + "§7/§b" + totalLaps,
+                            "",
+                            " §fTempo: §e" + currentFormattedTime,
+                            " §fRecorde: " + finalPB,
+                            finalTimeRemaining,
+                            "",
+                            " §fPista: §a" + trackName,
+                            "§8------------------",
+                            "§ewolfnetwork.com.br"
+                    );
+                } else {
+                    // Sem limite de tempo
+                    board.updateLines(
+                            "§8------------------",
+                            " §fPosição: " + posDisplay,
+                            " §fVolta: §b" + lap + "§7/§b" + totalLaps,
+                            "",
+                            " §fTempo: §e" + currentFormattedTime,
+                            " §fRecorde: " + finalPB,
+                            "",
+                            " §fPista: §a" + trackName,
+                            "§8------------------",
+                            "§ewolfnetwork.com.br"
+                    );
+                }
             });
         });
     }
@@ -121,13 +163,30 @@ public class ScoreboardDuelsTimeUtils {
         duelContexts.clear();
     }
 
-    private String formatPosition(int pos) {
-        return switch (pos) {
-            case 1 -> "§a§l1º LUGAR";
-            case 2 -> "§e§l2º LUGAR";
-            case 3 -> "§6§l3º LUGAR";
-            default -> "§f§l" + pos + "º LUGAR";
-        };
+    private String formatPosition(int pos, String langCode) {
+        String positionText;
+        String color;
+
+        switch (pos) {
+            case 1:
+                positionText = plugin.getDirectTranslation("duel_position_1st", langCode);
+                color = "§a§l";
+                break;
+            case 2:
+                positionText = plugin.getDirectTranslation("duel_position_2nd", langCode);
+                color = "§e§l";
+                break;
+            case 3:
+                positionText = plugin.getDirectTranslation("duel_position_3rd", langCode);
+                color = "§6§l";
+                break;
+            default:
+                positionText = plugin.getTranslation("duel_position_nth", langCode, "{position}", String.valueOf(pos));
+                color = "§f§l";
+                break;
+        }
+
+        return color + positionText;
     }
 
     private String formatTime(double seconds) {
@@ -140,6 +199,15 @@ public class ScoreboardDuelsTimeUtils {
         long ms = millis % 1000;
         if (minutes > 0) return String.format("%d:%02d.%03d", minutes, secs, ms);
         return String.format("%d.%03d", secs, ms);
+    }
+
+    private String formatTimeRemaining(int seconds) {
+        int minutes = seconds / 60;
+        int secs = seconds % 60;
+        if (minutes > 0) {
+            return String.format("%d:%02d", minutes, secs);
+        }
+        return String.format("%ds", secs);
     }
 
     // Classe auxiliar para manter o estado do duelo do jogador

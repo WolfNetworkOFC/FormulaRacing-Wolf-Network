@@ -48,10 +48,17 @@ track_world_info: "&bMundo: {world}"
 track_location_not_found: "&cLocalização da pista não encontrada!"
 
 # Mensagens de Duelo
+# Mensagens de Duelo
 duel_command_blocked: "&c&lDUELO &8» &7Este comando está bloqueado durante duelos!"
 duel_use_quit: "&7Use &f/duel sair &7para abandonar a corrida."
 duel_cannot_dismount: "&c&lDUELO &8» &7Você não pode sair do barco durante um duelo!"
 duel_cannot_teleport: "&c&lDUELO &8» &7Você não pode se teleportar durante um duelo!"
+duel_position_1st: "1º LUGAR"
+duel_position_2nd: "2º LUGAR"
+duel_position_3rd: "3º LUGAR"
+duel_position_nth: "{position}º LUGAR"
+duel_pb_label: "MP"
+duel_waiting: "Aguardando..."
 
 # Comandos de Câmera
 cam_started_following: "&aVocê começou a seguir &e{player} &a(modo normal)."
@@ -59,18 +66,28 @@ cam_stopped_following: "&cVocê parou de seguir (modo normal)."
 
 # Comandos de Idioma
 lang_help_title: "&6&lFormula Racing Language"
-lang_help_list: "&e/frlang list &7- Lista idiomas disponíveis."
-lang_help_set: "&e/frlang set <id> &7- Altera seu idioma."
-lang_help_reload: "&e/frlang reload &7- Recarrega configurações."
-lang_not_found: "&cIdioma '{lang}' não encontrado em lang/. Use /frlang list"
-lang_set_usage: "&cUse: /frlang set <idioma>"
+lang_help_list: "&e/lang list &7- Lista idiomas disponíveis."
+lang_help_set: "&e/lang set <id> &7- Altera seu idioma."
+lang_help_reload: "&e/lang reload &7- Recarrega configurações."
+lang_help_menu: "&e/lang menu &7- Abre o menu de seleção de idioma."
+lang_help_help: "&e/lang help &7- Mostra este menu de ajuda."
+lang_not_found: "&cIdioma '{lang}' não encontrado em lang/. Use /lang list"
+lang_set_usage: "&cUse: /lang set <idioma>"
 lang_list_title: "&8&m      &6 [ Idiomas Disponíveis ] &8&m      "
 lang_list_empty: "&7Nenhum arquivo .yml encontrado na pasta /lang."
 lang_list_current: " &e• &f{lang} &a(Atual) ✅"
-lang_list_available: " &e• &7{lang} &8- /frlang set {lang}"
+lang_list_available: " &e• &7{lang} &8- /lang set {lang}"
 lang_list_footer: "&8&m                                       "
 lang_reload_success: "&a[FormulaRacing] Configurações de idioma validadas!"
 lang_no_permission_reload: "&cSem permissão."
+
+# Menu GUI de Idiomas
+lang_menu_title: "&6&lSelecione Seu Idioma"
+lang_menu_current: "&aIdioma atual"
+lang_menu_click: "&7Clique para selecionar este idioma"
+lang_menu_info_title: "&eConfigurações de Idioma"
+lang_menu_info_line1: "&7Selecione seu idioma preferido"
+lang_menu_info_line2: "&7clicando em uma das opções acima."
 
 # Comando Reload
 reload_success: "&a[FormulaRacing] Plugin recarregado com sucesso!"

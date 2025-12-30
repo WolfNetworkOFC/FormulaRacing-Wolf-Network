@@ -1,6 +1,7 @@
 package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
@@ -18,6 +19,7 @@ public class TimeTrialDuelsAction {
 
     private final FormulaRacing plugin;
     private final DatabaseManager dm;
+    private TimeTrialDuels timeTrialDuels; // Referência para calcular posição em tempo real
 
     private final Map<UUID, DuelSession> activeTimers = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> activeVisuals = new ConcurrentHashMap<>(); // Armazena o duelId no visual
@@ -30,6 +32,13 @@ public class TimeTrialDuelsAction {
         this.plugin = plugin;
         this.dm = dm;
         startGlobalUpdateTask();
+    }
+
+    /**
+     * Define a referência do TimeTrialDuels (chamado após a inicialização)
+     */
+    public void setTimeTrialDuels(TimeTrialDuels timeTrialDuels) {
+        this.timeTrialDuels = timeTrialDuels;
     }
 
     /**
@@ -62,11 +71,45 @@ public class TimeTrialDuelsAction {
         }
     }
 
+    /**
+     * Reseta o timer da volta atual (chamado quando o jogador cruza a linha de start)
+     */
+    public void resetLapTimer(Player player) {
+        DuelSession session = activeTimers.get(player.getUniqueId());
+        if (session != null) {
+            session.resetLapTimer();
+        }
+    }
+
+    /**
+     * Atualiza o melhor tempo de volta do jogador (chamado quando uma volta é completada)
+     */
+    public void updateBestLapTime(Player player, double lapTime) {
+        DuelSession session = activeTimers.get(player.getUniqueId());
+        if (session != null) {
+            Double current = session.getBestLapTime();
+            if (current == null || lapTime < current) {
+                session.setBestLapTime(lapTime);
+                // Força atualização imediata do cache de PB
+                session.setPersonalBest("None");
+            }
+        }
+    }
+
     public void stopAll(Player player) {
         UUID uuid = player.getUniqueId();
         activeTimers.remove(uuid);
         activeVisuals.remove(uuid);
         player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(""));
+    }
+
+    /**
+     * Obtém o tempo decorrido em segundos para um jogador.
+     */
+    public double getPlayerElapsedSeconds(Player player) {
+        DuelSession session = activeTimers.get(player.getUniqueId());
+        if (session == null) return 0.0;
+        return session.getCurrentTimeMillis() / 1000.0;
     }
 
     private void startGlobalUpdateTask() {
@@ -89,15 +132,17 @@ public class TimeTrialDuelsAction {
                             updateDataAsync(player, session);
                         }
 
-                        if (session.getCachedPosition().contains("1º")) {
+                        if (session.getCachedPosition().contains("1º") || session.getCachedPosition().contains("1st")) {
                             spawnLeaderParticles(player);
                         }
 
-                        sendDuelActionBar(player, session.getCachedPosition(), session.getFormattedTime(), session.getPersonalBest());
+                        sendDuelActionBar(player, session.getCachedPosition(), session.getFormattedTime(), session.getPersonalBest(), session.getCachedDelta());
                     } else {
                         // MODO ESPERA: Visual ON, mas timer ainda não começou
                         // Mostra a barra com 00:00.000 ou "Aguardando..."
-                        sendDuelActionBar(player, "§f§l-º PLACE", "00:00.000", "§7--:--.---");
+                        String langCode = dm.getPlayerLanguage(uuid);
+                        String waitingText = plugin.getDirectTranslation("duel_waiting", langCode);
+                        sendDuelActionBar(player, "§f§l" + waitingText, "00:00.000", "§7--:--.---", "");
                     }
                 });
             }
@@ -107,42 +152,111 @@ public class TimeTrialDuelsAction {
     /**
      * Método centralizado para enviar a Action Bar
      */
-    private void sendDuelActionBar(Player player, String position, String time, String pb) {
-        String message = String.format("%s %s %s §f%s %s §8| %s §ePB: §7%s",
+    private void sendDuelActionBar(Player player, String position, String time, String pb, String delta) {
+        String langCode = dm.getPlayerLanguage(player.getUniqueId());
+        String pbLabel = plugin.getDirectTranslation("duel_pb_label", langCode);
+
+        String message = String.format("%s %s %s §f%s%s %s §8| %s §e%s: §7%s",
                 BRACKET, position, BRACKET,
-                time, ICON_TIMER,
-                ICON_RECORD, pb);
+                time, delta, ICON_TIMER,
+                ICON_RECORD, pbLabel, pb);
 
         player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(message));
     }
 
     private void updateDataAsync(Player player, DuelSession session) {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            int pos = dm.getplayerpositiononduel(session.getDuelId(), player);
-            session.setCachedPosition(formatPosition(pos));
+            // Obtém o idioma do jogador
+            String langCode = dm.getPlayerLanguage(player.getUniqueId());
+            session.setLangCode(langCode);
 
+            // Usa a posição em tempo real se TimeTrialDuels estiver disponível
+            int pos = 1;
+            if (timeTrialDuels != null) {
+                pos = timeTrialDuels.getPlayerPosition(session.getDuelId(), player.getUniqueId());
+            } else {
+                // Fallback para o método antigo (caso ainda não tenha sido inicializado)
+                pos = dm.getplayerpositiononduel(session.getDuelId(), player);
+            }
+            session.setCachedPosition(formatPosition(pos, langCode));
+
+            // Atualiza o melhor tempo de volta do jogador no duelo atual
+            if (session.getBestLapTime() == null) {
+                Double bestLap = dm.getPlayerBestLapTimeInDuel(player.getUniqueId(), session.getDuelId());
+                session.setBestLapTime(bestLap);
+            }
+
+            // Atualiza o display do PB no HUD (melhor tempo de volta)
             if (session.getPersonalBest().equals("None")) {
-                Object[] data = dm.getPlayerBestTimeOnDuel(player.getUniqueId(), session.getDuelId());
-                if (data != null) {
-                    double time = (double) data[0];
-                    String display = ((boolean) data[2]) ? formatTime(time) : "§e" + (int) data[1] + " CP";
-                    session.setPersonalBest(display);
+                Double bestLap = session.getBestLapTime();
+                if (bestLap != null && bestLap > 0) {
+                    session.setPersonalBest(formatTime(bestLap));
                 } else {
                     session.setPersonalBest("--:--.---");
                 }
             }
+
+            // Calcula o delta em tempo real
+            updateDelta(session);
         });
+    }
+
+    /**
+     * Calcula o delta comparando o tempo da volta atual com o melhor tempo de volta
+     */
+    private void updateDelta(DuelSession session) {
+        Double bestLap = session.getBestLapTime();
+        if (bestLap == null || bestLap <= 0) {
+            session.setCachedDelta("");
+            return;
+        }
+
+        double currentLapTime = session.getCurrentLapTime();
+        double delta = currentLapTime - bestLap;
+
+        String deltaStr;
+        String deltaColor;
+
+        if (Math.abs(delta) < 0.0009) {
+            deltaStr = " ±0.000";
+            deltaColor = "§e";
+        } else if (delta < 0) {
+            deltaStr = String.format(" §a-%.3f", Math.abs(delta));
+            deltaColor = "§a";
+        } else {
+            deltaStr = String.format(" §c+%.3f", delta);
+            deltaColor = "§c";
+        }
+
+        session.setCachedDelta(deltaColor + deltaStr);
     }
 
     // ... (Métodos formatPosition, formatTime e spawnLeaderParticles permanecem iguais)
 
-    private String formatPosition(int pos) {
-        return switch (pos) {
-            case 1 -> "§a§l1º PLACE";
-            case 2 -> "§e§l2º PLACE";
-            case 3 -> "§6§l3º PLACE";
-            default -> "§f§l" + pos + "º PLACE";
-        };
+    private String formatPosition(int pos, String langCode) {
+        String positionText;
+        String color;
+
+        switch (pos) {
+            case 1:
+                positionText = plugin.getDirectTranslation("duel_position_1st", langCode);
+                color = "§a§l";
+                break;
+            case 2:
+                positionText = plugin.getDirectTranslation("duel_position_2nd", langCode);
+                color = "§e§l";
+                break;
+            case 3:
+                positionText = plugin.getDirectTranslation("duel_position_3rd", langCode);
+                color = "§6§l";
+                break;
+            default:
+                positionText = plugin.getTranslation("duel_position_nth", langCode, "{position}", String.valueOf(pos));
+                color = "§f§l";
+                break;
+        }
+
+        return color + positionText;
     }
 
     public String formatTime(double seconds) {
@@ -159,14 +273,19 @@ public class TimeTrialDuelsAction {
         private final UUID uuid;
         private final int duelId;
         private final long startTime;
-        private String cachedPosition = "§f§l-º PLACE";
+        private String cachedPosition = "§f§l...";
         private String personalBest = "None";
         private int tickCounter = 0;
+        private Double bestLapTime = null; // Melhor tempo de volta no duelo atual (em segundos)
+        private double currentLapStartTime; // Início da volta atual
+        private String cachedDelta = ""; // Delta formatado para exibição
+        private String langCode = "en_US"; // Idioma do jogador
 
         public DuelSession(UUID uuid, int duelId) {
             this.uuid = uuid;
             this.duelId = duelId;
             this.startTime = System.currentTimeMillis();
+            this.currentLapStartTime = System.currentTimeMillis();
         }
 
         public boolean shouldUpdateData() { return tickCounter++ % 10 == 0; }
@@ -180,5 +299,13 @@ public class TimeTrialDuelsAction {
         public void setCachedPosition(String pos) { this.cachedPosition = pos; }
         public String getPersonalBest() { return personalBest; }
         public void setPersonalBest(String personalBest) { this.personalBest = personalBest; }
+        public Double getBestLapTime() { return bestLapTime; }
+        public void setBestLapTime(Double time) { this.bestLapTime = time; }
+        public double getCurrentLapTime() { return (System.currentTimeMillis() - currentLapStartTime) / 1000.0; }
+        public void resetLapTimer() { this.currentLapStartTime = System.currentTimeMillis(); }
+        public String getCachedDelta() { return cachedDelta; }
+        public void setCachedDelta(String delta) { this.cachedDelta = delta; }
+        public String getLangCode() { return langCode; }
+        public void setLangCode(String langCode) { this.langCode = langCode; }
     }
 }

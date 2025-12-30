@@ -14,12 +14,24 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.vehicle.VehicleExitEvent;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class FormulaRacingListener implements Listener {
     private final APIFormulaRacing api;
     private final TimerUtils timerUtils;
     private final FormulaRacing plugin;
     private final DatabaseManager db;
     private final PacketSender packetSender;
+
+    // Cooldown para mensagens de "não pode sair do barco"
+    private final Map<UUID, Long> dismountMessageCooldown = new ConcurrentHashMap<>();
+    private static final long MESSAGE_COOLDOWN_MS = 3000; // 3 segundos
 
     public FormulaRacingListener(FormulaRacing plugin, TimerUtils timerUtils, APIFormulaRacing api, DatabaseManager db, PacketSender packetSender) {
         this.plugin = plugin;
@@ -55,7 +67,7 @@ public class FormulaRacingListener implements Listener {
                     plugin.getLogger().info("[FormulaRacing] Limpeza: " + removedCount + " barcos abandonados foram removidos.");
                 }
             }
-        }.runTaskTimer(plugin, 0L, 200L); // 1200L (1 min delay inicial) | 6000L (Roda a cada 5 minutos)
+        }.runTaskTimer(plugin, 1200L, 6000L); // 1 minuto delay inicial | Roda a cada 5 minutos
     }
 
     @EventHandler
@@ -72,9 +84,18 @@ public class FormulaRacingListener implements Listener {
         // verificamos no banco se ele está em um duelo ativo
         if (db.isPlayerInActiveDuel(player.getUniqueId())) {
             event.setCancelled(true);
-            String langCode = db.getPlayerLanguage(player.getUniqueId());
-            player.sendMessage(plugin.getDirectTranslation("duel_cannot_dismount", langCode));
-            player.sendMessage(plugin.getDirectTranslation("duel_use_quit", langCode));
+
+            // Cooldown de mensagens para evitar spam
+            UUID uuid = player.getUniqueId();
+            long now = System.currentTimeMillis();
+            Long lastMessage = dismountMessageCooldown.get(uuid);
+
+            if (lastMessage == null || (now - lastMessage) >= MESSAGE_COOLDOWN_MS) {
+                String langCode = db.getPlayerLanguage(uuid);
+                player.sendMessage(plugin.getDirectTranslation("duel_cannot_dismount", langCode));
+                player.sendMessage(plugin.getDirectTranslation("duel_use_quit", langCode));
+                dismountMessageCooldown.put(uuid, now);
+            }
             return;
         }
 
