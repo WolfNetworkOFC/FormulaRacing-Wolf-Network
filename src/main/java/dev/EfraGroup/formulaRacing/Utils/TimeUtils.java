@@ -1,25 +1,21 @@
-package dev.EfraGroup.formulaRacing.Utils;
+ /*
+  * Decompiled with CFR 0.153-SNAPSHOT (d6f6758-dirty).
+  *
+  * Could not load the following classes:
+  *  org.bukkit.entity.Player
+  */
+ package dev.EfraGroup.formulaRacing.Utils;
 
-import org.bukkit.entity.Player;
+ import org.bukkit.entity.Player;
 
-public class TimeUtils {
+ public class TimeUtils {
+     public static void setPlayerTime(Player player, long time) {
+         player.setPlayerTime(time, false);
+     }
 
-    /**
-     * Altera o horário do dia de um jogador específico
-     *
-     * @param player Jogador que terá o horário alterado
-     * @param time   Horário em ticks (0 a 24000)
-     */
-    public static void setPlayerTime(Player player, long time) {
-        player.setPlayerTime(time, false); // false = hora fixa só para ele
-    }
+     public static void resetPlayerTime(Player player) {
+         player.resetPlayerTime();
+     }
+ }
 
-    /**
-     * Reseta o horário do jogador para o tempo do mundo
-     *
-     * @param player Jogador que terá o tempo resetado
-     */
-    public static void resetPlayerTime(Player player) {
-        player.resetPlayerTime();
-    }
-}
+    

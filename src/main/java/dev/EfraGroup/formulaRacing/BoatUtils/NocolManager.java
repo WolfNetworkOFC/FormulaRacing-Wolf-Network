@@ -2,108 +2,86 @@ package dev.EfraGroup.formulaRacing.BoatUtils;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import org.bukkit.entity.Boat;
-import org.bukkit.entity.ChestBoat;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.logging.Level;
 
 public class NocolManager {
-
+    // IDs de pacotes baseados na documentação do OpenBoatUtils
     private static final short PACKET_ID_NOCOL = 27;
-    private static final short NOCOL_MODE_ON = 2;
-    private static final short NOCOL_MODE_OFF = 0;
+    private static final short PACKET_VALUE_VANILLA = 0;
+    private static final short PACKET_VALUE_NO_COLLISION = 4;
+    private static final String CHANNEL = "openboatutils:settings";
 
     /**
-     * Ativa ou desativa colisão para jogador e barco.
-     * Só funciona se o jogador tiver o mod OpenBoatUtils.
+     * Define o modo de colisão para um jogador e seu veículo.
      */
     public static void setCollisionMode(Player player, boolean shouldCollide) {
-        if (player == null) return;
+        if (player == null || !playerHasMod(player)) {
+            return;
+        }
 
-        boolean hasMod = playerHasMod(player);
-        //FormulaRacing.getInstance().getLogger().info("[NocolManager] Jogador " + player.getName() + " tem mod? " + hasMod);
-
-        if (!hasMod) return;
-
-        // Jogador
+        // Envia para o jogador
         sendNocolPacket(player, shouldCollide);
 
-        // Veículo (se estiver em barco)
+        // Se estiver em um barco, envia para o veículo (afeta todos os passageiros com o mod)
         Entity vehicle = player.getVehicle();
-        if (vehicle instanceof Boat || vehicle instanceof ChestBoat) {
+        if (vehicle instanceof Boat) {
             sendNocolPacket(vehicle, shouldCollide);
         }
     }
 
     /**
-     * Envia pacote NoCol para jogador
+     * Envia o pacote de colisão diretamente para um Player.
      */
     private static void sendNocolPacket(Player player, boolean shouldCollide) {
-        try {
-            ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
-            DataOutputStream out = new DataOutputStream(byteStream);
+        try (ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+             DataOutputStream out = new DataOutputStream(byteStream)) {
+
+            short value = shouldCollide ? PACKET_VALUE_VANILLA : PACKET_VALUE_NO_COLLISION;
 
             out.writeShort(PACKET_ID_NOCOL);
-            out.writeShort(shouldCollide ? NOCOL_MODE_ON : NOCOL_MODE_OFF);
+            out.writeShort(value);
 
-            byte[] data = byteStream.toByteArray();
-            player.sendPluginMessage(FormulaRacing.getInstance(), "openboatutils:settings", data);
+            player.sendPluginMessage(FormulaRacing.getInstance(), CHANNEL, byteStream.toByteArray());
 
-            //FormulaRacing.getInstance().getLogger().info("[NocolManager] Pacote enviado para jogador " + player.getName() +
-            //        " | shouldCollide=" + shouldCollide);
+            FormulaRacing.getInstance().getDebugManager().logBoatUtils(
+                    String.format("[NocolManager] Pacote enviado para %s | Colisao=%b | Valor=%d",
+                            player.getName(), shouldCollide, value)
+            );
 
         } catch (IOException e) {
-            FormulaRacing.getInstance().getLogger().log(Level.SEVERE,
-                    "Erro ao enviar pacote NoCol para " + player.getName(), e);
+            FormulaRacing.getInstance().getDebugManager().logBoatUtils(
+                    "Erro ao enviar pacote NoCol para " + player.getName() + ": " + e.getMessage()
+            );
         }
     }
 
     /**
-     * Envia pacote NoCol para passageiros de um barco
+     * Itera sobre os passageiros de um veículo e envia o pacote para os que possuem o mod.
      */
     private static void sendNocolPacket(Entity vehicle, boolean shouldCollide) {
-        if (!(vehicle instanceof Boat || vehicle instanceof ChestBoat)) return;
+        if (!(vehicle instanceof Boat)) return;
 
-        vehicle.getPassengers().forEach(passenger -> {
+        for (Entity passenger : vehicle.getPassengers()) {
             if (passenger instanceof Player p && playerHasMod(p)) {
-                try {
-                    ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
-                    DataOutputStream out = new DataOutputStream(byteStream);
-
-                    out.writeShort(PACKET_ID_NOCOL);
-                    out.writeShort(shouldCollide ? NOCOL_MODE_ON : NOCOL_MODE_OFF);
-
-                    byte[] data = byteStream.toByteArray();
-                    p.sendPluginMessage(FormulaRacing.getInstance(), "openboatutils:settings", data);
-
-              //      FormulaRacing.getInstance().getLogger().info("[NocolManager] Pacote enviado para passageiro " + p.getName() +
-                //            " do veículo | shouldCollide=" + shouldCollide);
-
-                } catch (IOException e) {
-                    FormulaRacing.getInstance().getLogger().log(Level.SEVERE,
-                            "Erro ao enviar pacote NoCol para o passageiro " + p.getName(), e);
-                }
+                sendNocolPacket(p, shouldCollide);
             }
-        });
+        }
     }
 
-    /**
-     * Verifica se o jogador possui o mod OpenBoatUtils
-     */
     public static boolean playerHasMod(Player player) {
         return player != null && FormulaRacing.hasOpenBoatUtilsMod(player);
     }
 
     /**
-     * Registrar o canal no onEnable
+     * Registra o canal de saída no servidor. Deve ser chamado no onEnable.
      */
     public static void registerChannel() {
-        FormulaRacing.getInstance().getServer().getMessenger().registerOutgoingPluginChannel(
-                FormulaRacing.getInstance(), "openboatutils:settings");
-       // FormulaRacing.getInstance().getLogger().info("[NocolManager] Canal 'openboatutils:settings' registrado com sucesso.");
+        FormulaRacing.getInstance().getServer().getMessenger()
+                .registerOutgoingPluginChannel(FormulaRacing.getInstance(), CHANNEL);
     }
 }

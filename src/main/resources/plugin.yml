@@ -1,87 +1,108 @@
 name: FormulaRacing
-version: ALPHA 0.2
+version: 2.0
 main: dev.EfraGroup.formulaRacing.FormulaRacing
 api-version: 1.21
 author: EfraGroup
 description: Plugin de corrida de formula 1
-depend: [ WorldEdit ]
+depend: [WorldEdit]
 softdepend:
   - DecentHolograms
   - PlayerPoints
+  - HeadDatabase
+  - LuckPerms
 commands:
   boat:
     description: Dá um barco ao jogador
     usage: /boat
-    aliases: [ b ]
+    aliases: [b]
+  cam:
+    description: Dá um barco ao jogador
+    usage: /cam
   lonely:
-    description: Dá um barco ao jogador
+    description: Time trial solitário
     usage: /lonely
-  heat:
-    description: Dá um barco ao jogador
-    usage: /heat
-  round:
-    description: Base command for rounds
-    usage: /round
   track:
-    description: Base command for rounds
+    description: Gerenciamento de pistas
     usage: /track
     aliases: [t]
   trackedit:
-    usage: /trackedit
-    description: Command for editing tracks.
-    aliases: [ te, trackeditor ]
+    usage: /trackedit <create|select|delete|boatutils|region|checkpoint|time|icon|open|close|grid|pitlane|location>
+    description: Editor completo de pistas (inclui configuração de grid e pit lanes)
+    aliases: [te, trackeditor]
   debug:
     description: Comandos de debug
     usage: /debug
   formularacingreload:
     description: Recarrega as configurações do FormulaRacing
     usage: /formularacingreload
-    aliases: [ frr, frreload ]
+    aliases: [frr, frreload]
   timetrial:
     description: Começe uma TimeTrial
     usage: /timetrial
-    aliases: [ tt, timett ]
+    aliases: [tt, timett]
   language:
     description: Muda a linguagem do FormulaRacing
     usage: /language
-    aliases: [ lang, l]
+    aliases: [lang, l]
   reset:
     description: Reseta sua timetrial.
     usage: /reset
   timetrialrandom:
-      description: Entra em uma timetrial aleatória.
-      usage: /timetrialrandom
-      aliases: [ ttr, timetrialr, ttrandom ]
+    description: Entra em uma timetrial aleatória.
+    usage: /timetrialrandom
+    aliases: [ttr, timetrialr, ttrandom]
   timetrialcancel:
-      description: Entra em uma timetrial aleatória.
-      usage: /timetrialcancel
-      aliases: [ ttc, timetrialc, ttcancel ]
+    description: Entra em uma timetrial aleatória.
+    usage: /timetrialcancel
+    aliases: [ttc, timetrialc, ttcancel]
   voterace:
     description: Entra em uma timetrial aleatória.
     usage: /voterace
-    aliases: [ vr ]
+    aliases: [vr]
   race:
-    description: Entra em uma timetrial aleatória.
-    usage: /race
+    description: Sistema de Quick Races (corridas rápidas casuais)
+    usage: /race <create|join|leave|start|end|info>
+    aliases: [qr, quickrace]
   party:
     description: Entra em uma timetrial aleatória.
     usage: /party
-    aliases: [ p ]
+    aliases: [p]
   duel:
     description: Entra em uma timetrial aleatória.
     usage: /duel
   event:
-    description: Base command for Events.
-    usage: /event
+    description: Gerenciamento de Eventos de Corrida (Event)
+    usage: /event <list|info|create|delete|start|finish|sign|reserve|spectate|quit|settrack>
+  round:
+    description: Gerenciamento de Rodadas (Round)
+    usage: /round <list|create|delete|info>
+  heat:
+    description: Gerenciamento de Baterias (Heat)
+    usage: /heat <list|info|create|delete|load|start|finish|reset|set|add|remove>
   camera:
     description: Base command for cameras
-    aliases: [ c, cam ]
+    aliases: [c, cam]
+  spectator:
+    description: Configuração de áreas de espectadores/arquibancadas
+    usage: /spectator <add|remove|list|test> <pista>
+    aliases: [spec, arch]
+  spectate:
+    description: Modo espectador para assistir corridas
+    usage: /spectate <join|leave|follow|unfollow|list|info>
+    aliases: [watch, observe]
   formulamario:
-   description: Base command for formulamario
-   aliases: [ fm, fmario, formulam ]
+    description: Base command for formulamario
+    aliases: [fm, fmario, formulam]
   formulawolf:
     description: Base command for formulawolf
-    aliases: [ fw, fwolf, formulaw ]
+    aliases: [fw, fwolf, formulaw]
   settings:
     description: Base command for settings
-    aliases: [ s ]
+    aliases: [s]
+  pit:
+    description: Inicia minigame de pit stop para teste
+    usage: /pit
+  daily:
+    description: Gerenciamento de Daily Races
+    usage: /daily <force|status|reload>
+    permission: formularacing.admin.daily

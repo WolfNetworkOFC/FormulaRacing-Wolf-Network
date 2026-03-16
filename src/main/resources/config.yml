@@ -1,27 +1,26 @@
-#=========================================================#
+# =========================================================#
 #                         CUSTOM                           #
-#=========================================================#
+# =========================================================#
 
 leaderboards:
   updateticks: 18000
   fastesttime:
     lines:
-      - '§6§lLeaderboard for §e§l{mapname}'
-      - '§f{name1} §7- §e{time1}'
-      - '§f{name2} §7- §e{time2}'
-      - '§f{name3} §7- §e{time3}'
-      - '§f{name4} §7- §e{time4}'
-      - '§f{name5} §7- §e{time5}'
-      - '§f{name6} §7- §e{time6}'
-      - '§f{name7} §7- §e{time7}'
-      - '§f{name8} §7- §e{time8}'
-      - '§f{name9} §7- §e{time9}'
-      - '§f{name10} §7- §e{time10}'
+      - §6§lLeaderboard for §e§l{mapname}
+      - §f{name1} §7- §e{time1}
+      - §f{name2} §7- §e{time2}
+      - §f{name3} §7- §e{time3}
+      - §f{name4} §7- §e{time4}
+      - §f{name5} §7- §e{time5}
+      - §f{name6} §7- §e{time6}
+      - §f{name7} §7- §e{time7}
+      - §f{name8} §7- §e{time8}
+      - §f{name9} §7- §e{time9}
+      - §f{name10} §7- §e{time10}
 
-
-#=========================================================#
+# =========================================================#
 #                         DATABASE                        #
-#=========================================================#
+# =========================================================#
 
 database:
   type: sqlite # SQLite/MySQL.
@@ -35,8 +34,112 @@ database:
     file: formula_racing.db # Archive name
     auto-create-archive: false # Auto Create the archive .db if is deleted
 
-#=========================================================#
+# =========================================================#
 #                         EXTRAS                          #
-#=========================================================#
+# =========================================================#
 
-message-when-enter: true # [+] PlayerName
+scoreboard:
+  max-rows: 30 # Máximo de linhas na scoreboard. Minecraft padrão é 15, mas com a Megavex Library pode ser maior (até 32 ou mais).
+
+# =========================================================
+#                     MESSAGE SETTINGS
+# =========================================================
+message-settings:
+  join:
+    enabled: true
+    message: §8[§a+§8] §a{player} {rank}
+    first-join-message: §8[§a+§8] §a{player} {rank} (§aPrimeira vez!§8)
+  quit:
+    enabled: true
+    message: §8[§c-§8] §c{player} {rank}
+
+# =========================================================#
+#                      DEBUG SYSTEM                       #
+# =========================================================#
+# Enable detailed logging for different systems.
+# These can be toggled with /formularacingreload without restarting the server.
+
+debug:
+  # Track region detection (START/FINISH/Checkpoints)
+  # Useful for: HUD not appearing, laps not counting, checkpoints not detected
+  region-detection: false
+
+  # Duel system operations
+  # Useful for: Duel bugs, position calculation, lap counting, finish detection
+  duel-system: true
+
+  # Duel system verbose mode (position tracking every tick)
+  # Useful for: Detailed position calculation debugging
+  # WARNING: Generates MASSIVE amounts of logs - only enable for specific debugging
+  duel-system-verbose: false
+
+  # Time trial system operations
+  # Useful for: Timer issues, PB not saving, delta calculation problems
+  time-trial-system: false
+
+  # Boat utilities and NBT operations
+  # Useful for: Boat acceleration issues, ghost boats, player freezing
+  boat-utils: false
+
+  # Database read/write operations
+  # Useful for: Data not saving, records not loading, performance issues
+  # WARNING: Can generate LOTS of logs
+  database-operations: false
+
+  # Event system (races, tournaments)
+  # Useful for: Event bugs, participant tracking issues
+  event-system: false
+
+  # Packet handling (mod communication)
+  # Useful for: Client-server sync issues, mod not working
+  # WARNING: Can generate LOTS of logs
+  packet-handling: false
+
+  # Performance metrics (execution time tracking)
+  # Useful for: Finding slow operations, optimizing performance
+  performance-metrics: false
+
+  # Race system (official races: Event → Round → Heat)
+  # Useful for: Race bugs, heat loading issues, driver tracking
+  race-system: true
+
+  # Race system verbose mode (detailed race operations)
+  # Useful for: Detailed race state tracking, position updates, lap counting
+  # WARNING: Generates significant logs during active races
+  race-system-verbose: false
+
+  # Qualification system
+  # Useful for: Qualifying bugs, grid position calculation, time sorting
+  qualification-system: true
+
+  # Pit stop system (minigame and validation)
+  # Useful for: Pit stop detection issues, minigame bugs, mandatory pit validation
+  pit-stop-system: true
+
+  # Spectator system (follow drivers, camera modes)
+  # Useful for: Spectator mode bugs, camera following issues, teleport problems
+  spectator-system: true
+
+  # GUI system (menus, inventory clicks, display)
+  # Useful for: Menu not opening, items not clicking, visual bugs in GUIs
+  gui-system: false
+
+  # File system operations (loading/saving files)
+  # Useful for: Config not saving, tracks not loading from files
+  file-system: false
+
+daily-race:
+  enabled: false
+  time: "20:00"
+  timezone: system
+  practice-minutes: 15
+  qualifying-minutes: 15
+  race-minutes: 30
+  pit-stops: 0
+  event-name-format: Daily-{date}
+  exclude-tracks: []
+  runtime:
+    active-event-id: 48
+    phase: PRACTICE
+  last-date: "2026-01-08"
+  last-track: PlainsValley

@@ -1,222 +1,244 @@
-package dev.EfraGroup.formulaRacing.Utils;
+ /*
+  * Decompiled with CFR 0.153-SNAPSHOT (d6f6758-dirty).
+  *
+  * Could not load the following classes:
+  *  dev.EfraGroup.formulaRacing.Database.DatabaseManager
+  *  org.bukkit.Bukkit
+  *  org.bukkit.ChatColor
+  *  org.bukkit.Location
+  *  org.bukkit.Material
+  *  org.bukkit.entity.Boat
+  *  org.bukkit.entity.Entity
+  *  org.bukkit.entity.Player
+  *  org.bukkit.event.EventHandler
+  *  org.bukkit.event.EventPriority
+  *  org.bukkit.event.Listener
+  *  org.bukkit.event.inventory.InventoryClickEvent
+  *  org.bukkit.inventory.Inventory
+  *  org.bukkit.inventory.ItemStack
+  *  org.bukkit.inventory.meta.ItemMeta
+  *  org.bukkit.plugin.Plugin
+  */
+ package dev.EfraGroup.formulaRacing.Utils;
 
-import dev.EfraGroup.formulaRacing.APIFormulaRacing;
-import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
-import dev.EfraGroup.formulaRacing.FormulaRacing;
-import dev.EfraGroup.formulaRacing.PacketSender;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
+ import dev.EfraGroup.formulaRacing.APIFormulaRacing;
+ import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+ import dev.EfraGroup.formulaRacing.FormulaRacing;
+ import dev.EfraGroup.formulaRacing.PacketSender;
+ import dev.EfraGroup.formulaRacing.Utils.ScoreboardTimeTrialUtils;
+ import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
+ import java.util.ArrayList;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.UUID;
+ import java.util.concurrent.ConcurrentHashMap;
+ import org.bukkit.Bukkit;
+ import org.bukkit.ChatColor;
+ import org.bukkit.Location;
+ import org.bukkit.Material;
+ import org.bukkit.entity.Boat;
+ import org.bukkit.entity.Entity;
+ import org.bukkit.entity.Player;
+ import org.bukkit.event.EventHandler;
+ import org.bukkit.event.EventPriority;
+ import org.bukkit.event.Listener;
+ import org.bukkit.event.inventory.InventoryClickEvent;
+ import org.bukkit.inventory.Inventory;
+ import org.bukkit.inventory.ItemStack;
+ import org.bukkit.inventory.meta.ItemMeta;
+ import org.bukkit.plugin.Plugin;
 
-import java.util.*;
+ public class TimeTrialMenuUtils
+         implements Listener {
+     private final FormulaRacing plugin;
+     private final PacketSender ps;
+     private final DatabaseManager mysql;
+     private final APIFormulaRacing api;
+     private final TimerUtils timerUtils;
+     private final ScoreboardTimeTrialUtils stt;
+     private final String INVENTORY_TITLE = String.valueOf(ChatColor.GREEN) + "Escolha uma pista";
+     private final Map<UUID, Long> lastClickTime = new ConcurrentHashMap<UUID, Long>();
 
-public class TimeTrialMenuUtils implements Listener {
+     public TimeTrialMenuUtils(FormulaRacing plugin, DatabaseManager mysql, APIFormulaRacing api, PacketSender ps, TimerUtils timerUtils, ScoreboardTimeTrialUtils stt) {
+         this.plugin = plugin;
+         this.mysql = mysql;
+         this.api = api;
+         this.ps = ps;
+         this.timerUtils = timerUtils;
+         this.stt = stt;
+     }
 
-    private final FormulaRacing plugin;
-    private final PacketSender ps;
-    private final DatabaseManager mysql;
-    private final APIFormulaRacing api;
-    private final TimerUtils timerUtils;
-    private final ScoreboardTimeTrialUtils stt;
-    private final String INVENTORY_TITLE = ChatColor.GREEN + "Escolha uma pista";
+     public void open(Player player) {
+         // 1. Tipagem correta do Map para evitar casts manuais no loop
+         Map<String, DatabaseManager.TrackData> tracksData = this.mysql.getAllTracksWithData();
+         this.plugin.getDebugManager().logGuiSystem("DEBUG TT: Encontradas " + tracksData.size() + " pistas.");
 
-    // 🕒 Controle de cliques: <UUID, último clique em ms>
-    private final Map<UUID, Long> clickCooldown = new HashMap<>();
+         Inventory inv = Bukkit.createInventory(null, 54, this.INVENTORY_TITLE);
+         int slot = 0;
 
-    public TimeTrialMenuUtils(FormulaRacing plugin, DatabaseManager mysql, APIFormulaRacing api, PacketSender ps, TimerUtils timerUtils, ScoreboardTimeTrialUtils stt) {
-        this.plugin = plugin;
-        this.mysql = mysql;
-        this.api = api;
-        this.ps = ps;
-        this.timerUtils = timerUtils;
-        this.stt = stt;
+         for (Map.Entry<String, DatabaseManager.TrackData> entry : tracksData.entrySet()) {
+             // Trava de segurança para não ultrapassar o tamanho do inventário (54 slots)
+             if (slot >= 54) break;
 
-        Bukkit.getPluginManager().registerEvents(this, plugin);
-    }
+             String trackName = entry.getKey();
+             DatabaseManager.TrackData trackData = entry.getValue();
 
-    public void open(Player player) {
-        Map<String, DatabaseManager.TrackData> tracksData = mysql.getAllTracksWithData();
-        Inventory inv = Bukkit.createInventory(null, 54, INVENTORY_TITLE);
+             if (!this.mysql.isTrackOpen(trackName)) continue;
 
-        int slot = 0;
-        for (Map.Entry<String, DatabaseManager.TrackData> entry : tracksData.entrySet()) {
-            String trackName = entry.getKey();
-            DatabaseManager.TrackData trackData = entry.getValue();
+             String iconName = this.mysql.getIcon(trackName);
+             Double worldRecordTime = this.mysql.getBestTime(trackName);
+             Object[] playerBestData = this.mysql.getPlayerBestTime(player.getName(), trackName);
 
-            if (!mysql.isTrackOpen(trackName)) continue;
+             Double playerBestTime = (playerBestData != null) ? (Double) playerBestData[0] : null;
 
-            String iconName = mysql.getIcon(trackName);
-            Double worldRecordTime = mysql.getBestTime(trackName);
+             // 2. Tipagem correta da Leaderboard para o loop de posição
+             List<DatabaseManager.PlayerTime> leaderboard = this.mysql.getLeaderboard(trackName);
+             int playerPos = -1;
+             for (int i = 0; i < leaderboard.size(); ++i) {
+                 if (leaderboard.get(i).getPlayerName().equalsIgnoreCase(player.getName())) {
+                     playerPos = i + 1;
+                     break;
+                 }
+             }
 
-            // Buscar o PB do jogador
-            Object[] playerBestData = mysql.getPlayerBestTime(player.getName(), trackName);
-            Double playerBestTime = null;
-            if (playerBestData != null) {
-                playerBestTime = (Double) playerBestData[0];
-            }
+             Material iconMat;
+             try {
+                 iconMat = Material.valueOf(iconName.toUpperCase());
+             } catch (Exception e) {
+                 iconMat = Material.PAPER;
+             }
 
-            List<DatabaseManager.PlayerTime> leaderboard = mysql.getLeaderboard(trackName);
-            int playerPos = -1;
-            for (int i = 0; i < leaderboard.size(); i++) {
-                String lbPlayerName = leaderboard.get(i).getPlayerName();
-                if (lbPlayerName.equalsIgnoreCase(player.getName())) {
-                    playerPos = i + 1;
-                    break;
-                }
-            }
+             ItemStack item = new ItemStack(iconMat);
+             ItemMeta meta = item.getItemMeta();
+             if (meta != null) {
+                 meta.setDisplayName(ChatColor.WHITE + "" + ChatColor.ITALIC + trackName);
 
-            Material iconMat;
-            try {
-                iconMat = Material.valueOf(iconName.toUpperCase());
-            } catch (Exception e) {
-                iconMat = Material.PAPER;
-            }
+                 // CORREÇÃO: List de String, não de Object
+                 List<String> loreList = new ArrayList<>();
+                 loreList.add(ChatColor.YELLOW + "Owner: " + ChatColor.WHITE + trackData.getOwnerName());
+                 loreList.add("");
+                 loreList.add(ChatColor.YELLOW + "Your PB: " + ChatColor.WHITE + (playerBestTime != null ? this.formatTime(playerBestTime) : "(-)"));
+                 loreList.add(ChatColor.YELLOW + "World Record: " + ChatColor.WHITE + (worldRecordTime != null ? this.formatTime(worldRecordTime) : "(-)"));
+                 loreList.add(ChatColor.YELLOW + "Position: " + ChatColor.WHITE + (playerPos != -1 ? "#" + playerPos : "(-)"));
 
-            ItemStack item = new ItemStack(iconMat);
-            ItemMeta meta = item.getItemMeta();
-            if (meta != null) {
-                meta.setDisplayName(ChatColor.WHITE + "" + ChatColor.ITALIC + trackName);
-                List<String> loreList = new ArrayList<>();
-                loreList.add(ChatColor.YELLOW + "Owner: " + ChatColor.WHITE + trackData.getOwnerName());
-                loreList.add("");
-                loreList.add(ChatColor.YELLOW + "Your PB: " + ChatColor.WHITE + (playerBestTime != null ? formatTime(playerBestTime) : "(-)"));
-                loreList.add(ChatColor.YELLOW + "World Record: " + ChatColor.WHITE + (worldRecordTime != null ? formatTime(worldRecordTime) : "(-)"));
-                loreList.add(ChatColor.YELLOW + "Position: " + ChatColor.WHITE + (playerPos != -1 ? "#" + playerPos : "(-)"));
-                meta.setLore(loreList);
-                item.setItemMeta(meta);
-            }
+                 meta.setLore(loreList);
+                 item.setItemMeta(meta);
+             }
+             inv.setItem(slot++, item);
+         }
+         player.openInventory(inv);
+     }
 
-            inv.setItem(slot++, item);
-        }
+     private String formatTime(double time) {
+         int minutes = (int)(time / 60.0);
+         double seconds = time % 60.0;
+         if (minutes > 0) {
+             return String.format("%d:%06.3f", minutes, seconds);
+         }
+         return String.format("%.3f", seconds);
+     }
 
-        player.openInventory(inv);
-    }
+     @EventHandler(priority=EventPriority.LOWEST, ignoreCancelled=false)
+     public void onInventoryClick(InventoryClickEvent event) {
+         if (!event.getView().getTitle().equals(this.INVENTORY_TITLE)) {
+             return;
+         }
+         event.setCancelled(true);
+         ItemStack clicked = event.getCurrentItem();
+         if (clicked == null || clicked.getType() == Material.AIR) {
+             return;
+         }
+         if (!clicked.hasItemMeta() || clicked.getItemMeta().getDisplayName() == null) {
+             return;
+         }
+         if (!event.isLeftClick()) {
+             return;
+         }
+         Player player = (Player)event.getWhoClicked();
+         UUID uuid = player.getUniqueId();
+         String trackName = ChatColor.stripColor(clicked.getItemMeta().getDisplayName()).trim();
+         if (trackName.isEmpty()) {
+             this.plugin.getDebugManager().logGuiSystem("Track name is empty after strip colors! Display name was: " + clicked.getItemMeta().getDisplayName());
+             player.sendMessage("\u00a7cErro: Nome da pista inv\u00e1lido.");
+             return;
+         }
+         if (!this.mysql.isTrackOpen(trackName)) {
+             String langCode = this.mysql.getPlayerLanguage(uuid);
+             player.sendMessage(this.plugin.getDirectTranslation("track_is_closed", langCode));
+             return;
+         }
+         long now = System.currentTimeMillis();
+         Long previousTimestamp = this.lastClickTime.putIfAbsent(uuid, now);
+         if (previousTimestamp != null) {
+             long diff = now - previousTimestamp;
+             if (diff < 3000L) {
+                 return;
+             }
+             this.lastClickTime.put(uuid, now);
+         }
+         player.closeInventory();
+         Bukkit.getScheduler().runTaskLater(this.plugin, () -> {
+             try {
+                 this.processTeleport(player, trackName);
+             } catch (Exception e) {
+                 this.plugin.getDebugManager().logGuiSystem("[ERROR] Error processing teleport: " + e.getMessage());
+             }
+         }, 1L);
+     }
 
-    private String formatTime(double time) {
-        int minutes = (int) (time / 60);
-        double seconds = time % 60;
-        if (minutes > 0) {
-            return String.format("%d:%06.3f", minutes, seconds);
-        } else {
-            return String.format("%.3f", seconds);
-        }
-    }
-
-    @EventHandler
-    public void onInventoryClick(InventoryClickEvent event) {
-        if (!event.getView().getTitle().equals(INVENTORY_TITLE)) return;
-        event.setCancelled(true);
-
-        ItemStack clicked = event.getCurrentItem();
-        if (clicked == null || clicked.getType() == Material.AIR) return;
-        if (!clicked.hasItemMeta() || clicked.getItemMeta().getDisplayName() == null) return;
-
-        Player player = (Player) event.getWhoClicked();
-
-        // 🕒 Limite de um clique a cada 0.5s (500ms)
-        long now = System.currentTimeMillis();
-        long lastClick = clickCooldown.getOrDefault(player.getUniqueId(), 0L);
-        if (now - lastClick < 500) {
-            String langCode = mysql.getPlayerLanguage(player.getUniqueId());
-            player.sendMessage(plugin.getDirectTranslation("wait_before_click", langCode));
-            return;
-        }
-        clickCooldown.put(player.getUniqueId(), now);
-
-        // Remove todas as formatações de cor e itálico do nome da pista
-        String trackName = ChatColor.stripColor(clicked.getItemMeta().getDisplayName()).trim();
-
-        // Validação: trackName não pode estar vazio
-        if (trackName.isEmpty()) {
-            plugin.getLogger().warning("Track name is empty after strip colors! Display name was: " + clicked.getItemMeta().getDisplayName());
-            player.sendMessage("§cErro: Nome da pista inválido.");
-            return;
-        }
-
-        // Fecha o inventário para evitar cliques duplicados
-        player.closeInventory();
-
-        if (!mysql.isTrackOpen(trackName)) {
-            String langCode = mysql.getPlayerLanguage(player.getUniqueId());
-            player.sendMessage(plugin.getDirectTranslation("track_is_closed", langCode));
-            return;
-        }
-
-        if (event.isLeftClick()) {
-
-            // 🔹 Salva tempo parcial da pista anterior antes de trocar
-            String lastTrack = plugin.getLastTimeTrialTrack(player.getUniqueId());
-            if (lastTrack != null && !lastTrack.equals(trackName)) {
-                TimerUtils.PlayerTimerData data = timerUtils.getTimerData(player, lastTrack);
-                if (data != null && !data.getCheckpointsReached().isEmpty()) {
-                    double currentTime = timerUtils.getPlayerElapsedTime(player, lastTrack);
-                    int checkpoints = data.getCheckpointsReached().size();
-
-                    Object[] bestData = mysql.getPlayerBestTime(player.getUniqueId().toString(), lastTrack);
-                    double bestTime = (bestData != null) ? (Double) bestData[0] : Double.MAX_VALUE;
-                    int bestCheckpoints = (bestData != null) ? (Integer) bestData[1] : 0;
-                    boolean finished = (bestData != null) ? (Boolean) bestData[2] : false;
-
-                    boolean shouldSave = !finished && (checkpoints > bestCheckpoints ||
-                            (checkpoints == bestCheckpoints && currentTime < bestTime));
-
-                    if (shouldSave) {
-                        mysql.savePartialTime(player.getUniqueId(), player.getName(), lastTrack, currentTime, checkpoints);
-                        String langCode = mysql.getPlayerLanguage(player.getUniqueId());
-                        String formattedTime = formatTime(currentTime);
-                        player.sendMessage(plugin.getTranslation("partial_time_saved", langCode,
-                            "{track}", lastTrack, "{time}", formattedTime + " com " + checkpoints + " checkpoints"));
-                    }
-                }
-                timerUtils.stopTimer(player, lastTrack);
-            }
-
-            // 🔹 Teleporta para a nova pista
-            Location loc = mysql.getTrackSpawn(trackName);
-            if (loc != null) {
-
-                // 🚫 Impedir entrar em pista que usa BoatUtils se o jogador não tem o mod
-                boolean playerHasBoatUtils = FormulaRacing.hasOpenBoatUtilsMod(player);
-                boolean trackUsesBoatUtils = mysql.trackHaveBoatUtils(trackName);
-                String langCode = mysql.getPlayerLanguage(player.getUniqueId());
-
-                if (trackUsesBoatUtils && !playerHasBoatUtils) {
-                    player.sendMessage(plugin.getDirectTranslation("does_not_have_boatutils", langCode));
-                    player.sendMessage(plugin.getDirectTranslation("boatutils_required", langCode));
-                    return;
-                }
-                ps.sendBoatSetting(player, 0);
-                ps.applyBoatUtilsToPlayer(player, trackName);
-
-                player.teleport(loc);
-                api.spawnBoat(player, true, false, false);
-                plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);
-                stt.setPlayerTrack(player, trackName);
-
-                // Envia mensagem de teleporte com placeholder
-                String teleportMsg = plugin.getTranslation("timetrial_teleport", langCode, "{track}", trackName);
-                plugin.getLogger().info("Sending teleport message to " + player.getName() + ": " + teleportMsg);
-                player.sendMessage(teleportMsg);
-
-                // Envia informações da pista
-                DatabaseManager.TrackData trackData = mysql.getTrackData(trackName);
-                if (trackData != null) {
-                    player.sendMessage(plugin.getTranslation("track_owner_info", langCode, "{owner}", trackData.getOwnerName()));
-                    player.sendMessage(plugin.getTranslation("track_world_info", langCode, "{world}", trackData.getWorldName()));
-                }
-            } else {
-                String langCode = mysql.getPlayerLanguage(player.getUniqueId());
-                player.sendMessage(plugin.getDirectTranslation("track_location_not_found", langCode));
-            }
-
-        }
-    }
-}
+     private void processTeleport(Player player, String trackName) {
+         Location loc;
+         String lastTrack = this.plugin.getLastTimeTrialTrack(player.getUniqueId());
+         if (lastTrack != null && !lastTrack.equals(trackName)) {
+             TimerUtils.PlayerTimerData data = this.timerUtils.getTimerData(player, lastTrack);
+             if (data != null && !data.getCheckpointsReached().isEmpty()) {
+                 boolean shouldSave;
+                 double currentTime = this.timerUtils.getPlayerElapsedTime(player, lastTrack);
+                 int checkpoints = data.getCheckpointsReached().size();
+                 Object[] bestData = this.mysql.getPlayerBestTime(player.getUniqueId().toString(), lastTrack);
+                 double bestTime = bestData != null ? (Double)bestData[0] : Double.MAX_VALUE;
+                 int bestCheckpoints = bestData != null ? (Integer)bestData[1] : 0;
+                 boolean finished = bestData != null ? (Boolean)bestData[2] : false;
+                 boolean bl = shouldSave = !finished && (checkpoints > bestCheckpoints || checkpoints == bestCheckpoints && currentTime < bestTime);
+                 if (shouldSave) {
+                     this.mysql.savePartialTime(player.getUniqueId(), player.getName(), lastTrack, currentTime, checkpoints);
+                     String langCode = this.mysql.getPlayerLanguage(player.getUniqueId());
+                     String formattedTime = this.formatTime(currentTime);
+                     player.sendMessage(this.plugin.getTranslation("partial_time_saved", langCode, "{track}", lastTrack, "{time}", formattedTime + " com " + checkpoints + " checkpoints"));
+                 }
+             }
+             this.timerUtils.stopTimer(player, lastTrack);
+         }
+         if ((loc = this.mysql.getTrackSpawn(trackName)) != null) {
+             Entity bestTime;
+             boolean playerHasBoatUtils = FormulaRacing.hasOpenBoatUtilsMod(player);
+             boolean trackUsesBoatUtils = this.mysql.trackHaveBoatUtils(trackName);
+             String langCode = this.mysql.getPlayerLanguage(player.getUniqueId());
+             if (trackUsesBoatUtils && !playerHasBoatUtils) {
+                 this.plugin.sendMessage(player, "obu_mandatory_warning", "{track}", trackName);
+             }
+             if ((bestTime = player.getVehicle()) instanceof Boat) {
+                 Boat oldBoat = (Boat)bestTime;
+                 player.leaveVehicle();
+                 this.api.deleteBoat((Entity)oldBoat);
+             }
+             this.ps.sendBoatSetting(player, 0, new Object[0]);
+             this.ps.applyBoatUtilsToPlayer(player, trackName);
+             player.teleport(loc);
+             this.api.spawnBoat(player, true, false, false);
+             this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);
+             DatabaseManager.TrackData trackData = this.mysql.getTrackData(trackName);
+             String owner = trackData != null ? trackData.getOwnerName() : null;
+             this.stt.setPlayerTrack(player, trackName, owner);
+             String teleportMsg = this.plugin.getTranslation("timetrial_teleport", langCode, "{track}", trackName);
+             player.sendMessage(teleportMsg);
+             if (trackData != null) {
+                 player.sendMessage(this.plugin.getTranslation("track_owner_info", langCode, "{owner}", trackData.getOwnerName()));
+                 player.sendMessage(this.plugin.getTranslation("track_world_info", langCode, "{world}", trackData.getWorldName()));
+             }
+         } else {
+             String langCode = this.mysql.getPlayerLanguage(player.getUniqueId());
+             player.sendMessage(this.plugin.getDirectTranslation("track_location_not_found", langCode));
+         }
+     }
+ }

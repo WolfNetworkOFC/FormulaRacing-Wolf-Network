@@ -1,3 +1,8 @@
+//
+// Source code recreated from a .class file by IntelliJ IDEA
+// (powered by Fernflower decompiler)
+//
+
 package dev.EfraGroup.formulaRacing.Listener;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
@@ -8,42 +13,32 @@ import org.bukkit.event.Listener;
 import org.bukkit.scheduler.BukkitRunnable;
 
 public class CamListener implements Listener {
-
     private final FormulaRacing plugin;
     private final CamUtils camUtils;
 
-    public CamListener(FormulaRacing plugin, CamUtils camUtils) {
+    public CamListener(FormulaRacing plugin, final CamUtils camUtils) {
         this.plugin = plugin;
         this.camUtils = camUtils;
-
-        // Task que atualiza todos os seguidores normais
-        new BukkitRunnable() {
-            @Override
+        (new BukkitRunnable() {
             public void run() {
                 camUtils.updateFollowersNormal();
             }
-        }.runTaskTimer(plugin, 0L, 5L); // atualiza a cada 20 ticks (1 segundo)
+        }).runTaskTimer(plugin, 0L, 5L);
     }
 
-    /**
-     * Método que você deve chamar quando quiser teleportar o jogador para a câmera mais próxima.
-     * Isso acontece apenas uma vez, quando o jogador estiver mais próximo de uma câmera que da anterior.
-     */
     public void updateFollowerNormal(Player follower) {
-        if (!camUtils.isFollowingNormal(follower)) return;
-
-        Player target = camUtils.getTargetNormal(follower);
-        if (target == null || !target.isOnline()) return;
-
-        camUtils.updateFollowersNormal(); // Esse método do CamUtils já verifica a câmera mais próxima e teleporta apenas uma vez
+        if (this.camUtils.isFollowingNormal(follower)) {
+            Player target = this.camUtils.getTargetNormal(follower);
+            if (target != null && target.isOnline()) {
+                this.camUtils.updateFollowersNormal();
+            }
+        }
     }
 
-    /**
-     * Caso queira atualizar todos os jogadores online de uma vez (opcional)
-     */
     public void updateAllFollowersNormal() {
-        for (Player follower : Bukkit.getOnlinePlayers()) {
-            updateFollowerNormal(follower);
+        for(Player follower : Bukkit.getOnlinePlayers()) {
+            this.updateFollowerNormal(follower);
         }
+
     }
 }

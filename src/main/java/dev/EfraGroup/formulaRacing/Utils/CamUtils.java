@@ -1,19 +1,26 @@
+/*
+ * Decompiled with CFR 0.153-SNAPSHOT (d6f6758-dirty).
+ *
+ * Could not load the following classes:
+ *  dev.EfraGroup.formulaRacing.Database.DatabaseManager
+ *  org.bukkit.Bukkit
+ *  org.bukkit.Location
+ *  org.bukkit.entity.Player
+ */
 package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+
+import java.util.*;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
-import java.util.*;
-
 public class CamUtils {
-
-    // --- Following Normal ---
     private final Map<UUID, UUID> followingNormal = new HashMap<>();
     private final Map<UUID, Location> lastCameraNormal = new HashMap<>();
-
     private final DatabaseManager mysql;
     private final FormulaRacing plugin;
 
@@ -22,83 +29,73 @@ public class CamUtils {
         this.plugin = plugin;
     }
 
-    // ======================
-    // FOLLOWING NORMAL
-    // ======================
     public void startFollowingNormal(Player follower, Player target) {
-        followingNormal.put(follower.getUniqueId(), target.getUniqueId());
-        lastCameraNormal.remove(follower.getUniqueId()); // reseta câmera anterior
-
-        // Teleporta imediatamente para a câmera mais próxima
-        Location nearest = getNearestCamera(target);
+        this.followingNormal.put(follower.getUniqueId(), target.getUniqueId());
+        this.lastCameraNormal.remove(follower.getUniqueId());
+        Location nearest = this.getNearestCamera(target);
         if (nearest != null) {
             follower.teleport(nearest);
-            lastCameraNormal.put(follower.getUniqueId(), nearest);
+            this.lastCameraNormal.put(follower.getUniqueId(), nearest);
         }
-
-        String langCode = mysql.getPlayerLanguage(follower.getUniqueId());
-        follower.sendMessage(plugin.getTranslation("cam_started_following", langCode, "{player}", target.getName()));
+        String langCode = this.mysql.getPlayerLanguage(follower.getUniqueId());
+        follower.sendMessage(this.plugin.getTranslation("cam_started_following", langCode, "{player}", target.getName()));
     }
 
     public boolean stopFollowingNormal(Player follower) {
         UUID uuid = follower.getUniqueId();
-        if (followingNormal.containsKey(uuid)) {
-            followingNormal.remove(uuid);
-            lastCameraNormal.remove(uuid);
-            String langCode = mysql.getPlayerLanguage(follower.getUniqueId());
-            follower.sendMessage(plugin.getDirectTranslation("cam_stopped_following", langCode));
+        if (this.followingNormal.containsKey(uuid)) {
+            this.followingNormal.remove(uuid);
+            this.lastCameraNormal.remove(uuid);
+            String langCode = this.mysql.getPlayerLanguage(follower.getUniqueId());
+            follower.sendMessage(this.plugin.getDirectTranslation("cam_stopped_following", langCode));
             return true;
         }
         return false;
     }
 
     public boolean isFollowingNormal(Player follower) {
-        return followingNormal.containsKey(follower.getUniqueId());
+        return this.followingNormal.containsKey(follower.getUniqueId());
     }
 
     public Player getTargetNormal(Player follower) {
-        UUID targetId = followingNormal.get(follower.getUniqueId());
+        UUID targetId = this.followingNormal.get(follower.getUniqueId());
         return targetId != null ? Bukkit.getPlayer(targetId) : null;
     }
 
-    /** Atualiza todos os seguidores normais */
     public void updateFollowersNormal() {
-        for (UUID followerId : followingNormal.keySet()) {
+        for (UUID followerId : this.followingNormal.keySet()) {
+            Location last;
+            Location nearest;
+            Player target;
             Player follower = Bukkit.getPlayer(followerId);
-            if (follower == null || !follower.isOnline()) continue;
-
-            Player target = getTargetNormal(follower);
-            if (target == null || !target.isOnline()) continue;
-
-            Location nearest = getNearestCamera(target);
-            if (nearest == null) continue;
-
-            Location last = lastCameraNormal.get(followerId);
-            if (last == null || !locationsEqualBlock(last, nearest)) {
-                follower.teleport(nearest);
-                lastCameraNormal.put(followerId, nearest);
-            }
+            if (follower == null || !follower.isOnline() || (target = this.getTargetNormal(follower)) == null || !target.isOnline() || (nearest = this.getNearestCamera(target)) == null || (last = this.lastCameraNormal.get(followerId)) != null && this.locationsEqualBlock(last, nearest)) continue;
+            follower.teleport(nearest);
+            this.lastCameraNormal.put(followerId, nearest);
         }
     }
 
-    // ======================
-    // UTILIDADES
-    // ======================
     public Location getNearestCamera(Player target) {
-        List<Location> allCameras = mysql.getAllCameras();
-        if (allCameras.isEmpty()) return null;
+        // 1. Especificar o tipo da lista <Location>
+        List<Location> allCameras = this.mysql.getAllCameras();
+
+        if (allCameras == null || allCameras.isEmpty()) {
+            return null;
+        }
 
         Location targetLoc = target.getLocation();
+
+        // 2. Usar o Stream com o comparador de distância
+        // Nota: Usamos distanceSquared por ser muito mais leve que distance (evita raiz quadrada)
         return allCameras.stream()
-                .min(Comparator.comparingDouble(c -> c.distanceSquared(targetLoc)))
+                .filter(loc -> Objects.equals(loc.getWorld(), targetLoc.getWorld())) // Filtro de segurança para o mesmo mundo
+                .min(Comparator.comparingDouble(loc -> loc.distanceSquared(targetLoc)))
                 .orElse(null);
     }
 
     private boolean locationsEqualBlock(Location a, Location b) {
-        if (a == null || b == null) return false;
-        return a.getWorld().equals(b.getWorld())
-                && a.getBlockX() == b.getBlockX()
-                && a.getBlockY() == b.getBlockY()
-                && a.getBlockZ() == b.getBlockZ();
+        if (a == null || b == null) {
+            return false;
+        }
+        return Objects.equals(a.getWorld(),b.getWorld()) && a.getBlockX() == b.getBlockX() && a.getBlockY() == b.getBlockY() && a.getBlockZ() == b.getBlockZ();
     }
 }

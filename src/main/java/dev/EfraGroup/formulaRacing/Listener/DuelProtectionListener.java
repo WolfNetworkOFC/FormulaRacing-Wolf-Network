@@ -1,82 +1,87 @@
+//
+// Source code recreated from a .class file by IntelliJ IDEA
+// (powered by Fernflower decompiler)
+//
+
 package dev.EfraGroup.formulaRacing.Listener;
 
-import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Heat.Heats;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import net.md_5.bungee.api.ChatColor;
+import net.md_5.bungee.api.chat.ClickEvent;
+import net.md_5.bungee.api.chat.HoverEvent;
+import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.chat.ClickEvent.Action;
+import net.md_5.bungee.api.chat.hover.content.Content;
+import net.md_5.bungee.api.chat.hover.content.Text;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
-import org.bukkit.event.player.PlayerDropItemEvent;
 
-import java.util.Arrays;
-import java.util.List;
-
-/**
- * Listener dedicado a proteger a integridade dos duelos,
- * impedindo que jogadores usem comandos ou ações que possam
- * dar vantagem injusta ou quebrar a experiência da corrida.
- */
 public class DuelProtectionListener implements Listener {
-
     private final FormulaRacing plugin;
     private final DatabaseManager databaseManager;
-
-    // Lista de comandos que são bloqueados durante duelos (exceto /duel sair)
-    private static final List<String> BLOCKED_COMMANDS = Arrays.asList(
-            "/spawn",
-            "/home",
-            "/tp",
-            "/teleport",
-            "/tpa",
-            "/tpaccept",
-            "/back",
-            "/warp",
-            "/hub",
-            "/lobby",
-            "/suicide",
-            "/kill",
-            "/fly",
-            "/gm",
-            "/gamemode",
-            "/speed"
-    );
+    private static final List<String> BLOCKED_COMMANDS = Arrays.asList("/spawn", "/home", "/tp", "/teleport", "/tpa", "/tpaccept", "/back", "/warp", "/hub", "/lobby", "/suicide", "/kill", "/fly", "/gm", "/gamemode", "/speed", "/lonely");
 
     public DuelProtectionListener(FormulaRacing plugin, DatabaseManager databaseManager) {
         this.plugin = plugin;
         this.databaseManager = databaseManager;
     }
 
-    /**
-     * Bloqueia comandos que poderiam ser usados para escapar ou trapacear no duelo.
-     * Prioridade HIGHEST para garantir que seja processado antes de outros plugins.
-     */
-    @EventHandler(priority = EventPriority.HIGHEST)
+    @EventHandler(
+            priority = EventPriority.HIGHEST
+    )
     public void onCommandDuringDuel(PlayerCommandPreprocessEvent event) {
         Player player = event.getPlayer();
-
-        // Só verifica se o jogador está em duelo
-        if (!databaseManager.isPlayerInActiveDuel(player.getUniqueId())) {
-            return;
-        }
-
+        boolean isStaff = player.hasPermission("formularacing.admin");
+        UUID uuid = player.getUniqueId();
         String command = event.getMessage().toLowerCase().split(" ")[0];
+        if (!command.equals("/duel") && !command.equals("/race") && !command.equals("/heat") && !command.equals("/event") && !command.equals("/fr") && !command.equals("/formularacing")) {
+            boolean inDuel = this.plugin.getTimeTrialDuels() != null && this.plugin.getTimeTrialDuels().isPlayerActivelyInDuel(uuid);
+            boolean inQuickRace = this.plugin.getQuickRaceManager() != null && this.plugin.getQuickRaceManager().isPlayerActivelyRacing(uuid);
+            boolean inHeat = false;
+            if (this.plugin.getRaceEventManager() != null) {
+                Optional<Heats> activeHeat = this.plugin.getRaceEventManager().getPlayerActiveHeat(uuid);
+                if (activeHeat.isPresent()) {
+                    inHeat = ((Heats)activeHeat.get()).isPlayerActivelyRacing(uuid);
+                }
+            }
 
-        // Permite o comando /duel (para sair do duelo)
-        if (command.equals("/duel")) {
-            return;
-        }
+            if (inDuel || inQuickRace || inHeat) {
+                for(String blocked : BLOCKED_COMMANDS) {
+                    if (command.equals(blocked)) {
+                        if (isStaff && !command.equals("/lonely")) {
+                            return;
+                        }
 
-        // Bloqueia comandos perigosos
-        for (String blocked : BLOCKED_COMMANDS) {
-            if (command.equals(blocked)) {
-                event.setCancelled(true);
-                String langCode = databaseManager.getPlayerLanguage(player.getUniqueId());
-                player.sendMessage(plugin.getDirectTranslation("duel_command_blocked", langCode));
-                player.sendMessage(plugin.getDirectTranslation("duel_use_quit", langCode));
-                return;
+                        event.setCancelled(true);
+                        String langCode = this.databaseManager.getPlayerLanguage(uuid);
+                        String type = inDuel ? "duel" : "race";
+                        String leaveCmd = inDuel ? "/duel leave" : "/race leave";
+                        player.sendMessage(" ");
+                        String var10001 = String.valueOf(ChatColor.RED);
+                        player.sendMessage(var10001 + "⚠ " + this.plugin.getDirectTranslation(type + "_command_blocked", langCode));
+                        String clickText = this.plugin.getTranslation("protection_click_to_leave", langCode, new String[0]);
+                        String suffixText = this.plugin.getTranslation("protection_leave_suffix", langCode, new String[0]);
+                        String hoverText = this.plugin.getTranslation("protection_hover_leave", langCode, new String[]{"{command}", leaveCmd});
+                        TextComponent msg = new TextComponent(clickText);
+                        msg.addExtra(suffixText);
+                        msg.setClickEvent(new ClickEvent(Action.RUN_COMMAND, leaveCmd));
+                        msg.setHoverEvent(new HoverEvent(net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT, new Content[]{new Text(hoverText)}));
+                        player.spigot().sendMessage(msg);
+                        player.sendMessage(" ");
+                        return;
+                    }
+                }
+
             }
         }
     }
 }
-

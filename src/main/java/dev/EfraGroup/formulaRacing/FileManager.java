@@ -1,143 +1,120 @@
-package dev.EfraGroup.formulaRacing;
+//
+// Source code recreated from a .class file by IntelliJ IDEA
+// (powered by Fernflower decompiler)
+//
 
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.plugin.java.JavaPlugin;
+package dev.EfraGroup.formulaRacing;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 
 public class FileManager {
-
-    private final JavaPlugin plugin;
+    private final FormulaRacing plugin;
     private File configFile;
     private FileConfiguration config;
 
-    public FileManager(JavaPlugin plugin) {
+    public FileManager(FormulaRacing plugin) {
         this.plugin = plugin;
-        setup();
-        copyLangFiles(); // 🔹 Copia os arquivos de idioma ao iniciar
+        this.setup();
+        this.copyLangFiles();
     }
 
     private void setup() {
-        if (!plugin.getDataFolder().exists()) {
-            plugin.getDataFolder().mkdirs();
+        if (!this.plugin.getDataFolder().exists()) {
+            this.plugin.getDataFolder().mkdirs();
         }
 
-        configFile = new File(plugin.getDataFolder(), "config.yml");
-
-        if (!configFile.exists()) {
-            plugin.saveResource("config.yml", false);
+        this.configFile = new File(this.plugin.getDataFolder(), "config.yml");
+        if (!this.configFile.exists()) {
+            this.plugin.saveResource("config.yml", false);
         }
 
-        config = YamlConfiguration.loadConfiguration(configFile);
+        this.config = YamlConfiguration.loadConfiguration(this.configFile);
     }
 
     public FileConfiguration getConfig() {
-        return config;
+        return this.config;
     }
 
     public void saveConfig() {
         try {
-            config.save(configFile);
+            this.config.save(this.configFile);
         } catch (IOException e) {
-            plugin.getLogger().severe("❌ Não foi possível salvar o config.yml!");
-            e.printStackTrace();
+            this.plugin.getDebugManager().logFileSystem("❌ Não foi possível salvar o config.yml: " + e.getMessage());
         }
+
     }
 
     public void reloadConfig() {
-        config = YamlConfiguration.loadConfiguration(configFile);
+        this.config = YamlConfiguration.loadConfiguration(this.configFile);
     }
 
-    // ==============================
-    // 🔧 Métodos de Banco de Dados
-    // ==============================
-
     public String getDatabaseType() {
-        return config.getString("database.type", "sqlite");
+        return this.config.getString("database.type", "sqlite");
     }
 
     public String getMysqlHost() {
-        return config.getString("database.mysql.host");
+        return this.config.getString("database.mysql.host");
     }
 
     public int getMysqlPort() {
-        return config.getInt("database.mysql.port");
+        return this.config.getInt("database.mysql.port");
     }
 
     public String getMysqlDatabase() {
-        return config.getString("database.mysql.database");
+        return this.config.getString("database.mysql.database");
     }
 
     public String getMysqlUser() {
-        return config.getString("database.mysql.username");
+        return this.config.getString("database.mysql.username");
     }
 
     public String getMysqlPassword() {
-        return config.getString("database.mysql.password");
+        return this.config.getString("database.mysql.password");
     }
 
     public String getSQLiteFile() {
-        return config.getString("database.sqlite.file", "formularacing.db");
+        return this.config.getString("database.sqlite.file", "formularacing.db");
     }
 
     public String getArchiveFile() {
-        return config.getString("database.sqlite.archive.file", "archive.db");
+        return this.config.getString("database.sqlite.archive.file", "archive.db");
     }
 
     public boolean isAutoCreateArchiveEnabled() {
-        return config.getBoolean("database.sqlite.archive.auto-create-archive", true);
+        return this.config.getBoolean("database.sqlite.archive.auto-create-archive", true);
     }
 
     public String getSQLitePragma() {
-        return config.getString("database.sqlite.pragma", "foreign_keys = ON");
+        return this.config.getString("database.sqlite.pragma", "foreign_keys = ON");
     }
 
-    // ===========================================
-    // 🌍 SISTEMA DE LÍNGUAS (lang)
-    // ===========================================
-
-    /**
-     * Copia os arquivos de idioma (lang) da pasta resources/lang/
-     * para plugins/FormulaRacing/lang/, se ainda não existirem.
-     */
     private void copyLangFiles() {
         String folderName = "lang";
-        String[] langFiles = {"en_US.yml", "pt_BR.yml", "pt_PT.yml"};
-
-        File langFolder = new File(plugin.getDataFolder(), folderName);
+        String[] langFiles = new String[]{"en_US.yml", "pt_BR.yml", "pt_PT.yml"};
+        File langFolder = new File(this.plugin.getDataFolder(), folderName);
         if (!langFolder.exists()) {
             langFolder.mkdirs();
         }
 
-        for (String fileName : langFiles) {
-            copyResourceIfNotExists(folderName + "/" + fileName);
+        for(String fileName : langFiles) {
+            this.copyResourceIfNotExists(folderName + "/" + fileName);
         }
+
     }
 
-    /**
-     * Copia um arquivo do resources para a pasta de dados do plugin, se ainda não existir.
-     *
-     * @param resourcePath Caminho dentro do resources (ex: "lang/pt_BR.yml")
-     */
     private void copyResourceIfNotExists(String resourcePath) {
-        File outFile = new File(plugin.getDataFolder(), resourcePath);
-        if (outFile.exists()) return;
-
-        try (InputStream in = plugin.getResource(resourcePath)) {
-            if (in == null) {
-                plugin.getLogger().warning("⚠ Arquivo não encontrado no JAR: " + resourcePath);
-                return;
+        File outFile = new File(this.plugin.getDataFolder(), resourcePath);
+        if (!outFile.exists()) {
+            try {
+                this.plugin.saveResource(resourcePath, false);
+                this.plugin.getDebugManager().logFileSystem("✔ Arquivo copiado: " + resourcePath);
+            } catch (Exception e) {
+                this.plugin.getDebugManager().logFileSystem("❌ Falha ao copiar o arquivo: " + resourcePath + " (" + e.getMessage() + ")");
             }
 
-            Files.copy(in, outFile.toPath());
-            plugin.getLogger().info("✅ Arquivo copiado: " + resourcePath);
-        } catch (IOException e) {
-            plugin.getLogger().severe("❌ Falha ao copiar o arquivo: " + resourcePath);
-            e.printStackTrace();
         }
     }
 }

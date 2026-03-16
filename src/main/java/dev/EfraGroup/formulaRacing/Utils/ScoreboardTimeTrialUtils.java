@@ -1,84 +1,141 @@
+/*
+ * Decompiled with CFR 0.153-SNAPSHOT (d6f6758-dirty).
+ *
+ * Could not load the following classes:
+ *  dev.EfraGroup.formulaRacing.Database.DatabaseManager
+ *  org.bukkit.Bukkit
+ *  org.bukkit.entity.Player
+ *  org.bukkit.plugin.Plugin
+ *  org.bukkit.scheduler.BukkitRunnable
+ */
 package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
-import dev.EfraGroup.formulaRacing.Database.DatabaseManager.TrackRecord;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import fr.mrmicky.fastboard.FastBoard;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.*;
-
 public class ScoreboardTimeTrialUtils {
-
-    private final Map<UUID, String> playerTracks = new HashMap<>();
-    private final Map<UUID, FastBoard> boards = new HashMap<>();
+    private final Map<UUID, String> playerTracks = new ConcurrentHashMap<UUID, String>();
+    private final Map<UUID, String> playerTrackOwners = new ConcurrentHashMap<UUID, String>();
+    private final Map<UUID, FastBoard> boards = new ConcurrentHashMap<UUID, FastBoard>();
     private final DatabaseManager mysql;
     private boolean running = false;
+    private final Map<String, CachedLeaderboard> leaderboardCache = new ConcurrentHashMap<String, CachedLeaderboard>();
+    private final Map<String, String> trackOwnerCache = new ConcurrentHashMap<String, String>();
+    private final Map<UUID, Boolean> enabledCache = new ConcurrentHashMap<UUID, Boolean>();
+    private final Map<UUID, Long> lastEnabledCheck = new ConcurrentHashMap<UUID, Long>();
+    private final long CACHE_TTL_MS = 10000L;
+    private static final long SETTINGS_TTL = 5000L;
 
     public ScoreboardTimeTrialUtils(DatabaseManager mysql) {
         this.mysql = mysql;
     }
 
     public void startAutoUpdate() {
-        if (running) return;
-        running = true;
+        if (this.running) {
+            return;
+        }
+        this.running = true;
+        new BukkitRunnable(){
 
-        new BukkitRunnable() {
-            @Override
             public void run() {
                 for (Player player : Bukkit.getOnlinePlayers()) {
-                    String trackName = playerTracks.get(player.getUniqueId());
-                    if (trackName != null) show(player, trackName);
+                    String trackName = ScoreboardTimeTrialUtils.this.playerTracks.get(player.getUniqueId());
+                    if (trackName == null) continue;
+                    ScoreboardTimeTrialUtils.this.show(player, trackName);
                 }
             }
-        }.runTaskTimer(FormulaRacing.getInstance(), 0L, 120L);
+        }.runTaskTimer((Plugin)FormulaRacing.getInstance(), 0L, 20L);
     }
 
-    public void setPlayerTrack(Player player, String trackName) {
-        playerTracks.put(player.getUniqueId(), trackName);
+    public void setPlayerTrack(Player player, String trackName, String ownerName) {
+        this.playerTracks.put(player.getUniqueId(), trackName);
+        if (ownerName != null) {
+            this.playerTrackOwners.put(player.getUniqueId(), ownerName);
+        }
+        this.show(player, trackName);
     }
 
     public void clearPlayerTrack(Player player) {
-        playerTracks.remove(player.getUniqueId());
-        FastBoard board = boards.remove(player.getUniqueId());
-        if (board != null) board.delete();
+        this.playerTracks.remove(player.getUniqueId());
+        this.playerTrackOwners.remove(player.getUniqueId());
+        FastBoard board = this.boards.remove(player.getUniqueId());
+        if (board != null) {
+            board.delete();
+        }
     }
 
-    // Atualiza scoreboard
     public boolean show(Player player, String trackName) {
-        if (player == null || !player.isOnline()) return false;
-
-        boolean enabled = mysql.getTimeTrialScoreboard(player.getUniqueId());
-        FastBoard board = boards.get(player.getUniqueId());
-
-        // Se estiver desativado, remove a board
+        boolean enabled;
+        if (player == null || !player.isOnline()) {
+            return false;
+        }
+        if (FormulaRacing.getInstance().getTimeTrialDuels() != null && FormulaRacing.getInstance().getTimeTrialDuels().isPlayerInActiveDuelCached(player.getUniqueId())) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        if (this.enabledCache.containsKey(player.getUniqueId()) && now - this.lastEnabledCheck.getOrDefault(player.getUniqueId(), 0L) < 5000L) {
+            enabled = this.enabledCache.get(player.getUniqueId());
+        } else {
+            enabled = this.mysql.getTimeTrialScoreboard(player.getUniqueId());
+            this.enabledCache.put(player.getUniqueId(), enabled);
+            this.lastEnabledCheck.put(player.getUniqueId(), now);
+        }
+        FastBoard board = this.boards.get(player.getUniqueId());
         if (!enabled) {
             if (board != null) {
                 board.delete();
-                boards.remove(player.getUniqueId());
+                this.boards.remove(player.getUniqueId());
             }
             return false;
         }
-
-        // Criar board se não existir
         if (board == null) {
-            board = new FastBoard(player);
-            boards.put(player.getUniqueId(), board);
+            try {
+                board = new FastBoard(player);
+                this.boards.put(player.getUniqueId(), board);
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        try {
+            this.updateBoard(player, board, trackName);
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private void updateBoard(Player player, FastBoard board, String trackName) {
+        List<DatabaseManager.TrackRecord> allRecords;
+        CachedLeaderboard cached = leaderboardCache.get(trackName);
+
+        // 1. Gerenciamento de Cache
+        if (cached == null || cached.isExpired(10000L)) {
+            allRecords = mysql.getTopTimes(trackName);
+            if (allRecords == null) allRecords = new ArrayList<>();
+
+            // Ordenação: Finalizados primeiro > Mais Checkpoints > Menor Tempo
+            allRecords.sort(Comparator.comparingInt((DatabaseManager.TrackRecord tr) -> tr.isFinished() ? 0 : 1)
+                    .thenComparing(Comparator.comparingInt(DatabaseManager.TrackRecord::getCheckpointsReached).reversed())
+                    .thenComparingDouble(DatabaseManager.TrackRecord::getTime));
+
+            leaderboardCache.put(trackName, new CachedLeaderboard(allRecords));
+        } else {
+            allRecords = cached.records;
         }
 
-        // Pega records e ordena (Melhores primeiro)
-        List<TrackRecord> allRecords = mysql.getTopTimes(trackName);
-        if (allRecords == null) allRecords = new ArrayList<>();
-
-        allRecords.sort(
-                Comparator.<TrackRecord>comparingInt(tr -> tr.isFinished() ? 0 : 1)
-                        .thenComparing(Comparator.comparingInt(TrackRecord::getCheckpointsReached).reversed())
-                        .thenComparingDouble(TrackRecord::getTime)
-        );
-
-        // Encontra a posição exata do jogador na lista
+        // 2. Localizar posição do jogador
         int myPos = -1;
         for (int i = 0; i < allRecords.size(); i++) {
             if (allRecords.get(i).getPlayerName().equals(player.getName())) {
@@ -87,110 +144,131 @@ public class ScoreboardTimeTrialUtils {
             }
         }
 
-        board.updateTitle("§e§l-TimeTrial-");
+        // 3. Cabeçalho do Scoreboard
+        TranslationUtil tu = FormulaRacing.getInstance().getTranslationUtil();
+        board.updateTitle(tu.getTranslated(player, "scoreboard_tt_title"));
 
         List<String> lines = new ArrayList<>();
-        lines.add("§e§lTrack: §f" + trackName);
-        String creator = mysql.getTrackOwner(trackName);
-        if (creator != null) lines.add("§7By " + creator);
+        lines.add(tu.getTranslated(player, "scoreboard_tt_track", "{track}", trackName));
+
+        // Lógica do Criador da Pista
+        String creator = playerTrackOwners.getOrDefault(player.getUniqueId(), trackOwnerCache.get(trackName));
+        if (creator == null) {
+            creator = mysql.getTrackOwner(trackName);
+            if (creator != null) trackOwnerCache.put(trackName, creator);
+        }
+
+        if (creator != null) {
+            lines.add(tu.getTranslated(player, "scoreboard_tt_by", "{creator}", creator));
+        }
+
         lines.add("");
-        lines.add("§6Leaderboard:");
+        lines.add(tu.getTranslated(player, "scoreboard_tt_leaderboard"));
 
-        // --- LÓGICA DE SELEÇÃO DE LINHAS ---
-        TrackRecord firstPlace = null;
+        // 4. Lógica do Leaderboard Dinâmico (Top 5 ou Top 1 + Vizinhos)
+        List<DatabaseManager.TrackRecord> neighbors = new ArrayList<>();
+        DatabaseManager.TrackRecord firstPlace = null;
         boolean includeSeparator = false;
-        List<TrackRecord> neighbors = new ArrayList<>();
 
-        if (myPos == -1) {
-            // Se o jogador não tem tempo, mostra apenas os 5 primeiros
-            int end = Math.min(allRecords.size(), 5);
-            for (int i = 0; i < end; i++) neighbors.add(allRecords.get(i));
-        } else if (myPos < 5) {
-            // Se o jogador já está no Top 5, mostra do 1 ao 5 direto
-            int end = Math.min(allRecords.size(), 5);
-            for (int i = 0; i < end; i++) neighbors.add(allRecords.get(i));
+        if (myPos == -1 || myPos < 5) {
+            // Caso o jogador não tenha tempo ou já esteja no Top 5
+            int limit = Math.min(allRecords.size(), 5);
+            for (int i = 0; i < limit; i++) {
+                neighbors.add(allRecords.get(i));
+            }
         } else {
-            // Se o jogador está abaixo do 5º lugar (6th, 7th...)
-            firstPlace = allRecords.get(0); // Garante o 1st no topo
+            // Caso o jogador esteja longe: mostra o 1º lugar + separador + vizinhos ao redor dele
+            firstPlace = allRecords.get(0);
             includeSeparator = true;
 
-            // Pega os vizinhos: 1 acima, ele mesmo, e 1 abaixo (ou conforme houver espaço)
-            int start = Math.max(1, myPos - 1); // Começa no 1 para não repetir o líder que já pegamos
-            int end = Math.min(allRecords.size() - 1, myPos + 1);
+            int start = Math.max(1, myPos - 2);
+            int end = Math.min(allRecords.size() - 1, myPos + 2);
             for (int i = start; i <= end; i++) {
                 neighbors.add(allRecords.get(i));
             }
         }
 
-        // --- MONTAGEM FINAL DA SCOREBOARD ---
-
-        // 1. Adiciona o líder se ele estiver isolado
+        // 5. Renderização das linhas
         if (firstPlace != null) {
-            lines.add(formatRecordLine(firstPlace, 1, player.getName()));
+            lines.add(formatRecordLine(firstPlace, 1, player.getName(), player));
         }
 
-        // 2. Adiciona o separador se o jogador estiver longe do topo
         if (includeSeparator) {
             lines.add("§8-----------------");
         }
 
-        // 3. Adiciona os vizinhos (ou o Top 5 normal)
-        for (TrackRecord tr : neighbors) {
+        for (DatabaseManager.TrackRecord tr : neighbors) {
             int actualPos = allRecords.indexOf(tr) + 1;
-            lines.add(formatRecordLine(tr, actualPos, player.getName()));
+            lines.add(formatRecordLine(tr, actualPos, player.getName(), player));
         }
 
         lines.add("");
         lines.add("§ewolfnetwork.com.br");
 
         board.updateLines(lines);
-        return true;
     }
 
-    /**
-     * Método auxiliar para formatar cada linha da Leaderboard
-     */
-    private String formatRecordLine(TrackRecord tr, int pos, String observerName) {
+    private String formatRecordLine(DatabaseManager.TrackRecord tr, int pos, String observerName, Player viewer) {
+        String string;
         boolean isMe = tr.getPlayerName().equals(observerName);
-
-        // Sufixo da posição (1st, 2nd, 3rd, 4th...)
-        String suffix;
-        if (pos == 1) suffix = "st";
-        else if (pos == 2) suffix = "nd";
-        else if (pos == 3) suffix = "rd";
-        else suffix = "th";
-
-        // Cores baseadas na posição e se é o próprio jogador
-        String color = isMe ? "§f§l" : switch (pos) {
-            case 1 -> "§6"; // Ouro
-            case 2 -> "§7"; // Prata
-            case 3 -> "§c"; // Bronze (Cobre)
-            default -> "§7"; // Cinza para os demais
-        };
-
-        // Formatação do tempo/CP
-        String timeDisplay = tr.isFinished()
-                ? formatTime(tr.getTime())
-                : tr.getCheckpointsReached() + "CP(" + formatTime(tr.getTime()) + ")";
-
-        String nameDisplay = isMe ? "§r§lVocê" : "§r" + tr.getPlayerName();
-
-        // Exemplo: §61st §f0.45.231 §6PlayerName
-        return color + pos + suffix + " §f" + nameDisplay + " " + timeDisplay;
+        String suffix = pos == 1 ? "st" : (pos == 2 ? "nd" : (pos == 3 ? "rd" : "th"));
+        if (isMe) {
+            string = "\u00a7f\u00a7l";
+        } else {
+            switch (pos) {
+                case 1: {
+                    string = "\u00a76";
+                    break;
+                }
+                case 2: {
+                    string = "\u00a77";
+                    break;
+                }
+                case 3: {
+                    string = "\u00a7c";
+                    break;
+                }
+                default: {
+                    string = "\u00a77";
+                }
+            }
+        }
+        String color = string;
+        String timeDisplay = tr.isFinished() ? this.formatTime(tr.getTime()) : "\u00a77" + tr.getCheckpointsReached() + "CP(\u00a7f" + this.formatTime(tr.getTime()) + "\u00a77)";
+        String nameDisplay = isMe ? FormulaRacing.getInstance().getTranslationUtil().getTranslated(viewer, "scoreboard_tt_you", new String[0]) : "\u00a7r" + tr.getPlayerName();
+        return color + pos + suffix + " \u00a7f" + nameDisplay + " " + timeDisplay;
     }
 
     public String formatTime(double timeInSeconds) {
-        long minutes = (long) (timeInSeconds / 60);
-        long seconds = (long) (timeInSeconds % 60);
-        long millis = (long) ((timeInSeconds - Math.floor(timeInSeconds)) * 1000);
-
-        if (minutes > 0) return String.format("%d:%02d.%03d", minutes, seconds, millis);
+        long minutes = (long)(timeInSeconds / 60.0);
+        long seconds = (long)(timeInSeconds % 60.0);
+        long millis = (long)((timeInSeconds - Math.floor(timeInSeconds)) * 1000.0);
+        if (minutes > 0L) {
+            return String.format("%d:%02d.%03d", minutes, seconds, millis);
+        }
         return String.format("%d.%03d", seconds, millis);
     }
 
     public void clearAll() {
-        for (FastBoard board : boards.values()) board.delete();
-        boards.clear();
-        playerTracks.clear();
+        for (FastBoard board : this.boards.values()) {
+            board.delete();
+        }
+        this.boards.clear();
+        this.playerTracks.clear();
+        this.playerTrackOwners.clear();
+    }
+
+    private static class CachedLeaderboard {
+        final List<DatabaseManager.TrackRecord> records;
+        final long timestamp;
+
+        CachedLeaderboard(List<DatabaseManager.TrackRecord> records) {
+            this.records = records;
+            this.timestamp = System.currentTimeMillis();
+        }
+
+        boolean isExpired(long ttl) {
+            return System.currentTimeMillis() - this.timestamp > ttl;
+        }
     }
 }

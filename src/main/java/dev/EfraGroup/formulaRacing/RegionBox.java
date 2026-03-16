@@ -1,42 +1,42 @@
+//
+// Source code recreated from a .class file by IntelliJ IDEA
+// (powered by Fernflower decompiler)
+//
+
 package dev.EfraGroup.formulaRacing;
 
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 
+import java.util.Objects;
+
 public class RegionBox {
     private final Location min;
     private final Location max;
 
-    public RegionBox(Location min, Location max) {
-        this.min = min;
-        this.max = max;
+    public RegionBox(Location loc1, Location loc2) {
+        this.min = new Location(loc1.getWorld(), Math.min(loc1.getX(), loc2.getX()), Math.min(loc1.getY(), loc2.getY()), Math.min(loc1.getZ(), loc2.getZ()));
+        this.max = new Location(loc1.getWorld(), Math.max(loc1.getX(), loc2.getX()), Math.max(loc1.getY(), loc2.getY()), Math.max(loc1.getZ(), loc2.getZ()));
     }
 
     public boolean contains(Location location) {
-        return location.getWorld().equals(min.getWorld()) &&
-                location.getX() >= min.getX() && location.getX() <= max.getX() &&
-                location.getY() >= min.getY() && location.getY() <= max.getY() &&
-                location.getZ() >= min.getZ() && location.getZ() <= max.getZ();
+        return Objects.equals(location.getWorld(), this.min.getWorld()) && location.getX() >= this.min.getX() && location.getX() <= this.max.getX() && location.getY() >= this.min.getY() && location.getY() <= this.max.getY() && location.getZ() >= this.min.getZ() && location.getZ() <= this.max.getZ();
     }
 
     public boolean contains(Player player) {
-        return contains(player.getLocation());
+        return this.contains(player.getLocation());
     }
 
     public Location getMin() {
-        return min;
+        return this.min;
     }
 
     public Location getMax() {
-        return max;
+        return this.max;
     }
 
     public Vector getCenter() {
-        return new Vector(
-                (min.getX() + max.getX()) / 2,
-                (min.getY() + max.getY()) / 2,
-                (min.getZ() + max.getZ()) / 2
-        );
+        return new Vector((this.min.getX() + this.max.getX()) / (double)2.0F, (this.min.getY() + this.max.getY()) / (double)2.0F, (this.min.getZ() + this.max.getZ()) / (double)2.0F);
     }
 }

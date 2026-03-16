@@ -1,148 +1,231 @@
+/*
+ * Decompiled with CFR 0.153-SNAPSHOT (d6f6758-dirty).
+ *
+ * Could not load the following classes:
+ *  dev.EfraGroup.formulaRacing.Database.DatabaseManager
+ *  org.bukkit.Bukkit
+ *  org.bukkit.entity.Player
+ *  org.bukkit.plugin.Plugin
+ *  org.bukkit.scheduler.BukkitRunnable
+ */
 package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.TimeTrialDuelsAction;
 import fr.mrmicky.fastboard.FastBoard;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
-
+import fr.mrmicky.fastboard.FastBoardBase;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
 public class ScoreboardDuelsTimeUtils {
-
     private final FormulaRacing plugin;
     private final DatabaseManager mysql;
-    private final TimeTrialDuelsAction ttda; // Necessário para pegar o tempo real
-    private final Map<UUID, FastBoard> boards = new ConcurrentHashMap<>();
+    private final TimeTrialDuelsAction ttda;
+    private TimeTrialDuels timeTrialDuels;
+    private final Map<UUID, FastBoard> boards = new ConcurrentHashMap<UUID, FastBoard>();
+    private final Map<UUID, DuelContext> duelContexts = new ConcurrentHashMap<UUID, DuelContext>();
 
-    // Armazena dados contextuais para a task saber o que exibir
-    private final Map<UUID, DuelContext> duelContexts = new ConcurrentHashMap<>();
-
-    public ScoreboardDuelsTimeUtils(FormulaRacing plugin, DatabaseManager mysql, TimeTrialDuelsAction ttda) {
+    public ScoreboardDuelsTimeUtils(FormulaRacing plugin, DatabaseManager mysql, TimeTrialDuelsAction ttda, TimeTrialDuels timeTrialDuels) {
         this.plugin = plugin;
         this.mysql = mysql;
         this.ttda = ttda;
-        startAutoUpdateTask();
+        this.timeTrialDuels = timeTrialDuels;
+        this.startAutoUpdateTask();
     }
 
-    /**
-     * Task que roda em repetição para atualizar todas as boards ativas
-     */
+    public void setTimeTrialDuels(TimeTrialDuels timeTrialDuels) {
+        this.timeTrialDuels = timeTrialDuels;
+    }
+
     private void startAutoUpdateTask() {
         new BukkitRunnable() {
-            @Override
-            public void run() {
-                for (UUID uuid : boards.keySet()) {
-                    Player player = Bukkit.getPlayer(uuid);
-                    DuelContext ctx = duelContexts.get(uuid);
 
+            public void run() {
+                for (UUID uuid : ScoreboardDuelsTimeUtils.this.boards.keySet()) {
+                    Player player = Bukkit.getPlayer((UUID) uuid);
+                    DuelContext ctx = ScoreboardDuelsTimeUtils.this.duelContexts.get(uuid);
                     if (player == null || !player.isOnline() || ctx == null) {
-                        removeBoard(uuid);
+                        ScoreboardDuelsTimeUtils.this.removeBoard(uuid);
                         continue;
                     }
-
-                    // Pega o tempo milissegundos do cronômetro real no TTDA
-                    //long currentMillis = ttda.getPlayerTimeMillis(player);
-                    String formattedTime = formatTimeFromMillis(13223);
-
-                    // Chama o update (que já lida com o banco de forma async internamente)
-                    update(player, ctx.duelId, formattedTime, ctx.currentLap, ctx.totalLaps, ctx.trackName);
+                    double elapsedSeconds = ScoreboardDuelsTimeUtils.this.ttda.getPlayerElapsedSeconds(player);
+                    String formattedTime = ScoreboardDuelsTimeUtils.this.formatTime(elapsedSeconds);
+                    ScoreboardDuelsTimeUtils.this.update(player, ctx.duelId, formattedTime, ctx.currentLap, ctx.totalLaps, ctx.trackName);
                 }
             }
-        }.runTaskTimer(plugin, 0L, 2L); // Rodando a cada 2 ticks para performance balanceada
+        }.runTaskTimer((Plugin) this.plugin, 0L, 2L);
     }
 
     public void applyDuelBoard(Player player, int duelId, int totalLaps, String trackName) {
         FastBoard board = new FastBoard(player);
-        board.updateTitle("§b§lDUEL §f§lRACING");
-        boards.put(player.getUniqueId(), board);
-
-        // Registra o contexto para a task saber os dados fixos
-        duelContexts.put(player.getUniqueId(), new DuelContext(duelId, totalLaps, trackName));
+        board.updateTitle(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_title", new String[0]));
+        this.boards.put(player.getUniqueId(), board);
+        this.duelContexts.put(player.getUniqueId(), new DuelContext(duelId, totalLaps, trackName));
     }
 
-    /**
-     * Atualiza a volta atual do jogador (chamado quando ele passa num CP/Finish)
-     */
     public void updatePlayerLap(Player player, int lap) {
-        DuelContext ctx = duelContexts.get(player.getUniqueId());
-        if (ctx != null) ctx.currentLap = lap;
+        DuelContext ctx = this.duelContexts.get(player.getUniqueId());
+        if (ctx != null) {
+            ctx.currentLap = lap;
+        }
     }
 
     public void update(Player player, int duelId, String currentFormattedTime, int lap, int totalLaps, String trackName) {
-        FastBoard board = boards.get(player.getUniqueId());
-        if (board == null) return;
+        FastBoard board = this.boards.get(player.getUniqueId());
+        if (board == null) {
+            return;
+        }
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            int pos = mysql.getplayerpositiononduel(duelId, player);
-            Object[] data = mysql.getPlayerBestTimeOnDuel(player.getUniqueId(), duelId);
+        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+            // CORREÇÃO: Usar String em vez de Object
+            String posDisplay;
+            String langCode = this.mysql.getPlayerLanguage(player.getUniqueId());
+            Double bestLap = this.mysql.getPlayerBestLapTimeInDuel(player.getUniqueId(), duelId);
 
             String pbDisplay = "§7--:--.---";
-            if (data != null) {
-                pbDisplay = "§f" + formatTime((double) data[0]);
+            if (bestLap != null && bestLap > 0.0) {
+                pbDisplay = "§f" + this.formatTime(bestLap);
             }
 
-            final String finalPB = pbDisplay;
-            final String posDisplay = formatPosition(pos);
+            if (bestLap == null || bestLap <= 0.0) {
+                String waitingText = this.plugin.getDirectTranslation("duel_waiting", langCode);
+                posDisplay = "§f§l" + waitingText;
+            } else {
+                int pos = this.timeTrialDuels.getPlayerPosition(duelId, player.getUniqueId());
+                posDisplay = this.formatPosition(pos, langCode);
+            }
 
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                board.updateLines(
-                        "§8------------------",
-                        " §fPosição: " + posDisplay,
-                        " §fVolta: §b" + lap + "§7/§b" + totalLaps,
-                        "",
-                        " §fTempo: §e" + currentFormattedTime,
-                        " §fRecorde: " + finalPB,
-                        "",
-                        " §fPista: §a" + trackName,
-                        "§8------------------",
-                        "§ewolfnetwork.com.br"
-                );
-            });
+            int timeRemaining = this.timeTrialDuels.getTimeRemaining(duelId);
+            String timeRemainingDisplay = "";
+
+            if (timeRemaining >= 0) {
+                timeRemainingDisplay = this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_time_remaining")
+                        + "§c" + this.formatTimeRemaining(timeRemaining);
+            }
+
+            // Variáveis finais para o lambda (efetivamente finais)
+            final String finalPB = pbDisplay;
+            final String finalPos = posDisplay;
+            final String finalTimeRemaining = timeRemainingDisplay;
+
+            // Volta para a Thread Principal (Sync) para atualizar a Scoreboard
+            Bukkit.getScheduler().runTask(this.plugin, () ->
+                    this.updateBoardLines(player, board, timeRemaining, finalPos, lap, totalLaps, currentFormattedTime, finalPB, finalTimeRemaining, trackName)
+            );
         });
     }
 
     public void removeBoard(Player player) {
-        removeBoard(player.getUniqueId());
+        this.removeBoard(player.getUniqueId());
     }
 
     private void removeBoard(UUID uuid) {
-        FastBoard board = boards.remove(uuid);
-        if (board != null) board.delete();
-        duelContexts.remove(uuid);
+        FastBoard board = this.boards.remove(uuid);
+        if (board != null) {
+            board.delete();
+        }
+        this.duelContexts.remove(uuid);
     }
 
     public void clearAll() {
-        boards.values().forEach(FastBoard::delete);
-        boards.clear();
-        duelContexts.clear();
+        this.boards.values().forEach(FastBoardBase::delete);
+        this.boards.clear();
+        this.duelContexts.clear();
     }
 
-    private String formatPosition(int pos) {
-        return switch (pos) {
-            case 1 -> "§a§l1º LUGAR";
-            case 2 -> "§e§l2º LUGAR";
-            case 3 -> "§6§l3º LUGAR";
-            default -> "§f§l" + pos + "º LUGAR";
-        };
+    private String formatPosition(int pos, String langCode) {
+        String positionText;
+        if (pos <= 0) {
+            pos = 1;
+        }
+        return (switch (pos) {
+            case 1 -> {
+                positionText = this.plugin.getDirectTranslation("duel_position_1st", langCode);
+                yield "\u00a7a\u00a7l";
+            }
+            case 2 -> {
+                positionText = this.plugin.getDirectTranslation("duel_position_2nd", langCode);
+                yield "\u00a7e\u00a7l";
+            }
+            case 3 -> {
+                positionText = this.plugin.getDirectTranslation("duel_position_3rd", langCode);
+                yield "\u00a76\u00a7l";
+            }
+            default -> {
+                positionText = this.plugin.getTranslation("duel_position_nth", langCode, "{position}", String.valueOf(pos));
+                yield "\u00a7f\u00a7l";
+            }
+        }) + positionText;
     }
 
     private String formatTime(double seconds) {
-        return formatTimeFromMillis((long)(seconds * 1000));
+        return this.formatTimeFromMillis((long) (seconds * 1000.0));
     }
 
     private String formatTimeFromMillis(long millis) {
-        long minutes = (millis / 60000);
-        long secs = (millis % 60000) / 1000;
-        long ms = millis % 1000;
-        if (minutes > 0) return String.format("%d:%02d.%03d", minutes, secs, ms);
+        long minutes = millis / 60000L;
+        long secs = millis % 60000L / 1000L;
+        long ms = millis % 1000L;
+        if (minutes > 0L) {
+            return String.format("%d:%02d.%03d", minutes, secs, ms);
+        }
         return String.format("%d.%03d", secs, ms);
     }
 
-    // Classe auxiliar para manter o estado do duelo do jogador
+    private String formatTimeRemaining(int seconds) {
+        int minutes = seconds / 60;
+        int secs = seconds % 60;
+        if (minutes > 0) {
+            return String.format("%dm %02ds", minutes, secs);
+        }
+        return String.format("%ds", secs);
+    }
+
+    private void updateBoardLines(Player player, FastBoard board, int timeRemaining, String finalPosDisplay, int lap, int totalLaps, String currentFormattedTime, String finalPB, String finalTimeRemaining, String trackName) {
+        FastBoard currentBoard = this.boards.get(player.getUniqueId());
+
+        // Verifica se o jogador ainda possui uma scoreboard ativa e se é a mesma instância
+        if (currentBoard == null || currentBoard != board) {
+            return;
+        }
+
+        // CORREÇÃO: Usando List<String> para compatibilidade com board.updateLines
+        List<String> lines = new ArrayList<>();
+
+        // Linha de separação padrão
+        String separator = "§8------------------";
+        String footer = "§ewolfnetwork.com.br";
+
+        lines.add(separator);
+        lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_position") + finalPosDisplay);
+        lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_lap") + "§b" + lap + "§7/§b" + totalLaps);
+        lines.add("");
+        lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_time") + "§e" + currentFormattedTime);
+        lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_record") + finalPB);
+
+        // Se houver tempo restante (ex: contagem regressiva), adicionamos a linha
+        if (timeRemaining >= 0) {
+            lines.add(finalTimeRemaining);
+        }
+
+        lines.add("");
+        lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_track") + "§a" + trackName);
+        lines.add(separator);
+        lines.add(footer);
+
+        // Atualiza as linhas da Scoreboard
+        board.updateLines(lines);
+    }
+
     private static class DuelContext {
         int duelId;
         int totalLaps;

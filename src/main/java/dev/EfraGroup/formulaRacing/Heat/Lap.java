@@ -1,28 +1,46 @@
+//
+// Source code recreated from a .class file by IntelliJ IDEA
+// (powered by Fernflower decompiler)
+//
+
 package dev.EfraGroup.formulaRacing.Heat;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 public class Lap {
-
     private final UUID playerUUID;
     private final int heatId;
     private final String trackNameWS;
-    private long lapStart; // timestamp em ms
-    private long lapEnd;   // timestamp em ms
-    private boolean pitted; // <— era static, removido
-    private boolean saved;  // marca se já foi salvo no DB
+    private long lapStart;
+    private long lapEnd;
+    private boolean pitted;
+    private boolean saved;
+    private final Map<Integer, Long> checkpointTimes;
 
     public Lap(UUID playerUUID, int heatId, String trackNameWS) {
         this.playerUUID = playerUUID;
         this.heatId = heatId;
         this.trackNameWS = trackNameWS;
         this.lapStart = System.currentTimeMillis();
-        this.lapEnd = 0;
+        this.lapEnd = 0L;
         this.pitted = false;
         this.saved = false;
+        this.checkpointTimes = new HashMap();
     }
 
-    // Construtor usado ao carregar do banco
+    public Lap(long startTime) {
+        this.playerUUID = null;
+        this.heatId = 0;
+        this.trackNameWS = null;
+        this.lapStart = startTime;
+        this.lapEnd = 0L;
+        this.pitted = false;
+        this.saved = false;
+        this.checkpointTimes = new HashMap();
+    }
+
     public Lap(int id, UUID playerUUID, int heatId, String trackNameWS, long lapStart, long lapEnd, boolean pitted) {
         this.playerUUID = playerUUID;
         this.heatId = heatId;
@@ -31,54 +49,102 @@ public class Lap {
         this.lapEnd = lapEnd;
         this.pitted = pitted;
         this.saved = true;
+        this.checkpointTimes = new HashMap();
     }
 
-    // =======================
-    // 🔹 GETTERS / SETTERS
-    // =======================
-    public UUID getPlayerUUID() { return playerUUID; }
+    public UUID getPlayerUUID() {
+        return this.playerUUID;
+    }
 
-    public int getHeatId() { return heatId; }
+    public int getHeatId() {
+        return this.heatId;
+    }
 
-    public String getTrackNameWS() { return trackNameWS; }
+    public String getTrackNameWS() {
+        return this.trackNameWS;
+    }
 
-    public long getLapStart() { return lapStart; }
+    public long getLapStart() {
+        return this.lapStart;
+    }
 
-    public void setLapStart(long lapStart) { this.lapStart = lapStart; }
+    public void setLapStart(long lapStart) {
+        this.lapStart = lapStart;
+    }
 
-    public long getLapEnd() { return lapEnd; }
+    public long getLapEnd() {
+        return this.lapEnd;
+    }
 
-    public void setLapEnd(long lapEnd) { this.lapEnd = lapEnd; }
+    public void setLapEnd(long lapEnd) {
+        this.lapEnd = lapEnd;
+    }
 
-    public boolean hasPitted() { return pitted; } // ✅ método certo para stream/filter
+    public boolean hasPitted() {
+        return this.pitted;
+    }
 
-    public void setPitted(boolean pitted) { this.pitted = pitted; }
+    public boolean isPitted() {
+        return this.pitted;
+    }
 
-    public boolean isSaved() { return saved; }
+    public void setPitted(boolean pitted) {
+        this.pitted = pitted;
+    }
 
-    public void setSaved(boolean saved) { this.saved = saved; }
+    public boolean isSaved() {
+        return this.saved;
+    }
 
-    // =======================
-    // 🔹 UTILITÁRIOS
-    // =======================
-    public long getLapTime() {
-        if (lapEnd > 0) {
-            return lapEnd - lapStart;
+    public void setSaved(boolean saved) {
+        this.saved = saved;
+    }
+
+    public long getStartTime() {
+        return this.lapStart;
+    }
+
+    public Map<Integer, Long> getCheckpointTimes() {
+        return this.checkpointTimes;
+    }
+
+    public Map<Integer, Long> getRelativeCheckpointTimes() {
+        Map<Integer, Long> relative = new HashMap();
+
+        for(Map.Entry<Integer, Long> entry : this.checkpointTimes.entrySet()) {
+            relative.put((Integer)entry.getKey(), (Long)entry.getValue() - this.lapStart);
         }
-        return System.currentTimeMillis() - lapStart;
+
+        return relative;
     }
 
-    @Override
+    public void finishLap(long endTime) {
+        this.lapEnd = endTime;
+    }
+
+    public long getLapTime() {
+        return this.lapEnd > 0L ? this.lapEnd - this.lapStart : System.currentTimeMillis() - this.lapStart;
+    }
+
+    public void recordCheckpointTime(int checkpointId, long timestamp) {
+        this.checkpointTimes.put(checkpointId, timestamp);
+    }
+
+    public Long getCheckpointTime(int checkpointId) {
+        return (Long)this.checkpointTimes.get(checkpointId);
+    }
+
+    public Long getRelativeCheckpointTime(int checkpointId) {
+        Long timestamp = (Long)this.checkpointTimes.get(checkpointId);
+        return timestamp == null ? null : timestamp - this.lapStart;
+    }
+
+    public int getLatestCheckpoint() {
+        return (Integer)this.checkpointTimes.keySet().stream().max(Integer::compareTo).orElse(0);
+    }
+
     public String toString() {
-        return "Lap{" +
-                "playerUUID=" + playerUUID +
-                ", heatId=" + heatId +
-                ", trackNameWS='" + trackNameWS + '\'' +
-                ", lapStart=" + lapStart +
-                ", lapEnd=" + lapEnd +
-                ", pitted=" + pitted +
-                ", saved=" + saved +
-                ", lapTime=" + getLapTime() +
-                '}';
+        String var10000 = String.valueOf(this.playerUUID);
+        return "Lap{playerUUID=" + var10000 + ", heatId=" + this.heatId + ", trackNameWS='" + this.trackNameWS + "', lapStart=" + this.lapStart + ", lapEnd=" + this.lapEnd + ", pitted=" + this.pitted + ", saved=" + this.saved + ", lapTime=" + this.getLapTime() + "}";
     }
 }
