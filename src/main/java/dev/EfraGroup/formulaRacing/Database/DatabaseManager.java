@@ -1303,33 +1303,37 @@ public class DatabaseManager {
                 "SELECT checkpointId, worldName, min_x, min_y, min_z, max_x, max_y, max_z " +
                         "FROM fr_checkpoint WHERE LOWER(trackNameWS) = LOWER(?) ORDER BY checkpointId ASC";
 
-        try (Connection conn = getOrConnect(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, cleanTrack);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    String worldName = rs.getString("worldName");
-                    if (Bukkit.getWorld(worldName) == null) continue;
+        String trackNameDisplay = trackNameWS;
+        TrackData td = getTrackData(trackNameWS);
+        if (td != null) {
+            trackNameDisplay = td.getTrackName();
+        }
 
-                    // Busca o display name para o checkpoint (opcional, mas bom manter coerência)
-                    String trackNameDisplay = trackNameWS;
-                    TrackData td = getTrackData(trackNameWS);
-                    if (td != null) trackNameDisplay = td.getTrackName();
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, cleanTrack);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        String worldName = rs.getString("worldName");
+                        if (Bukkit.getWorld(worldName) == null) continue;
 
-                    checkpoints.add(
-                            new RegionData(
-                                    rs.getInt("checkpointId"),
-                                    trackNameDisplay,
-                                    trackNameWS,
-                                    "CHECKPOINT",
-                                    rs.getDouble("min_x"),
-                                    rs.getDouble("min_y"),
-                                    rs.getDouble("min_z"),
-                                    rs.getDouble("max_x"),
-                                    rs.getDouble("max_y"),
-                                    rs.getDouble("max_z"),
-                                    worldName
-                            )
-                    );
+                        checkpoints.add(
+                                new RegionData(
+                                        rs.getInt("checkpointId"),
+                                        trackNameDisplay,
+                                        trackNameWS,
+                                        "CHECKPOINT",
+                                        rs.getDouble("min_x"),
+                                        rs.getDouble("min_y"),
+                                        rs.getDouble("min_z"),
+                                        rs.getDouble("max_x"),
+                                        rs.getDouble("max_y"),
+                                        rs.getDouble("max_z"),
+                                        worldName
+                                )
+                        );
+                    }
                 }
             }
         } catch (SQLException e) {
