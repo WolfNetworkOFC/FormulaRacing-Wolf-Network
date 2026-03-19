@@ -274,6 +274,35 @@ public class PacketSender {
             sendBoatSetting(player, (short)26, settingId, value, blocks);
         }
     }
+
+    public void resetBoatUtilsToVanilla(Player player) {
+        if (!FormulaRacing.hasOpenBoatUtilsMod(player)) {
+            return;
+        }
+
+        sendBoatSetting(player, (short) 1, 0f);
+        sendBoatSetting(player, (short) 2, 0.6f);
+        sendBoatSetting(player, (short) 4, true);
+        sendBoatSetting(player, (short) 5, true);
+        sendBoatSetting(player, (short) 6, false);
+        sendBoatSetting(player, (short) 7, 0f);
+        sendBoatSetting(player, (short) 9, -0.03999999910593033d);
+        sendBoatSetting(player, (short) 10, 1.0f);
+        sendBoatSetting(player, (short) 11, 0.04f);
+        sendBoatSetting(player, (short) 12, 0.005f);
+        sendBoatSetting(player, (short) 13, 0.005f);
+        sendBoatSetting(player, (short) 14, true);
+        sendBoatSetting(player, (short) 16, true);
+        sendBoatSetting(player, (short) 17, true);
+        sendBoatSetting(player, (short) 19, 0);
+        sendBoatSetting(player, (short) 20, true);
+        sendBoatSetting(player, (short) 21, 0.0f);
+        sendBoatSetting(player, (short) 27, (short) 0);
+        sendBoatSetting(player, (short) 28, false);
+        sendBoatSetting(player, (short) 29, false);
+        sendBoatSetting(player, (short) 30, (byte) 5);
+    }
+
     private final java.util.Set<UUID> lonelyPlayers = new java.util.HashSet<>();
     public void applyLonelyToPlayer(Player player, boolean lonelyActive) {
         UUID uuid = player.getUniqueId();

@@ -1,0 +1,7 @@
+default:
+  inventory_size: 27
+  min_targets: 7
+  max_targets: 7
+  target_item: REDSTONE
+  wrong_item: GRAY_STAINED_GLASS_PANE
+  shuffle_on_error: true

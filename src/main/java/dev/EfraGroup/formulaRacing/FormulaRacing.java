@@ -189,7 +189,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     public void onEnable() {
         instance = this;
-
+   //opa vitor kakakakakakkaka
         try {
             this.fileManager = new FileManager(this);
             this.timeTrialController = new TimeTrialController(this);

@@ -61,11 +61,11 @@ public class TrackVisualizer {
         UUID uuid = player.getUniqueId();
         if (this.activeViewers.containsKey(uuid) && ((String)this.activeViewers.get(uuid)).equalsIgnoreCase(trackName)) {
             this.activeViewers.remove(uuid);
-            this.plugin.sendMessage(player, "visual_disabled", new String[]{trackName});
+            this.plugin.sendMessage(player, "visual_disabled", new String[]{"{track}", trackName});
             player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(""));
         } else {
             this.activeViewers.put(uuid, trackName);
-            this.plugin.sendMessage(player, "visual_enabled", new String[]{trackName});
+            this.plugin.sendMessage(player, "visual_enabled", new String[]{"{track}", trackName});
             this.plugin.sendMessage(player, "visual_showing", new String[0]);
         }
 
@@ -137,7 +137,13 @@ public class TrackVisualizer {
                 }
 
                 if (this.isInsideRegion(playerLoc, cp.getMinX(), cp.getMinY(), cp.getMinZ(), cp.getMaxX(), cp.getMaxY(), cp.getMaxZ())) {
-                    currentRegionName = this.plugin.getTranslation("visual_region_checkpoint", langCode, new String[]{String.valueOf(cp.getId())});
+                    String checkpointId = String.valueOf(cp.getId());
+                    String checkpointLabel = this.plugin.getTranslation("visual_region_checkpoint", langCode, new String[]{"{id}", checkpointId, "%s", checkpointId, "{checkpoint}", checkpointId});
+                    if (checkpointLabel.contains("[Lang Error]")) {
+                        checkpointLabel = "§6§lCHECKPOINT #" + checkpointId;
+                    }
+
+                    currentRegionName = checkpointLabel;
                 }
             }
         }
