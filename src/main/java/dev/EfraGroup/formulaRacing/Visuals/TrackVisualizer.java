@@ -139,6 +139,9 @@ public class TrackVisualizer {
                 if (this.isInsideRegion(playerLoc, cp.getMinX(), cp.getMinY(), cp.getMinZ(), cp.getMaxX(), cp.getMaxY(), cp.getMaxZ())) {
                     String checkpointId = String.valueOf(cp.getId());
                     String checkpointLabel = this.plugin.getTranslation("visual_region_checkpoint", langCode, new String[]{"{id}", checkpointId, "%s", checkpointId, "{checkpoint}", checkpointId});
+                    if (checkpointLabel.contains("%s") || checkpointLabel.contains("%1$s")) {
+                        checkpointLabel = checkpointLabel.replace("%1$s", checkpointId).replace("%s", checkpointId);
+                    }
                     if (checkpointLabel.contains("[Lang Error]")) {
                         checkpointLabel = "§6§lCHECKPOINT #" + checkpointId;
                     }

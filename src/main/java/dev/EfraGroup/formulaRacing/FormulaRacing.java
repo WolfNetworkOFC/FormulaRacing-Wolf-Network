@@ -390,6 +390,8 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 for(int i = 0; i < placeholders.length - 1; i += 2) {
                     msg = msg.replace(placeholders[i], placeholders[i + 1]);
                 }
+
+                msg = this.applyLegacyStringPlaceholders(msg, placeholders);
             }
 
             translated.add(ChatColor.translateAlternateColorCodes('&', msg));
@@ -412,6 +414,35 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                     message = message.replace(placeholder, value);
                 }
             }
+
+            message = this.applyLegacyStringPlaceholders(message, placeholders);
+        }
+
+        return message;
+    }
+
+    private String applyLegacyStringPlaceholders(String message, String... placeholders) {
+        if (placeholders == null || placeholders.length < 2) {
+            return message;
+        }
+
+        List<String> values = new ArrayList();
+
+        for(int i = 1; i < placeholders.length; i += 2) {
+            values.add(placeholders[i]);
+        }
+
+        for(int i = 0; i < values.size(); ++i) {
+            message = message.replace("%" + (i + 1) + "$s", (CharSequence)values.get(i));
+        }
+
+        for(String value : values) {
+            int idx = message.indexOf("%s");
+            if (idx < 0) {
+                break;
+            }
+
+            message = message.substring(0, idx) + value + message.substring(idx + 2);
         }
 
         return message;
