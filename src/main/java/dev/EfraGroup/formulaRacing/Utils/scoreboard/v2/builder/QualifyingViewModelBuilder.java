@@ -15,8 +15,9 @@ public class QualifyingViewModelBuilder implements StateViewModelBuilder {
     @Override
     public ScoreboardViewModel build(ScoreboardContext context) {
         List<String> lines = new ArrayList<>();
+        lines.add(BuilderSupport.heatContext(context));
         lines.add(BuilderSupport.spacer(0));
-        int fixedLines = 6;
+        int fixedLines = 7;
         long remaining = context.heat().getSessionTimeRemaining();
         if (remaining >= 0L) {
             String timer = context.plugin().getTranslationUtil().getTranslated(
@@ -35,6 +36,7 @@ public class QualifyingViewModelBuilder implements StateViewModelBuilder {
         lines.add(BuilderSupport.spacer(1));
         lines.addAll(BuilderSupport.buildClassificationLines(context, true, fixedLines));
         lines.add(BuilderSupport.spacer(2));
+        lines.add("§ewolfnetwork.com.br");
         int minHeight = BuilderSupport.minHeightForClassification(context.heat().getDriverCount());
         BuilderSupport.padToMinHeight(lines, minHeight);
         return new ScoreboardViewModel(

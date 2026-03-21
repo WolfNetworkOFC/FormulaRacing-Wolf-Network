@@ -202,13 +202,14 @@ public class ScoreboardDuelsTimeUtils {
         List<String> lines = new ArrayList<>();
 
         // Linha de separação padrão
-        String separator = "§8------------------";
-        String footer = "§ewolfnetwork.com.br";
+        String separator = this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_common_separator");
+        String footer = this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_common_footer");
 
+        lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_track") + "§f" + trackName);
         lines.add(separator);
         lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_position") + finalPosDisplay);
         lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_lap") + "§b" + lap + "§7/§b" + totalLaps);
-        lines.add("");
+        lines.add("§8| §7§l┃┃§r");
         lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_time") + "§e" + currentFormattedTime);
         lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_record") + finalPB);
 
@@ -218,7 +219,6 @@ public class ScoreboardDuelsTimeUtils {
         }
 
         lines.add("");
-        lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_track") + "§a" + trackName);
         lines.add(separator);
         lines.add(footer);
 

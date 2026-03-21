@@ -5,6 +5,7 @@ import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Heat.Lap;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.style.TimingScoreboardStyle;
 import java.time.Duration;
 import java.time.Instant;
 import fr.mrmicky.fastboard.FastBoard;
@@ -32,8 +33,8 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
     private BukkitTask updateTask;
     private Instant lastUpdate;
     private final int maxRows;
+    private final String accentMarker;
     private static final int UPDATE_INTERVAL_TICKS = 2;
-    private static final String SCOREBOARD_SEPARATOR = "\u00a77\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501";
 
     public RaceScoreboardManagerAdvanced(FormulaRacing plugin) {
         this.plugin = plugin;
@@ -43,6 +44,8 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
         this.spectatorHeats = new HashMap<UUID, Heats>();
         this.lastUpdate = Instant.now();
         this.maxRows = plugin.getConfig().getInt("scoreboard.max-rows", 15);
+        String configuredMarker = plugin.getConfig().getString("scoreboard.style.accent-marker", "┃");
+        this.accentMarker = TimingScoreboardStyle.normalizeAccentMarker(configuredMarker);
         this.startAutoUpdate();
     }
 
@@ -107,6 +110,14 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
         Map<String, String> langMap = cache.translationCache.computeIfAbsent(lang, k -> new HashMap<>());
 
         return langMap.computeIfAbsent(key, k -> this.plugin.getTranslationUtil().getTranslated(viewer, key));
+    }
+
+    private String commonSeparator(Player viewer) {
+        return this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_common_separator");
+    }
+
+    private String commonFooter(Player viewer) {
+        return this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_common_footer");
     }
 
     private void updateHeatScoreboards(Heats heat, List<Player> drivers, List<Player> spectators, ScoreboardTickCache cache) {
@@ -256,7 +267,7 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
 
     private List<String> getLinesSetup(Heats heat, Player viewer) {
         ArrayList<String> lines = new ArrayList<String>();
-        lines.add(SCOREBOARD_SEPARATOR);
+        lines.add(this.commonSeparator(viewer));
         lines.add("\u00a77" + this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_state_preparing", new String[0]));
         lines.add("");
         lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_label_track", "{track}", heat.getTrackNameWS()));
@@ -267,8 +278,8 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
         }
         lines.add("");
         lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_waiting_start", new String[0]));
-        lines.add(SCOREBOARD_SEPARATOR);
-        lines.add("\u00a7ewolfnetwork.com.br");
+        lines.add(this.commonSeparator(viewer));
+        lines.add(this.commonFooter(viewer));
         return lines;
     }
 
@@ -314,11 +325,11 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
         for (int i = start; i < end; ++i) {
             Driver d = sortedDrivers.get(i);
             int pos = i + 1;
-            String formatted = cache.lineCache.computeIfAbsent(lang, k -> new HashMap<>()).computeIfAbsent(d.getUuid(), k -> this.formatDriverLineAdvanced(d, null, heat, pos, sortedDrivers, true, viewer));
+            String formatted = this.formatDriverLineAdvanced(d, driver, heat, pos, sortedDrivers, true, viewer);
             lines.add(formatted);
         }
         lines.add("");
-        lines.add("\u00a7ewolfnetwork.com.br");
+        lines.add(this.commonFooter(viewer));
         return lines;
     }
 
@@ -338,7 +349,6 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
             lines.add(this.getTranslatedCached(viewer, "scoreboard_label_practice_end", cache) + "\u00a7c" + this.formatTimeShort(remaining));
             lines.add("");
         }
-        String lang = this.plugin.getTranslationUtil().getPlayerLanguage(viewer.getUniqueId());
         int fixedLines = 4;
         int availableLines = Math.max(5, this.maxRows - fixedLines);
         int totalDrivers = sortedDrivers.size();
@@ -346,14 +356,14 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
         for (int i = 0; i < limit; ++i) {
             Driver d = sortedDrivers.get(i);
             int pos = i + 1;
-            String formatted = cache.lineCache.computeIfAbsent(lang, k -> new HashMap<>()).computeIfAbsent(d.getUuid(), k -> this.formatDriverLineSpectator(d, heat, pos, sortedDrivers, true, viewer));
+            String formatted = this.formatDriverLineSpectator(d, heat, pos, sortedDrivers, true, viewer);
             lines.add(formatted);
         }
         if (sortedDrivers.isEmpty()) {
             lines.add("\u00a78" + this.getTranslatedCached(viewer, "scoreboard_waiting_times", cache));
         }
         lines.add("");
-        lines.add("\u00a7ewolfnetwork.com.br");
+        lines.add(this.commonFooter(viewer));
         return lines;
     }
 
@@ -369,7 +379,7 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
         lines.add("");
         long remaining = heat.getSessionTimeRemaining();
         if (remaining > 0L) {
-            lines.add("\u00a77Time: \u00a7b" + this.formatTimeShort(remaining));
+            lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_v2_time", "{time}", "§b" + this.formatTimeShort(remaining)));
             lines.add("");
         } else if (remaining == 0L) {
             lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_status_finishing", new String[0]));
@@ -383,7 +393,6 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
             playerPosIdx = i;
             break;
         }
-        String lang = this.plugin.getTranslationUtil().getPlayerLanguage(viewer.getUniqueId());
         int totalDrivers = sortedDrivers.size();
         int start = 0;
         int end = 0;
@@ -401,14 +410,14 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
         for (int i = start; i < end; ++i) {
             Driver d = sortedDrivers.get(i);
             int pos = i + 1;
-            String formatted = cache.lineCache.computeIfAbsent(lang, k -> new HashMap<>()).computeIfAbsent(d.getUuid(), k -> this.formatDriverLineAdvanced(d, null, heat, pos, sortedDrivers, true, viewer));
+            String formatted = this.formatDriverLineAdvanced(d, driver, heat, pos, sortedDrivers, true, viewer);
             lines.add(formatted);
         }
         if (sortedDrivers.isEmpty()) {
             lines.add("\u00a78" + this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_waiting_times", new String[0]));
         }
         lines.add("");
-        lines.add("\u00a7ewolfnetwork.com.br");
+        lines.add(this.commonFooter(viewer));
         return lines;
     }
 
@@ -424,25 +433,24 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
         lines.add("");
         long remaining = heat.getSessionTimeRemaining();
         if (remaining > 0L) {
-            lines.add("\u00a77Time: \u00a7b" + this.formatTimeShort(remaining));
+            lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_v2_time", "{time}", "§b" + this.formatTimeShort(remaining)));
             lines.add("");
         }
         int fixedLines = remaining >= 0L ? 5 : 4;
         int availableLines = Math.max(5, this.maxRows - fixedLines);
         int totalDrivers = sortedDrivers.size();
-        String lang = this.plugin.getTranslationUtil().getPlayerLanguage(viewer.getUniqueId());
         int limit = Math.min(availableLines, sortedDrivers.size());
         for (int i = 0; i < limit; ++i) {
             Driver d = sortedDrivers.get(i);
             int pos = i + 1;
-            String formatted = cache.lineCache.computeIfAbsent(lang, k -> new HashMap<>()).computeIfAbsent(d.getUuid(), k -> this.formatDriverLineSpectator(d, heat, pos, sortedDrivers, true, viewer));
+            String formatted = this.formatDriverLineSpectator(d, heat, pos, sortedDrivers, true, viewer);
             lines.add(formatted);
         }
         if (sortedDrivers.isEmpty()) {
             lines.add("\u00a78" + this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_waiting_times", new String[0]));
         }
         lines.add("");
-        lines.add("\u00a7ewolfnetwork.com.br");
+        lines.add(this.commonFooter(viewer));
         return lines;
     }
 
@@ -458,25 +466,24 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
         int fixedLines = 4;
         int availableLines = Math.max(5, this.maxRows - fixedLines);
         int totalDrivers = sortedDrivers.size();
-        String lang = this.plugin.getTranslationUtil().getPlayerLanguage(viewer.getUniqueId());
         int limit = Math.min(availableLines, totalDrivers);
         for (int i = 0; i < limit; ++i) {
             Driver d = sortedDrivers.get(i);
             int pos = i + 1;
-            String formatted = cache.lineCache.computeIfAbsent(lang, k -> new HashMap<>()).computeIfAbsent(d.getUuid(), k -> this.formatDriverLineSpectator(d, heat, pos, sortedDrivers, false, viewer));
+            String formatted = this.formatDriverLineSpectator(d, heat, pos, sortedDrivers, false, viewer);
             lines.add(formatted);
         }
         if (limit < totalDrivers) {
             // empty if block
         }
         lines.add("");
-        lines.add("\u00a7ewolfnetwork.com.br");
+        lines.add(this.commonFooter(viewer));
         return lines;
     }
 
     private List<String> getLinesLoaded(Heats heat, Driver driver, Player viewer) {
         ArrayList<String> lines = new ArrayList<String>();
-        lines.add(SCOREBOARD_SEPARATOR);
+        lines.add(this.commonSeparator(viewer));
         lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_title_grid", new String[0]));
         lines.add("");
         lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_label_position_f", "{pos}", String.valueOf(driver.getStartPosition())));
@@ -486,22 +493,22 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
         }
         lines.add("");
         lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_prepare_start", new String[0]));
-        lines.add(SCOREBOARD_SEPARATOR);
-        lines.add("\u00a7ewolfnetwork.com.br");
+        lines.add(this.commonSeparator(viewer));
+        lines.add(this.commonFooter(viewer));
         return lines;
     }
 
     private List<String> getLinesStarting(Heats heat, Driver driver, Player viewer) {
         ArrayList<String> lines = new ArrayList<String>();
-        lines.add(SCOREBOARD_SEPARATOR);
+        lines.add(this.commonSeparator(viewer));
         lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_lights_out", new String[0]));
         lines.add("");
         lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_label_position_f", "{pos}", String.valueOf(driver.getStartPosition())));
         lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_label_laps", "{laps}", String.valueOf(heat.getTotalLaps())));
         lines.add("");
         lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_lights_out", new String[0]));
-        lines.add(SCOREBOARD_SEPARATOR);
-        lines.add("\u00a7ewolfnetwork.com.br");
+        lines.add(this.commonSeparator(viewer));
+        lines.add(this.commonFooter(viewer));
         return lines;
     }
 
@@ -531,7 +538,6 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
             playerPosIdx = i;
             break;
         }
-        String lang = this.plugin.getTranslationUtil().getPlayerLanguage(viewer.getUniqueId());
         int totalDrivers = sortedDrivers.size();
         int start = 0;
         int end = 0;
@@ -549,17 +555,17 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
         for (int i = start; i < end; ++i) {
             Driver d = sortedDrivers.get(i);
             int pos = i + 1;
-            String formatted = cache.lineCache.computeIfAbsent(lang, k -> new HashMap<>()).computeIfAbsent(d.getUuid(), k -> this.formatDriverLineAdvanced(d, driver, heat, pos, sortedDrivers, false, viewer));
+            String formatted = this.formatDriverLineAdvanced(d, driver, heat, pos, sortedDrivers, false, viewer);
             lines.add(formatted);
         }
         lines.add("");
-        lines.add("\u00a7ewolfnetwork.com.br");
+        lines.add(this.commonFooter(viewer));
         return lines;
     }
 
     private List<String> getLinesFinished(Heats heat, Driver driver, Player viewer, List<Driver> sortedDrivers, ScoreboardTickCache cache) {
         ArrayList<String> lines = new ArrayList<String>();
-        lines.add(SCOREBOARD_SEPARATOR);
+        lines.add(this.commonSeparator(viewer));
         lines.add(this.getTranslatedCached(viewer, "scoreboard_title_finished", cache));
         lines.add("");
         if (driver.isFinished()) {
@@ -589,33 +595,33 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
             if (++count < 5) continue;
             break;
         }
-        lines.add(SCOREBOARD_SEPARATOR);
-        lines.add("\u00a7ewolfnetwork.com.br");
+        lines.add(this.commonSeparator(viewer));
+        lines.add(this.commonFooter(viewer));
         return lines;
     }
 
     private List<String> getLinesSpectatorStarting(Heats heat, Player viewer, List<Driver> sortedDrivers, ScoreboardTickCache cache) {
         ArrayList<String> lines = new ArrayList<String>();
-        lines.add(SCOREBOARD_SEPARATOR);
+        lines.add(this.commonSeparator(viewer));
         lines.add(this.getTranslatedCached(viewer, "scoreboard_lights_out", cache));
         lines.add("");
         lines.add(this.getTranslatedCached(viewer, "scoreboard_lights_out", cache));
-        lines.add(SCOREBOARD_SEPARATOR);
-        lines.add("\u00a7ewolfnetwork.com.br");
+        lines.add(this.commonSeparator(viewer));
+        lines.add(this.commonFooter(viewer));
         return lines;
     }
 
     private List<String> getLinesSpectatorLoaded(Heats heat, Player viewer) {
         ArrayList<String> lines = new ArrayList<String>();
-        lines.add(SCOREBOARD_SEPARATOR);
+        lines.add(this.commonSeparator(viewer));
         lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_title_grid", new String[0]));
         lines.add("");
         lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_label_drivers", "{drivers}", String.valueOf(heat.getDriverCount())));
         lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_label_laps", "{laps}", String.valueOf(heat.getTotalLaps())));
         lines.add("");
         lines.add(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_waiting_start", new String[0]));
-        lines.add(SCOREBOARD_SEPARATOR);
-        lines.add("\u00a7ewolfnetwork.com.br");
+        lines.add(this.commonSeparator(viewer));
+        lines.add(this.commonFooter(viewer));
         return lines;
     }
 
@@ -627,33 +633,14 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
         return this.getLinesFinished(heat, firstDriver, viewer, sortedDrivers, cache);
     }
 
-    private String formatDriverLine(Driver d, Driver currentDriver, Heats heat, int position, List<Driver> allDrivers, boolean isQualification, Player viewer) {
-        Object name;
+    private String formatDriverLine(Driver d, Driver compareDriver, Heats heat, int position, boolean isQualification, Player viewer) {
         Player p = Bukkit.getPlayer((UUID)d.getUuid());
         String posText = this.paddPosition(position, d, heat);
-        String divider = " \u00a78|";
-        String status = this.getDriverStatus(d, p, heat, viewer);
-        Object gap = "";
-        if (status.isEmpty()) {
-            if (position > 1) {
-                Driver ahead = allDrivers.get(position - 2);
-                gap = this.calculateGap(d, ahead, heat, isQualification);
-            } else if (isQualification && d.getFastestLap() != null) {
-                gap = " \u00a77" + this.formatTime(d.getFastestLap().getLapTime());
-            } else if (!isQualification) {
-                gap = " \u00a7e " + this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_label_interval", new String[0]) + " ";
-            }
-        }
-        Object object = name = p != null ? p.getName() : "Offline";
-        if (((String)name).length() > 14) {
-            name = ((String)name).substring(0, 14);
-        }
-        name = " \u00a7f" + (String)name;
-        String pitInfo = "";
-        if (heat.getTotalPits() > 0 && status.isEmpty()) {
-            pitInfo = this.getPitStopIndicator(d.getPitstops(), heat.getTotalPits(), viewer);
-        }
-        return posText + divider + status + (String)(status.isEmpty() ? gap : "") + (String)name + pitInfo;
+        String middle = this.getMiddleBlock(d, compareDriver, p, heat, isQualification, viewer);
+        String teamMarker = this.getTeamMarker(position);
+        String name = this.paddDriverName(p != null ? p.getName() : this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_status_offline", new String[0]));
+        String pitInfo = this.getPitStopIndicator(d.getPitstops(), heat.getTotalPits());
+        return posText + " §8|" + middle + " " + teamMarker + " " + name + pitInfo;
     }
 
     private String getPitStopStatusDetailed(int completed, int required, Player viewer) {
@@ -667,16 +654,48 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
     }
 
     private String formatDriverLineAdvanced(Driver d, Driver currentDriver, Heats heat, int position, List<Driver> allDrivers, boolean isQualification, Player viewer) {
-        return this.formatDriverLine(d, currentDriver, heat, position, allDrivers, isQualification, viewer);
+        Driver compareDriver;
+        if (currentDriver != null && currentDriver.getUuid().equals(d.getUuid())) {
+            compareDriver = d;
+        } else {
+            compareDriver = currentDriver;
+        }
+        return this.formatDriverLine(d, compareDriver, heat, position, isQualification, viewer);
     }
 
-    private String getPositionColor(int position) {
-        return switch (position) {
-            case 1 -> "\u00a76";
-            case 2 -> "\u00a77";
-            case 3 -> "\u00a7c";
-            default -> "\u00a77";
-        };
+    private String getTeamMarker(int position) {
+        return TimingScoreboardStyle.teamMarker(this.accentMarker, position);
+    }
+
+    private String getMiddleBlock(Driver current, Driver compareDriver, Player player, Heats heat, boolean isQualification, Player viewer) {
+        String status = this.getDriverStatus(current, player, heat, viewer);
+        if (!status.isEmpty()) {
+            return status;
+        }
+
+        if (isQualification) {
+            if (compareDriver == null || compareDriver.getUuid().equals(current.getUuid())) {
+                Lap best = current.getFastestLap();
+                return best == null ? " §8--.---   " : " §7" + TimingScoreboardStyle.padRight(this.formatTime(best.getLapTime()), 8);
+            }
+            return this.calculateGap(current, compareDriver, heat, true);
+        }
+
+        if (compareDriver == null || compareDriver.getUuid().equals(current.getUuid())) {
+            return this.getDrsIndicatorOrSpacing(current);
+        }
+
+        return this.calculateGap(current, compareDriver, heat, false);
+    }
+
+    private String getDrsIndicatorOrSpacing(Driver driver) {
+        if (driver.isDrsActive()) {
+            return " §a§lDRS§r      ";
+        }
+        if (driver.hasDrsPermission()) {
+            return " §f§lDRS§r      ";
+        }
+        return " §8         ";
     }
 
     private String calculateGap(Driver current, Driver ahead, Heats heat, boolean isQualification) {
@@ -692,12 +711,12 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
             }
             long diff = currentBest.getLapTime() - aheadBest.getLapTime();
             if (diff > 0L) {
-                return " \u00a7a+" + this.formatTimeDiff(diff);
+                return " \u00a7a+" + TimingScoreboardStyle.padRight(this.formatTimeDiff(diff), 7);
             }
             if (diff < 0L) {
-                return " \u00a7c-" + this.formatTimeDiff(Math.abs(diff));
+                return " \u00a7c-" + TimingScoreboardStyle.padRight(this.formatTimeDiff(Math.abs(diff)), 7);
             }
-            return " \u00a7e=";
+            return " \u00a7e=" + TimingScoreboardStyle.padRight("0.000", 7);
         }
         int currentLaps = current.getLapCount();
         int aheadLaps = ahead.getLapCount();
@@ -737,17 +756,17 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
         }
         if (showTime) {
             if (finalDiff > 0L) {
-                return " \u00a7a+" + this.formatTimeDiff(finalDiff);
+                return " \u00a7a+" + TimingScoreboardStyle.padRight(this.formatTimeDiff(finalDiff), 7);
             }
             if (finalDiff < 0L) {
-                return " \u00a7c-" + this.formatTimeDiff(Math.abs(finalDiff));
+                return " \u00a7c-" + TimingScoreboardStyle.padRight(this.formatTimeDiff(Math.abs(finalDiff)), 7);
             }
-            return " \u00a7e=";
+            return " \u00a7e=" + TimingScoreboardStyle.padRight("0.000", 7);
         }
         if (currentLaps < aheadLaps) {
-            return " \u00a7c-" + (aheadLaps - currentLaps) + "L";
+            return " \u00a7c-" + TimingScoreboardStyle.padRight((aheadLaps - currentLaps) + "L", 7);
         }
-        return " \u00a78--";
+        return " \u00a78--      ";
     }
 
     private String formatTime(long timeMs) {
@@ -779,7 +798,7 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
     }
 
     private String paddPosition(int pos, Driver driver, Heats heat) {
-        String posColor = this.getPositionColor(pos);
+        String posColor = TimingScoreboardStyle.positionColor(pos);
         Object posStr = String.valueOf(pos);
         if (pos < 10) {
             posStr = (String)posStr + " ";
@@ -796,19 +815,19 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
 
     private String getDriverStatus(Driver driver, Player player, Heats heat, Player viewer) {
         if (driver.isDnf()) {
-            return " \u00a77" + this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_status_dnf_short", new String[0]) + "     ";
+            return " \u00a77" + TimingScoreboardStyle.padRight(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_status_dnf_short", new String[0]), 9);
         }
         if (player == null || !player.isOnline()) {
-            return " \u00a77" + this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_status_offline", new String[0]) + " ";
+            return " \u00a77" + TimingScoreboardStyle.padRight(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_status_offline", new String[0]), 9);
         }
         if (this.plugin.getPitStopManager() != null && this.plugin.getPitStopManager().isPlayerInPitRegion(driver.getUuid())) {
-            return " \u00a7e" + this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_status_in_pit", new String[0]) + " ";
+            return " \u00a77" + TimingScoreboardStyle.padRight(this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_status_in_pit", new String[0]), 9);
         }
         return "";
     }
 
     private String paddDriverName(String name) {
-        int maxLen = 18;
+        int maxLen = 14;
         if (name.length() > maxLen) {
             name = name.substring(0, maxLen);
         }
@@ -816,39 +835,24 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
         return "\u00a7f" + name + " ".repeat(Math.max(0, spacesNeeded));
     }
 
-    private String getPitStopIndicator(int completed, int required, Player viewer) {
+    private String getPitStopIndicator(int completed, int required) {
+        if (required <= 0) {
+            return "";
+        }
         String color = completed == 0 ? "\u00a7c" : (completed < required ? "\u00a76" : "\u00a7a");
-        return " \u00a77" + color + completed + "\u00a77/" + required + " " + this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_format_pits_short", new String[0]);
+        return " \u00a78P: " + color + completed;
     }
 
     private String formatDriverLineSpectator(Driver d, Heats heat, int position, List<Driver> allDrivers, boolean isQualification, Player viewer) {
-        Player p = Bukkit.getPlayer((UUID)d.getUuid());
-        String posText = this.paddPosition(position, d, heat);
-        String divider = " \u00a78|";
-        String status = this.getDriverStatus(d, p, heat, viewer);
-        String name = this.paddDriverName(p != null ? p.getName() : "Offline");
-        String teamIcon = "\u00a77\u00a7l||\u00a7r";
-        Object gap = "";
-        if (status.isEmpty()) {
-            if (position > 1) {
-                Driver ahead = allDrivers.get(position - 2);
-                gap = this.calculateGap(d, ahead, heat, isQualification);
-            } else if (isQualification && d.getFastestLap() != null) {
-                gap = " \u00a77" + this.formatTime(d.getFastestLap().getLapTime());
-            } else if (!isQualification && position == 1) {
-                gap = " \u00a7e " + this.plugin.getTranslationUtil().getTranslated(viewer, "scoreboard_label_interval", new String[0]) + " ";
+        Driver compareDriver = null;
+        if (isQualification) {
+            if (!allDrivers.isEmpty() && position > 1) {
+                compareDriver = allDrivers.get(0);
             }
+        } else if (position > 1 && position - 2 < allDrivers.size()) {
+            compareDriver = allDrivers.get(position - 2);
         }
-        String pitInfo = "";
-        if (heat.getTotalPits() > 0 && status.isEmpty()) {
-            pitInfo = this.getPitStopIndicator(d.getPitstops(), heat.getTotalPits(), viewer);
-        }
-        Object lapInfo = "";
-        if (status.isEmpty()) {
-            int currentLap = d.getCurrentLap() == null ? 0 : d.getLapCount() + 1;
-            lapInfo = " \u00a78L" + currentLap;
-        }
-        return posText + divider + status + (String)(status.isEmpty() ? gap : "") + " " + teamIcon + " " + name + (String)lapInfo + pitInfo;
+        return this.formatDriverLine(d, compareDriver, heat, position, isQualification, viewer);
     }
 
     public void shutdown() {

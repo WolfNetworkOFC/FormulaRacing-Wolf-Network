@@ -147,8 +147,11 @@ public class ScoreboardTimeTrialUtils {
         // 3. Cabeçalho do Scoreboard
         TranslationUtil tu = FormulaRacing.getInstance().getTranslationUtil();
         board.updateTitle(tu.getTranslated(player, "scoreboard_tt_title"));
+        String separator = tu.getTranslated(player, "scoreboard_common_separator");
+        String footer = tu.getTranslated(player, "scoreboard_common_footer");
 
         List<String> lines = new ArrayList<>();
+        lines.add(separator);
         lines.add(tu.getTranslated(player, "scoreboard_tt_track", "{track}", trackName));
 
         // Lógica do Criador da Pista
@@ -162,6 +165,7 @@ public class ScoreboardTimeTrialUtils {
             lines.add(tu.getTranslated(player, "scoreboard_tt_by", "{creator}", creator));
         }
 
+        lines.add(separator);
         lines.add("");
         lines.add(tu.getTranslated(player, "scoreboard_tt_leaderboard"));
 
@@ -194,7 +198,7 @@ public class ScoreboardTimeTrialUtils {
         }
 
         if (includeSeparator) {
-            lines.add("§8-----------------");
+            lines.add(separator);
         }
 
         for (DatabaseManager.TrackRecord tr : neighbors) {
@@ -203,7 +207,8 @@ public class ScoreboardTimeTrialUtils {
         }
 
         lines.add("");
-        lines.add("§ewolfnetwork.com.br");
+        lines.add(separator);
+        lines.add(footer);
 
         board.updateLines(lines);
     }
@@ -211,7 +216,6 @@ public class ScoreboardTimeTrialUtils {
     private String formatRecordLine(DatabaseManager.TrackRecord tr, int pos, String observerName, Player viewer) {
         String string;
         boolean isMe = tr.getPlayerName().equals(observerName);
-        String suffix = pos == 1 ? "st" : (pos == 2 ? "nd" : (pos == 3 ? "rd" : "th"));
         if (isMe) {
             string = "\u00a7f\u00a7l";
         } else {
@@ -235,8 +239,13 @@ public class ScoreboardTimeTrialUtils {
         }
         String color = string;
         String timeDisplay = tr.isFinished() ? this.formatTime(tr.getTime()) : "\u00a77" + tr.getCheckpointsReached() + "CP(\u00a7f" + this.formatTime(tr.getTime()) + "\u00a77)";
-        String nameDisplay = isMe ? FormulaRacing.getInstance().getTranslationUtil().getTranslated(viewer, "scoreboard_tt_you", new String[0]) : "\u00a7r" + tr.getPlayerName();
-        return color + pos + suffix + " \u00a7f" + nameDisplay + " " + timeDisplay;
+        String marker = color + "§l┃┃§r";
+        String nameDisplay = isMe ? FormulaRacing.getInstance().getTranslationUtil().getTranslated(viewer, "scoreboard_tt_you", new String[0]) : tr.getPlayerName();
+        if (nameDisplay.length() > 10) {
+            nameDisplay = nameDisplay.substring(0, 10);
+        }
+        String rank = color + pos + ".";
+        return rank + " §8| §7" + timeDisplay + " " + marker + " §f" + nameDisplay;
     }
 
     public String formatTime(double timeInSeconds) {

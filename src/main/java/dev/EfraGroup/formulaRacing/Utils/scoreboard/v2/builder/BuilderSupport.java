@@ -3,6 +3,7 @@ package dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Lap;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.style.TimingScoreboardStyle;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.model.ScoreboardContext;
 import java.util.ArrayList;
 import java.util.List;
@@ -95,6 +96,7 @@ final class BuilderSupport {
         Driver leader = sorted.get(0);
         Driver referenceDriver = context.spectator() ? null : context.viewerDriver();
 
+        String marker = accentMarker(context);
         for (int i = start; i < end; i++) {
             Driver current = sorted.get(i);
             Driver reference;
@@ -107,7 +109,7 @@ final class BuilderSupport {
             } else {
                 reference = referenceDriver;
             }
-            lines.add(formatLine(context, i + 1, current, reference, qualifyingMode));
+            lines.add(formatLine(context, marker, i + 1, current, reference, qualifyingMode));
         }
 
         return lines;
@@ -165,101 +167,115 @@ final class BuilderSupport {
         return -1;
     }
 
-    private static String formatLine(ScoreboardContext context, int pos, Driver current, Driver reference, boolean qualifyingMode) {
+    private static String formatLine(ScoreboardContext context, String accentMarker, int pos, Driver current, Driver reference, boolean qualifyingMode) {
         Player p = Bukkit.getPlayer(current.getUuid());
         String name = p != null ? p.getName() : tr(context, "scoreboard_v2_offline");
-        if (name.length() > 11) {
-            name = name.substring(0, 11);
-        }
-
-        boolean self = context.viewerDriver() != null && context.viewerDriver().getUuid().equals(current.getUuid());
-        String gap = "-";
-        String gapColor = "§f";
-        if (!self && reference != null) {
-            if (qualifyingMode) {
-                Lap currentLap = current.getFastestLap();
-                Lap referenceLap = reference.getFastestLap();
-                if (currentLap != null && referenceLap != null) {
-                    long diff = currentLap.getLapTime() - referenceLap.getLapTime();
-                    if (diff >= 0) {
-                        gapColor = "§a";
-                        gap = "+" + formatTime(diff);
-                    } else {
-                        gapColor = "§c";
-                        gap = "-" + formatTime(Math.abs(diff));
-                    }
-                }
-            } else {
-                int lapDelta = current.getLapCount() - reference.getLapCount();
-                if (lapDelta != 0) {
-                    if (lapDelta > 0) {
-                        gapColor = "§c";
-                        gap = "-" + lapDelta + "L";
-                    } else {
-                        gapColor = "§a";
-                        gap = "+" + Math.abs(lapDelta) + "L";
-                    }
-                } else {
-                    long diff = current.getTotalTime() - reference.getTotalTime();
-                    if (diff < 0L) {
-                        gapColor = "§c";
-                        gap = "-" + formatTime(Math.abs(diff));
-                    } else if (diff > 0L) {
-                        gapColor = "§a";
-                        gap = "+" + formatTime(diff);
-                    }
-                }
-            }
-        }
-
-        String prefix = self ? "§e> " : "§f  ";
-        String status = current.isDnf() ? " " + tr(context, "scoreboard_v2_status_dnf") : "";
-        String rank = rankTag(pos);
-        String pilotName = self ? "§e" + padRight(name, 12) : "§f" + padRight(name, 12);
+        String rank = rankTag(pos, current, context);
+        String middle = middleBlock(context, current, reference, p, qualifyingMode);
+        String marker = teamMarker(accentMarker, pos);
+        String pilotName = "§f" + padRight(name, 14);
         String pits = formatPits(context, current);
-        String gapFixed = padLeft(gap, 8);
 
-        return prefix + rank + " " + gapColor + gapFixed + " §8// " + pilotName + pits + status;
+        return rank + " §8|" + middle + " " + marker + " " + pilotName + pits;
     }
 
-    private static String rankTag(int pos) {
-        if (pos == 1) {
-            return "§6" + pos;
+    private static String middleBlock(ScoreboardContext context, Driver current, Driver reference, Player player, boolean qualifyingMode) {
+        String status = statusBlock(context, current, player);
+        if (!status.isEmpty()) {
+            return status;
         }
-        if (pos == 2) {
-            return "§7" + pos;
+
+        if (qualifyingMode) {
+            if (reference == null || reference.getUuid().equals(current.getUuid())) {
+                Lap best = current.getFastestLap();
+                return best == null ? " §8--.---   " : " §7" + padRight(formatTime(best.getLapTime()), 8);
+            }
+            return gapBlock(current, reference, true);
         }
-        if (pos == 3) {
-            return "§c" + pos;
+
+        if (reference == null || reference.getUuid().equals(current.getUuid())) {
+            if (current.isDrsActive()) {
+                return " §a§lDRS§r      ";
+            }
+            if (current.hasDrsPermission()) {
+                return " §f§lDRS§r      ";
+            }
+            return " §8         ";
         }
-        return "§f" + pos;
+
+        return gapBlock(current, reference, false);
+    }
+
+    private static String gapBlock(Driver current, Driver reference, boolean qualifyingMode) {
+        if (qualifyingMode) {
+            Lap currentBest = current.getFastestLap();
+            Lap referenceBest = reference.getFastestLap();
+            if (currentBest == null || referenceBest == null) {
+                return " §8--      ";
+            }
+            long diff = currentBest.getLapTime() - referenceBest.getLapTime();
+            if (diff > 0L) {
+                return " §a+" + padRight(formatTime(diff), 7);
+            }
+            if (diff < 0L) {
+                return " §c-" + padRight(formatTime(Math.abs(diff)), 7);
+            }
+            return " §e=" + padRight("0.000", 7);
+        }
+
+        int lapDelta = current.getLapCount() - reference.getLapCount();
+        if (lapDelta != 0) {
+            if (lapDelta > 0) {
+                return " §c-" + padRight(lapDelta + "L", 7);
+            }
+            return " §a+" + padRight(Math.abs(lapDelta) + "L", 7);
+        }
+
+        long diff = current.getTotalTime() - reference.getTotalTime();
+        if (diff > 0L) {
+            return " §a+" + padRight(formatTime(diff), 7);
+        }
+        if (diff < 0L) {
+            return " §c-" + padRight(formatTime(Math.abs(diff)), 7);
+        }
+        return " §e=" + padRight("0.000", 7);
+    }
+
+    private static String statusBlock(ScoreboardContext context, Driver driver, Player player) {
+        if (driver.isDnf()) {
+            return " §7" + padRight(tr(context, "scoreboard_status_dnf_short"), 9);
+        }
+        if (player == null || !player.isOnline()) {
+            return " §7" + padRight(tr(context, "scoreboard_status_offline"), 9);
+        }
+        if (context.plugin().getPitStopManager() != null && context.plugin().getPitStopManager().isPlayerInPitRegion(driver.getUuid())) {
+            return " §7" + padRight(tr(context, "scoreboard_status_in_pit"), 9);
+        }
+        return "";
+    }
+
+    private static String rankTag(int pos, Driver driver, ScoreboardContext context) {
+        boolean fastestLap = context.heat().getFastestLapUUID() != null && context.heat().getFastestLapUUID().equals(driver.getUuid());
+        return TimingScoreboardStyle.rankTag(pos, fastestLap, driver.isFinished());
+    }
+
+    private static String teamMarker(String accentMarker, int pos) {
+        return TimingScoreboardStyle.teamMarker(accentMarker, pos);
+    }
+
+    private static String accentMarker(ScoreboardContext context) {
+        return TimingScoreboardStyle.normalizeAccentMarker(context.plugin().getConfig().getString("scoreboard.style.accent-marker", "┃"));
     }
 
     private static String padRight(String value, int size) {
-        if (value.length() >= size) {
-            return value;
-        }
-        StringBuilder sb = new StringBuilder(value);
-        while (sb.length() < size) {
-            sb.append(' ');
-        }
-        return sb.toString();
-    }
-
-    private static String padLeft(String value, int size) {
-        if (value.length() >= size) {
-            return value;
-        }
-        StringBuilder sb = new StringBuilder();
-        while (sb.length() + value.length() < size) {
-            sb.append(' ');
-        }
-        sb.append(value);
-        return sb.toString();
+        return TimingScoreboardStyle.padRight(value, size);
     }
 
     private static String formatPits(ScoreboardContext context, Driver driver) {
         Integer requiredPits = context.heat().getTotalPits();
+        if (requiredPits == null || requiredPits <= 0) {
+            return "";
+        }
         int pits = driver.getPitstops();
 
         String pitsColor = "§f";
@@ -273,7 +289,7 @@ final class BuilderSupport {
             }
         }
 
-        return " " + tr(context, "scoreboard_v2_pits", "{count}", pitsColor + pits);
+        return " §8P: " + pitsColor + pits;
     }
 
     static String scoreboardTitle(ScoreboardContext context, String baseKey) {

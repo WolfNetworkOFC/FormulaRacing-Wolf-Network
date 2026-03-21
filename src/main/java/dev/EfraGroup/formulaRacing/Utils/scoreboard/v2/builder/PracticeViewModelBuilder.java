@@ -15,8 +15,9 @@ public class PracticeViewModelBuilder implements StateViewModelBuilder {
     @Override
     public ScoreboardViewModel build(ScoreboardContext context) {
         List<String> lines = new ArrayList<>();
+        lines.add(BuilderSupport.heatContext(context));
         lines.add(BuilderSupport.spacer(0));
-        int fixedLines = 6;
+        int fixedLines = 7;
         if (!context.spectator() && context.viewerDriver() != null) {
             lines.add(BuilderSupport.formatBestLap(context, context.viewerDriver()));
             fixedLines++;
@@ -24,6 +25,7 @@ public class PracticeViewModelBuilder implements StateViewModelBuilder {
         lines.add(BuilderSupport.spacer(1));
         lines.addAll(BuilderSupport.buildClassificationLines(context, true, fixedLines));
         lines.add(BuilderSupport.spacer(2));
+        lines.add("§ewolfnetwork.com.br");
         int minHeight = BuilderSupport.minHeightForClassification(context.heat().getDriverCount());
         BuilderSupport.padToMinHeight(lines, minHeight);
         return new ScoreboardViewModel(
