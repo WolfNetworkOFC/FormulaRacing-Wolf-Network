@@ -1,0 +1,371 @@
+package dev.EfraGroup.formulaRacing.Utils.scoreboard.v2;
+
+import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Heat.HeatState;
+import dev.EfraGroup.formulaRacing.Heat.Heats;
+import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardService;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder.DefaultStateViewModelBuilder;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder.FinishedViewModelBuilder;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder.PracticeViewModelBuilder;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder.QualifyingViewModelBuilder;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder.RacingViewModelBuilder;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder.StateViewModelBuilder;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.model.ScoreboardContext;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.model.ScoreboardViewModel;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.FastBoardAdapter;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.MegavexAdapter;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.ScoreboardAdapter;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.render.LineBudgetPolicy;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.render.ScoreboardRenderer;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
+
+public class RaceScoreboardV2Manager implements RaceScoreboardService {
+    private final FormulaRacing plugin;
+    private final ScoreboardAdapter primaryAdapter;
+    private final FastBoardAdapter fallbackAdapter;
+    private final boolean fallbackEnabled;
+    private final int canaryPercentage;
+    private final boolean metricsLogEnabled;
+    private final long metricsLogIntervalSeconds;
+    private final int maxRows;
+    private final long updateIntervalMs;
+    private final ScoreboardRenderer renderer;
+    private final List<StateViewModelBuilder> builders;
+    private final StateViewModelBuilder defaultBuilder;
+
+    private final Map<UUID, Heats> playerHeats;
+    private final Map<UUID, Heats> spectatorHeats;
+    private BukkitTask updateTask;
+    private Instant lastUpdate = Instant.now();
+    private Instant lastMetricsLog = Instant.now();
+    private long updatesOk;
+    private long updatesFailed;
+    private long fallbackActivated;
+    private long renderNanosTotal;
+    private long renderSamples;
+
+    public RaceScoreboardV2Manager(FormulaRacing plugin) {
+        this.plugin = plugin;
+        this.maxRows = plugin.getConfig().getInt("scoreboard.max-rows", 15);
+        this.updateIntervalMs = parseDurationMillis(plugin.getConfig().getString("scoreboard.v2.interval", "500ms"));
+        this.fallbackEnabled = plugin.getConfig().getBoolean("scoreboard.v2.fallback-fastboard-enabled", true);
+        this.canaryPercentage = plugin.getConfig().getInt("scoreboard.v2.canary-percentage", 0);
+        this.metricsLogEnabled = plugin.getConfig().getBoolean("scoreboard.v2.metrics-log-enabled", false);
+        this.metricsLogIntervalSeconds = Math.max(5L, plugin.getConfig().getLong("scoreboard.v2.metrics-log-interval-seconds", 30L));
+
+        this.primaryAdapter = new MegavexAdapter(plugin, this.maxRows);
+        this.fallbackAdapter = new FastBoardAdapter();
+
+        this.renderer = new ScoreboardRenderer(new LineBudgetPolicy());
+        this.builders = List.of(
+                new PracticeViewModelBuilder(),
+                new QualifyingViewModelBuilder(),
+                new RacingViewModelBuilder(),
+                new FinishedViewModelBuilder()
+        );
+        this.defaultBuilder = new DefaultStateViewModelBuilder();
+
+        this.playerHeats = new HashMap<>();
+        this.spectatorHeats = new HashMap<>();
+
+        this.startAutoUpdate();
+    }
+
+    @Override
+    public void addPlayer(Player player, Heats heat) {
+        if (player == null || heat == null) {
+            return;
+        }
+        this.removePlayer(player);
+        this.playerHeats.put(player.getUniqueId(), heat);
+        this.activeAdapter(player).create(player);
+        this.renderPlayer(player, heat, false);
+    }
+
+    @Override
+    public void removePlayer(Player player) {
+        if (player == null) {
+            return;
+        }
+        this.playerHeats.remove(player.getUniqueId());
+        this.primaryAdapter.delete(player);
+        this.fallbackAdapter.delete(player);
+    }
+
+    @Override
+    public void removeHeat(Heats heat) {
+        if (heat == null) {
+            return;
+        }
+
+        this.playerHeats.entrySet().removeIf(entry -> {
+            if (!entry.getValue().equals(heat)) {
+                return false;
+            }
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player != null) {
+                this.primaryAdapter.delete(player);
+                this.fallbackAdapter.delete(player);
+            }
+            return true;
+        });
+
+        this.spectatorHeats.entrySet().removeIf(entry -> {
+            if (!entry.getValue().equals(heat)) {
+                return false;
+            }
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player != null) {
+                this.primaryAdapter.delete(player);
+                this.fallbackAdapter.delete(player);
+            }
+            return true;
+        });
+    }
+
+    @Override
+    public void addSpectator(Player spectator, Heats heat) {
+        if (spectator == null || heat == null) {
+            return;
+        }
+        this.removeSpectator(spectator);
+        this.spectatorHeats.put(spectator.getUniqueId(), heat);
+        this.activeAdapter(spectator).create(spectator);
+        this.renderPlayer(spectator, heat, true);
+    }
+
+    @Override
+    public void removeSpectator(Player spectator) {
+        if (spectator == null) {
+            return;
+        }
+        this.spectatorHeats.remove(spectator.getUniqueId());
+        this.primaryAdapter.delete(spectator);
+        this.fallbackAdapter.delete(spectator);
+    }
+
+    @Override
+    public void shutdown() {
+        if (this.updateTask != null) {
+            this.updateTask.cancel();
+        }
+        this.playerHeats.keySet().forEach(uuid -> {
+            Player p = Bukkit.getPlayer(uuid);
+            if (p != null) {
+                this.primaryAdapter.delete(p);
+                this.fallbackAdapter.delete(p);
+            }
+        });
+        this.spectatorHeats.keySet().forEach(uuid -> {
+            Player p = Bukkit.getPlayer(uuid);
+            if (p != null) {
+                this.primaryAdapter.delete(p);
+                this.fallbackAdapter.delete(p);
+            }
+        });
+
+        if (this.primaryAdapter instanceof MegavexAdapter megavexAdapter) {
+            megavexAdapter.shutdown();
+        }
+        this.fallbackAdapter.shutdown();
+        this.playerHeats.clear();
+        this.spectatorHeats.clear();
+    }
+
+    private void startAutoUpdate() {
+        this.updateTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                Instant now = Instant.now();
+                if (Duration.between(RaceScoreboardV2Manager.this.lastUpdate, now).toMillis() < RaceScoreboardV2Manager.this.updateIntervalMs) {
+                    return;
+                }
+                RaceScoreboardV2Manager.this.lastUpdate = now;
+
+                Map<Heats, List<Player>> playersByHeat = new HashMap<>();
+                for (Map.Entry<UUID, Heats> entry : RaceScoreboardV2Manager.this.playerHeats.entrySet()) {
+                    Player player = Bukkit.getPlayer(entry.getKey());
+                    if (player == null || !player.isOnline()) {
+                        continue;
+                    }
+                    playersByHeat.computeIfAbsent(entry.getValue(), ignored -> new ArrayList<>()).add(player);
+                }
+
+                Map<Heats, List<Player>> spectatorsByHeat = new HashMap<>();
+                for (Map.Entry<UUID, Heats> entry : RaceScoreboardV2Manager.this.spectatorHeats.entrySet()) {
+                    Player player = Bukkit.getPlayer(entry.getKey());
+                    if (player == null || !player.isOnline()) {
+                        continue;
+                    }
+                    spectatorsByHeat.computeIfAbsent(entry.getValue(), ignored -> new ArrayList<>()).add(player);
+                }
+
+                for (Map.Entry<Heats, List<Player>> entry : playersByHeat.entrySet()) {
+                    Heats heat = entry.getKey();
+                    List<Player> players = entry.getValue();
+                    List<Driver> sorted = RaceScoreboardV2Manager.this.getSortedDriversForHeat(heat);
+                    for (Player player : players) {
+                        RaceScoreboardV2Manager.this.renderPlayer(player, heat, false, sorted);
+                    }
+                }
+
+                for (Map.Entry<Heats, List<Player>> entry : spectatorsByHeat.entrySet()) {
+                    Heats heat = entry.getKey();
+                    List<Player> players = entry.getValue();
+                    List<Driver> sorted = RaceScoreboardV2Manager.this.getSortedDriversForHeat(heat);
+                    for (Player player : players) {
+                        RaceScoreboardV2Manager.this.renderPlayer(player, heat, true, sorted);
+                    }
+                }
+
+                RaceScoreboardV2Manager.this.logMetricsIfNeeded();
+            }
+        }.runTaskTimer(this.plugin, 0L, 2L);
+    }
+
+    private void renderPlayer(Player player, Heats heat, boolean spectator) {
+        this.renderPlayer(player, heat, spectator, this.getSortedDriversForHeat(heat));
+    }
+
+    private void renderPlayer(Player player, Heats heat, boolean spectator, List<Driver> sortedDrivers) {
+        long startNanos = System.nanoTime();
+        Driver viewerDriver = spectator ? null : heat.getDriver(player.getUniqueId());
+        ScoreboardContext context = new ScoreboardContext(this.plugin, heat, player, viewerDriver, spectator, sortedDrivers, this.maxRows);
+
+        try {
+            ScoreboardViewModel baseModel = this.findBuilder(heat.getHeatState()).build(context);
+            ScoreboardViewModel rendered = this.renderer.render(context, baseModel);
+            ScoreboardAdapter adapter = this.activeAdapter(player);
+            adapter.updateTitle(player, rendered.title());
+            adapter.updateLines(player, rendered.lines());
+            this.clearOtherAdapter(player, adapter);
+            this.updatesOk++;
+        } catch (Exception ex) {
+            this.updatesFailed++;
+            this.plugin.getDebugManager().logRaceSystem("[ScoreboardV2] Render error for " + player.getName() + " heat=" + heat.getId() + " state=" + heat.getHeatState() + ": " + ex.getMessage());
+            this.renderSimplified(player, heat);
+        } finally {
+            this.renderNanosTotal += (System.nanoTime() - startNanos);
+            this.renderSamples++;
+        }
+    }
+
+    private void renderSimplified(Player player, Heats heat) {
+        List<String> lines = new ArrayList<>();
+        lines.add("§e" + heat.getName());
+        lines.add("§7" + heat.getHeatState().name());
+        lines.add("§7Pilotos: §f" + heat.getDriverCount());
+        lines.add("§7Voltas: §f" + heat.getTotalLaps());
+        lines.add("§ewolfnetwork.com.br");
+
+        if (this.fallbackEnabled) {
+            this.fallbackActivated++;
+            this.fallbackAdapter.updateTitle(player, this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_title_waiting"));
+            this.fallbackAdapter.updateLines(player, lines);
+            this.primaryAdapter.delete(player);
+            return;
+        }
+
+        this.primaryAdapter.updateTitle(player, this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_title_waiting"));
+        this.primaryAdapter.updateLines(player, lines);
+    }
+
+    private StateViewModelBuilder findBuilder(HeatState state) {
+        for (StateViewModelBuilder builder : this.builders) {
+            if (builder.supports(state)) {
+                return builder;
+            }
+        }
+        return this.defaultBuilder;
+    }
+
+    private List<Driver> getSortedDriversForHeat(Heats heat) {
+        if (heat.getHeatState() == HeatState.QUALIFYING || heat.getHeatState() == HeatState.PRACTICE || heat.getHeatState() == HeatState.IDLE) {
+            return heat.getDrivers().values().stream()
+                    .filter(driver -> driver.getFastestLap() != null)
+                    .sorted(Comparator.comparingLong(driver -> driver.getFastestLap().getLapTime()))
+                    .collect(Collectors.toList());
+        }
+
+        return heat.getDrivers().values().stream()
+                .filter(driver -> !driver.isDnf())
+                .sorted(Comparator.comparingInt(Driver::getPosition))
+                .collect(Collectors.toList());
+    }
+
+    private long parseDurationMillis(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return 500L;
+        }
+        String normalized = raw.trim().toLowerCase();
+        try {
+            if (normalized.endsWith("ms")) {
+                return Math.max(100L, Long.parseLong(normalized.substring(0, normalized.length() - 2)));
+            }
+            if (normalized.endsWith("s")) {
+                long seconds = Long.parseLong(normalized.substring(0, normalized.length() - 1));
+                return Math.max(100L, seconds * 1000L);
+            }
+            return Math.max(100L, Long.parseLong(normalized));
+        } catch (NumberFormatException ex) {
+            return 500L;
+        }
+    }
+
+    private ScoreboardAdapter activeAdapter(Player player) {
+        if (this.shouldUsePrimary(player) && this.primaryAdapter.isHealthy(player)) {
+            return this.primaryAdapter;
+        }
+        if (this.fallbackEnabled) {
+            return this.fallbackAdapter;
+        }
+        return this.primaryAdapter;
+    }
+
+    private boolean shouldUsePrimary(Player player) {
+        if (this.canaryPercentage <= 0 || this.canaryPercentage >= 100) {
+            return true;
+        }
+        int bucket = Math.floorMod(player.getUniqueId().hashCode(), 100);
+        return bucket < this.canaryPercentage;
+    }
+
+    private void clearOtherAdapter(Player player, ScoreboardAdapter active) {
+        if (active == this.primaryAdapter) {
+            this.fallbackAdapter.delete(player);
+        } else {
+            this.primaryAdapter.delete(player);
+        }
+    }
+
+    private void logMetricsIfNeeded() {
+        if (!this.metricsLogEnabled) {
+            return;
+        }
+        Instant now = Instant.now();
+        if (Duration.between(this.lastMetricsLog, now).toSeconds() < this.metricsLogIntervalSeconds) {
+            return;
+        }
+        this.lastMetricsLog = now;
+        long avgMicros = this.renderSamples == 0 ? 0L : (this.renderNanosTotal / this.renderSamples) / 1000L;
+        this.plugin.getDebugManager().logRaceSystem(
+                "[ScoreboardV2] ok=" + this.updatesOk
+                        + " fail=" + this.updatesFailed
+                        + " fallback=" + this.fallbackActivated
+                        + " avgRenderMicros=" + avgMicros
+        );
+    }
+}
