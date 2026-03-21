@@ -763,8 +763,17 @@ public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
             }
             return " \u00a7e=" + TimingScoreboardStyle.padRight("0.000", 7);
         }
-        if (currentLaps < aheadLaps) {
-            return " \u00a7c-" + TimingScoreboardStyle.padRight((aheadLaps - currentLaps) + "L", 7);
+        long currentProgressMs = current.getTimeAtLastCheckpoint();
+        long aheadProgressMs = ahead.getTimeAtLastCheckpoint();
+        if (currentProgressMs > 0L && aheadProgressMs > 0L) {
+            long diff = currentProgressMs - aheadProgressMs;
+            if (diff > 0L) {
+                return " \u00a7a+" + TimingScoreboardStyle.padRight(this.formatTimeDiff(diff), 7);
+            }
+            if (diff < 0L) {
+                return " \u00a7c-" + TimingScoreboardStyle.padRight(this.formatTimeDiff(Math.abs(diff)), 7);
+            }
+            return " \u00a7e=" + TimingScoreboardStyle.padRight("0.000", 7);
         }
         return " \u00a78--      ";
     }

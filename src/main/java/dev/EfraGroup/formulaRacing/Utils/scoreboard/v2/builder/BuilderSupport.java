@@ -175,7 +175,7 @@ final class BuilderSupport {
                 Lap best = current.getFastestLap();
                 return best == null ? " §8--.---   " : " §7" + padRight(formatTime(best.getLapTime()), 8);
             }
-            return gapBlock(current, reference, true);
+            return gapBlock(context, current, reference, true);
         }
 
         if (reference == null || reference.getUuid().equals(current.getUuid())) {
@@ -188,10 +188,10 @@ final class BuilderSupport {
             return " §8         ";
         }
 
-        return gapBlock(current, reference, false);
+        return gapBlock(context, current, reference, false);
     }
 
-    private static String gapBlock(Driver current, Driver reference, boolean qualifyingMode) {
+    private static String gapBlock(ScoreboardContext context, Driver current, Driver reference, boolean qualifyingMode) {
         if (qualifyingMode) {
             Lap currentBest = current.getFastestLap();
             Lap referenceBest = reference.getFastestLap();
@@ -208,22 +208,36 @@ final class BuilderSupport {
             return " §e=" + padRight("0.000", 7);
         }
 
-        int lapDelta = current.getLapCount() - reference.getLapCount();
-        if (lapDelta != 0) {
-            if (lapDelta > 0) {
-                return " §c-" + padRight(lapDelta + "L", 7);
+        int currentLaps = current.getLapCount();
+        int currentCp = current.getCheckpointsReached();
+
+        Long currentAtProgress = current.getAbsoluteTimeAtProgress(currentLaps, currentCp);
+        Long referenceAtProgress = reference.getAbsoluteTimeAtProgress(currentLaps, currentCp);
+        if (currentAtProgress != null && referenceAtProgress != null) {
+            long diff = currentAtProgress - referenceAtProgress;
+            if (diff > 0L) {
+                return " §a+" + padRight(formatTime(diff), 7);
             }
-            return " §a+" + padRight(Math.abs(lapDelta) + "L", 7);
+            if (diff < 0L) {
+                return " §c-" + padRight(formatTime(Math.abs(diff)), 7);
+            }
+            return " §e=" + padRight("0.000", 7);
         }
 
-        long diff = current.getTotalTime() - reference.getTotalTime();
-        if (diff > 0L) {
-            return " §a+" + padRight(formatTime(diff), 7);
+        long currentProgressMs = current.getTimeAtLastCheckpoint();
+        long referenceProgressMs = reference.getTimeAtLastCheckpoint();
+        if (currentProgressMs > 0L && referenceProgressMs > 0L) {
+            long diff = currentProgressMs - referenceProgressMs;
+            if (diff > 0L) {
+                return " §a+" + padRight(formatTime(diff), 7);
+            }
+            if (diff < 0L) {
+                return " §c-" + padRight(formatTime(Math.abs(diff)), 7);
+            }
+            return " §e=" + padRight("0.000", 7);
         }
-        if (diff < 0L) {
-            return " §c-" + padRight(formatTime(Math.abs(diff)), 7);
-        }
-        return " §e=" + padRight("0.000", 7);
+
+        return " §8--      ";
     }
 
     private static String statusBlock(ScoreboardContext context, Driver driver, Player player) {
