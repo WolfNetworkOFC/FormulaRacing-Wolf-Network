@@ -161,7 +161,7 @@ final class BuilderSupport {
         String pilotName = "§f" + padRight(name, 14);
         String pits = formatPits(context, current);
 
-        return rank + " §8|" + middle + " " + marker + " " + pilotName + pits;
+        return rank + " §7|" + middle + " " + marker + " " + pilotName + pits;
     }
 
     private static String middleBlock(ScoreboardContext context, Driver current, Driver reference, Player player, boolean qualifyingMode) {

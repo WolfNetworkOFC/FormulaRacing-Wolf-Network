@@ -148,13 +148,13 @@ public class ScoreboardTimeTrialUtils {
 
         // 3. Cabeçalho do Scoreboard
         TranslationUtil tu = FormulaRacing.getInstance().getTranslationUtil();
-        board.updateTitle(tu.getTranslated(player, "scoreboard_tt_title"));
+        board.updateTitle(this.boldTitle(tu.getTranslated(player, "scoreboard_tt_title")));
         String separator = tu.getTranslated(player, "scoreboard_common_separator");
         String footer = tu.getTranslated(player, "scoreboard_common_footer");
 
         List<String> lines = new ArrayList<>();
         lines.add(separator);
-        lines.add(tu.getTranslated(player, "scoreboard_tt_track", "{track}", trackName));
+        lines.add("§f§l" + tu.getTranslated(player, "scoreboard_tt_track", "{track}", trackName));
 
         // Lógica do Criador da Pista
         String creator = playerTrackOwners.getOrDefault(player.getUniqueId(), trackOwnerCache.get(trackName));
@@ -164,12 +164,12 @@ public class ScoreboardTimeTrialUtils {
         }
 
         if (creator != null) {
-            lines.add(tu.getTranslated(player, "scoreboard_tt_by", "{creator}", creator));
+            lines.add("§f§l" + tu.getTranslated(player, "scoreboard_tt_by", "{creator}", creator));
         }
 
         lines.add(separator);
         lines.add("");
-        lines.add(tu.getTranslated(player, "scoreboard_tt_leaderboard"));
+        lines.add("§e§l" + tu.getTranslated(player, "scoreboard_tt_leaderboard"));
 
         // 4. Lógica do Leaderboard Dinâmico (Top ou Top 1 + Vizinhos)
         List<DatabaseManager.TrackRecord> neighbors = new ArrayList<>();
@@ -185,22 +185,23 @@ public class ScoreboardTimeTrialUtils {
                 neighbors.add(allRecords.get(i));
             }
         } else {
-            if (availableForEntries <= 2) {
-                int limit = Math.min(allRecords.size(), availableForEntries);
-                for (int i = 0; i < limit; i++) {
-                    neighbors.add(allRecords.get(i));
-                }
-            } else {
+            boolean canShowLeaderAndStillCenter = availableForEntries >= 7;
+            int neighborsLimit = availableForEntries;
+            int minIndex = 0;
+            if (canShowLeaderAndStillCenter) {
                 firstPlace = allRecords.get(0);
                 includeSeparator = true;
-
-                int neighborsLimit = Math.max(1, availableForEntries - 2);
-                int start = Math.max(1, myPos - neighborsLimit / 2);
-                int end = Math.min(allRecords.size() - 1, start + neighborsLimit - 1);
-                start = Math.max(1, end - neighborsLimit + 1);
-                for (int i = start; i <= end; i++) {
-                    neighbors.add(allRecords.get(i));
+                neighborsLimit -= 2;
+                minIndex = 1;
+            }
+            int start = Math.max(minIndex, myPos - neighborsLimit / 2);
+            int end = Math.min(allRecords.size() - 1, start + neighborsLimit - 1);
+            start = Math.max(minIndex, end - neighborsLimit + 1);
+            for (int i = start; i <= end; i++) {
+                if (canShowLeaderAndStillCenter && i == 0) {
+                    continue;
                 }
+                neighbors.add(allRecords.get(i));
             }
         }
 
@@ -229,7 +230,7 @@ public class ScoreboardTimeTrialUtils {
         String string;
         boolean isMe = tr.getPlayerName().equals(observerName);
         if (isMe) {
-            string = "\u00a7f\u00a7l";
+            string = "\u00a7e\u00a7l";
         } else {
             switch (pos) {
                 case 1: {
@@ -245,20 +246,20 @@ public class ScoreboardTimeTrialUtils {
                     break;
                 }
                 default: {
-                    string = "\u00a77";
+                    string = "\u00a7f";
                 }
             }
         }
         String color = string;
-        String timeDisplay = tr.isFinished() ? "§b" + this.formatTime(tr.getTime()) : "§e" + tr.getCheckpointsReached() + "CP §8(§f" + this.formatTime(tr.getTime()) + "§8)";
+        String timeDisplay = tr.isFinished() ? "§b" + this.formatTime(tr.getTime()) : "§6" + tr.getCheckpointsReached() + "CP §7(§f" + this.formatTime(tr.getTime()) + "§7)";
         String configured = FormulaRacing.getInstance().getConfig().getString("scoreboard.style.accent-marker", "┃");
         String accent = TimingScoreboardStyle.normalizeAccentMarker(configured);
         String marker = color + "§l" + accent + accent + "§r";
         String nameDisplay = isMe ? FormulaRacing.getInstance().getTranslationUtil().getTranslated(viewer, "scoreboard_tt_you", new String[0]) : tr.getPlayerName();
         nameDisplay = TimingScoreboardStyle.padRight(nameDisplay, 14);
         String rank = color + pos + ".";
-        String nameColor = isMe ? "§e" : "§f";
-        return rank + " §8| " + timeDisplay + " " + marker + " " + nameColor + nameDisplay;
+        String nameColor = isMe ? "§e§l" : "§f";
+        return rank + " §7| " + timeDisplay + " " + marker + " " + nameColor + nameDisplay;
     }
 
     public String formatTime(double timeInSeconds) {
@@ -269,6 +270,16 @@ public class ScoreboardTimeTrialUtils {
             return String.format("%d:%02d.%03d", minutes, seconds, millis);
         }
         return String.format("%d.%03d", seconds, millis);
+    }
+
+    private String boldTitle(String title) {
+        if (title == null || title.isEmpty()) {
+            return "§l";
+        }
+        if (title.length() >= 2 && title.charAt(0) == '§') {
+            return title.substring(0, 2) + "§l" + title.substring(2);
+        }
+        return "§l" + title;
     }
 
     public void clearAll() {

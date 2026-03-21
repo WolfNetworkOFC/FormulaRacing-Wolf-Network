@@ -69,7 +69,7 @@ public class ScoreboardDuelsTimeUtils {
 
     public void applyDuelBoard(Player player, int duelId, int totalLaps, String trackName) {
         FastBoard board = new FastBoard(player);
-        board.updateTitle(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_title", new String[0]));
+        board.updateTitle(this.boldTitle(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_title", new String[0])));
         this.boards.put(player.getUniqueId(), board);
         this.duelContexts.put(player.getUniqueId(), new DuelContext(duelId, totalLaps, trackName));
     }
@@ -192,6 +192,16 @@ public class ScoreboardDuelsTimeUtils {
         return String.format("%ds", secs);
     }
 
+    private String boldTitle(String title) {
+        if (title == null || title.isEmpty()) {
+            return "§l";
+        }
+        if (title.length() >= 2 && title.charAt(0) == '§') {
+            return title.substring(0, 2) + "§l" + title.substring(2);
+        }
+        return "§l" + title;
+    }
+
     private void updateBoardLines(Player player, FastBoard board, int timeRemaining, String finalPosDisplay, int lap, int totalLaps, String currentFormattedTime, String finalPB, String finalTimeRemaining, String trackName) {
         FastBoard currentBoard = this.boards.get(player.getUniqueId());
 
@@ -208,13 +218,13 @@ public class ScoreboardDuelsTimeUtils {
         String footer = this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_common_footer");
         String marker = TimingScoreboardStyle.normalizeAccentMarker(this.plugin.getConfig().getString("scoreboard.style.accent-marker", "┃"));
 
-        lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_track") + "§f" + trackName);
+        lines.add("§f§l" + this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_track") + "§f" + trackName);
         lines.add(separator);
-        lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_position") + finalPosDisplay);
-        lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_lap") + "§b" + lap + "§7/§b" + totalLaps);
-        lines.add("§8| §7§l" + marker + marker + "§r");
-        lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_time") + "§b" + currentFormattedTime);
-        lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_record") + finalPB);
+        lines.add("§f§l" + this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_position") + finalPosDisplay);
+        lines.add("§f§l" + this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_lap") + "§b" + lap + "§7/§b" + totalLaps);
+        lines.add("§7| §7§l" + marker + marker + "§r");
+        lines.add("§f§l" + this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_time") + "§b§l" + currentFormattedTime);
+        lines.add("§f§l" + this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_record") + finalPB);
 
         // Se houver tempo restante (ex: contagem regressiva), adicionamos a linha
         if (timeRemaining >= 0 && lines.size() < MAX_LINES - 3) {

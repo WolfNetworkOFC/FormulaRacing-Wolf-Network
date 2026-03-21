@@ -29,6 +29,7 @@ track_is_closed: "&cEsta pista está fechada e não pode ser usada no momento!"
 does_not_have_boatutils: "&cEsta pista usa configurações especiais de BoatUtils, mas você não está com o mod!"
 boatutils_required: "&cUse o BoatUtils Mod para entrar nesta pista."
 partial_time_saved: "&aTempo parcial da pista anterior &e{track} &afoi salvo: &e{time}"
+tt_save_partial: "&aParcial salva! &7Checkpoints: &f{count} &7| Tempo: &f{time}"
 timetrial_cancelled: "&cTime trial cancelado."
 
 # Comandos de Pista
@@ -138,12 +139,14 @@ hotbar_spawn_lore:
 hotbar_settings_name: "&e&lConfigurações"
 hotbar_settings_lore:
   - "&7Abre suas configurações"
-hotbar_visibility_off_name: "&7&lFantasmas: OFF"
+hotbar_visibility_off_name: "&7&lLONELY: ON"
 hotbar_visibility_off_lore:
-  - "&7Clique para mostrar fantasmas"
-hotbar_visibility_on_name: "&f&lFantasmas: ON"
+  - "&7Você está oculto para outros pilotos"
+  - "&7Clique para desativar o modo Lonely"
+hotbar_visibility_on_name: "&f&lLONELY: OFF"
 hotbar_visibility_on_lore:
-  - "&7Clique para ocultar fantasmas"
+  - "&7Você pode ver e ser visto por outros"
+  - "&7Clique para ativar o modo Lonely"
 
 # Mensagens de Party
 party_created: "&aParty criada!"
@@ -237,7 +240,7 @@ scoreboard_format_pits_short: "P"
 scoreboard_pit_status_mandatory: "&7Paradas: &c{current}&7/&f{total}"
 scoreboard_pit_status_remaining_detailed: "&7Paradas: &6{current}&7/&f{total} &8(&f{missing} restantes&8)"
 scoreboard_pit_status_complete_detailed: "&7Paradas: &a{current}&7/&f{total}"
-scoreboard_common_separator: "&8------------------------"
+scoreboard_common_separator: "&7------------------------"
 scoreboard_common_footer: "&ewolfnetwork.com.br"
 scoreboard_duel_title: "&6Duelo"
 scoreboard_duel_position: "&7Posicao: "
