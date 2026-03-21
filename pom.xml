@@ -298,7 +298,7 @@
                             <executable>cmd</executable>
                             <arguments>
                                 <argument>/c</argument>
-                                <argument>git add -u src/main pom.xml &amp;&amp; git diff --cached --quiet || (git commit -m "auto: deploy ${project.artifactId}-${project.version}" &amp;&amp; (git push origin HEAD:refs/heads/${autoGitBackupBranch} || (echo [WARN] Auto push to ${autoGitBackupBranch} failed; commit kept locally. &amp; exit /b 0)))</argument>
+                                <argument>git add -A . &amp;&amp; (git diff --cached --quiet || (git commit -m "auto: deploy ${project.artifactId}-${project.version}" &amp;&amp; (git push origin HEAD:refs/heads/${autoGitBackupBranch} || (echo [WARN] Auto push to ${autoGitBackupBranch} failed; commit kept locally. &amp; exit /b 0))))</argument>
                             </arguments>
                         </configuration>
                     </execution>
