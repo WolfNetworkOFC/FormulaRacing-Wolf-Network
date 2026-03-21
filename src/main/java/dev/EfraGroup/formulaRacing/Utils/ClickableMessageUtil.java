@@ -111,6 +111,28 @@
          player.spigot().sendMessage((BaseComponent)message);
      }
 
+     public static void sendEventSignBroadcast(Player player, String text, String hoverText, String eventName) {
+         player.sendMessage("");
+         TextComponent line = new TextComponent(TextComponent.fromLegacyText((String)text));
+         line.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/event sign " + eventName));
+         if (hoverText != null && !hoverText.isEmpty()) {
+             line.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Content[]{new Text(hoverText)}));
+         }
+         player.spigot().sendMessage((BaseComponent)line);
+         player.sendMessage("");
+     }
+
+     public static void sendQuickRaceJoinBroadcast(Player player, String text, String hoverText) {
+         player.sendMessage("");
+         TextComponent line = new TextComponent(TextComponent.fromLegacyText((String)text));
+         line.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/race join"));
+         if (hoverText != null && !hoverText.isEmpty()) {
+             line.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Content[]{new Text(hoverText)}));
+         }
+         player.spigot().sendMessage((BaseComponent)line);
+         player.sendMessage("");
+     }
+
      public static void sendClickableMessage(Player player, String message, String command, String hoverText) {
          TextComponent component = new TextComponent(message);
          component.setColor(ChatColor.AQUA);
@@ -144,57 +166,10 @@
      }
 
      public static void sendQuickRaceInvite(Player player, String trackName, int laps, int pits, int currentDrivers, int maxDrivers) {
-         TranslationUtil t = FormulaRacing.getInstance().getTranslationUtil();
-         TextComponent line1 = new TextComponent("\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557");
-         line1.setColor(ChatColor.GOLD);
-         TextComponent line2 = new TextComponent("\u2551 ");
-         line2.setColor(ChatColor.GOLD);
-         TextComponent title = new TextComponent(t.getTranslated(player, "quickrace_broadcast_active", new String[0]));
-         title.setBold(Boolean.valueOf(true));
-         title.setColor(ChatColor.GREEN);
-         line2.addExtra((BaseComponent)title);
-         TextComponent line3 = new TextComponent("\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563");
-         line3.setColor(ChatColor.GOLD);
-         TextComponent line4 = new TextComponent("\u2551 ");
-         line4.setColor(ChatColor.GOLD);
-         TextComponent trackLabel = new TextComponent(t.getTranslated(player, "quickrace_broadcast_track", new String[0]));
-         trackLabel.setColor(ChatColor.WHITE);
-         TextComponent trackValue = new TextComponent(trackName);
-         trackValue.setColor(ChatColor.YELLOW);
-         line4.addExtra((BaseComponent)trackLabel);
-         line4.addExtra((BaseComponent)trackValue);
-         TextComponent line5 = new TextComponent("\u2551 ");
-         line5.setColor(ChatColor.GOLD);
-         TextComponent details = new TextComponent(t.getTranslated(player, "quickrace_broadcast_laps_pits", "{laps}", String.valueOf(laps), "{pits}", String.valueOf(pits)));
-         details.setColor(ChatColor.GRAY);
-         line5.addExtra((BaseComponent)details);
-         TextComponent line6 = new TextComponent("\u2551 ");
-         line6.setColor(ChatColor.GOLD);
-         TextComponent slots = new TextComponent(t.getTranslated(player, "quickrace_broadcast_drivers", "{current}", String.valueOf(currentDrivers), "{max}", String.valueOf(maxDrivers)));
-         slots.setColor(ChatColor.GRAY);
-         line6.addExtra((BaseComponent)slots);
-         TextComponent line7 = new TextComponent("\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563");
-         line7.setColor(ChatColor.GOLD);
-         TextComponent line8 = new TextComponent("\u2551 ");
-         line8.setColor(ChatColor.GOLD);
-         TextComponent joinButton = new TextComponent(t.getTranslated(player, "quickrace_broadcast_click", new String[0]));
-         joinButton.setColor(ChatColor.AQUA);
-         joinButton.setBold(Boolean.valueOf(true));
-         joinButton.setUnderlined(Boolean.valueOf(true));
-         joinButton.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/race join"));
-         joinButton.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Content[]{new Text(t.getTranslated(player, "quickrace_broadcast_click_hover", new String[0]))}));
-         line8.addExtra((BaseComponent)joinButton);
-         TextComponent line9 = new TextComponent("\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d");
-         line9.setColor(ChatColor.GOLD);
-         player.spigot().sendMessage((BaseComponent)line1);
-         player.spigot().sendMessage((BaseComponent)line2);
-         player.spigot().sendMessage((BaseComponent)line3);
-         player.spigot().sendMessage((BaseComponent)line4);
-         player.spigot().sendMessage((BaseComponent)line5);
-         player.spigot().sendMessage((BaseComponent)line6);
-         player.spigot().sendMessage((BaseComponent)line7);
-         player.spigot().sendMessage((BaseComponent)line8);
-         player.spigot().sendMessage((BaseComponent)line9);
+          TranslationUtil t = FormulaRacing.getInstance().getTranslationUtil();
+         String clickText = t.getTranslated(player, "quickrace_click_to_join", "{track}", trackName, "{laps}", String.valueOf(laps), "{pits}", String.valueOf(pits), "{current}", String.valueOf(currentDrivers), "{max}", String.valueOf(maxDrivers));
+         String hoverText = t.getTranslated(player, "quickrace_click_to_join_hover", "{track}", trackName, "{laps}", String.valueOf(laps), "{pits}", String.valueOf(pits), "{current}", String.valueOf(currentDrivers), "{max}", String.valueOf(maxDrivers));
+         sendQuickRaceJoinBroadcast(player, clickText, hoverText);
      }
 
      public static void broadcastEventStarted(String eventName) {

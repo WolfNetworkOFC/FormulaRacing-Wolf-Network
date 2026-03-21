@@ -1,6 +1,7 @@
 package dev.EfraGroup.formulaRacing.Command;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Controllers.EventSignupService;
 import dev.EfraGroup.formulaRacing.Controllers.RaceEventManager;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Event.EventState;
@@ -32,11 +33,13 @@ public class EventCommand extends BaseCommand {
     private final FormulaRacing plugin;
     private final RaceEventManager eventManager;
     private final DatabaseManager database;
+    private final EventSignupService signupService;
 
     public EventCommand(FormulaRacing plugin) {
         this.plugin = plugin;
         this.eventManager = plugin.getRaceEventManager();
         this.database = plugin.getDatabaseManager();
+        this.signupService = new EventSignupService(plugin);
     }
 
     @Default
@@ -235,54 +238,57 @@ public class EventCommand extends BaseCommand {
 
         if (event == null) {
             this.plugin.sendMessage(player, "event_none_selected", new String[0]);
-        } else {
-            UUID playerUUID = player.getUniqueId();
-            String track = event.getTrackNameWS();
-            if (track != null && this.database.trackHaveBoatUtils(track) && !FormulaRacing.hasOpenBoatUtilsMod(player)) {
-                this.plugin.sendMessage(player, "obu_mandatory_warning", new String[]{"{track}", track});
-            }
-            if (event.isSubscriber(playerUUID)) {
-                if (event.getCreatorUUID().equals(new UUID(0L, 0L))) {
-                    this.plugin.getDailyRaceManager().signUpAndTeleport(player, event);
-                } else {
-                    this.plugin.sendMessage(player, "event_already_subscribed", new String[0]);
-                }
+            return;
+        }
 
-            } else if (!event.isOpenSign() && !player.hasPermission("formularacing.event.admin")) {
+        EventSignupService.SignupResult result = this.signupService.signPlayer(player, event, true);
+        boolean isActiveDaily = this.plugin.getDailyRaceManager() != null && this.plugin.getDailyRaceManager().getActiveDailyEvent().isPresent() && ((Events)this.plugin.getDailyRaceManager().getActiveDailyEvent().get()).getId() == event.getId();
+        if (isActiveDaily) {
+            this.plugin.getDailyRaceManager().handleDailySignup(player, event, result);
+            return;
+        }
+
+        switch (result.getStatus()) {
+            case ALREADY_SUBSCRIBED:
+            case ALREADY_SUBSCRIBED_DAILY:
+                this.plugin.sendMessage(player, "event_already_subscribed", new String[0]);
+                return;
+            case SIGN_CLOSED:
                 this.plugin.sendMessage(player, "event_sign_closed", new String[0]);
-            } else if (event.getState() == EventState.FINISHED) {
+                return;
+            case FINISHED:
                 this.plugin.sendMessage(player, "event_already_finished", new String[0]);
-            } else {
-                if (event.isReserve(playerUUID)) {
-                    event.removeReserve(playerUUID);
+                return;
+            case ERROR:
+                this.plugin.sendMessage(player, "event_sign_error", new String[0]);
+                return;
+            case NO_EVENT:
+                this.plugin.sendMessage(player, "event_none_selected", new String[0]);
+                return;
+            case SIGNED:
+                if (result.isMovedFromReserve()) {
                     this.plugin.sendMessage(player, "event_moved_from_reserve", new String[0]);
                 }
 
-                if (this.plugin.getDailyRaceManager() != null && this.plugin.getDailyRaceManager().getActiveDailyEvent().isPresent() && ((Events)this.plugin.getDailyRaceManager().getActiveDailyEvent().get()).getId() == event.getId()) {
-                    this.plugin.getDailyRaceManager().signUpAndTeleport(player, event);
-                } else {
-                    if (event.addSubscriber(playerUUID)) {
-                        player.sendMessage("");
-                        this.plugin.sendMessage(player, "event_signed", new String[0]);
-                        String var10001 = String.valueOf(ChatColor.GRAY);
-                        player.sendMessage(var10001 + "Evento: " + String.valueOf(ChatColor.WHITE) + event.getDisplayName());
-                        if (event.getTrackNameWS() != null) {
-                            var10001 = String.valueOf(ChatColor.GRAY);
-                            player.sendMessage(var10001 + "Pista: " + String.valueOf(ChatColor.WHITE) + event.getTrackNameWS());
-                        }
-
-                        var10001 = String.valueOf(ChatColor.GRAY);
-                        player.sendMessage(var10001 + "Inscritos: " + String.valueOf(ChatColor.WHITE) + event.getSubscriberCount());
-                        player.sendMessage("");
-                        this.database.setPlayerSelectedEvent(playerUUID, event);
-                        var10001 = String.valueOf(ChatColor.GRAY);
-                        this.broadcastToAdmins(var10001 + "[Evento] " + String.valueOf(ChatColor.GREEN) + player.getName() + " se inscreveu em " + event.getDisplayName() + String.valueOf(ChatColor.GRAY) + " (" + event.getSubscriberCount() + " inscritos)");
-                    } else {
-                        this.plugin.sendMessage(player, "event_sign_error", new String[0]);
-                    }
-
+                UUID playerUUID = player.getUniqueId();
+                player.sendMessage("");
+                this.plugin.sendMessage(player, "event_signed", new String[0]);
+                String var10001 = String.valueOf(ChatColor.GRAY);
+                player.sendMessage(var10001 + "Evento: " + String.valueOf(ChatColor.WHITE) + event.getDisplayName());
+                if (event.getTrackNameWS() != null) {
+                    var10001 = String.valueOf(ChatColor.GRAY);
+                    player.sendMessage(var10001 + "Pista: " + String.valueOf(ChatColor.WHITE) + event.getTrackNameWS());
                 }
-            }
+
+                var10001 = String.valueOf(ChatColor.GRAY);
+                player.sendMessage(var10001 + "Inscritos: " + String.valueOf(ChatColor.WHITE) + event.getSubscriberCount());
+                player.sendMessage("");
+                this.database.setPlayerSelectedEvent(playerUUID, event);
+                var10001 = String.valueOf(ChatColor.GRAY);
+                this.broadcastToAdmins(var10001 + "[Evento] " + String.valueOf(ChatColor.GREEN) + player.getName() + " se inscreveu em " + event.getDisplayName() + String.valueOf(ChatColor.GRAY) + " (" + event.getSubscriberCount() + " inscritos)");
+                return;
+            default:
+                this.plugin.sendMessage(player, "event_sign_error", new String[0]);
         }
     }
 
@@ -383,19 +389,9 @@ public class EventCommand extends BaseCommand {
             for(Player onlinePlayer : this.plugin.getServer().getOnlinePlayers()) {
                 UUID playerUUID = onlinePlayer.getUniqueId();
                 if (!event.isSubscriber(playerUUID) && (event.isOpenSign() || onlinePlayer.hasPermission("formularacing.event.admin"))) {
-                    onlinePlayer.sendMessage("");
-                    onlinePlayer.sendMessage(String.valueOf(ChatColor.GOLD) + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                    String var10001 = String.valueOf(ChatColor.YELLOW);
-                    onlinePlayer.sendMessage(var10001 + "  \ud83c\udfc1 " + String.valueOf(ChatColor.GOLD) + String.valueOf(ChatColor.BOLD) + "INSCRIÇÕES ABERTAS!");
-                    onlinePlayer.sendMessage("");
-                    var10001 = String.valueOf(ChatColor.GRAY);
-                    onlinePlayer.sendMessage(var10001 + "  Evento: " + String.valueOf(ChatColor.WHITE) + event.getDisplayName());
-                    var10001 = String.valueOf(ChatColor.GRAY);
-                    onlinePlayer.sendMessage(var10001 + "  Pista: " + String.valueOf(ChatColor.YELLOW) + (event.getTrackNameWS() != null ? event.getTrackNameWS() : "A definir"));
-                    onlinePlayer.sendMessage("");
-                    ClickableMessageUtil.sendClickableLine(onlinePlayer, String.valueOf(ChatColor.GREEN) + "  ► " + String.valueOf(ChatColor.GREEN) + String.valueOf(ChatColor.BOLD), "CLIQUE AQUI PARA SE INSCREVER", "", "/event sign " + event.getDisplayName(), "§aClique para se inscrever no evento §f" + event.getDisplayName(), false);
-                    onlinePlayer.sendMessage(String.valueOf(ChatColor.GOLD) + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                    onlinePlayer.sendMessage("");
+                    String clickText = this.plugin.getTranslationUtil().getTranslated(onlinePlayer, "event_click_to_sign", new String[]{"{event}", event.getDisplayName()});
+                    String hoverText = this.plugin.getTranslationUtil().getTranslated(onlinePlayer, "event_click_to_sign_hover", new String[]{"{event}", event.getDisplayName()});
+                    ClickableMessageUtil.sendEventSignBroadcast(onlinePlayer, clickText, hoverText, event.getDisplayName());
                     ++sentCount;
                 }
             }

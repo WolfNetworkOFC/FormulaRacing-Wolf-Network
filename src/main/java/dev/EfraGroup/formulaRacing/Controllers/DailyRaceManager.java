@@ -14,6 +14,7 @@ import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Round.RoundState;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
+import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -51,6 +52,7 @@ public class DailyRaceManager {
     private static final DateTimeFormatter DATE_FORMAT;
     private static final DateTimeFormatter TIME_FORMAT;
     private final FormulaRacing plugin;
+    private final EventSignupService signupService;
     private final Random random = new Random();
     private BukkitTask scheduleTickTask;
     private BukkitTask phaseTask;
@@ -64,6 +66,7 @@ public class DailyRaceManager {
         this.phase = DailyRaceManager.Phase.IDLE;
         this.practiceStartTime = null;
         this.plugin = plugin;
+        this.signupService = new EventSignupService(plugin);
         this.ensureDefaults();
         this.tryResume();
     }
@@ -128,16 +131,18 @@ public class DailyRaceManager {
     }
 
     public void signUpAndTeleport(Player player, Events event) {
-        UUID playerUUID = player.getUniqueId();
-        if (event.isSubscriber(playerUUID)) {
-            if (this.phase == DailyRaceManager.Phase.PRACTICE) {
-                this.teleportToPractice(player, event);
-            } else {
-                player.sendMessage(String.valueOf(ChatColor.YELLOW) + "Você já está inscrito neste evento!");
-            }
+        EventSignupService.SignupResult result = this.signupService.signPlayer(player, event, false);
+        this.handleDailySignup(player, event, result);
+    }
 
-        } else {
-            if (event.addSubscriber(playerUUID)) {
+    public void handleDailySignup(Player player, Events event, EventSignupService.SignupResult result) {
+        UUID playerUUID = player.getUniqueId();
+        switch (result.getStatus()) {
+            case SIGNED:
+                if (result.isMovedFromReserve()) {
+                    this.plugin.sendMessage(player, "event_moved_from_reserve", new String[0]);
+                }
+
                 player.sendMessage("");
                 this.plugin.sendMessage(player, "daily_signup_success", new String[0]);
                 this.plugin.sendMessage(player, "daily_signup_event", new String[]{"{event}", event.getDisplayName()});
@@ -153,10 +158,29 @@ public class DailyRaceManager {
                 } else {
                     this.plugin.sendMessage(player, "daily_signup_wait", new String[0]);
                 }
-            } else {
-                this.plugin.sendMessage(player, "daily_signup_error", new String[0]);
-            }
 
+                return;
+            case ALREADY_SUBSCRIBED:
+            case ALREADY_SUBSCRIBED_DAILY:
+                if (this.phase == DailyRaceManager.Phase.PRACTICE) {
+                    this.teleportToPractice(player, event);
+                } else {
+                    this.plugin.sendMessage(player, "event_already_subscribed", new String[0]);
+                }
+
+                return;
+            case SIGN_CLOSED:
+                this.plugin.sendMessage(player, "event_sign_closed", new String[0]);
+                return;
+            case FINISHED:
+                this.plugin.sendMessage(player, "event_already_finished", new String[0]);
+                return;
+            case NO_EVENT:
+                this.plugin.sendMessage(player, "event_none_selected", new String[0]);
+                return;
+            case ERROR:
+            default:
+                this.plugin.sendMessage(player, "daily_signup_error", new String[0]);
         }
     }
 
@@ -666,10 +690,7 @@ public class DailyRaceManager {
                     }
 
                     player.sendMessage("");
-                    TextComponent signComp = new TextComponent(this.plugin.getTranslation("daily_sign_click", lang, new String[0]));
-                    signComp.setHoverEvent(new HoverEvent(Action.SHOW_TEXT, new Content[]{new Text(this.plugin.getTranslation("daily_sign_hover", lang, new String[]{"{event}", eventName}))}));
-                    signComp.setClickEvent(new ClickEvent(net.md_5.bungee.api.chat.ClickEvent.Action.RUN_COMMAND, "/event sign " + eventName));
-                    player.spigot().sendMessage(signComp);
+                    ClickableMessageUtil.sendEventSignBroadcast(player, this.plugin.getTranslation("daily_sign_click", lang, new String[]{"{event}", eventName}), this.plugin.getTranslation("daily_sign_hover", lang, new String[]{"{event}", eventName}), eventName);
                     player.sendMessage("");
                     var10001 = String.valueOf(ChatColor.GOLD);
                     player.sendMessage(var10001 + String.valueOf(ChatColor.BOLD) + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -716,10 +737,7 @@ public class DailyRaceManager {
 
                 player.sendMessage("");
                 if (event.isOpenSign()) {
-                    TextComponent signComp = new TextComponent(this.plugin.getTranslation("daily_sign_click", lang, new String[0]));
-                    signComp.setHoverEvent(new HoverEvent(Action.SHOW_TEXT, new Content[]{new Text(this.plugin.getTranslation("daily_sign_hover", lang, new String[]{"{event}", eventName}))}));
-                    signComp.setClickEvent(new ClickEvent(net.md_5.bungee.api.chat.ClickEvent.Action.RUN_COMMAND, "/event sign " + eventName));
-                    player.spigot().sendMessage(signComp);
+                    ClickableMessageUtil.sendEventSignBroadcast(player, this.plugin.getTranslation("daily_sign_click", lang, new String[]{"{event}", eventName}), this.plugin.getTranslation("daily_sign_hover", lang, new String[]{"{event}", eventName}), eventName);
                 }
 
                 TextComponent specComp = new TextComponent(this.plugin.getTranslation("event_watch_click", lang, new String[0]));
@@ -738,15 +756,6 @@ public class DailyRaceManager {
     private void broadcastPracticeStart(Events event, int practiceMinutes) {
         String track = event.getTrackNameWS();
         String eventName = event.getDisplayName();
-        String var10002 = String.valueOf(ChatColor.GREEN);
-        TextComponent signComp = new TextComponent(var10002 + "► " + String.valueOf(ChatColor.BOLD) + "CLIQUE AQUI" + String.valueOf(ChatColor.GREEN) + " para se inscrever ");
-        HoverEvent.Action var10003 = Action.SHOW_TEXT;
-        Content[] var10004 = new Content[1];
-        String var10009 = String.valueOf(ChatColor.YELLOW);
-        var10004[0] = new Text(var10009 + "Clique para se inscrever no evento " + eventName);
-        signComp.setHoverEvent(new HoverEvent(var10003, var10004));
-        signComp.setClickEvent(new ClickEvent(net.md_5.bungee.api.chat.ClickEvent.Action.RUN_COMMAND, "/event sign " + eventName));
-
         for(Player player : Bukkit.getOnlinePlayers()) {
             String lang = this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
             player.sendMessage("");
@@ -757,10 +766,7 @@ public class DailyRaceManager {
             this.plugin.sendMessage(player, "daily_signup_track", new String[]{"{track}", track});
             this.plugin.sendMessage(player, "daily_start_practice", new String[]{"{time}", String.valueOf(practiceMinutes)});
             player.sendMessage("");
-            TextComponent signCompPlayer = new TextComponent(this.plugin.getTranslation("daily_sign_click", lang, new String[0]));
-            signCompPlayer.setHoverEvent(new HoverEvent(Action.SHOW_TEXT, new Content[]{new Text(this.plugin.getTranslation("daily_sign_hover", lang, new String[]{"{event}", eventName}))}));
-            signCompPlayer.setClickEvent(new ClickEvent(net.md_5.bungee.api.chat.ClickEvent.Action.RUN_COMMAND, "/event sign " + eventName));
-            player.spigot().sendMessage(signCompPlayer);
+            ClickableMessageUtil.sendEventSignBroadcast(player, this.plugin.getTranslation("daily_sign_click", lang, new String[]{"{event}", eventName}), this.plugin.getTranslation("daily_sign_hover", lang, new String[]{"{event}", eventName}), eventName);
             player.sendMessage("");
             var10001 = String.valueOf(ChatColor.GOLD);
             player.sendMessage(var10001 + String.valueOf(ChatColor.BOLD) + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
