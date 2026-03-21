@@ -45,6 +45,8 @@ scoreboard:
     interval: 500ms
     canary-percentage: 0
     fallback-fastboard-enabled: true
+    metrics-log-enabled: false
+    metrics-log-interval-seconds: 30
 
 # =========================================================
 #                     MESSAGE SETTINGS
