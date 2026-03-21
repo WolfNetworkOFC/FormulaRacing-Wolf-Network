@@ -15,7 +15,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
-@CommandAlias("fradmin|fra")
+@CommandAlias("admin|fradmin|fra")
 @CommandPermission("formularacing.admin")
 public class AdminCommand extends BaseCommand {
 

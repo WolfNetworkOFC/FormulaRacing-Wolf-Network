@@ -20,16 +20,10 @@ timetrial_menu_wr: "&eRecorde Mundial: &f{time}"
 timetrial_menu_position: "&ePosição: &f{position}"
 timetrial_menu_no_time: "(-)"
 timetrial_completed: "&6🏁 &fTempo: &b{time}"
-timetrial_new_pb_new_rank: "&aNovo PB! Entraste no ranking em &e#{rank}&a."
-timetrial_new_pb_improved_rank: "&aNovo PB! Subiste de &e#{old} &apara &e#{new}&a."
-timetrial_new_pb_same_rank: "&aNovo PB! Mantiveste a posição &e#{rank}&a."
-timetrial_incomplete_lap: "&cVolta incompleta: checkpoints &e{count}&c/&e{total}&c."
 track_not_found: "&cPista não encontrada com esse nome."
 track_is_closed: "&cEsta pista está fechada e não pode ser usada no momento!"
-does_not_have_boatutils: "&cEsta pista usa configurações especiais de BoatUtils, mas não tens o mod!"
-boatutils_required: "&cUsa o BoatUtils Mod para entrar nesta pista."
+obu_mandatory_warning: "&c&l⚠ AVISO: &7A pista &f{track} &7requer o mod &bOpenBoatUtils &7para ser percorrida em condições plenas. Sem ele, podes ficar travado em elevações!"
 partial_time_saved: "&aTempo parcial da pista anterior &e{track} &afoi guardado: &e{time}"
-tt_save_partial: "&aParcial guardada! &7Checkpoints: &f{count} &7| Tempo: &f{time}"
 timetrial_cancelled: "&cTime trial cancelado."
 
 # Comandos de Pista
@@ -55,15 +49,22 @@ track_location_not_found: "&cLocalização da pista não encontrada!"
 
 # Mensagens de Duelo
 duel_command_blocked: "&c&lDUELO &8» &7Este comando está bloqueado durante duelos!"
-duel_use_quit: "&7Usa &f/duel sair &7para abandonar a corrida."
+duel_use_quit: "&7Usa &f/duel sair &7para abandonar o duelo."
 duel_cannot_dismount: "&c&lDUELO &8» &7Não podes sair do barco durante um duelo!"
 duel_cannot_teleport: "&c&lDUELO &8» &7Não podes te teleportar durante um duelo!"
+race_command_blocked: "&c&lCORRIDA &8» &7Este comando está bloqueado durante Quick Races!"
+race_use_quit: "&7Usa &f/race leave &7para sair da corrida."
+race_cannot_dismount: "&c&lCORRIDA &8» &7Não podes sair do barco durante a Quick Race!"
+heat_command_blocked: "&c&lEVENTO &8» &7Este comando está bloqueado durante corridas oficiais!"
+heat_use_quit: "&7Usa &f/event leave &7para sair do evento."
+heat_cannot_dismount: "&c&lEVENTO &8» &7Não podes sair do barco durante a corrida oficial!"
 duel_position_1st: "1º LUGAR"
 duel_position_2nd: "2º LUGAR"
 duel_position_3rd: "3º LUGAR"
 duel_position_nth: "{position}º LUGAR"
 duel_pb_label: "MP"
 duel_waiting: "A aguardar..."
+duel_waiting_others: "A aguardar outros jogadores..."
 duel_time_remaining: "&c&lTEMPO &8» &7{time} segundos restantes!"
 duel_time_up_title: "&c&lTEMPO ESGOTADO!"
 duel_time_up_message: "&c&l⏰ TEMPO ESGOTADO!"
@@ -83,6 +84,13 @@ duel_error_spawn: "&cErro ao carregar o spawn da pista."
 duel_error_create: "&cErro ao criar duelo. Contacta um administrador."
 duel_lonely_enabled: "&d&lLONELY &8» &fModo fantasma ativado! Oponentes ocultos."
 duel_victory_forfeit: "&a&l✦ VITÓRIA! &fVenceste porque o oponente desistiu."
+duel_lap_complete_after_time_limit: "&a&l✓ &fVolta {lap} completada!"
+duel_lap_time_after_time_limit: "&e&l⏱ &fTempo: &a{time}"
+duel_waiting_others_time_limit: "&c&l⚠ &fTempo limite atingido - a aguardar outros jogadores..."
+duel_waiting_others_finish: "&eA aguardar que outros jogadores terminem..."
+duel_lap_completed_title: "&a&lVOLTA COMPLETA!"
+duel_lap_completed_subtitle: "&fTempo: &e{time}"
+duel_separator_line: "&8§m                                                                  "
 
 # Comandos de Câmera
 cam_started_following: "&aComçaste a seguir &e{player} &a(modo normal)."
@@ -120,34 +128,6 @@ reload_error: "&c[FormulaRacing] Erro ao recarregar o plugin. Verifica a consola
 # Menu de Configurações
 settings_menu_title: "&6&lConfigurações"
 
-# Hotbar
-hotbar_menu_name: "&6&lMenu FormulaRacing"
-hotbar_menu_lore:
-  - "&7Abre o menu principal de modos"
-hotbar_tracks_name: "&b&lSeletor de Pistas"
-hotbar_tracks_lore:
-  - "&7Abre a lista de pistas"
-hotbar_random_name: "&d&lPista Aleatória"
-hotbar_random_lore:
-  - "&7Teleporta para uma pista aleatória"
-hotbar_reset_name: "&c&lReiniciar Tentativa"
-hotbar_reset_lore:
-  - "&7Reinicia a tua tentativa atual"
-hotbar_spawn_name: "&a&lVoltar ao Spawn"
-hotbar_spawn_lore:
-  - "&7Volta para o spawn"
-hotbar_settings_name: "&e&lConfigurações"
-hotbar_settings_lore:
-  - "&7Abre as tuas configurações"
-hotbar_visibility_off_name: "&7&lLONELY: ON"
-hotbar_visibility_off_lore:
-  - "&7Estás oculto para outros pilotos"
-  - "&7Clica para desativar o modo Lonely"
-hotbar_visibility_on_name: "&f&lLONELY: OFF"
-hotbar_visibility_on_lore:
-  - "&7Podes ver e ser visto pelos outros"
-  - "&7Clica para ativar o modo Lonely"
-
 # Mensagens de Party
 party_created: "&aParty criada!"
 party_disbanded: "&cParty desfeita."
@@ -182,105 +162,757 @@ error_generic: "&cOcorreu um erro. Tenta novamente."
 error_database: "&cErro na base de dados. Contacta um administrador."
 error_file_not_found: "&cFicheiro de configuração não encontrado."
 
-# Visualização de Pista (/te view)
-visual_enabled: "&aVisualização ativada para a pista &e{track}&a."
-visual_disabled: "&cVisualização desativada para a pista &e{track}&c."
-visual_showing: "&7A mostrar regiões próximas com partículas."
-visual_region_start: "&a&lREGIÃO DE INÍCIO"
-visual_region_end: "&c&lREGIÃO DE FIM"
-visual_region_checkpoint: "&6&lCHECKPOINT #{id}"
-visual_region_pit_entry: "&9&lENTRADA DO PIT"
-visual_region_pit_exit: "&b&lSAÍDA DO PIT"
-visual_actionbar_in: "&7Estás em: {region}"
-visual_actionbar_none: "&7Nenhuma região detetada"
+# ==========================================
+# Mensagens do Sistema de Corridas
+# ==========================================
 
-# Scoreboard
-scoreboard_title_waiting: "&6A Aguardar"
-scoreboard_title_practice: "&6Treino"
-scoreboard_title_qualifying: "&6Qualifying"
-scoreboard_title_starting: "&6Partida"
-scoreboard_title_race: "&6Corrida"
-scoreboard_title_finished: "&6Finalizada"
-scoreboard_title_grid: "&6Grelha"
-scoreboard_v2_no_active_drivers: "&fSem pilotos ativos"
-scoreboard_v2_best_lap: "&fMelhor: {time}"
-scoreboard_v2_time: "&fTempo: {time}"
-scoreboard_v2_pits: "&7Pits: {count}"
-scoreboard_v2_offline: "Offline"
-scoreboard_v2_status_dnf: "&cDNF"
-scoreboard_v2_drivers: "&7Pilotos: &f{count}"
-scoreboard_v2_track: "&7Pista: &f{track}"
-scoreboard_v2_laps: "&7Voltas: &f{laps}"
-scoreboard_v2_position: "&7Posicao: &f{position}"
-scoreboard_state_preparing: "A preparar"
-scoreboard_waiting_start: "A aguardar inicio"
-scoreboard_waiting_times: "A aguardar tempos de volta"
-scoreboard_lights_out: "Luzes apagadas"
-scoreboard_header_classification: "Classificacao"
-scoreboard_header_final: "Resultado final"
-scoreboard_label_track: "&7Pista: &f{track}"
-scoreboard_label_drivers: "&7Pilotos: &f{drivers}"
-scoreboard_label_laps: "&7Voltas: &f{laps}"
-scoreboard_label_lap_f: "&7Volta: &f{current}&7/&f{total}"
-scoreboard_label_pits: "&7Pits: &f{pits}"
-scoreboard_label_position_f: "&7Posicao: &f{pos}"
-scoreboard_label_time: "&7Tempo: &f{time}"
-scoreboard_label_best: "&7Melhor: &b{time}"
-scoreboard_label_practice_end: "&7Fim do treino em: "
-scoreboard_label_interval: "Intervalo"
-scoreboard_label_pits_remaining: "&7Pits restantes: &c{pits}"
-scoreboard_label_pits_complete: "&7Pits: &acompleto"
-scoreboard_status_finishing: "&eA finalizar volta atual"
-scoreboard_status_dnf: "&cDNF"
-scoreboard_status_dnf_desc: "&7Nao finalizou"
-scoreboard_status_dnf_short: "DNF"
-scoreboard_status_offline: "Offline"
-scoreboard_status_in_pit: "NO PIT"
-scoreboard_format_pits_short: "P"
-scoreboard_pit_status_mandatory: "&7Paragens: &c{current}&7/&f{total}"
-scoreboard_pit_status_remaining_detailed: "&7Paragens: &6{current}&7/&f{total} &8(&f{missing} em falta&8)"
-scoreboard_pit_status_complete_detailed: "&7Paragens: &a{current}&7/&f{total}"
-scoreboard_common_separator: "&7------------------------"
-scoreboard_common_footer: "&ewolfnetwork.com.br"
-scoreboard_duel_title: "&6Duelo"
-scoreboard_duel_position: "&7Posicao: "
-scoreboard_duel_lap: "&7Volta: "
-scoreboard_duel_time: "&7Tempo: "
-scoreboard_duel_record: "&7PB: "
-scoreboard_duel_time_remaining: "&7Restante: "
-scoreboard_duel_track: "&7Pista: "
-scoreboard_tt_title: "&6Time Trial"
-scoreboard_tt_track: "&7Pista: &f{track}"
-scoreboard_tt_by: "&7Por: &f{creator}"
-scoreboard_tt_leaderboard: "&7Melhores tempos"
-scoreboard_tt_you: "&eTu"
+# Corrida - Geral
+race_event_created: "&a✓ Evento de corrida criado: &e{event}"
+race_event_deleted: "&a✓ Evento eliminado: &e{event}"
+race_event_not_found: "&cEvento não encontrado: &e{event}"
+race_event_started: "&a✓ Corrida iniciada: &e{event}"
+race_event_stopped: "&c✗ Corrida parada: &e{event}"
+race_already_in_event: "&cJá estás num evento!"
+race_not_in_event: "&cNão estás em nenhum evento!"
+race_event_full: "&cEvento está cheio!"
+race_event_not_running: "&cEvento não está a decorrer!"
 
-# Event Broadcast / Daily Event
-event_click_to_sign: "&b--> Clica para te inscreveres em &l{event}&r&b <--"
-event_click_to_sign_hover: "&aClica para te inscreveres em {event}"
-event_broadcast_sent: "&aBroadcast enviado para &e{count} &ajogadores."
-event_formal_header: "&eEvento ativo: &f{event}"
-event_formal_phase: "&eFase atual: &f{phase}"
-event_watch_click: "&a--> Clica para assistir a &l{event}&r&a <--"
-event_watch_hover: "&aClica para entrar como espectador em {event}"
+# Corrida - Entrar/Sair
+race_joined: "&a✓ Entraste no evento: &e{event}"
+race_left: "&7Saíste do evento."
+race_kicked: "&cForamexpulso do evento &e{event} &cpor &f{admin}"
+race_player_kicked: "&a✓ &e{player} &afoi expulso do evento"
 
-daily_signup_success: "&aInscricao concluida com sucesso!"
+# Corrida - Estados
+race_state_setup: "Preparação"
+race_state_loaded: "Carregado"
+race_state_racing: "A Correr"
+race_state_finished: "Finalizado"
+
+# Corrida - Heat
+race_heat_loading: "&eA carregar corrida..."
+race_heat_loaded: "&aCorrida carregada! Prepara-te!"
+race_heat_starting: "&6A iniciar em {seconds}s..."
+race_heat_started: "&a✓ VAI! VAI! VAI!"
+race_heat_finished: "&a✓ CORRIDA FINALIZADA!"
+
+# Corrida - Voltas
+race_lap_completed: "&7Volta &f{lap}&7/&f{total} &acompleta!"
+race_lap_fastest: "&6⚡ Volta mais rápida: &e{time}"
+race_lap_personal_best: "&a★ Melhor volta pessoal!"
+
+# Corrida - Pit Stops
+race_pit_required: "&cPrecisas completar mais &e{pits} &cpit stop(s)!"
+race_pit_completed: "&a✓ Pit stop completo! ({current}/{total})"
+race_pit_click_items: "&eClica em todos os itens coloridos!"
+race_pit_wrong_click: "&cErrado! Itens baralhados!"
+
+# Corrida - Finalização
+race_finish_position: "&a✓ Terminaste na posição: &e#{position}"
+race_finish_time: "&7Tempo total: &f{time}"
+race_finish_disqualified: "&c✗ Desqualificado! Pit stops em falta: {missing}"
+
+# Corrida - Qualificação
+race_quali_starting: "&6A iniciar qualificação..."
+race_quali_grid_set: "&aPosições na grelha definidas pela qualificação!"
+race_quali_best_time: "&6Melhor tempo: &e{time} &7(P{position})"
+
+# Corrida - Espectador
+race_spectator_joined: "&a✓ Estás a assistir: &e{event}"
+race_spectator_left: "&7Paraste de assistir."
+race_spectator_following: "&a✓ A seguir &e{driver}"
+race_spectator_stopped_following: "&7Paraste de seguir o piloto."
+race_spectator_driver_left: "&7O piloto que estavas a seguir saiu."
+
+# Corrida - Erros
+race_track_not_configured: "&cPista &e{track} &cnão está configurada para corridas!"
+race_no_grid_positions: "&cNenhuma posição de grelha configurada para esta pista!"
+race_no_pit_lanes: "&cNenhum pit lane configurado para esta pista!"
+race_no_spectator_areas: "&cNenhuma área de espectador configurada para esta pista!"
+
+# Quick Race
+quickrace_already_active: "&c✗ Já existe uma Quick Race ativa na pista &e{track}&c!"
+quickrace_end_instruction: "&7Usa &f/race end &7para finalizar a corrida atual."
+quickrace_create_error: "&c✗ Erro ao criar Quick Race!"
+quickrace_round_error: "&c✗ Erro ao obter round da Quick Race!"
+quickrace_heat_error: "&c✗ Erro ao obter heat da Quick Race!"
+quickrace_none_active: "&c✗ Nenhuma Quick Race ativa no momento!"
+quickrace_already_started: "&c✗ A corrida já começou ou não está pronta!"
+quickrace_already_in: "&e⚠ Já estás nesta corrida!"
+quickrace_full: "&c✗ A corrida está cheia! (&e{max} &cpilotos)"
+quickrace_joined: "&a✓ Entraste na Quick Race!"
+quickrace_info_track: "&7Pista: &f{track}"
+quickrace_info_laps_pits: "&7Voltas: &f{laps} | Pits: &f{pits}"
+quickrace_info_drivers: "&7Pilotos: &f{current}/{max}"
+quickrace_join_error: "&c✗ Erro ao entrar na corrida!"
+quickrace_not_in: "&e⚠ Não estás nesta corrida!"
+quickrace_left_dnf: "&e⚠ Saíste da corrida e foste desqualificado."
+quickrace_left: "&e⚠ Saíste da Quick Race!"
+quickrace_not_enough_drivers: "&c✗ Não há pilotos suficientes! (mínimo 1)"
+quickrace_start_error: "&c✗ Erro ao iniciar a corrida!"
+quickrace_finished: "&a✓ Quick Race finalizada!"
+
+# Anúncios de Evento
+event_broadcast_finish: "&6🏁 &e{player} &fchegou em &b{pos}º &fcom o tempo &e{time}"
+event_broadcast_dnf: "&c🏁 &e{player} &fdesclassificado: &7{reason}"
+event_broadcast_fastest_lap: "&6⚡ &e{player} &ffez a volta mais rápida: &e{time}"
+event_broadcast_pit_entry: "&e🛠 &fO piloto &e{player} &fentrou nas boxes."
+event_broadcast_pit_exit: "&a🛠 &fO piloto &e{player} &fsaiu das boxes."
+event_broadcast_pit_stop: "&e🛠 &fO piloto &e{player} &fcompletou o pit stop &e#{pits} &f(&e{time}s&f)"
+event_broadcast_started: "&a🏎 &fO evento &e{event} &fcomeçou!"
+event_broadcast_finished: "&a🏁 &eO evento &f{event} &efoi finalizado!"
+event_intermission_next_round: "&7O próximo round iniciará em &e{time} segundos&7..."
+event_broadcast_admin_finish: "&e⚠ A corrida foi finalizada pelo administrador!"
+event_broadcast_race_starting: "&a✓ A corrida está a começar!"
+event_broadcast_quali_results_header: "&6📊 &fResultados da Qualificação:"
+event_broadcast_quali_result_line: "&7P{pos}: &e{player} &f- &b{time}"
+event_broadcast_driver_joined: "&a✓ &e{player} &fentrou na corrida! &7({current}/{max})"
+event_broadcast_driver_left: "&e⚠ &e{player} &fsaiu da corrida. &7({current}/{max})"
+event_finish_title: "&6🏁 FINALIZADO!"
+event_finish_subtitle: "&ePosição: &f{pos}º"
+event_dnf_title: "&c🏁 DESCLASSIFICADO!"
+event_dnf_subtitle: "&7Não finalizaste a corrida"
+event_fastest_lap_title: "&d⚡ VOLTA MAIS RÁPIDA!"
+event_fastest_lap_subtitle: "&fTempo: &e{time}"
+
+# ==========================================
+# Mensagens de Duelo (Adicionais)
+# ==========================================
+duel_usage: "&cUsa: /duel <jogador> ou /duel sair"
+duel_player_not_found_offline: "&cJogador inválido ou offline."
+duel_challenge_self: "&cNão podes desafiar-te a ti mesmo."
+duel_accept_usage: "&cUsa: /duel accept <nome>"
+duel_deny: "&cConvite recusado."
+duel_quit_confirm: "&7Saíste do duelo."
+duel_not_in_duel: "&cNão estás num duelo ativo."
+duel_challenger_offline: "&c&lERRO &8» &7O desafiante &f{player} &7está offline."
+duel_no_invite: "&c&lERRO &8» &7Não tens convites pendentes de &f{player}&7."
+duel_already_in_duel: "&cJá estás num duelo!"
+duel_opponent_busy: "&cO desafiante já entrou noutro duelo!"
+duel_invalid_track: "&cErro: Pista inválida."
+duel_invite_sent: "&a&lDUELO &8» &fConvite enviado para &e{player}&f!"
+duel_invite_received_header: "&e{player} &7desafiou-te para um duelo!"
+duel_invite_details: "&fPista: &b{track} &8| &fVoltas: &b{laps}"
+duel_invite_expired_target: "&c&lDUELO &8» &7O convite de &f{player} &7expirou."
+duel_invite_expired_sender: "&c&lDUELO &8» &7O teu convite para &f{player} &7expirou."
+duel_gui_setup: "&8Configurar Duelo"
+duel_gui_tracks: "&8Selecionar Pista"
+duel_search_start: "&e&lPESQUISA &8» &fEscreve o nome da pista no chat."
+duel_search_cancelled: "&cBusca cancelada."
+duel_track_selected: "&aPista selecionada: &f{track}"
+duel_invite_accept: "&a&l[ACEITAR CONVITE]"
+duel_invite_deny: "&c&l[RECUSAR]"
+duel_invite_expires: "&8(Este convite expira em 60 segundos)"
+
+# ==========================================
+# Mensagens do Track Editor
+# ==========================================
+te_help_header: "&6&l========== Ajuda: /trackedit (te) =========="
+te_help_create: "&e/te create <nome> &7- Cria uma nova pista"
+te_help_select: "&e/te select <pista> &7- Seleciona uma pista para edição"
+te_help_view: "&e/te view [pista] &7- Teleporta, seleciona e visualiza a pista"
+te_help_info: "&e/te info [pista] &7- Mostra informações da pista"
+te_help_region: "&e/te region <start|end> &7- Define regiões (usa WorldEdit)"
+te_help_pitstop: "&e/te pitstop <addentry|addexit|remove|info|edit> &7- Configura Pit Stop"
+te_help_pitlane: "&e/te pitlane <add|remove|info> &7- Configura Pit Lanes"
+te_help_grid: "&e/te grid <set|remove|list> &7- Configura Grelha de largada"
+te_help_spawn: "&e/te spawn set &7- Define o ponto de spawn da pista"
+te_help_more: "&7Para mais comandos, usa as sugestões do tab (autocomplete)."
+te_track_name_length: "&cO nome da pista não pode ter mais que 30 caracteres."
+te_track_exists: "&cJá existe uma pista com esse nome."
+te_created: "&aPista '{track}' criada com sucesso com o ícone: &e{icon}"
+te_create_error: "&cErro ao criar a pista. Vê a consola para mais detalhes."
+te_selected: "&aPista selecionada: &f{track}"
+te_teleported: "&a✓ Teleportado para o spawn da pista: &f{track}"
+te_view_enabled: "&a✓ Pista &f{track} &adefinida como selecionada."
+te_deleted: "&aPista '{track}' eliminada com sucesso."
+te_owner_set: "&a✅ Dono da pista &f{track} &aatualizado para: &f{owner}"
+te_cam_added: "&aCâmara adicionada com ID &f{id} &ana pista &f{track}"
+te_cam_removed: "&cCâmara de ID &f{id} &cremovida!"
+te_cam_list: "&eCâmeras da pista &f{track}: &a{ids}"
+te_time_ticks: "&eComando de tempo (ticks) recebido para &f{track}&e: &f{ticks}"
+te_times_reset: "&aTodos os tempos da pista &f{track} &aforam reiniciados."
+te_region_start_saved: "&aRegião START guardada com sucesso! ID: {id}"
+te_region_end_saved: "&aRegião END guardada com sucesso! ID: {id}"
+te_region_error: "&cErro ao guardar a região {type}."
+te_no_selection: "&cPrecisas de fazer uma seleção com o WorldEdit."
+te_spawn_saved: "&aSpawn guardado com sucesso!"
+te_checkpoint_added: "&aCheckpoint {id} adicionado na pista &e{track}"
+te_checkpoint_removed: "&cCheckpoint {id} removido da pista &e{track}"
+te_checkpoint_error: "&cErro ao adicionar/remover o checkpoint {id}"
+te_icon_updated: "&aÍcone da pista '{track}' atualizado para: &e{icon}"
+te_track_opened: "&ePista {track} aberta com sucesso."
+te_track_closed: "&ePista {track} fechada com sucesso."
+te_track_already_open: "&cA pista {track} já está aberta."
+te_track_already_closed: "&cA pista {track} já está fechada."
+te_pitstop_none: "&cNão há pit stop region configurada para {track}"
+te_pitstop_configured: "&aPit Stop Region para {track} está configurada."
+te_pitstop_entry_set: "&aPit Entry definida para {track}"
+te_pitstop_exit_set: "&aPit Exit definida para {track}"
+te_pitstop_removed: "&aPit Stop removido de {track}"
+te_pitstop_none_remove: "&cNão havia pit stop para remover."
+te_pitstop_list: "&aPit stops carregados ({count}): &7{tracks}"
+te_pitstop_empty_list: "&cNenhum pit stop carregado."
+
+# ==========================================
+# Mensagens de Evento (Adicionais)
+# ==========================================
+event_none_selected: "&c✗ Nenhum evento selecionado!"
+event_none_selected_hint: "&eNenhum evento selecionado. Usa /event info <nome> para ver detalhes."
+event_list_header: "&6&l  EVENTOS ATIVOS"
+event_list_empty: "&7  Nenhum evento ativo no momento."
+event_selected: "&a✓ Selecionado: &f{event}"
+event_full_created: "&a✓ Evento completo criado com sucesso: &6{event}"
+event_full_error: "&c✗ Erro ao criar evento completo. Verifica a pista e o nome."
+event_delete_error: "&c✗ Erro ao remover evento."
+event_start_error: "&c✗ Falha ao iniciar evento."
+event_finish_error: "&c✗ Falha ao finalizar evento."
+event_already_subscribed: "&eJá estás inscrito neste evento!"
+event_sign_closed: "&c✗ Inscrições fechadas para este evento!"
+event_already_finished: "&c✗ Este evento já foi finalizado!"
+event_moved_from_reserve: "&7➜ Foste movido de &eReserva &7para &aInscrito"
+event_signed: "&a✓ Inscrição confirmada!"
+event_sign_error: "&c✗ Não foi possível inscrever no evento!"
+event_reserve_left: "&e⚠ Saíste da reserva do evento: &f{event}"
+event_reserve_joined: "&a✓ Inscreveste-te como reserva no evento: &6{event}"
+event_reserve_error: "&c✗ Não foi possível inscrever como reserva."
+event_spectator_joined: "&a✓ És agora espectador do evento: &6{event}"
+event_spectator_error: "&c✗ Não foi possível entrar como espectador."
+event_left: "&a✓ Saíste do evento: &6{event}"
+event_not_in_event: "&c✗ Não estás em nenhum evento ativo."
+event_track_set: "&a✓ Pista do evento atualizada para: &6{track}"
+event_usage_settrack: "&c✗ Usa: /event settrack [evento] <pista>"
+event_signs_open: "&a✓ Inscrições ABERTAS para {event}"
+event_signs_closed: "&a✓ Inscrições FECHADAS para {event}"
+event_broadcast_sent: "&a✓ Mensagem de inscrição enviada para {count} jogador(es)"
+event_broadcast_open_title: "&e  🏁 &6&lINSCRIÇÕES ABERTAS!"
+event_broadcast_click: "&aClica para te inscreveres no evento &f{event}"
+event_click_sign: "CLICA AQUI PARA TE INSCREVERES"
+event_info_subscribers: "{count} inscritos"
+event_info_reserves: "(+{count} reservas)"
+event_info_track_undefined: "A definir"
+event_info_track_none: "Não definida"
+event_started: "&a✓ Evento iniciado com sucesso!"
+event_finished: "&a✓ Evento finalizado com sucesso!"
+
+# ==========================================
+# Mensagens de Espectador (SpectatorManager)
+# ==========================================
+spectator_watching: "&a✓ Agora estás a assistir à corrida!"
+spectator_help_follow: "&7Usa &f/spectate follow <piloto> &7para seguir um piloto"
+spectator_help_leave: "&7Usa &f/spectate leave &7para sair do modo espectador"
+spectator_time_watched: "&7Assististe à corrida por &f{time}"
+spectator_title_mode: "&6&lMODO ESPECTADOR"
+spectator_subtitle_mode: "&7Assiste à corrida"
+spectator_driver_not_found: "&c✗ Piloto não encontrado ou offline!"
+spectator_driver_not_racing: "&c✗ Esse jogador não está a participar na corrida!"
+spectator_following: "&a✓ Agora estás a seguir &e{driver}"
+spectator_help_unfollow: "&7Usa &f/spectate unfollow &7para parar de seguir"
+spectator_unfollowed: "&7Paraste de seguir o piloto"
+spectator_target_left: "&7O piloto que estavas a seguir saiu"
+
+# ==========================================
+# Mensagens de Votação (RaceVoteManager)
+# ==========================================
+vote_proposal_active_error: "&c✗ Já existe uma proposta ativa!"
+vote_quickrace_active_error: "&c✗ Já existe uma Quick Race ativa!"
+vote_wait_finish: "&7Aguarda que a corrida atual termine"
+vote_track_not_found: "&c✗ Pista não encontrada: {track}"
+vote_none_active_error: "&c✗ Não há proposta ativa no momento!"
+vote_none_active_hint: "&7Usa /race propose <pista> para criar uma proposta"
+vote_cancel_error_none: "&e⚠ Não há proposta ativa no momento!"
+vote_cancel_error_perm: "&c✗ Não podes cancelar esta proposta!"
+vote_cancelled: "&c✗ Proposta de corrida cancelada por {player}"
+vote_help_propose: "&7Sugere uma corrida com: &f/race propose <pista> [voltas] [pits]"
+vote_expired: "&c✗ Esta proposta expirou!"
+vote_already_voted: "&e⚠ Já votaste nesta proposta!"
+vote_registered: "&a✓ Voto registado!"
+vote_cant_remove_self: "&c✗ Não podes remover o teu voto da própria proposta!"
+vote_not_voted: "&e⚠ Não votaste nesta proposta!"
+vote_removed: "&e⚠ Voto removido!"
+vote_approved: "   ✓ PROPOSTA APROVADA! ✓"
+vote_creating: "&eA criar Quick Race..."
+
+# ==========================================
+# Mensagens de Listeners (Region, Checkpoint, PitStop)
+# ==========================================
+region_tt_disabled: "&c&lAVISO &8» &7O teu &bTime Trial &7está desativado!"
+region_tt_enable_hint: "&7Usa &f/settings timetrial true &7para ativar e começar a contar o teu tempo."
+race_session_ended: "&c&l⏱ SESSÃO ENCERRADA! &fA tua volta foi registada."
+race_laps_complete: "&a&l🏁 SESSÃO COMPLETA! &fVocê completou todas as voltas."
+race_pitstops_remaining: "&6⚠ &7Pit stops obrigatórios restantes: &e{count}"
+race_pitstops_complete: "&a✓ &7Todos os pit stops completados!"
+race_waiting_start: "&c&l⚠ &eAguardando largada..."
+race_countdown_prepare: "&c&l⚠ PREPARAR PARA LARGADA!"
+race_countdown_go: "&a&l✓ LARGADA! BOA CORRIDA!"
+quali_countdown_prepare: "&b&l⏱ PREPARAR PARA QUALIFICATÓRIA!"
+quali_countdown_go: "&b&l⏱ QUALIFICATÓRIA COMEÇOU! BOA SORTE!"
+race_title_prepare_sub: "&7Preparar..."
+race_title_go: "&a&l✓ GO! GO! GO!"
+quali_title_go: "&b&l⏱ BOA SORTE!"
+quali_subtitle_go: "&7Faz a tua melhor volta!"
+protection_click_to_leave: "&e&l► CLIQUE AQUI"
+protection_click_to_leave: "&e&l► CLICA AQUI"
+protection_leave_suffix: "&e para sair da corrida"
+protection_hover_leave: "Clica para usar {command}"
+
+# ==========================================
+# Mensagens de GUI e Itens (MainMenu, Settings)
+# ==========================================
+gui_title_main_menu: "&8Menu Principal"
+gui_main_qr_running_name: "&cQuick Race (Em Andamento)"
+gui_main_qr_running_lore:
+  - "&7Uma corrida está a decorrer agora."
+  - "&eClica para tentar assistir ou entrar."
+gui_main_qr_lobby_name: "&aQuick Race (Lobby Aberto)"
+gui_main_qr_lobby_lore:
+  - "&7Uma corrida está a aguardar jogadores."
+  - "&eClica para entrar!"
+gui_main_qr_voting_name: "&eQuick Race (Votação)"
+gui_main_qr_voting_lore:
+  - "&7Uma votação está em curso."
+  - "&eClica para votar!"
+gui_main_qr_none_name: "&bQuick Race"
+gui_main_qr_none_lore:
+  - "&7Nenhuma corrida ativa."
+  - "&eClica para iniciar uma nova corrida."
+gui_main_tt_name: "&eTime Trial"
+gui_main_tt_lore_header: "&7Menu de pistas."
+gui_main_tt_lore_count: "&7Pistas disponíveis: &f{count}"
+gui_main_tt_lore_action: "&eClica para ver as pistas."
+gui_main_duels_name: "&cDuelos"
+gui_main_duels_lore: "&7Desafia outros jogadores para x1."
+gui_main_settings_name: "&7Configurações"
+gui_main_settings_lore: "&7Ajusta as tuas preferências."
+gui_title_settings: "&8Configurações"
+gui_settings_lang_name: "&eIdioma / Language"
+gui_settings_lang_lore: "&7Alterar idioma / Change language."
+gui_settings_tt_name: "&bTime Trials"
+gui_settings_status_on: "&aATIVADO"
+gui_settings_status_off: "&cDESATIVADO"
+gui_settings_tt_toggled: "&aTime Trials {state}."
+gui_settings_status_enabled: "ativados"
+gui_settings_status_disabled: "desativados"
+gui_settings_sounds_name: "&6Sons (Em breve)"
+gui_settings_sounds_lore: "&7Ativar/Desativar efeitos sonoros."
+gui_settings_sounds_wip: "&cConfiguração de sons ainda em desenvolvimento."
+gui_settings_back_name: "&cVoltar"
+gui_settings_back_lore: "&7Voltar ao menu principal."
+gui_title_quick_race: "&8Configurar Quick Race"
+gui_qr_track_name: "&b&lPista"
+gui_qr_track_lore_selected: "&7Selecionada: &f{track}"
+gui_qr_track_lore_click: "&eClica para alterar"
+gui_qr_laps_name: "&f&lVoltas"
+gui_qr_laps_lore_current: "&7Atual: &f{count}"
+gui_qr_laps_lore_left: "&7Botão Esq: &a+1"
+gui_qr_laps_lore_right: "&7Botão Dir: &c-1"
+gui_qr_pits_name: "&6&lPits Obrigatórios"
+gui_qr_pits_lore_current: "&7Atual: &f{count}"
+gui_qr_pits_lore_note: "&cNota: Deve ser menor que as voltas!"
+gui_qr_pits_error_laps: "&cO número de pits deve ser menor que o número de voltas."
+gui_qr_start_name: "&a&lINICIAR CORRIDA"
+gui_qr_start_lore_track: "&7Pista: &f{track}"
+gui_qr_start_lore_laps: "&7Voltas: &f{laps}"
+gui_qr_start_lore_pits: "&7Pits: &f{pits}"
+gui_qr_start_lore_action: "&eClica para propor a corrida!"
+gui_qr_start_error_track: "&cSeleciona uma pista primeiro!"
+gui_close_name: "&cFechar"
+gui_title_duel_select: "&8Seleciona um oponente"
+gui_duel_none_online_name: "&cNinguém online"
+gui_duel_none_online_lore: "&7Não há outros jogadores online para duelar."
+gui_duel_player_lore: "&7Clica para desafiar."
+gui_title_track_selector: "&8Seleciona uma Pista"
+gui_track_lore_select: "&7Clica para selecionar."
+gui_pit_editor_title: "&8Pit Stop: {track}"
+gui_pit_editor_size_name: "&eTamanho Inventário: &f{size}"
+gui_pit_editor_size_desc: "&7Tamanho do GUI do minigame."
+gui_pit_editor_size_action: "&eClica para alternar (27, 36, 45, 54)"
+gui_pit_editor_min_targets_name: "&eMin Alvos: &f{value}"
+gui_pit_editor_target_desc: "&7Itens para clicar."
+gui_pit_editor_target_action: "&eEsquerdo: +1 | Direito: -1"
+gui_pit_editor_max_targets_name: "&eMax Alvos: &f{value}"
+gui_pit_editor_shuffle_name: "&eBaralhar no Erro: {status}"
+gui_pit_editor_shuffle_desc: "&7Muda itens de lugar ao errar."
+gui_pit_editor_shuffle_action: "&eClica para alternar"
+gui_pit_editor_wrong_item_name: "&cItem Errado (Atual)"
+gui_pit_editor_wrong_item_lore:
+  - "&7Este é o item que o jogador NÃO deve clicar."
+  - ""
+  - "&eClica para definir o item da tua mão"
+  - "&ecomo o novo item errado."
+gui_pit_editor_add_target_name: "&aAdicionar Alvo (Da Mão)"
+gui_pit_editor_add_target_lore:
+  - "&7Adiciona o item da tua mão"
+  - "&7à lista de itens alvo."
+  - ""
+  - "&eClica para adicionar"
+gui_pit_editor_remove_target_lore: "&cClica para REMOVER este item"
+gui_pit_editor_error_hold_item: "&cSegura um item na mão para definir!"
+gui_pit_editor_error_duplicate: "&cEste item já está na lista de alvos!"
+gui_pit_editor_status_on: "&aLigado"
+gui_pit_editor_status_off: "&cDesligado"
+race_teleport_stand: "&7&o[Foste teleportado para a bancada]"
+race_title_stand: "&7Bancada"
+race_teleport_spawn: "&7&o[Foste teleportado para o spawn da pista]"
+race_no_spectator_area: "&e⚠ Nenhuma área de espectador configurada para esta pista."
+pit_entering: "&e⚠ A entrar no pit stop..."
+pit_completed: "&a✓ Pit stop completado!"
+pit_invalid_entry: "&c✗ Pit stop inválido! Não passaste pela entrada."
+pit_invalid_game: "&c✗ Pit stop inválido! Não completaste o minigame."
+pitlane_entering: "&e⚠ A entrar no pit lane! Prepara-te para o minigame..."
+pit_action_blocked: "&c✗ Ação não permitida no pit stop!"
+pit_shift_blocked: "&c✗ Shift-click não permitido!"
+
+# Time Trial Command
+tt_error_duel_active: "&c&lERRO &8» &7Você não pode iniciar um Time Trial enquanto estiver em um &b&lDUELO &7ativo!"
+tt_error_finish_current: "&7Termine a sua corrida atual primeiro."
+tt_track_not_found: "&cPista não encontrada: {track}"
+tt_track_no_spawn: "&cA pista selecionada não tem spawn definido."
+tt_auto_enabled: "&a&lINFO &8» &7O seu &bTime Trial &7foi ativado automaticamente."
+tt_cancelled: "&aO seu time trial foi cancelado com sucesso."
+tt_error_quickrace: "&c&lERRO &8» &7Você não pode iniciar um Time Trial durante uma &bQuick Race&7."
+tt_error_event: "&c&lERRO &8» &7Você não pode iniciar um Time Trial durante um &bEvento&7."
+tt_no_tracks_avail: "&cNão há pistas disponíveis no momento."
+tt_no_tracks_compatible: "&cNão há pistas compatíveis disponíveis para si no momento."
+tt_error_reset_quickrace: "&c&lERRO &8» &7Você não pode usar &f/reset &7durante uma &bQuick Race&7."
+tt_error_reset_mode: "&c&lERRO &8» &7O comando &f/reset &7só pode ser usado em &bTreino Livre &7ou &bTime Trial&7."
+tt_error_reset_duel: "&c&lERRO &8» &7O comando &f/reset &7não pode ser usado durante um &b&lDUELO&7."
+tt_error_no_session: "&cVocê não está em nenhuma sessão ativa ou Time Trial."
+tt_error_spawn_not_found: "&cNão foi possível encontrar o ponto de spawn da pista: &e{track}"
+tt_save_partial: "&aO seu tempo parcial até ao checkpoint &e{count} &afoi salvo: &e{time}"
+
+# Race Command
+race_create_laps_invalid: "&cNúmero de voltas inválido! Use no mínimo 1."
+race_create_laps_max: "&cNúmero de voltas muito alto! Máximo: 100."
+race_create_pits_invalid: "&cNúmero de pits inválido! Use 0 ou mais."
+race_create_pits_max: "&cNúmero de pits deve ser menor que o número de voltas!"
+race_created_success: "&a✓ Quick Race criada com sucesso!"
+race_created_track: "&7Pista: &f{track}"
+race_created_config: "&7Voltas: &f{laps} &7| Pits: &f{pits}"
+race_created_waiting: "&7Aguardando pilotos..."
+race_created_hint: "&eUse &f/race start &epara iniciar a corrida"
+race_propose_disabled: "&c✗ Sistema de propostas não está disponível!"
+race_propose_success: "&a✓ Proposta criada com sucesso!"
+race_propose_hint: "&7Outros jogadores agora podem votar com /race vote"
+race_join_msg: "{player} entrou na quick race ({count} pilotos)"
+race_leave_error: "&c✗ Você não está em nenhuma corrida ou evento!"
+race_info_none: "&e⚠ Nenhuma Quick Race ativa no momento!"
+race_info_hint: "&7Use /race create <pista> para criar uma."
+race_info_header: "      🏁 QUICK RACE INFO 🏁"
+race_info_pilots: "&ePilotos na corrida:"
+race_info_status_finished: "&a✓ FINALIZADO"
+race_info_status_dnf: "&c✗ DNF"
+race_info_status_racing: "&7Correndo"
+race_info_more_pilots: "&7  ... e mais {count} pilotos"
+race_help_header: "      COMANDOS /RACE"
+race_help_admin: "═══ ADMIN ═══"
+
+# Pit Stop Minigame
+pit_minigame_title: "&c&lPIT STOP! &7Clique nos itens!"
+pit_item_click_name: "&c&l✦ CLIQUE AQUI!"
+pit_item_click_lore1: "&7Clique rápido para completar"
+pit_item_click_lore2: "&7o pit stop mais rápido!"
+pit_error_longer: "&c✗ Ops! O pit ficou mais demorado..."
+pit_complete_msg: "&a✓ Pit stop completado em &f{time} segundos&a! &7(Precisão &f{accuracy}%&7, Misclicks &f{misclicks}&7)"
+pit_cancel_msg: "&c✗ Pit stop cancelado - você saiu do pit lane!"
+
+# Daily Race Manager
+daily_msg_header: "🏁 Daily Race em andamento!"
+daily_msg_phase: "&7Fase atual: &f{phase}"
+daily_sign_click: "► CLIQUE AQUI para se inscrever"
+daily_sign_hover: "Clique para se inscrever no evento {event}"
+daily_qual_header: "🏁 Qualificatória da Daily Race em andamento!"
+daily_race_header: "🏁 Corrida da Daily Race em andamento!"
+daily_start_header: "🏁 Daily Race do dia começou!"
+daily_start_practice: "&7Free Practice: &f{time} min"
+event_formal_header: "🏆 Evento Formal: &f{event}"
+event_formal_phase: "&7Fase: &f{phase}"
+event_watch_click: "► CLIQUE AQUI para assistir"
+event_watch_hover: "Clique para assistir ao evento {event}"
+
+daily_signup_success: "&a✓ Inscrição confirmada na Daily Race!"
 daily_signup_event: "&7Evento: &f{event}"
 daily_signup_track: "&7Pista: &f{track}"
-daily_signup_leave_hint: "&7Para sair do evento, usa &f/event leave"
-daily_signup_wait: "&eAguarda o inicio da proxima fase."
-daily_signup_error: "&cNao foi possivel concluir a tua inscricao."
-daily_teleport_practice: "&aFoste teleportado para o treino livre."
+daily_signup_leave_hint: "&ePara sair a qualquer momento, digite &f/race leave"
+daily_signup_wait: "&eAguarde o início do treino livre para ser teleportado!"
+daily_signup_error: "&c✗ Não foi possível se inscrever na Daily Race!"
+daily_teleport_practice: "&aTeleportado para o Treino Livre!"
 
-daily_msg_header: "&6Corrida diaria ativa"
+
+
+# Admin & Visuals & Pit Phase 3
+admin_reload_start: "§e§l[FormulaRacing] §7Recarregando configurações..."
+admin_debug_reloaded: "§a✓ Sistema de debug recarregado"
+admin_daily_reloaded: "§a✓ Daily Race recarregada"
+admin_debug_active: "§e[FormulaRacing Debug] §7Sistema de debug ativo."
+visual_disabled: "§c✗ Visualização da pista §f%s §cdesativada."
+visual_enabled: "§a✓ Visualização da pista §f%s §aativada!"
+visual_showing: "§7Mostrando: §aSTART§7, §cEND§7, §6Checkpoints§7, §bPitStops§7, §fGrid§7 e §dSpawn§7."
+visual_region_start: "§l§aSTART"
+visual_region_end: "§l§cEND"
+visual_region_checkpoint: "§6§lCHECKPOINT #%s"
+visual_region_pit_entry: "§9§lPIT ENTRY"
+visual_region_pit_exit: "§b§lPIT EXIT"
+visual_region_pit_lane: "§3§lPIT LANE #%s"
+visual_actionbar_in: "§7Você está em: %s"
+visual_actionbar_none: "§8(Nenhuma região detectada)"
+pit_go_msg: "§a§lVAI! VAI! VAI! §7(Dirija até a saída)"
+pit_error_active: "§cVocê já está em um minigame de pit stop!"
+pit_error_no_track: "§e⚠ §7Nenhuma pista detectada nesta localização."
+pit_using_default: "§7Usando configuração §fDEFAULT§7."
+pit_check_tip: "§7(Use §f/te pitstop check§7 para verificar a região ou §f/pit <pista>§7 para forçar)"
+duel_countdown_go: "§a§lVAI!"
+duel_lap_first_title: "§e§lVOLTA 1"
+
+# ==========================================
+# Mensagens de Sess�o e Broadcast (Adicionais)
+# ==========================================
+quickrace_timer_status: '&eIniciando em {time}s...'
+event_broadcast_standings_header: '&6 &fClassificação Final:'
+event_broadcast_standings_line: '&7#{pos} &e{player} &f- &b{info}'
+event_broadcast_standings_footer: '&8&m-------------------------'
+event_broadcast_heat_complete: '&a Heat completado!'
+event_broadcast_session_warning: '&c A sessão termina em {time} segundos!'
+event_broadcast_session_expired_lap: '&c Tempo esgotado! Termine a sua volta atual!'
+event_broadcast_session_expired: '&c Sessão encerrada!'
+event_broadcast_session_cancelled: '&c Sessão cancelada!'
+event_session_cancelled_title: '&cCANCELADO'
+event_session_cancelled_subtitle: '&7A sessão foi cancelada.'
+event_broadcast_pit_penalty: '&c {player} recebeu penalização por pit stops pendentes: {missing}'
+event_session_expired_title: '&cTEMPO ESGOTADO'
+event_session_expired_subtitle: '&7Termine a sua volta!'
+
+
+# ==========================================
+# Quick Race & Scoreboard Fixes
+# ==========================================
+quickrace_broadcast_active: '&a QUICK RACE ATIVA!'
+quickrace_broadcast_track: 'Pista: '
+quickrace_broadcast_laps_pits: 'Voltas: {laps} | Pits: {pits}'
+quickrace_broadcast_drivers: 'Pilotos: {current}/{max}'
+quickrace_broadcast_click: '[  CLIQUE PARA ENTRAR ]'
+quickrace_broadcast_click_hover: '&aClique para entrar na Quick Race!&n&7Comando: &f/race join'
+quickrace_leave_hint: '&ePara sair a qualquer momento, digite &f/race leave'
+
+scoreboard_title_practice: '&d&l TREINO LIVRE'
+scoreboard_title_qualifying: '&b&l QUALIFICATÓRIA'
+scoreboard_title_waiting: '&6&l AGUARDANDO'
+scoreboard_title_starting: '&6&l COMEÇANDO'
+scoreboard_title_race: '&c&l CORRIDA'
+scoreboard_title_finished: '&a&l FINALIZADO'
+scoreboard_state_preparing: 'Preparando'
+scoreboard_label_track: '&7Pista: &f{track}'
+scoreboard_label_laps: '&7Voltas: &f{laps}'
+scoreboard_label_pits: '&7Pits: &f{pits}'
+scoreboard_label_drivers: '&7Pilotos: &f{drivers}'
+scoreboard_waiting_start: '&eAguardando início...'
+scoreboard_lights_out: '&c&lLIGHTS OUT!'
+scoreboard_label_position_f: '&7Posição: &f#{pos}'
+scoreboard_label_lap_f: '&7Volta: &f{current}/&f{total}'
+scoreboard_header_classification: '&6&lClassificação:'
+scoreboard_header_stats: '&6&lEstatísticas:'
+scoreboard_label_time: '&7Tempo: &f{time}'
+scoreboard_label_best: '&7Melhor: &f{time}'
+scoreboard_status_dnf: '&c&lDNF'
+scoreboard_status_dnf_desc: '&7Não finalizou a corrida'
+scoreboard_header_final: '&ePlacar Final:'
+scoreboard_waiting_times: '&8Aguardando tempos...'
+
+actionbar_preparing: '&e Preparando corrida...'
+actionbar_practice_lap: '&7Volta: &f{lap}'
+actionbar_cross_line: ' &8| &e Cruze a linha!'
+actionbar_qualifying_pos: '&bP{pos}'
+actionbar_grid_pos: '&6 GRID: &fP{pos}'
+actionbar_prepare_start: ' &8| &e&l PREPARAR!'
+actionbar_lights_out_visual: '&c&l &e&l &6&l &e&l &c&l &f LIGHTS OUT!'
+actionbar_finished_title: '&a Finalizado: '
+actionbar_dnf_title: '&c DNF - NÃO FINALIZOU'
+actionbar_race_finished: '&7Corrida finalizada'
+actionbar_info_laps: ' §8| §7Voltas: §f{laps}'
+actionbar_info_pits: ' §8| §7Pits: §f{pits}'
+actionbar_info_best_lap: ' §8| §7MV: §e{time}'
+
+
+scoreboard_label_pits_remaining: '&7Pits: &c{pits} &7restante(s)'
+scoreboard_label_pits_complete: '&7Pits: &a Completo'
+
+
+scoreboard_pit_status_mandatory: '&7Pits: &c{current}/{total} &c Obrigatório!'
+scoreboard_pit_status_remaining_detailed: '&7Pits: &6{current}/{total} &6(falta {missing})'
+scoreboard_pit_status_complete_detailed: '&7Pits: &a {current}/{total} &a(completo)'
+
+
+scoreboard_label_practice_end: '&7Fim do Treino: '
+scoreboard_label_time_remaining: '&7Tempo Restante: '
+scoreboard_status_waiting: 'Aguardando...'
+scoreboard_status_finishing: '&cFINALIZANDO'
+
+scoreboard_title_grid: '&6&lGRELHA DE PARTIDA'
+
+scoreboard_status_dnf_short: 'DNF'
+scoreboard_status_offline: 'Offline'
+scoreboard_status_in_pit: 'No Pit'
+scoreboard_label_interval: 'Intervalo'
+scoreboard_format_pits_short: 'pits'
+
+
+scoreboard_tt_title: '&e&l-TimeTrial-'
+scoreboard_tt_track: '&e&lPista: &f{track}'
+scoreboard_tt_by: '&7Por {creator}'
+scoreboard_tt_leaderboard: "&6Leaderboard:"
+timetrial_new_pb_new_rank: "&a&lNOVO RECORDE PESSOAL! &e(Posição: Nova ➝ #{rank})"
+timetrial_new_pb_improved_rank: "&a&lNOVO RECORDE PESSOAL! &e(Posição: #{old} ➝ #{new})"
+timetrial_new_pb_same_rank: "&a&lNOVO RECORDE PESSOAL! &e(Posição: #{rank})"
+timetrial_incomplete_lap: "&c&l✖ &fVolta incompleta! &7({count}/{total} CPs)"
+scoreboard_tt_you: "&r&lVocê"
+scoreboard_duel_title: '&b&lDUEL &f&lRACING'
+scoreboard_duel_position: '&fPosição: '
+scoreboard_duel_lap: '&fVolta: '
+scoreboard_duel_time: '&fTempo: '
+scoreboard_duel_record: '&fRecorde: '
+scoreboard_duel_time_remaining: '&fTempo Restante: '
+scoreboard_duel_track: '&fPista: '
+
+hotbar_menu_name: '&a&oMenu Principal'
+hotbar_menu_lore:
+  - '&7Clica para abrir o menu.'
+  - ''
+  - '&eClica com o botão direito.'
+hotbar_tracks_name: '&e&oPistas / Time Trial'
+hotbar_tracks_lore:
+  - '&7Clica para selecionar uma pista.'
+  - ''
+  - '&eClica com o botão direito.'
+hotbar_random_name: '&d&oPista Aleatória'
+hotbar_random_lore:
+  - '&7Ir para uma pista aleatória.'
+  - ''
+  - '&eClica com o botão direito.'
+hotbar_visibility_on_name: '&b&oJogadores: &a&oVisíveis'
+hotbar_visibility_on_lore:
+  - '&7Clica para &cOCULTAR &7jogadores.'
+  - ''
+  - '&eClica com o botão direito.'
+hotbar_visibility_off_name: '&b&oJogadores: &c&oOcultos'
+hotbar_visibility_off_lore:
+  - '&7Clica para &aMOSTRAR &7jogadores.'
+  - ''
+  - '&eClica com o botão direito.'
+hotbar_reset_name: '&c&oReset'
+hotbar_reset_lore:
+  - '&7Reiniciar corrida atual.'
+  - ''
+  - '&eClica com o botão direito.'
+hotbar_spawn_name: '&c&oVoltar ao Spawn'
+hotbar_spawn_lore:
+  - '&7Voltar ao lobby.'
+  - ''
+  - '&eClica com o botão direito.'
+hotbar_settings_name: '&7&oDefinições'
+hotbar_settings_lore:
+  - '&7Abrir definições.'
+  - ''
+  - '&eClica com o botão direito.'
+
+lonely_cannot_change_racing: '§c❌ Não podes alterar o Lonely Mode durante uma corrida ou duelo!'
+lonely_invalid_usage: '§cSubcomando inválido. Usa: /lonely <true|false>'
+lonely_enabled: '§a✅ Lonely Mode ativado! §7(Estás invisível para todos)'
+lonely_disabled: '§c❌ Lonely Mode desativado!'
+lonely_obu_tip_header: '§e§l💡 DICA OPENBOATUTILS:'
+lonely_obu_tip_line1: '§7Para ativares o §fGhost Mode §7(ver jogadores sem colisão),'
+lonely_obu_tip_line2: '§7deves §cDESATIVAR §7o Lonely Mode durante'
+lonely_obu_tip_line3: '§7treinos ou qualificatórias.'
+lonely_no_obu_info: '§7ℹ Instala o §bOpenBoatUtils §7para teres acesso ao Ghost Mode!'
+
+cam_usage: '§eUsa: /cam <follow|stop>'
+cam_require_spectator: '§cPrecisas de estar no modo §lEspectador §cpara usares câmaras.'
+cam_player_not_found: '§cJogador não encontrado.'
+cam_stop_success: '§aParaste de seguir.'
+cam_stop_failed: '§cNão estavas a seguir ninguém.'
+
+spectate_usage: '&cUsa: /spectate join <evento>'
+spectate_not_found: '&cEvento não encontrado: {event}'
+spectate_not_running: '&cO evento não está a decorrer!'
+spectate_state_info: '&eEstado atual: {state}'
+spectate_already_driver: '&cEstás a participar nesta corrida!'
+spectate_already_driver_desc: '&eNão é possível ser espectador e piloto ao mesmo tempo.'
+spectate_already_spectator: '&cJá estás no modo espectador!'
+spectate_join_failed: '&cNão foi possível entrar como espectador.'
+spectate_active_header: '&a╔═══════════════════════════════╗'
+spectate_active_title: '&a║ &6&lModo Espectador Ativo!'
+spectate_active_divider: '&a╠═══════════════════════════════╣'
+spectate_active_event: '&a║ &fEvento: &e{event}'
+spectate_active_track: '&a║ &fPista: &e{track}'
+spectate_active_drivers: '&a║ &fPilotos: &e{count}'
+spectate_active_commands_header: '&a║ &7Comandos úteis:'
+spectate_active_command_follow: '&a║ &f/spectate follow <piloto>'
+spectate_active_command_leave: '&a║ &f/spectate leave'
+spectate_active_footer: '&a╚═══════════════════════════════╝'
+spectate_leave_not_spectator: '&cNão estás no modo espectador!'
+spectate_leave_success: '&a✓ Saíste do modo espectador'
+spectate_follow_not_spectator: '&cPrecisas de estar no modo espectador!'
+spectate_follow_join_hint: '&eUsa: /spectate join <evento>'
+spectate_follow_header: '&a╔═══════════════════════════════╗'
+spectate_follow_title: '&a║ &6&lA seguir Piloto!'
+spectate_follow_divider: '&a╠═══════════════════════════════╣'
+spectate_follow_driver: '&a║ &fPiloto: &e{driver}'
+spectate_follow_desc: '&a║ &7A tua câmara seguirá o piloto'
+spectate_follow_stop_hint: '&a║ &7Usa §f/spectate unfollow §7para parares'
+spectate_follow_footer: '&a╚═══════════════════════════════╝'
+spectate_unfollow_not_spectator: '&cNão estás no modo espectador!'
+spectate_unfollow_not_following: '&eNão estavas a seguir ninguém.'
+spectate_unfollow_success: '&a✓ Voltaste para o modo câmara livre'
+spectate_list_no_events: '&eNão há corridas ativas no momento.'
+spectate_list_header: '&a╔═══════════════════════════════╗'
+spectate_list_title: '&a║ &6&lEventos Disponíveis'
+spectate_list_divider: '&a╠═══════════════════════════════╣'
+spectate_list_event_name: '&a║ &e{event}'
+spectate_list_event_track: '&a║   &fPista: &7{track}'
+spectate_list_event_spectators: '&a║   &fEspectadores: &7{count}'
+spectate_list_event_join_hint: '&a║   &7Usa: §f/spectate join {event}'
+spectate_list_footer: '&a╚═══════════════════════════════╝'
+spectate_info_not_spectator: '&eNão estás no modo espectador.'
+spectate_info_list_hint: '&7Usa §f/spectate list §7para veres eventos disponíveis'
+spectate_info_header: '&a╔═══════════════════════════════╗'
+spectate_info_title: '&a║ &6&lModo Espectador'
+spectate_info_divider: '&a╠═══════════════════════════════╣'
+spectate_info_event: '&a║ &fEvento: &e{event}'
+spectate_info_track: '&a║ &fPista: &e{track}'
+spectate_info_mode: '&a║ &fModo: &e{mode}'
+spectate_info_following: '&a║ &fA seguir: &e{player}'
+spectate_info_time: '&a║ &fTempo a assistir: &e{time}'
+spectate_info_footer: '&a╚═══════════════════════════════╝'
+spectate_help_header: '&a╔═══════════════════════════════╗'
+spectate_help_title: '&a║ &6&lComandos de Espectador'
+spectate_help_divider: '&a╠═══════════════════════════════╣'
+spectate_help_join: '&a║ &f/spectate join <evento>'
+spectate_help_join_desc: '&a║ &7  Entra como espectador'
+spectate_help_leave: '&a║ &f/spectate leave'
+spectate_help_leave_desc: '&a║ &7  Sai do modo espectador'
+spectate_help_follow: '&a║ &f/spectate follow <piloto>'
+spectate_help_follow_desc: '&a║ &7  Segue um piloto'
+spectate_help_unfollow: '&a║ &f/spectate unfollow'
+spectate_help_unfollow_desc: '&a║ &7  Para de seguir'
+spectate_help_list: '&a║ &f/spectate list'
+spectate_help_list_desc: '&a║ &7  Lista eventos disponíveis'
+spectate_help_info: '&a║ &f/spectate info'
+spectate_help_info_desc: '&a║ &7  Informações do modo atual'
+spectate_help_footer: '&a╚═══════════════════════════════╝'
+
+# Added missing keys
 daily_msg_track: "&7Pista: &f{track}"
-daily_msg_phase: "&7Fase: &f{phase}"
-daily_sign_click: "&b--> Clica para te inscreveres em &l{event}&r&b <--"
-daily_sign_hover: "&aClica para te inscreveres em {event}"
-daily_qual_header: "&eQualificacao em curso"
-daily_race_header: "&cCorrida final em curso"
-daily_start_header: "&6A corrida diaria comecou!"
-daily_start_practice: "&7Treino livre aberto por &f{time} &7minutos"
-
+event_already_started_quit_error: "&cEvento ja iniciado. Nao e possivel alternar para reserva."
+event_create_error: "&cErro ao criar evento."
+event_click_to_sign: "&b--> Clica para te inscreveres em &l{event}&r&b <--"
+event_click_to_sign_hover: "&aClica para te inscreveres em {event}"
+quickrace_already_creating: "&eUma Quick Race ja esta a ser criada. Aguarda..."
 quickrace_click_to_join: "&b--> Clica para entrar na Quick Race (&f{track}&b) <--"
-quickrace_click_to_join_hover: "&aEntrar na Quick Race\n&7Pista: &f{track}\n&7Voltas: &f{laps}\n&7Pits: &f{pits}\n&7Pilotos: &f{current}&7/&f{max}"
+quickrace_click_to_join_hover: "&aEntrar na Quick Race
+&7Pista: &f{track}
+&7Voltas: &f{laps}
+&7Pits: &f{pits}
+&7Pilotos: &f{current}&7/&f{max}"
+pit_lane_start: "&eEntraste na pit lane."
+scoreboard_common_separator: "&7------------------------"
+scoreboard_common_footer: "&ewolfnetwork.com.br"
+scoreboard_v2_time: "&fTempo: {time}"

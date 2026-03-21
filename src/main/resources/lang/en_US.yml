@@ -20,16 +20,10 @@ timetrial_menu_wr: "&eWorld Record: &f{time}"
 timetrial_menu_position: "&ePosition: &f{position}"
 timetrial_menu_no_time: "(-)"
 timetrial_completed: "&6🏁 &fTime: &b{time}"
-timetrial_new_pb_new_rank: "&aNew PB! You entered the ranking at &e#{rank}&a."
-timetrial_new_pb_improved_rank: "&aNew PB! You improved from &e#{old} &ato &e#{new}&a."
-timetrial_new_pb_same_rank: "&aNew PB! You kept your rank at &e#{rank}&a."
-timetrial_incomplete_lap: "&cIncomplete lap: checkpoints &e{count}&c/&e{total}&c."
 track_not_found: "&cTrack not found with that name."
 track_is_closed: "&cThis track is closed and cannot be used at the moment!"
-does_not_have_boatutils: "&cThis track uses special BoatUtils settings, but you don't have the mod!"
-boatutils_required: "&cUse the BoatUtils Mod to enter this track."
+obu_mandatory_warning: "&c&l⚠ WARNING: &7The track &f{track} &7requires the &bOpenBoatUtils &7mod for full racing conditions. Without it, you may get stuck on elevations!"
 partial_time_saved: "&aPartial time from previous track &e{track} &awas saved: &e{time}"
-tt_save_partial: "&aPartial saved! &7Checkpoints: &f{count} &7| Time: &f{time}"
 timetrial_cancelled: "&cTime trial cancelled."
 
 # Track Commands
@@ -54,16 +48,138 @@ track_world_info: "&bWorld: {world}"
 track_location_not_found: "&cTrack location not found!"
 
 # Duel Messages
+
+# ==========================================
+# Race System Messages
+# ==========================================
+
+# Race - General
+race_event_created: "&a✓ Race event created: &e{event}"
+race_event_deleted: "&a✓ Event deleted: &e{event}"
+race_event_not_found: "&cEvent not found: &e{event}"
+race_event_started: "&a✓ Race started: &e{event}"
+race_event_stopped: "&c✗ Race stopped: &e{event}"
+race_already_in_event: "&cYou are already in an event!"
+race_not_in_event: "&cYou are not in any event!"
+race_event_full: "&cEvent is full!"
+race_event_not_running: "&cEvent is not running!"
+
+# Race - Join/Leave
+race_joined: "&a✓ You joined the event: &e{event}"
+race_left: "&7You left the event."
+race_kicked: "&cYou were kicked from the event &e{event} &cby &f{admin}"
+race_player_kicked: "&a✓ &e{player} &awas kicked from the event"
+
+# Race - States
+race_state_setup: "Setup"
+race_state_loaded: "Loaded"
+race_state_racing: "Racing"
+race_state_finished: "Finished"
+
+# Race - Heat
+race_heat_loading: "&eLoading race..."
+race_heat_loaded: "&aRace loaded! Get ready!"
+race_heat_starting: "&6Starting in {seconds}s..."
+race_heat_started: "&a✓ GO! GO! GO!"
+race_heat_finished: "&a✓ RACE FINISHED!"
+
+# Race - Laps
+race_lap_completed: "&7Lap &f{lap}&7/&f{total} &acompleted!"
+race_lap_fastest: "&6⚡ Fastest lap: &e{time}"
+race_lap_personal_best: "&a★ Personal best lap!"
+
+# Race - Pit Stops
+race_pit_required: "&cYou need to complete &e{pits} &cmore pit stop(s)!"
+race_pit_completed: "&a✓ Pit stop completed! ({current}/{total})"
+race_pit_click_items: "&eClick on all colored items!"
+race_pit_wrong_click: "&cWrong! Items reshuffled!"
+
+# Race - Finish
+race_finish_position: "&a✓ Finished in position: &e#{position}"
+race_finish_time: "&7Total time: &f{time}"
+race_finish_disqualified: "&c✗ Disqualified! Missing pit stops: {missing}"
+
+# Race - Qualification
+race_quali_starting: "&6Qualification starting..."
+race_quali_grid_set: "&aGrid positions set from qualification!"
+race_quali_best_time: "&6Best time: &e{time} &7(P{position})"
+
+# Race - Spectator
+race_spectator_joined: "&a✓ You are now spectating: &e{event}"
+race_spectator_left: "&7You stopped spectating."
+race_spectator_following: "&a✓ Following &e{driver}"
+race_spectator_stopped_following: "&7Stopped following driver."
+race_spectator_driver_left: "&7The driver you were following left."
+
+# Race - Errors
+race_track_not_configured: "&cTrack &e{track} &cis not configured for races!"
+race_no_grid_positions: "&cNo grid positions configured for this track!"
+race_no_pit_lanes: "&cNo pit lanes configured for this track!"
+race_no_spectator_areas: "&cNo spectator areas configured for this track!"
+
+# Quick Race
+quickrace_already_active: "&c✗ There is already an active Quick Race on track &e{track}&c!"
+quickrace_end_instruction: "&7Use &f/race end &7to finish the current race."
+quickrace_create_error: "&c✗ Error creating Quick Race!"
+quickrace_round_error: "&c✗ Error obtaining Quick Race round!"
+quickrace_heat_error: "&c✗ Error obtaining Quick Race heat!"
+quickrace_none_active: "&c✗ No Quick Race active at the moment!"
+quickrace_already_started: "&c✗ The race has already started or is not ready!"
+quickrace_already_in: "&e⚠ You are already in this race!"
+quickrace_full: "&c✗ The race is full! (&e{max} &cdrivers)"
+quickrace_joined: "&a✓ You joined the Quick Race!"
+quickrace_info_track: "&7Track: &f{track}"
+quickrace_info_laps_pits: "&7Laps: &f{laps} | Pits: &f{pits}"
+quickrace_info_drivers: "&7Drivers: &f{current}/{max}"
+quickrace_join_error: "&c✗ Error joining the race!"
+quickrace_not_in: "&e⚠ You are not in this race!"
+quickrace_left_dnf: "&e⚠ You left the race and were disqualified."
+quickrace_left: "&e⚠ You left the Quick Race!"
+quickrace_not_enough_drivers: "&c✗ Not enough drivers! (minimum 1)"
+quickrace_start_error: "&c✗ Error starting the race!"
+quickrace_finished: "&a✓ Quick Race finished!"
+
+# Event Announcements
+event_broadcast_finish: "&6🏁 &e{player} &ffinished in &b{pos} &fwith time &e{time}"
+event_broadcast_dnf: "&c🏁 &e{player} &fdisqualified: &7{reason}"
+event_broadcast_fastest_lap: "&6⚡ &e{player} &fset the fastest lap: &e{time}"
+event_broadcast_pit_entry: "&e🛠 &fDriver &e{player} &fentered the pits."
+event_broadcast_pit_exit: "&a🛠 &fDriver &e{player} &fleft the pits."
+event_broadcast_pit_stop: "&e🛠 &fDriver &e{player} &fcompleted pit stop &e#{pits} &f(&e{time}s&f)"
+event_broadcast_started: "&a🏎 &fEvent &e{event} &fhas started!"
+event_broadcast_finished: "&c🏁 &fEvent &e{event} &fhas finished!"
+event_intermission_next_round: "&7The next round will start in &e{time} seconds&7..."
+event_broadcast_admin_finish: "&e⚠ The race was finished by an administrator!"
+event_broadcast_race_starting: "&a✓ The race is starting!"
+event_broadcast_quali_results_header: "&6📊 &fQualification Results:"
+event_broadcast_quali_result_line: "&7P{pos}: &e{player} &f- &b{time}"
+event_broadcast_driver_joined: "&a✓ &e{player} &fjoined the race! &7({current}/{max})"
+event_broadcast_driver_left: "&e⚠ &e{player} &fleft the race. &7({current}/{max})"
+event_finish_title: "&6🏁 FINISHED!"
+event_finish_subtitle: "&ePosition: &f{pos}"
+event_dnf_title: "&c🏁 DISQUALIFIED!"
+event_dnf_subtitle: "&7You did not finish the race"
+event_fastest_lap_title: "&d⚡ FASTEST LAP!"
+event_fastest_lap_subtitle: "&fTime: &e{time}"
+
+# Duel Messages
 duel_command_blocked: "&c&lDUEL &8» &7This command is blocked during duels!"
-duel_use_quit: "&7Use &f/duel sair &7to abandon the race."
+duel_use_quit: "&7Use &f/duel quit &7to leave the duel."
 duel_cannot_dismount: "&c&lDUEL &8» &7You cannot leave the boat during a duel!"
 duel_cannot_teleport: "&c&lDUEL &8» &7You cannot teleport during a duel!"
+race_command_blocked: "&c&lRACE &8» &7This command is blocked during Quick Races!"
+race_use_quit: "&7Use &f/race leave &7to leave the race."
+race_cannot_dismount: "&c&lRACE &8» &7You cannot leave the boat during a Quick Race!"
+heat_command_blocked: "&c&lEVENT &8» &7This command is blocked during official races!"
+heat_use_quit: "&7Use &f/event leave &7to leave the event."
+heat_cannot_dismount: "&c&lEVENT &8» &7You cannot leave the boat during the official race!"
 duel_position_1st: "1st PLACE"
 duel_position_2nd: "2nd PLACE"
 duel_position_3rd: "3rd PLACE"
 duel_position_nth: "{position}th PLACE"
 duel_pb_label: "PB"
 duel_waiting: "Waiting..."
+duel_waiting_others: "Waiting for other players..."
 duel_time_remaining: "&c&lTIME &8» &7{time} seconds remaining!"
 duel_time_up_title: "&c&lTIME'S UP!"
 duel_time_up_message: "&c&l⏰ TIME'S UP!"
@@ -83,6 +199,13 @@ duel_error_spawn: "&cError loading track spawn."
 duel_error_create: "&cError creating duel. Contact an administrator."
 duel_lonely_enabled: "&d&lLONELY &8» &fGhost mode enabled! Opponents hidden."
 duel_victory_forfeit: "&a&l✦ VICTORY! &fYou won because your opponent quit."
+duel_lap_complete_after_time_limit: "&a&l✓ &fLap {lap} completed!"
+duel_lap_time_after_time_limit: "&e&l⏱ &fTime: &a{time}"
+duel_waiting_others_time_limit: "&c&l⚠ &fTime limit reached - waiting for other players..."
+duel_waiting_others_finish: "&eWaiting for other players to finish..."
+duel_lap_completed_title: "&a&lLAP COMPLETE!"
+duel_lap_completed_subtitle: "&fTime: &e{time}"
+duel_separator_line: "&8&m                                                                  "
 
 # Camera Commands
 cam_started_following: "&aYou started following &e{player} &a(normal mode)."
@@ -120,34 +243,6 @@ reload_error: "&c[FormulaRacing] Error reloading the plugin. Check console."
 # Settings Menu
 settings_menu_title: "&6&lSettings"
 
-# Hotbar
-hotbar_menu_name: "&6&lFormulaRacing Menu"
-hotbar_menu_lore:
-  - "&7Open the main mode menu"
-hotbar_tracks_name: "&b&lTrack Browser"
-hotbar_tracks_lore:
-  - "&7Open available tracks"
-hotbar_random_name: "&d&lRandom Track"
-hotbar_random_lore:
-  - "&7Teleport to a random track"
-hotbar_reset_name: "&c&lReset Run"
-hotbar_reset_lore:
-  - "&7Reset your current run"
-hotbar_spawn_name: "&a&lReturn to Spawn"
-hotbar_spawn_lore:
-  - "&7Go back to spawn"
-hotbar_settings_name: "&e&lSettings"
-hotbar_settings_lore:
-  - "&7Open personal settings"
-hotbar_visibility_off_name: "&7&lLONELY: ON"
-hotbar_visibility_off_lore:
-  - "&7You are hidden from other players"
-  - "&7Click to disable Lonely mode"
-hotbar_visibility_on_name: "&f&lLONELY: OFF"
-hotbar_visibility_on_lore:
-  - "&7You can see and be seen by others"
-  - "&7Click to enable Lonely mode"
-
 # Party Messages
 party_created: "&aParty created!"
 party_disbanded: "&cParty disbanded."
@@ -182,105 +277,644 @@ error_generic: "&cAn error occurred. Please try again."
 error_database: "&cDatabase error. Contact an administrator."
 error_file_not_found: "&cConfiguration file not found."
 
-# Track Visualization (/te view)
-visual_enabled: "&aVisualization enabled for track &e{track}&a."
-visual_disabled: "&cVisualization disabled for track &e{track}&c."
-visual_showing: "&7Showing nearby regions with particles."
-visual_region_start: "&a&lSTART REGION"
-visual_region_end: "&c&lEND REGION"
-visual_region_checkpoint: "&6&lCHECKPOINT #{id}"
-visual_region_pit_entry: "&9&lPIT ENTRY"
-visual_region_pit_exit: "&b&lPIT EXIT"
-visual_actionbar_in: "&7You are in: {region}"
-visual_actionbar_none: "&7No region detected"
+# ==========================================
+# Duel Messages (Additional)
+# ==========================================
+duel_usage: "&cUse: /duel <player> or /duel quit"
+duel_player_not_found_offline: "&cInvalid player or offline."
+duel_challenge_self: "&cYou cannot challenge yourself."
+duel_accept_usage: "&cUse: /duel accept <name>"
+duel_deny: "&cInvite denied."
+duel_quit_confirm: "&7You left the duel."
+duel_not_in_duel: "&cYou are not in an active duel."
+duel_challenger_offline: "&c&lERROR &8» &7The challenger &f{player} &7is offline."
+duel_no_invite: "&c&lERROR &8» &7You have no pending invites from &f{player}&7."
+duel_already_in_duel: "&cYou are already in a duel!"
+duel_opponent_busy: "&cThe challenger has already joined another duel!"
+duel_invalid_track: "&cError: Invalid track."
+duel_invite_sent: "&a&lDUEL &8» &fInvite sent to &e{player}&f!"
+duel_invite_received_header: "&e{player} &7challenged you to a duel!"
+duel_invite_details: "&fTrack: &b{track} &8| &fLaps: &b{laps}"
+duel_invite_expired_target: "&c&lDUEL &8» &7Invite from &f{player} &7expired."
+duel_invite_expired_sender: "&c&lDUEL &8» &7Your invite to &f{player} &7expired."
+duel_gui_setup: "&8Setup Duel"
+duel_gui_tracks: "&8Select Track"
+duel_search_start: "&e&lSEARCH &8» &fType the track name in chat."
+duel_search_cancelled: "&cSearch cancelled."
+duel_track_selected: "&aTrack selected: &f{track}"
+duel_invite_accept: "&a&l[ACCEPT INVITE]"
+duel_invite_deny: "&c&l[DENY]"
+duel_invite_expires: "&8(This invite expires in 60 seconds)"
 
-# Scoreboard
-scoreboard_title_waiting: "&6Waiting"
-scoreboard_title_practice: "&6Practice"
-scoreboard_title_qualifying: "&6Qualifying"
-scoreboard_title_starting: "&6Starting"
-scoreboard_title_race: "&6Race"
-scoreboard_title_finished: "&6Finished"
-scoreboard_title_grid: "&6Grid"
-scoreboard_v2_no_active_drivers: "&fNo active drivers"
-scoreboard_v2_best_lap: "&fBest: {time}"
-scoreboard_v2_time: "&fTime: {time}"
-scoreboard_v2_pits: "&7Pits: {count}"
-scoreboard_v2_offline: "Offline"
-scoreboard_v2_status_dnf: "&cDNF"
-scoreboard_v2_drivers: "&7Drivers: &f{count}"
-scoreboard_v2_track: "&7Track: &f{track}"
-scoreboard_v2_laps: "&7Laps: &f{laps}"
-scoreboard_v2_position: "&7Position: &f{position}"
-scoreboard_state_preparing: "Preparing"
-scoreboard_waiting_start: "Waiting for start"
-scoreboard_waiting_times: "Waiting for lap times"
-scoreboard_lights_out: "Lights out"
-scoreboard_header_classification: "Classification"
-scoreboard_header_final: "Final results"
-scoreboard_label_track: "&7Track: &f{track}"
-scoreboard_label_drivers: "&7Drivers: &f{drivers}"
-scoreboard_label_laps: "&7Laps: &f{laps}"
-scoreboard_label_lap_f: "&7Lap: &f{current}&7/&f{total}"
-scoreboard_label_pits: "&7Pits: &f{pits}"
-scoreboard_label_position_f: "&7Position: &f{pos}"
-scoreboard_label_time: "&7Time: &f{time}"
-scoreboard_label_best: "&7Best: &b{time}"
-scoreboard_label_practice_end: "&7Practice ends in: "
-scoreboard_label_interval: "Interval"
-scoreboard_label_pits_remaining: "&7Pits remaining: &c{pits}"
-scoreboard_label_pits_complete: "&7Pits: &acomplete"
-scoreboard_status_finishing: "&eFinishing current lap"
-scoreboard_status_dnf: "&cDNF"
-scoreboard_status_dnf_desc: "&7Did not finish"
-scoreboard_status_dnf_short: "DNF"
-scoreboard_status_offline: "Offline"
-scoreboard_status_in_pit: "IN PIT"
-scoreboard_format_pits_short: "P"
-scoreboard_pit_status_mandatory: "&7Pit stops: &c{current}&7/&f{total}"
-scoreboard_pit_status_remaining_detailed: "&7Pit stops: &6{current}&7/&f{total} &8(&f{missing} left&8)"
-scoreboard_pit_status_complete_detailed: "&7Pit stops: &a{current}&7/&f{total}"
-scoreboard_common_separator: "&7------------------------"
-scoreboard_common_footer: "&ewolfnetwork.com.br"
-scoreboard_duel_title: "&6Duel"
-scoreboard_duel_position: "&7Position: "
-scoreboard_duel_lap: "&7Lap: "
-scoreboard_duel_time: "&7Time: "
-scoreboard_duel_record: "&7PB: "
-scoreboard_duel_time_remaining: "&7Remaining: "
-scoreboard_duel_track: "&7Track: "
-scoreboard_tt_title: "&6Time Trial"
-scoreboard_tt_track: "&7Track: &f{track}"
-scoreboard_tt_by: "&7By: &f{creator}"
-scoreboard_tt_leaderboard: "&7Top times"
-scoreboard_tt_you: "&eYou"
+# ==========================================
+# Track Editor Messages
+# ==========================================
+te_help_header: "&6&l========== Help: /trackedit (te) =========="
+te_help_create: "&e/te create <name> &7- Create a new track"
+te_help_select: "&e/te select <track> &7- Select a track for editing"
+te_help_view: "&e/te view [track] &7- Teleport, select and view the track"
+te_help_info: "&e/te info [track] &7- Show track information"
+te_help_region: "&e/te region <start|end> &7- Define regions (use WorldEdit)"
+te_help_pitstop: "&e/te pitstop <addentry|addexit|remove|info|edit> &7- Configure Pit Stop"
+te_help_pitlane: "&e/te pitlane <add|remove|info> &7- Configure Pit Lanes"
+te_help_grid: "&e/te grid <set|remove|list> &7- Configure Grid"
+te_help_spawn: "&e/te spawn set &7- Set track spawn point"
+te_help_more: "&7For more commands, use tab completion."
+te_track_name_length: "&cTrack name cannot be longer than 30 characters."
+te_track_exists: "&cA track with that name already exists."
+te_created: "&aTrack '{track}' created successfully with icon: &e{icon}"
+te_create_error: "&cError creating track. Check console for details."
+te_selected: "&aTrack selected: &f{track}"
+te_teleported: "&a✓ Teleported to track spawn: &f{track}"
+te_view_enabled: "&a✓ Track &f{track} &aset as selected."
+te_deleted: "&aTrack '{track}' deleted successfully."
+te_owner_set: "&a✅ Owner of track &f{track} &aupdated to: &f{owner}"
+te_cam_added: "&aCamera added with ID &f{id} &ato track &f{track}"
+te_cam_removed: "&cCamera ID &f{id} &cremoved!"
+te_cam_list: "&eCameras for track &f{track}: &a{ids}"
+te_time_ticks: "&eTime command (ticks) received for &f{track}&e: &f{ticks}"
+te_times_reset: "&aAll times for track &f{track} &awere reset."
+te_region_start_saved: "&aSTART region saved successfully! ID: {id}"
+te_region_end_saved: "&aEND region saved successfully! ID: {id}"
+te_region_error: "&cError saving {type} region."
+te_no_selection: "&cYou need to make a selection with WorldEdit."
+te_spawn_saved: "&aSpawn saved successfully!"
+te_checkpoint_added: "&aCheckpoint {id} added to track &e{track}"
+te_checkpoint_removed: "&cCheckpoint {id} removed from track &e{track}"
+te_checkpoint_error: "&cError adding/removing checkpoint {id}"
+te_icon_updated: "&aIcon for track '{track}' updated to: &e{icon}"
+te_track_opened: "&eTrack {track} opened successfully."
+te_track_closed: "&eTrack {track} closed successfully."
+te_track_already_open: "&cTrack {track} is already open."
+te_track_already_closed: "&cTrack {track} is already closed."
+te_pitstop_none: "&cNo pit stop region configured for {track}"
+te_pitstop_configured: "&aPit Stop Region for {track} is configured."
+te_pitstop_entry_set: "&aPit Entry set for {track}"
+te_pitstop_exit_set: "&aPit Exit set for {track}"
+te_pitstop_removed: "&aPit Stop removed from {track}"
+te_pitstop_none_remove: "&cThere was no pit stop to remove."
+te_pitstop_list: "&aLoaded pit stops ({count}): &7{tracks}"
+te_pitstop_empty_list: "&cNo pit stops loaded."
 
-# Event Broadcast / Daily Event
-event_click_to_sign: "&b--> Click to sign up for &l{event}&r&b <--"
-event_click_to_sign_hover: "&aClick to sign up for {event}"
-event_broadcast_sent: "&aBroadcast sent to &e{count} &aplayers."
-event_formal_header: "&eActive event: &f{event}"
-event_formal_phase: "&eCurrent phase: &f{phase}"
-event_watch_click: "&a--> Click to spectate &l{event}&r&a <--"
-event_watch_hover: "&aClick to spectate {event}"
+# ==========================================
+# Event Messages (Additional)
+# ==========================================
+event_none_selected: "&c✗ No event selected!"
+event_none_selected_hint: "&eNo event selected. Use /event info <name> to see details."
+event_list_header: "&6&l  ACTIVE EVENTS"
+event_list_empty: "&7  No active events at the moment."
+event_selected: "&a✓ Selected: &f{event}"
+event_full_created: "&a✓ Full event created successfully: &6{event}"
+event_full_error: "&c✗ Error creating full event. Check track and name."
+event_delete_error: "&c✗ Error removing event."
+event_start_error: "&c✗ Failed to start event."
+event_finish_error: "&c✗ Failed to finish event."
+event_already_subscribed: "&eYou are already subscribed to this event!"
+event_sign_closed: "&c✗ Signups closed for this event!"
+event_already_finished: "&c✗ This event has already finished!"
+event_moved_from_reserve: "&7➜ You were moved from &eReserve &7to &aSubscribed"
+event_signed: "&a✓ Subscription confirmed!"
+event_sign_error: "&c✗ Could not subscribe to the event!"
+event_reserve_left: "&e⚠ You left the event reserve: &f{event}"
+event_reserve_joined: "&a✓ You subscribed as reserve for event: &6{event}"
+event_reserve_error: "&c✗ Could not subscribe as reserve."
+event_spectator_joined: "&a✓ You are now spectating event: &6{event}"
+event_spectator_error: "&c✗ Could not join as spectator."
+event_left: "&a✓ You left the event: &6{event}"
+event_not_in_event: "&c✗ You are not in any active event."
+event_track_set: "&a✓ Event track updated to: &6{track}"
+event_usage_settrack: "&c✗ Usage: /event settrack [event] <track>"
+event_signs_open: "&a✓ Signups OPEN for {event}"
+event_signs_closed: "&a✓ Signups CLOSED for {event}"
+event_broadcast_sent: "&a✓ Signup message sent to {count} player(s)"
+event_broadcast_open_title: "&e  🏁 &6&lSIGNUPS OPEN!"
+event_broadcast_click: "&aClick to subscribe to event &f{event}"
+event_click_sign: "CLICK HERE TO SUBSCRIBE"
+event_info_subscribers: "{count} subscribers"
+event_info_reserves: "(+{count} reserves)"
+event_info_track_undefined: "To be defined"
+event_info_track_none: "Not defined"
+event_started: "&a✓ Event started successfully!"
+event_finished: "&a✓ Event finished successfully!"
 
-daily_signup_success: "&aSigned up successfully!"
+# ==========================================
+# Spectator Messages (SpectatorManager)
+# ==========================================
+spectator_watching: "&a✓ You are now watching the race!"
+spectator_help_follow: "&7Use &f/spectate follow <driver> &7to follow a driver"
+spectator_help_leave: "&7Use &f/spectate leave &7to leave spectator mode"
+spectator_time_watched: "&7You watched the race for &f{time}"
+spectator_title_mode: "&6&lSPECTATOR MODE"
+spectator_subtitle_mode: "&7Watch the race"
+spectator_driver_not_found: "&c✗ Driver not found or offline!"
+spectator_driver_not_racing: "&c✗ This player is not participating in the race!"
+spectator_following: "&a✓ Now following &e{driver}"
+spectator_help_unfollow: "&7Use &f/spectate unfollow &7to stop following"
+spectator_unfollowed: "&7Stopped following driver"
+spectator_target_left: "&7The driver you were following left"
+
+# ==========================================
+# Voting Messages (RaceVoteManager)
+# ==========================================
+vote_proposal_active_error: "&c✗ There is already an active proposal!"
+vote_quickrace_active_error: "&c✗ There is already an active Quick Race!"
+vote_wait_finish: "&7Wait for the current race to finish"
+vote_track_not_found: "&c✗ Track not found: {track}"
+vote_none_active_error: "&c✗ No active proposal at the moment!"
+vote_none_active_hint: "&7Use /race propose <track> to create a proposal"
+vote_cancel_error_none: "&e⚠ No active proposal at the moment!"
+vote_cancel_error_perm: "&c✗ You cannot cancel this proposal!"
+vote_cancelled: "&c✗ Race proposal cancelled by {player}"
+vote_help_propose: "&7Propose a race with: &f/race propose <track> [laps] [pits]"
+vote_expired: "&c✗ This proposal has expired!"
+vote_already_voted: "&e⚠ You already voted on this proposal!"
+vote_registered: "&a✓ Vote registered!"
+vote_cant_remove_self: "&c✗ You cannot remove your vote from your own proposal!"
+vote_not_voted: "&e⚠ You haven't voted on this proposal!"
+vote_removed: "&e⚠ Vote removed!"
+vote_approved: "   ✓ PROPOSAL APPROVED! ✓"
+vote_creating: "&eCreating Quick Race..."
+
+# ==========================================
+# Listener Messages (Region, Checkpoint, PitStop)
+# ==========================================
+region_tt_disabled: "&c&lWARNING &8» &7Your &bTime Trial &7is disabled!"
+region_tt_enable_hint: "&7Use &f/settings timetrial true &7to enable and start timing."
+race_session_ended: "&c&l⏱ SESSION ENDED! &fYour lap has been registered."
+race_laps_complete: "&a&l🏁 SESSION COMPLETE! &fYou have completed all laps."
+race_pitstops_remaining: "&6⚠ &7Mandatory pit stops remaining: &e{count}"
+race_pitstops_complete: "&a✓ &7All pit stops completed!"
+race_waiting_start: "&c&l⚠ &eWaiting for start..."
+race_countdown_prepare: "&c&l⚠ PREPARE TO START!"
+race_countdown_go: "&a&l✓ GO! GOOD LUCK!"
+quali_countdown_prepare: "&b&l⏱ PREPARE TO QUALIFYING!"
+quali_countdown_go: "&b&l⏱ QUALIFYING STARTED! GOOD LUCK!"
+race_title_prepare_sub: "&7Prepare..."
+race_title_go: "&a&l✓ GO! GO! GO!"
+quali_title_go: "&b&l⏱ GOOD LUCK!"
+quali_subtitle_go: "&7Set your best lap!"
+protection_click_to_leave: "&e&l► CLICK HERE"
+protection_click_to_leave: "&e&l► CLICK HERE"
+protection_leave_suffix: "&e to leave the race"
+protection_hover_leave: "Click to use {command}"
+
+# ==========================================
+# GUI and Item Messages (MainMenu, Settings)
+# ==========================================
+gui_title_main_menu: "&8Main Menu"
+gui_main_qr_running_name: "&cQuick Race (In Progress)"
+gui_main_qr_running_lore:
+  - "&7A race is currently active."
+  - "&eClick to try spectating or joining."
+gui_main_qr_lobby_name: "&aQuick Race (Lobby Open)"
+gui_main_qr_lobby_lore:
+  - "&7A race is waiting for players."
+  - "&eClick to join!"
+gui_main_qr_voting_name: "&eQuick Race (Voting)"
+gui_main_qr_voting_lore:
+  - "&7Voting is in progress."
+  - "&eClick to vote!"
+gui_main_qr_none_name: "&bQuick Race"
+gui_main_qr_none_lore:
+  - "&7No active race."
+  - "&eClick to start a new race."
+gui_main_tt_name: "&eTime Trial"
+gui_main_tt_lore_header: "&7Tracks menu."
+gui_main_tt_lore_count: "&7Available tracks: &f{count}"
+gui_main_tt_lore_action: "&eClick to view tracks."
+gui_main_duels_name: "&cDuels"
+gui_main_duels_lore: "&7Challenge other players to 1v1."
+gui_main_settings_name: "&7Settings"
+gui_main_settings_lore: "&7Adjust your preferences."
+gui_title_settings: "&8Settings"
+gui_settings_lang_name: "&eIdioma / Language"
+gui_settings_lang_lore: "&7Change language / Alterar idioma."
+gui_settings_tt_name: "&bTime Trials"
+gui_settings_status_on: "&aENABLED"
+gui_settings_status_off: "&cDISABLED"
+gui_settings_tt_toggled: "&aTime Trials {state}."
+gui_settings_status_enabled: "enabled"
+gui_settings_status_disabled: "disabled"
+gui_settings_sounds_name: "&6Sounds (Coming Soon)"
+gui_settings_sounds_lore: "&7Enable/Disable sound effects."
+gui_settings_sounds_wip: "&cSound settings are still in development."
+gui_settings_back_name: "&cBack"
+gui_settings_back_lore: "&7Back to main menu."
+gui_title_quick_race: "&8Configure Quick Race"
+gui_qr_track_name: "&b&lTrack"
+gui_qr_track_lore_selected: "&7Selected: &f{track}"
+gui_qr_track_lore_click: "&eClick to change"
+gui_qr_laps_name: "&f&lLaps"
+gui_qr_laps_lore_current: "&7Current: &f{count}"
+gui_qr_laps_lore_left: "&7Left Click: &a+1"
+gui_qr_laps_lore_right: "&7Right Click: &c-1"
+gui_qr_pits_name: "&6&lMandatory Pits"
+gui_qr_pits_lore_current: "&7Current: &f{count}"
+gui_qr_pits_lore_note: "&cNote: Must be less than laps!"
+gui_qr_pits_error_laps: "&cPits must be less than laps."
+gui_qr_start_name: "&a&lSTART RACE"
+gui_qr_start_lore_track: "&7Track: &f{track}"
+gui_qr_start_lore_laps: "&7Laps: &f{laps}"
+gui_qr_start_lore_pits: "&7Pits: &f{pits}"
+gui_qr_start_lore_action: "&eClick to propose race!"
+gui_qr_start_error_track: "&cSelect a track first!"
+gui_close_name: "&cClose"
+gui_title_duel_select: "&8Select Opponent"
+gui_duel_none_online_name: "&cNo one online"
+gui_duel_none_online_lore: "&7No other players online to duel."
+gui_duel_player_lore: "&7Click to challenge."
+gui_title_track_selector: "&8Select a Track"
+gui_track_lore_select: "&7Click to select."
+gui_pit_editor_title: "&8Pit Stop: {track}"
+gui_pit_editor_size_name: "&eInventory Size: &f{size}"
+gui_pit_editor_size_desc: "&7Minigame GUI size."
+gui_pit_editor_size_action: "&eClick to toggle (27, 36, 45, 54)"
+gui_pit_editor_min_targets_name: "&eMin Targets: &f{value}"
+gui_pit_editor_target_desc: "&7Items to click."
+gui_pit_editor_target_action: "&eLeft: +1 | Right: -1"
+gui_pit_editor_max_targets_name: "&eMax Targets: &f{value}"
+gui_pit_editor_shuffle_name: "&eShuffle on Error: {status}"
+gui_pit_editor_shuffle_desc: "&7Shuffles items upon error."
+gui_pit_editor_shuffle_action: "&eClick to toggle"
+gui_pit_editor_wrong_item_name: "&cWrong Item (Current)"
+gui_pit_editor_wrong_item_lore:
+  - "&7This is the item the player must NOT click."
+  - ""
+  - "&eClick to set item in hand"
+  - "&eas the new wrong item."
+gui_pit_editor_add_target_name: "&aAdd Target (From Hand)"
+gui_pit_editor_add_target_lore:
+  - "&7Adds the item in your hand"
+  - "&7to the target items list."
+  - ""
+  - "&eClick to add"
+gui_pit_editor_remove_target_lore: "&cClick to REMOVE this item"
+gui_pit_editor_error_hold_item: "&cHold an item in hand to set!"
+gui_pit_editor_error_duplicate: "&cThis item is already in the target list!"
+gui_pit_editor_status_on: "&aOn"
+gui_pit_editor_status_off: "&cOff"
+race_teleport_stand: "&7&o[You were teleported to the stands]"
+race_title_stand: "&7Stands"
+race_teleport_spawn: "&7&o[You were teleported to the track spawn]"
+race_no_spectator_area: "&e⚠ No spectator area configured for this track."
+pit_entering: "&e⚠ Entering pit stop..."
+pit_completed: "&a✓ Pit stop completed!"
+pit_invalid_entry: "&c✗ Invalid pit stop! You didn't pass the entry."
+pit_invalid_game: "&c✗ Invalid pit stop! You didn't complete the minigame."
+pitlane_entering: "&e⚠ Entering pit lane! Get ready for the minigame..."
+pit_action_blocked: "&c✗ Action not allowed in pit stop!"
+pit_shift_blocked: "&c✗ Shift-click not allowed!"
+
+# Time Trial Command
+tt_error_duel_active: "&c&lERROR &8» &7You cannot start a Time Trial while in an active &b&lDUEL&7!"
+tt_error_finish_current: "&7Finish your current race first."
+tt_track_not_found: "&cTrack not found: {track}"
+tt_track_no_spawn: "&cThe selected track has no defined spawn."
+tt_auto_enabled: "&a&lINFO &8» &7Your &bTime Trial &7has been automatically enabled."
+tt_cancelled: "&aYour time trial has been successfully cancelled."
+tt_error_quickrace: "&c&lERROR &8» &7You cannot start a Time Trial during a &bQuick Race&7."
+tt_error_event: "&c&lERROR &8» &7You cannot start a Time Trial during an &bEvent&7."
+tt_no_tracks_avail: "&cNo tracks available at the moment."
+tt_no_tracks_compatible: "&cNo compatible tracks available for you at the moment."
+tt_error_reset_quickrace: "&c&lERROR &8» &7You cannot use &f/reset &7during a &bQuick Race&7."
+tt_error_reset_mode: "&c&lERROR &8» &7The command &f/reset &7can only be used in &bFree Practice &7or &bTime Trial&7."
+tt_error_reset_duel: "&c&lERROR &8» &7The command &f/reset &7cannot be used during a &b&lDUEL&7."
+tt_error_no_session: "&cYou are not in any active session or Time Trial."
+tt_error_spawn_not_found: "&cCould not find the spawn point for track: &e{track}"
+tt_save_partial: "&aYour partial time up to checkpoint &e{count} &awas saved: &e{time}"
+
+# Race Command
+race_create_laps_invalid: "&cInvalid number of laps! Use at least 1."
+race_create_laps_max: "&cNumber of laps too high! Max: 100."
+race_create_pits_invalid: "&cInvalid number of pits! Use 0 or more."
+race_create_pits_max: "&cNumber of pits must be less than the number of laps!"
+race_created_success: "&a✓ Quick Race created successfully!"
+race_created_track: "&7Track: &f{track}"
+race_created_config: "&7Laps: &f{laps} &7| Pits: &f{pits}"
+race_created_waiting: "&7Waiting for drivers..."
+race_created_hint: "&eUse &f/race start &eto start the race"
+race_propose_disabled: "&c✗ Proposal system is not available!"
+race_propose_success: "&a✓ Proposal created successfully!"
+race_propose_hint: "&7Other players can now vote with /race vote"
+race_join_msg: "{player} joined the quick race ({count} drivers)"
+race_leave_error: "&c✗ You are not in any race or event!"
+race_info_none: "&e⚠ No active Quick Race at the moment!"
+race_info_hint: "&7Use /race create <track> to create one."
+race_info_header: "      🏁 QUICK RACE INFO 🏁"
+race_info_pilots: "&eDrivers in race:"
+race_info_status_finished: "&a✓ FINISHED"
+race_info_status_dnf: "&c✗ DNF"
+race_info_status_racing: "&7Racing"
+race_info_more_pilots: "&7  ... and {count} more drivers"
+race_help_header: "      COMMANDS /RACE"
+race_help_admin: "═══ ADMIN ═══"
+
+# Pit Stop Minigame
+pit_minigame_title: "&c&lPIT STOP! &7Click the items!"
+pit_item_click_name: "&c&l✦ CLICK HERE!"
+pit_item_click_lore1: "&7Click fast to complete"
+pit_item_click_lore2: "&7the fastest pit stop!"
+pit_error_longer: "&c✗ Ops! The pit stop got longer..."
+pit_complete_msg: "&a✓ Pit stop completed in &f{time} seconds&a! &7(Precision &f{accuracy}%&7, Misclicks &f{misclicks}&7)"
+pit_cancel_msg: "&c✗ Pit stop cancelled - you left the pit lane!"
+
+# Daily Race Manager
+daily_msg_header: "🏁 Daily Race in progress!"
+daily_msg_phase: "&7Current Phase: &f{phase}"
+daily_sign_click: "► CLICK HERE to sign up"
+daily_sign_hover: "Click to sign up for event {event}"
+daily_qual_header: "🏁 Daily Race Qualification in progress!"
+daily_race_header: "🏁 Daily Race Main Race in progress!"
+daily_start_header: "🏁 Daily Race has started!"
+daily_start_practice: "&7Free Practice: &f{time} min"
+event_formal_header: "🏆 Formal Event: &f{event}"
+event_formal_phase: "&7Phase: &f{phase}"
+event_watch_click: "► CLICK HERE to watch"
+event_watch_hover: "Click to watch event {event}"
+
+daily_signup_success: "&a✓ Registration confirmed for the Daily Race!"
 daily_signup_event: "&7Event: &f{event}"
 daily_signup_track: "&7Track: &f{track}"
-daily_signup_leave_hint: "&7To leave the event, use &f/event leave"
-daily_signup_wait: "&ePlease wait for the next phase to begin."
-daily_signup_error: "&cCould not complete your signup."
-daily_teleport_practice: "&aYou were teleported to free practice."
+daily_signup_leave_hint: "&eTo leave at any time, type &f/race leave"
+daily_signup_wait: "&eWait for the start of free practice to be teleported!"
+daily_signup_error: "&c✗ Could not register for the Daily Race!"
+daily_teleport_practice: "&aTeleported to Free Practice!"
 
-daily_msg_header: "&6Daily race is active"
+
+
+# Admin & Visuals & Pit Phase 3
+admin_reload_start: "§e§l[FormulaRacing] §7Reloading configuration..."
+admin_debug_reloaded: "§a✓ Debug system reloaded"
+admin_daily_reloaded: "§a✓ Daily Race reloaded"
+admin_debug_active: "§e[FormulaRacing Debug] §7Debug system active."
+visual_disabled: "§c✗ Track visualization §f%s §cdisabled."
+visual_enabled: "§a✓ Track visualization §f%s §aenabled!"
+visual_showing: "§7Showing: §aSTART§7, §cEND§7, §6Checkpoints§7, §bPitStops§7, §fGrid§7 and §dSpawn§7."
+visual_region_start: "§l§aSTART"
+visual_region_end: "§l§cEND"
+visual_region_checkpoint: "§6§lCHECKPOINT #%s"
+visual_region_pit_entry: "§9§lPIT ENTRY"
+visual_region_pit_exit: "§b§lPIT EXIT"
+visual_region_pit_lane: "§3§lPIT LANE #%s"
+visual_actionbar_in: "§7You are in: %s"
+visual_actionbar_none: "§8(No region detected)"
+pit_go_msg: "§a§lGO! GO! GO! §7(Drive to the exit)"
+pit_error_active: "§cYou are already in a pit stop minigame!"
+pit_error_no_track: "§e⚠ §7No track detected at this location."
+pit_using_default: "§7Using §fDEFAULT §7configuration."
+pit_check_tip: "§7(Use §f/te pitstop check§7 to verify region or §f/pit <track>§7 to force)"
+duel_countdown_go: "§a§lGO!"
+duel_lap_first_title: "§e§lLAP 1"
+
+# ==========================================
+# Session and Broadcast Messages (Additional)
+# ==========================================
+quickrace_timer_status: '&eStarting in {time}s...'
+event_broadcast_standings_header: '&6 &fFinal Standings:'
+event_broadcast_standings_line: '&7#{pos} &e{player} &f- &b{info}'
+event_broadcast_standings_footer: '&8&m-------------------------'
+event_broadcast_heat_complete: '&a Heat completed!'
+event_broadcast_session_warning: '&c Session ends in {time} seconds!'
+event_broadcast_session_expired_lap: '&c Time''s up! Finish your current lap!'
+event_broadcast_session_expired: '&c Session ended!'
+event_broadcast_session_cancelled: '&c Session cancelled!'
+event_session_cancelled_title: '&cCANCELLED'
+event_session_cancelled_subtitle: '&7The session was cancelled.'
+event_broadcast_pit_penalty: '&c {player} was penalized for missing pit stops: {missing}'
+event_session_expired_title: '&cTIME''S UP'
+event_session_expired_subtitle: '&7Finish your lap!'
+
+
+# ==========================================
+# Quick Race & Scoreboard Fixes
+# ==========================================
+quickrace_broadcast_active: '&a&l QUICK RACE ACTIVE!'
+quickrace_broadcast_track: 'Track: '
+quickrace_broadcast_laps_pits: 'Laps: {laps} | Pits: {pits}'
+quickrace_broadcast_drivers: 'Drivers: {current}/{max}'
+quickrace_broadcast_click: '[  CLICK TO JOIN ]'
+quickrace_broadcast_click_hover: '&aClick to join the Quick Race!&n&7Command: &f/race join'
+quickrace_leave_hint: '&eTo leave at any time, type &f/race leave'
+
+scoreboard_title_practice: '&d&l FREE PRACTICE'
+scoreboard_title_qualifying: '&b&l QUALIFYING'
+scoreboard_title_waiting: '&6&l WAITING'
+scoreboard_title_starting: '&6&l STARTING'
+scoreboard_title_race: '&c&l RACE'
+scoreboard_title_finished: '&a&l FINISHED'
+scoreboard_state_preparing: 'Preparing'
+scoreboard_label_track: '&7Track: &f{track}'
+scoreboard_label_laps: '&7Laps: &f{laps}'
+scoreboard_label_pits: '&7Pits: &f{pits}'
+scoreboard_label_drivers: '&7Drivers: &f{drivers}'
+scoreboard_waiting_start: '&eWaiting for start...'
+scoreboard_lights_out: '&c&lLIGHTS OUT!'
+scoreboard_label_position_f: '&7Position: &f#{pos}'
+scoreboard_label_lap_f: '&7Lap: &f{current}&7/&f{total}'
+scoreboard_header_classification: '&6&lStandings:'
+scoreboard_header_stats: '&6&lStats:'
+scoreboard_label_time: '&7Time: &f{time}'
+scoreboard_label_best: '&7Best: &f{time}'
+scoreboard_status_dnf: '&c&lDNF'
+scoreboard_status_dnf_desc: '&7Did not finish'
+scoreboard_header_final: '&eFinal Score:'
+scoreboard_waiting_times: '&8Waiting for times...'
+
+actionbar_preparing: '&e Preparing race...'
+actionbar_practice_lap: '&7Lap: &f{lap}'
+actionbar_cross_line: ' &8| &e Cross the line!'
+actionbar_qualifying_pos: '&bP{pos}'
+actionbar_grid_pos: '&6 GRID: &fP{pos}'
+actionbar_prepare_start: ' &8| &e&l GET READY!'
+actionbar_lights_out_visual: '&c&l &e&l &6&l &e&l &c&l &f LIGHTS OUT!'
+actionbar_finished_title: '&a Finished: '
+actionbar_dnf_title: '&c DNF - Did not finish'
+actionbar_race_finished: '&7Race finished'
+actionbar_info_laps: ' §8| §7Laps: §f{laps}'
+actionbar_info_pits: ' §8| §7Pits: §f{pits}'
+actionbar_info_best_lap: ' §8| §7PB: §e{time}'
+
+
+scoreboard_label_pits_remaining: '&7Pits: &c{pits} &7remaining'
+scoreboard_label_pits_complete: '&7Pits: &a Complete'
+
+
+scoreboard_pit_status_mandatory: '&7Pits: &c{current}/{total} &c Mandatory!'
+scoreboard_pit_status_remaining_detailed: '&7Pits: &6{current}/{total} &6({missing} left)'
+scoreboard_pit_status_complete_detailed: '&7Pits: &a {current}/{total} &a(complete)'
+
+
+scoreboard_label_practice_end: '&7Practice End: '
+scoreboard_label_time_remaining: '&7Time Left: '
+scoreboard_status_waiting: 'Waiting...'
+scoreboard_status_finishing: '&cFINISHING'
+
+scoreboard_title_grid: '&6&lSTARTING GRID'
+
+scoreboard_status_dnf_short: 'DNF'
+scoreboard_status_offline: 'Offline'
+scoreboard_status_in_pit: 'In Pit'
+scoreboard_label_interval: 'Interval'
+scoreboard_format_pits_short: 'pits'
+
+
+scoreboard_tt_title: '&e&l-TimeTrial-'
+scoreboard_tt_track: '&e&lTrack: &f{track}'
+scoreboard_tt_by: '&7By {creator}'
+scoreboard_tt_leaderboard: "&6Leaderboard:"
+timetrial_new_pb_new_rank: "&a&lNEW PERSONAL BEST! &e(Rank: New ➝ #{rank})"
+timetrial_new_pb_improved_rank: "&a&lNEW PERSONAL BEST! &e(Rank: #{old} ➝ #{new})"
+timetrial_new_pb_same_rank: "&a&lNEW PERSONAL BEST! &e(Rank: #{rank})"
+timetrial_incomplete_lap: "&c&l✖ &fIncomplete lap! &7({count}/{total} CPs)"
+scoreboard_tt_you: "&r&lYou"
+scoreboard_duel_title: '&b&lDUEL &f&lRACING'
+scoreboard_duel_position: ' &fPosition: '
+scoreboard_duel_lap: ' &fLap: '
+scoreboard_duel_time: ' &fTime: '
+scoreboard_duel_record: ' &fRecord: '
+scoreboard_duel_time_remaining: ' &fTime Left: '
+scoreboard_duel_track: ' &fTrack: '
+
+hotbar_menu_name: '&a&oMain Menu'
+hotbar_menu_lore:
+  - '&7Click to open the menu.'
+  - ''
+  - '&eRight-click.'
+hotbar_tracks_name: '&e&oTracks / Time Trial'
+hotbar_tracks_lore:
+  - '&7Click to select a track.'
+  - ''
+  - '&eRight-click.'
+hotbar_random_name: '&d&oRandom Track'
+hotbar_random_lore:
+  - '&7Go to a random track.'
+  - ''
+  - '&eRight-click.'
+hotbar_visibility_on_name: '&b&oPlayers: &a&oVisible'
+hotbar_visibility_on_lore:
+  - '&7Click to &cHIDE &7players.'
+  - ''
+  - '&eRight-click.'
+hotbar_visibility_off_name: '&b&oPlayers: &c&oHidden'
+hotbar_visibility_off_lore:
+  - '&7Click to &aSHOW &7players.'
+  - ''
+  - '&eRight-click.'
+hotbar_reset_name: '&c&oReset'
+hotbar_reset_lore:
+  - '&7Reset current race.'
+  - ''
+  - '&eRight-click.'
+hotbar_spawn_name: '&c&oBack to Spawn'
+hotbar_spawn_lore:
+  - '&7Return to lobby.'
+  - ''
+  - '&eRight-click.'
+hotbar_settings_name: '&7&oSettings'
+hotbar_settings_lore:
+  - '&7Open settings.'
+  - ''
+  - '&eRight-click.'
+
+lonely_cannot_change_racing: '§c❌ You cannot change Lonely Mode during a race or duel!'
+lonely_invalid_usage: '§cInvalid subcommand. Use: /lonely <true|false>'
+lonely_enabled: '§a✅ Lonely Mode enabled! §7(You are invisible to everyone)'
+lonely_disabled: '§c❌ Lonely Mode disabled!'
+lonely_obu_tip_header: '§e§l💡 OPENBOATUTILS TIP:'
+lonely_obu_tip_line1: '§7To enable §fGhost Mode §7(see players without collision),'
+lonely_obu_tip_line2: '§7you must §cDISABLE §7Lonely Mode during'
+lonely_obu_tip_line3: '§7practice or qualifying.'
+lonely_no_obu_info: '§7ℹ Install §bOpenBoatUtils §7to access Ghost Mode!'
+
+cam_usage: '§eUse: /cam <follow|stop>'
+cam_require_spectator: '§cYou need to be in §lSpectator §cmode to use cameras.'
+cam_player_not_found: '§cPlayer not found.'
+cam_stop_success: '§aYou stopped following.'
+cam_stop_failed: '§cYou were not following anyone.'
+
+spectate_usage: '&cUse: /spectate join <event>'
+spectate_not_found: '&cEvent not found: {event}'
+spectate_not_running: '&cThe event is not running!'
+spectate_state_info: '&eCurrent state: {state}'
+spectate_already_driver: '&cYou are participating in this race!'
+spectate_already_driver_desc: '&eYou cannot be a spectator and a driver at the same time.'
+spectate_already_spectator: '&cYou are already in spectator mode!'
+spectate_join_failed: '&cCould not join as a spectator.'
+spectate_active_header: '&a╔═══════════════════════════════╗'
+spectate_active_title: '&a║ &6&lSpectator Mode Active!'
+spectate_active_divider: '&a╠═══════════════════════════════╣'
+spectate_active_event: '&a║ &fEvent: &e{event}'
+spectate_active_track: '&a║ &fTrack: &e{track}'
+spectate_active_drivers: '&a║ &fDrivers: &e{count}'
+spectate_active_commands_header: '&a║ &7Useful commands:'
+spectate_active_command_follow: '&a║ &f/spectate follow <driver>'
+spectate_active_command_leave: '&a║ &f/spectate leave'
+spectate_active_footer: '&a╚═══════════════════════════════╝'
+spectate_leave_not_spectator: '&cYou are not in spectator mode!'
+spectate_leave_success: '&a✓ You left spectator mode'
+spectate_follow_not_spectator: '&cYou need to be in spectator mode!'
+spectate_follow_join_hint: '&eUse: /spectate join <event>'
+spectate_follow_header: '&a╔═══════════════════════════════╗'
+spectate_follow_title: '&a║ &6&lFollowing Driver!'
+spectate_follow_divider: '&a╠═══════════════════════════════╣'
+spectate_follow_driver: '&a║ &fDriver: &e{driver}'
+spectate_follow_desc: '&a║ &7Your camera will follow the driver'
+spectate_follow_stop_hint: '&a║ &7Use §f/spectate unfollow §7to stop'
+spectate_follow_footer: '&a╚═══════════════════════════════╝'
+spectate_unfollow_not_spectator: '&cYou are not in spectator mode!'
+spectate_unfollow_not_following: '&eYou were not following anyone.'
+spectate_unfollow_success: '&a✓ You returned to free camera mode'
+spectate_list_no_events: '&eThere are no active races at the moment.'
+spectate_list_header: '&a╔═══════════════════════════════╗'
+spectate_list_title: '&a║ &6&lAvailable Events'
+spectate_list_divider: '&a╠═══════════════════════════════╣'
+spectate_list_event_name: '&a║ &e{event}'
+spectate_list_event_track: '&a║   &fTrack: &7{track}'
+spectate_list_event_spectators: '&a║   &fSpectators: &7{count}'
+spectate_list_event_join_hint: '&a║   &7Use: §f/spectate join {event}'
+spectate_list_footer: '&a╚═══════════════════════════════╝'
+spectate_info_not_spectator: '&eYou are not in spectator mode.'
+spectate_info_list_hint: '&7Use §f/spectate list §7to see available events'
+spectate_info_header: '&a╔═══════════════════════════════╗'
+spectate_info_title: '&a║ &6&lSpectator Mode'
+spectate_info_divider: '&a╠═══════════════════════════════╣'
+spectate_info_event: '&a║ &fEvent: &e{event}'
+spectate_info_track: '&a║ &fTrack: &e{track}'
+spectate_info_mode: '&a║ &fMode: &e{mode}'
+spectate_info_following: '&a║ &fFollowing: &e{player}'
+spectate_info_time: '&a║ &fWatch time: &e{time}'
+spectate_info_footer: '&a╚═══════════════════════════════╝'
+spectate_help_header: '&a╔═══════════════════════════════╗'
+spectate_help_title: '&a║ &6&lSpectator Commands'
+spectate_help_divider: '&a╠═══════════════════════════════╣'
+spectate_help_join: '&a║ &f/spectate join <event>'
+spectate_help_join_desc: '&a║ &7  Join as a spectator'
+spectate_help_leave: '&a║ &f/spectate leave'
+spectate_help_leave_desc: '&a║ &7  Leave spectator mode'
+spectate_help_follow: '&a║ &f/spectate follow <driver>'
+spectate_help_follow_desc: '&a║ &7  Follow a driver'
+spectate_help_unfollow: '&a║ &f/spectate unfollow'
+spectate_help_unfollow_desc: '&a║ &7  Stop following'
+spectate_help_list: '&a║ &f/spectate list'
+spectate_help_list_desc: '&a║ &7  List available events'
+spectate_help_info: '&a║ &f/spectate info'
+spectate_help_info_desc: '&a║ &7  Current mode info'
+spectate_help_footer: '&a╚═══════════════════════════════╝'
+
+# Added missing keys
 daily_msg_track: "&7Track: &f{track}"
-daily_msg_phase: "&7Phase: &f{phase}"
-daily_sign_click: "&b--> Click to sign up for &l{event}&r&b <--"
-daily_sign_hover: "&aClick to sign up for {event}"
-daily_qual_header: "&eQualification in progress"
-daily_race_header: "&cFinal race in progress"
-daily_start_header: "&6Daily race has started!"
-daily_start_practice: "&7Free practice is open for &f{time} &7minutes"
-
+event_already_started_quit_error: "&cEvent already started. You cannot switch to reserve."
+event_create_error: "&cError creating event."
+event_click_to_sign: "&b--> Click to sign up for &l{event}&r&b <--"
+event_click_to_sign_hover: "&aClick to sign up for {event}"
+quickrace_already_creating: "&eA Quick Race is already being created. Please wait..."
 quickrace_click_to_join: "&b--> Click to join the Quick Race (&f{track}&b) <--"
-quickrace_click_to_join_hover: "&aJoin the Quick Race\n&7Track: &f{track}\n&7Laps: &f{laps}\n&7Pits: &f{pits}\n&7Drivers: &f{current}&7/&f{max}"
+quickrace_click_to_join_hover: "&aJoin the Quick Race
+&7Track: &f{track}
+&7Laps: &f{laps}
+&7Pits: &f{pits}
+&7Drivers: &f{current}&7/&f{max}"
+pit_lane_start: "&eYou entered the pit lane."
+scoreboard_common_separator: "&7------------------------"
+scoreboard_common_footer: "&ewolfnetwork.com.br"
+scoreboard_v2_time: "&fTime: {time}"

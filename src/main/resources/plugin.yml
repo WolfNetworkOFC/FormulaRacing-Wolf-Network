@@ -32,6 +32,10 @@ commands:
   debug:
     description: Comandos de debug
     usage: /debug
+  admin:
+    description: Comandos administrativos do FormulaRacing
+    usage: /admin
+    aliases: [fradmin, fra]
   formularacingreload:
     description: Recarrega as configurações do FormulaRacing
     usage: /formularacingreload
