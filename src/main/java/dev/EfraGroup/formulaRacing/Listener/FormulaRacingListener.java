@@ -86,7 +86,7 @@ public class FormulaRacingListener implements Listener {
                     for(Rounds round : eventObj.getEventSchedule().getRounds().values()) {
                         for(Heats heat : round.getHeats().values()) {
                             Driver d = heat.getDriver(player.getUniqueId());
-                            if (d != null && heat.getHeatState() == HeatState.RACING && (heat.isPushtopass() || heat.isDrsEnabled())) {
+                            if (d != null && heat.getHeatState() == HeatState.RACING && heat.isPushtopass()) {
                                 event.setCancelled(true);
                                 if (this.plugin.getPTP() != null) {
                                     this.plugin.getPTP().togglePTP(player, d, heat);

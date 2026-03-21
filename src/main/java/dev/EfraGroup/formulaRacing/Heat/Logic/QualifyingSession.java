@@ -24,8 +24,8 @@ public class QualifyingSession implements SessionLogic {
             heat.getPlugin().getDRS().startDrsTask(heat);
         }
 
-        heat.getPlugin().getPTP().startPTPTask(heat);
         if (heat.isPushtopass()) {
+            heat.getPlugin().getPTP().startPTPTask(heat);
         }
 
         if (heat.getHeatState() == HeatState.LOADED || heat.getHeatState() == HeatState.IDLE || heat.getHeatState() == HeatState.SETUP || heat.getHeatState() == HeatState.STARTING) {

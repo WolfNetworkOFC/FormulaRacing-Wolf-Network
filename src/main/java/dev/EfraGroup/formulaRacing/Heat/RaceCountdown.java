@@ -63,7 +63,9 @@ public class RaceCountdown {
                         if (this.tick >= RaceCountdown.this.maxLights * 20 + 20) {
                             RaceCountdown.this.onLightsOut();
                             this.cancel();
-                            RaceCountdown.this.heat.getPlugin().getPTP().startPTPTask(RaceCountdown.this.heat);
+                            if (RaceCountdown.this.heat.isPushtopass()) {
+                                RaceCountdown.this.heat.getPlugin().getPTP().startPTPTask(RaceCountdown.this.heat);
+                            }
                         }
 
                     }

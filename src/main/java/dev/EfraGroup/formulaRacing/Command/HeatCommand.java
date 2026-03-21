@@ -847,6 +847,29 @@ public class HeatCommand extends BaseCommand {
         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 1.0F, 1.2F);
     }
 
+    @Subcommand("set pushtopass|set p2p")
+    @CommandCompletion("@heat true|false")
+    @CommandPermission("formularacing.event.admin")
+    public void onSetPushToPass(Player player, Heats heat, Boolean enabled) {
+        if (heat == null) {
+            Events selected = this.database.getPlayerSelectedEvent(player.getUniqueId()).orElse(null);
+            if (selected == null) {
+                player.sendMessage("§c[!] Você precisa especificar um Heat ou selecionar um Evento primeiro.");
+                return;
+            }
+
+            selected.getSchedule().getRoundsCollection().forEach((round) -> round.getHeats().values().forEach((h) -> h.setPushtopass(enabled)));
+            String status = enabled ? "§2LIGADO" : "§cDESLIGADO";
+            player.sendMessage("§a[P2P] Status definido como " + status + " §apara TODO o evento: §f" + selected);
+        } else {
+            heat.setPushtopass(enabled);
+            String status = enabled ? "§2LIGADO" : "§cDESLIGADO";
+            player.sendMessage("§a[P2P] Status definido como " + status + " §apara o Heat: §f" + heat.getHeatNumber());
+        }
+
+        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 1.0F, 1.2F);
+    }
+
     @Subcommand("set driverposition")
     @CommandCompletion("@heat @players <[+/-]pos>")
     @CommandPermission("formularacing.event.admin")
