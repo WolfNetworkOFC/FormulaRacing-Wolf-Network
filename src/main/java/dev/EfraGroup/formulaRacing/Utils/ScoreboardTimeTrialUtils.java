@@ -12,6 +12,7 @@ package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.style.TimingScoreboardStyle;
 import fr.mrmicky.fastboard.FastBoard;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -25,6 +26,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
 public class ScoreboardTimeTrialUtils {
+    private static final int MAX_LINES = 15;
     private final Map<UUID, String> playerTracks = new ConcurrentHashMap<UUID, String>();
     private final Map<UUID, String> playerTrackOwners = new ConcurrentHashMap<UUID, String>();
     private final Map<UUID, FastBoard> boards = new ConcurrentHashMap<UUID, FastBoard>();
@@ -169,26 +171,36 @@ public class ScoreboardTimeTrialUtils {
         lines.add("");
         lines.add(tu.getTranslated(player, "scoreboard_tt_leaderboard"));
 
-        // 4. Lógica do Leaderboard Dinâmico (Top 5 ou Top 1 + Vizinhos)
+        // 4. Lógica do Leaderboard Dinâmico (Top ou Top 1 + Vizinhos)
         List<DatabaseManager.TrackRecord> neighbors = new ArrayList<>();
         DatabaseManager.TrackRecord firstPlace = null;
         boolean includeSeparator = false;
 
+        int footerLines = 3;
+        int availableForEntries = Math.max(3, MAX_LINES - lines.size() - footerLines);
+
         if (myPos == -1 || myPos < 5) {
-            // Caso o jogador não tenha tempo ou já esteja no Top 5
-            int limit = Math.min(allRecords.size(), 5);
+            int limit = Math.min(allRecords.size(), availableForEntries);
             for (int i = 0; i < limit; i++) {
                 neighbors.add(allRecords.get(i));
             }
         } else {
-            // Caso o jogador esteja longe: mostra o 1º lugar + separador + vizinhos ao redor dele
-            firstPlace = allRecords.get(0);
-            includeSeparator = true;
+            if (availableForEntries <= 2) {
+                int limit = Math.min(allRecords.size(), availableForEntries);
+                for (int i = 0; i < limit; i++) {
+                    neighbors.add(allRecords.get(i));
+                }
+            } else {
+                firstPlace = allRecords.get(0);
+                includeSeparator = true;
 
-            int start = Math.max(1, myPos - 2);
-            int end = Math.min(allRecords.size() - 1, myPos + 2);
-            for (int i = start; i <= end; i++) {
-                neighbors.add(allRecords.get(i));
+                int neighborsLimit = Math.max(1, availableForEntries - 2);
+                int start = Math.max(1, myPos - neighborsLimit / 2);
+                int end = Math.min(allRecords.size() - 1, start + neighborsLimit - 1);
+                start = Math.max(1, end - neighborsLimit + 1);
+                for (int i = start; i <= end; i++) {
+                    neighbors.add(allRecords.get(i));
+                }
             }
         }
 
@@ -238,14 +250,15 @@ public class ScoreboardTimeTrialUtils {
             }
         }
         String color = string;
-        String timeDisplay = tr.isFinished() ? this.formatTime(tr.getTime()) : "\u00a77" + tr.getCheckpointsReached() + "CP(\u00a7f" + this.formatTime(tr.getTime()) + "\u00a77)";
-        String marker = color + "§l┃┃§r";
+        String timeDisplay = tr.isFinished() ? "§b" + this.formatTime(tr.getTime()) : "§e" + tr.getCheckpointsReached() + "CP §8(§f" + this.formatTime(tr.getTime()) + "§8)";
+        String configured = FormulaRacing.getInstance().getConfig().getString("scoreboard.style.accent-marker", "┃");
+        String accent = TimingScoreboardStyle.normalizeAccentMarker(configured);
+        String marker = color + "§l" + accent + accent + "§r";
         String nameDisplay = isMe ? FormulaRacing.getInstance().getTranslationUtil().getTranslated(viewer, "scoreboard_tt_you", new String[0]) : tr.getPlayerName();
-        if (nameDisplay.length() > 10) {
-            nameDisplay = nameDisplay.substring(0, 10);
-        }
+        nameDisplay = TimingScoreboardStyle.padRight(nameDisplay, 14);
         String rank = color + pos + ".";
-        return rank + " §8| §7" + timeDisplay + " " + marker + " §f" + nameDisplay;
+        String nameColor = isMe ? "§e" : "§f";
+        return rank + " §8| " + timeDisplay + " " + marker + " " + nameColor + nameDisplay;
     }
 
     public String formatTime(double timeInSeconds) {

@@ -15,9 +15,12 @@ public class FinishedViewModelBuilder implements StateViewModelBuilder {
     @Override
     public ScoreboardViewModel build(ScoreboardContext context) {
         List<String> lines = new ArrayList<>();
+        lines.add(BuilderSupport.heatContext(context));
         lines.add(BuilderSupport.spacer(0));
-        lines.addAll(BuilderSupport.buildClassificationLines(context, false, 5));
+        lines.addAll(BuilderSupport.buildClassificationLines(context, false, 7));
         lines.add(BuilderSupport.spacer(2));
+        lines.add(BuilderSupport.commonSeparator(context));
+        lines.add(BuilderSupport.commonFooter(context));
         int minHeight = BuilderSupport.minHeightForWaiting(context.heat().getDriverCount());
         BuilderSupport.padToMinHeight(lines, minHeight);
 

@@ -14,6 +14,7 @@ import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Utils.TimeTrialDuelsAction;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.style.TimingScoreboardStyle;
 import fr.mrmicky.fastboard.FastBoard;
 import fr.mrmicky.fastboard.FastBoardBase;
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
 public class ScoreboardDuelsTimeUtils {
+    private static final int MAX_LINES = 15;
     private final FormulaRacing plugin;
     private final DatabaseManager mysql;
     private final TimeTrialDuelsAction ttda;
@@ -204,18 +206,23 @@ public class ScoreboardDuelsTimeUtils {
         // Linha de separação padrão
         String separator = this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_common_separator");
         String footer = this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_common_footer");
+        String marker = TimingScoreboardStyle.normalizeAccentMarker(this.plugin.getConfig().getString("scoreboard.style.accent-marker", "┃"));
 
         lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_track") + "§f" + trackName);
         lines.add(separator);
         lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_position") + finalPosDisplay);
         lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_lap") + "§b" + lap + "§7/§b" + totalLaps);
-        lines.add("§8| §7§l┃┃§r");
-        lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_time") + "§e" + currentFormattedTime);
+        lines.add("§8| §7§l" + marker + marker + "§r");
+        lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_time") + "§b" + currentFormattedTime);
         lines.add(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_record") + finalPB);
 
         // Se houver tempo restante (ex: contagem regressiva), adicionamos a linha
-        if (timeRemaining >= 0) {
+        if (timeRemaining >= 0 && lines.size() < MAX_LINES - 3) {
             lines.add(finalTimeRemaining);
+        }
+
+        while (lines.size() > MAX_LINES - 3) {
+            lines.remove(lines.size() - 1);
         }
 
         lines.add("");

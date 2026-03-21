@@ -17,9 +17,10 @@ public class RacingViewModelBuilder implements StateViewModelBuilder {
         List<String> lines = new ArrayList<>();
         lines.add(BuilderSupport.heatContext(context));
         lines.add(BuilderSupport.spacer(0));
-        lines.addAll(BuilderSupport.buildClassificationLines(context, false, 6));
+        lines.addAll(BuilderSupport.buildClassificationLines(context, false, 7));
         lines.add(BuilderSupport.spacer(1));
-        lines.add("§ewolfnetwork.com.br");
+        lines.add(BuilderSupport.commonSeparator(context));
+        lines.add(BuilderSupport.commonFooter(context));
         int minHeight = BuilderSupport.minHeightForClassification(context.heat().getDriverCount());
         BuilderSupport.padToMinHeight(lines, minHeight);
         return new ScoreboardViewModel(

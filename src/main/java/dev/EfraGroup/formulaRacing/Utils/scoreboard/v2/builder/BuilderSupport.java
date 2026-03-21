@@ -12,22 +12,8 @@ import org.bukkit.entity.Player;
 
 final class BuilderSupport {
     private static final String[] SPACERS = new String[]{
-            "§0",
-            "§1",
-            "§2",
-            "§3",
-            "§4",
-            "§5",
-            "§6",
-            "§7",
-            "§8",
-            "§9",
-            "§a",
-            "§b",
-            "§c",
-            "§d",
-            "§e",
-            "§f"
+            "§0", "§1", "§2", "§3", "§4", "§5", "§6", "§7",
+            "§8", "§9", "§a", "§b", "§c", "§d", "§e", "§f"
     };
 
     private BuilderSupport() {
@@ -95,7 +81,6 @@ final class BuilderSupport {
 
         Driver leader = sorted.get(0);
         Driver referenceDriver = context.spectator() ? null : context.viewerDriver();
-
         String marker = accentMarker(context);
         for (int i = start; i < end; i++) {
             Driver current = sorted.get(i);
@@ -279,14 +264,12 @@ final class BuilderSupport {
         int pits = driver.getPitstops();
 
         String pitsColor = "§f";
-        if (requiredPits != null && requiredPits > 0) {
-            if (pits >= requiredPits) {
-                pitsColor = "§a";
-            } else if (pits > 0) {
-                pitsColor = "§6";
-            } else {
-                pitsColor = "§c";
-            }
+        if (pits >= requiredPits) {
+            pitsColor = "§a";
+        } else if (pits > 0) {
+            pitsColor = "§6";
+        } else {
+            pitsColor = "§c";
         }
 
         return " §8P: " + pitsColor + pits;
@@ -331,6 +314,14 @@ final class BuilderSupport {
 
     static String lapsSummary(ScoreboardContext context) {
         return tr(context, "scoreboard_v2_laps", "{laps}", String.valueOf(context.heat().getTotalLaps()));
+    }
+
+    static String commonSeparator(ScoreboardContext context) {
+        return tr(context, "scoreboard_common_separator");
+    }
+
+    static String commonFooter(ScoreboardContext context) {
+        return tr(context, "scoreboard_common_footer");
     }
 
     static String viewerPositionSummary(ScoreboardContext context) {
