@@ -40,6 +40,11 @@ database:
 
 scoreboard:
   max-rows: 30 # Máximo de linhas na scoreboard. Minecraft padrão é 15, mas com a Megavex Library pode ser maior (até 32 ou mais).
+  v2:
+    enabled: false
+    interval: 500ms
+    canary-percentage: 0
+    fallback-fastboard-enabled: true
 
 # =========================================================
 #                     MESSAGE SETTINGS

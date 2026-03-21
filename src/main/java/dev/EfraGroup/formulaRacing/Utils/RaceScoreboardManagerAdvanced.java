@@ -23,7 +23,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
-public class RaceScoreboardManagerAdvanced {
+public class RaceScoreboardManagerAdvanced implements RaceScoreboardService {
     private final FormulaRacing plugin;
     private final Map<UUID, FastBoard> boards;
     private final Map<UUID, Heats> playerHeats;

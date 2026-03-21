@@ -16,7 +16,7 @@ import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.RaceActionBarManager;
-import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardManagerAdvanced;
+import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardService;
 
 import java.lang.MatchException;
 import java.time.Instant;
@@ -1169,7 +1169,7 @@ public class Heats {
         return this.gridManager;
     }
 
-    public RaceScoreboardManagerAdvanced getScoreboardManager() {
+    public RaceScoreboardService getScoreboardManager() {
         return this.plugin.getRaceScoreboardManager();
     }
 

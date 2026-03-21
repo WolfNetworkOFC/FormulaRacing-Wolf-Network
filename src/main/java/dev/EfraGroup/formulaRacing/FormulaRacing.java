@@ -53,6 +53,7 @@ import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
 import dev.EfraGroup.formulaRacing.Utils.RaceActionBarManager;
+import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardService;
 import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardManagerAdvanced;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardDuelsTimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardTimeTrialUtils;
@@ -61,6 +62,7 @@ import dev.EfraGroup.formulaRacing.Utils.TimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.TranslationUtil;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.RaceScoreboardV2Manager;
 import dev.EfraGroup.formulaRacing.Visuals.TrackVisualizer;
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -125,7 +127,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private TranslationUtil translationUtil;
     private DailyRaceManager dailyRaceManager;
     private RaceActionBarManager raceActionBarManager;
-    private RaceScoreboardManagerAdvanced raceScoreboardManager;
+    private RaceScoreboardService raceScoreboardManager;
     private TrackVisualizer trackVisualizer;
     private EventAnnouncements eventAnnouncements;
     private TimeTrialController timeTrialController;
@@ -214,7 +216,13 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.spectatorManager = new SpectatorManager(this);
             this.readyCheckManager = new ReadyCheckManager(this);
             this.raceActionBarManager = new RaceActionBarManager(this);
-            this.raceScoreboardManager = new RaceScoreboardManagerAdvanced(this);
+            if (this.getConfig().getBoolean("scoreboard.v2.enabled", false)) {
+                this.raceScoreboardManager = new RaceScoreboardV2Manager(this);
+                this.getLogger().info("[FormulaRacing] Scoreboard V2 enabled (Megavex).");
+            } else {
+                this.raceScoreboardManager = new RaceScoreboardManagerAdvanced(this);
+                this.getLogger().info("[FormulaRacing] Scoreboard V1 enabled (FastBoard).");
+            }
             this.trackVisualizer = new TrackVisualizer(this);
             this.eventAnnouncements = new EventAnnouncements(this);
             this.quickRaceManager = new QuickRaceManager(this, this.raceEventManager, this.dm);
@@ -278,6 +286,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
         if (this.spectatorManager != null) {
             this.spectatorManager.shutdown();
+        }
+
+        if (this.raceScoreboardManager != null) {
+            this.raceScoreboardManager.shutdown();
         }
 
         try {
@@ -595,7 +607,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return this.raceActionBarManager;
     }
 
-    public RaceScoreboardManagerAdvanced getRaceScoreboardManager() {
+    public RaceScoreboardService getRaceScoreboardManager() {
         return this.raceScoreboardManager;
     }
 
