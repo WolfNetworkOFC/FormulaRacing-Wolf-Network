@@ -54,7 +54,6 @@ import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
 import dev.EfraGroup.formulaRacing.Utils.RaceActionBarManager;
 import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardService;
-import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardManagerAdvanced;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardDuelsTimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardTimeTrialUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimeTrialDuelsAction;
@@ -62,7 +61,10 @@ import dev.EfraGroup.formulaRacing.Utils.TimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.TranslationUtil;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.ScoreboardOwnershipCoordinator;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.RaceScoreboardV2Manager;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.MegavexAdapter;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.ScoreboardAdapter;
 import dev.EfraGroup.formulaRacing.Visuals.TrackVisualizer;
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -128,6 +130,8 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private DailyRaceManager dailyRaceManager;
     private RaceActionBarManager raceActionBarManager;
     private RaceScoreboardService raceScoreboardManager;
+    private ScoreboardOwnershipCoordinator scoreboardOwnershipCoordinator;
+    private MegavexAdapter sharedScoreboardAdapter;
     private TrackVisualizer trackVisualizer;
     private EventAnnouncements eventAnnouncements;
     private TimeTrialController timeTrialController;
@@ -202,7 +206,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.worldEditSelect = new WorldEditSelect();
             this.dcu = new DiscordUtils();
             this.hotbarController = new HotbarController(this, this.dm);
-            this.stt = new ScoreboardTimeTrialUtils(this.dm);
+            this.scoreboardOwnershipCoordinator = new ScoreboardOwnershipCoordinator();
+            this.sharedScoreboardAdapter = new MegavexAdapter(this, this.getConfig().getInt("scoreboard.max-rows", 15));
+            this.stt = new ScoreboardTimeTrialUtils(this, this.dm, this.sharedScoreboardAdapter, this.scoreboardOwnershipCoordinator);
             this.packetSender = new PacketSender(this.dm, this);
             this.timerUtils = new TimerUtils(this, this.dm);
             this.cu = new CamUtils(this.dm, this);
@@ -216,13 +222,8 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.spectatorManager = new SpectatorManager(this);
             this.readyCheckManager = new ReadyCheckManager(this);
             this.raceActionBarManager = new RaceActionBarManager(this);
-            if (this.getConfig().getBoolean("scoreboard.v2.enabled", false)) {
-                this.raceScoreboardManager = new RaceScoreboardV2Manager(this);
-                this.getLogger().info("[FormulaRacing] Scoreboard V2 enabled (Megavex).");
-            } else {
-                this.raceScoreboardManager = new RaceScoreboardManagerAdvanced(this);
-                this.getLogger().info("[FormulaRacing] Scoreboard V1 enabled (FastBoard).");
-            }
+            this.raceScoreboardManager = new RaceScoreboardV2Manager(this, this.sharedScoreboardAdapter, this.scoreboardOwnershipCoordinator);
+            this.getLogger().info("[FormulaRacing] Unified scoreboard enabled (Megavex).");
             this.trackVisualizer = new TrackVisualizer(this);
             this.eventAnnouncements = new EventAnnouncements(this);
             this.quickRaceManager = new QuickRaceManager(this, this.raceEventManager, this.dm);
@@ -233,7 +234,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.raceEventManager.loadActiveEventsFromDatabase();
             this.dailyRaceManager = new DailyRaceManager(this);
             this.dailyRaceManager.start();
-            ScoreboardDuelsTimeUtils scoreboardDuelsUtils = new ScoreboardDuelsTimeUtils(this, this.dm, this.ttda,null);
+            ScoreboardDuelsTimeUtils scoreboardDuelsUtils = new ScoreboardDuelsTimeUtils(this, this.dm, this.ttda, null, this.sharedScoreboardAdapter, this.scoreboardOwnershipCoordinator);
             this.ttd = new TimeTrialDuels(this, this.dm, this.packetSender, this.ttda, scoreboardDuelsUtils);
             this.ttda.setTimeTrialDuels(this.ttd);
             scoreboardDuelsUtils.setTimeTrialDuels(this.ttd);
@@ -290,6 +291,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
         if (this.raceScoreboardManager != null) {
             this.raceScoreboardManager.shutdown();
+        }
+
+        if (this.sharedScoreboardAdapter != null) {
+            this.sharedScoreboardAdapter.shutdown();
         }
 
         try {
@@ -609,6 +614,14 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     public RaceScoreboardService getRaceScoreboardManager() {
         return this.raceScoreboardManager;
+    }
+
+    public ScoreboardOwnershipCoordinator getScoreboardOwnershipCoordinator() {
+        return this.scoreboardOwnershipCoordinator;
+    }
+
+    public ScoreboardAdapter getSharedScoreboardAdapter() {
+        return this.sharedScoreboardAdapter;
     }
 
     public RaceVoteManager getRaceVoteManager() {

@@ -1,20 +1,18 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by Fernflower decompiler)
-//
-
 package dev.EfraGroup.formulaRacing.Controllers;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Event.Events;
+import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Spectator;
 import dev.EfraGroup.formulaRacing.Participant.Spectator.SpectatorMode;
+import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,8 +29,12 @@ public class SpectatorManager {
     private final Map<UUID, Spectator> spectators;
     private final Map<UUID, Events> spectatorToEvent;
     private final Map<Integer, Set<UUID>> eventToSpectators;
+    private final Map<UUID, Heats> spectatorBoundHeat;
+    private final Map<UUID, GameMode> previousGameModes;
     private BukkitTask followTask;
-    private static final int FOLLOW_UPDATE_INTERVAL = 5;
+    private BukkitTask bindingTask;
+    private static final int FOLLOW_UPDATE_INTERVAL_TICKS = 5;
+    private static final int BINDING_UPDATE_INTERVAL_TICKS = 10;
 
     public Set<UUID> getSpectatorsInEvent(int eventId) {
         return (Set)this.eventToSpectators.getOrDefault(eventId, Collections.emptySet());
@@ -44,7 +46,10 @@ public class SpectatorManager {
         this.spectators = new ConcurrentHashMap();
         this.spectatorToEvent = new ConcurrentHashMap();
         this.eventToSpectators = new ConcurrentHashMap();
+        this.spectatorBoundHeat = new ConcurrentHashMap();
+        this.previousGameModes = new ConcurrentHashMap();
         this.startFollowTask();
+        this.startBindingTask();
     }
 
     public boolean addSpectator(Player player, Events event) {
@@ -57,8 +62,11 @@ public class SpectatorManager {
             Spectator spectator = new Spectator(playerId, player.getName());
             this.spectators.put(playerId, spectator);
             this.spectatorToEvent.put(playerId, event);
+            this.previousGameModes.put(playerId, player.getGameMode());
             ((Set)this.eventToSpectators.computeIfAbsent(event.getId(), (k) -> ConcurrentHashMap.newKeySet())).add(playerId);
+            event.addSpectator(playerId);
             this.setupSpectatorMode(player, spectator, event);
+            this.syncBindingFor(playerId, player, event);
             this.plugin.sendMessage(player, "spectator_watching", new String[0]);
             this.plugin.sendMessage(player, "spectator_help_follow", new String[0]);
             this.plugin.sendMessage(player, "spectator_help_leave", new String[0]);
@@ -74,14 +82,25 @@ public class SpectatorManager {
             return false;
         } else {
             Events event = (Events)this.spectatorToEvent.remove(playerId);
+            GameMode previousMode = (GameMode)this.previousGameModes.remove(playerId);
+            Heats boundHeat = (Heats)this.spectatorBoundHeat.remove(playerId);
+            if (boundHeat != null) {
+                this.plugin.getRaceScoreboardManager().removeSpectator(player);
+            }
+
             if (event != null) {
                 Set<UUID> eventSpectators = (Set)this.eventToSpectators.get(event.getId());
                 if (eventSpectators != null) {
                     eventSpectators.remove(playerId);
+                    if (eventSpectators.isEmpty()) {
+                        this.eventToSpectators.remove(event.getId());
+                    }
                 }
+
+                event.removeSpectator(playerId);
             }
 
-            this.restorePlayer(player);
+            this.restorePlayer(player, previousMode);
             long watchTime = spectator.getWatchTime() / 1000L;
             this.plugin.sendMessage(player, "spectator_time_watched", new String[]{"{time}", this.formatTime(watchTime)});
             this.debug.logSpectatorSystem(String.format("%s saiu do modo espectador", player.getName()));
@@ -98,7 +117,6 @@ public class SpectatorManager {
     }
 
     private void setupSpectatorMode(Player player, Spectator spectator, Events event) {
-        GameMode previousGameMode = player.getGameMode();
         player.setGameMode(GameMode.SPECTATOR);
         Location spectatorLocation = this.getSpectatorLocation(event);
         if (spectatorLocation != null) {
@@ -110,10 +128,14 @@ public class SpectatorManager {
         player.sendTitle(title, subtitle, 10, 60, 20);
     }
 
-    private void restorePlayer(Player player) {
-        player.setGameMode(GameMode.SURVIVAL);
+    private void restorePlayer(Player player, GameMode previousMode) {
+        if (previousMode == null) {
+            previousMode = GameMode.SURVIVAL;
+        }
+
+        player.setGameMode(previousMode);
         player.setFlying(false);
-        player.setAllowFlight(false);
+        player.setAllowFlight(previousMode == GameMode.CREATIVE || previousMode == GameMode.SPECTATOR);
     }
 
     private Location getSpectatorLocation(Events event) {
@@ -175,7 +197,7 @@ public class SpectatorManager {
     private void startFollowTask() {
         this.followTask = (new BukkitRunnable() {
             public void run() {
-                for(Map.Entry<UUID, Spectator> entry : SpectatorManager.this.spectators.entrySet()) {
+                for(Map.Entry<UUID, Spectator> entry : new ArrayList<>(SpectatorManager.this.spectators.entrySet())) {
                     Spectator spectator = (Spectator)entry.getValue();
                     if (spectator.getMode() == SpectatorMode.FOLLOW_DRIVER) {
                         UUID driverUUID = spectator.getFollowingDriverUUID();
@@ -201,7 +223,100 @@ public class SpectatorManager {
                 }
 
             }
-        }).runTaskTimer(this.plugin, 0L, 5L);
+        }).runTaskTimer(this.plugin, 0L, FOLLOW_UPDATE_INTERVAL_TICKS);
+    }
+
+    private void startBindingTask() {
+        this.bindingTask = (new BukkitRunnable() {
+            public void run() {
+                for(Map.Entry<UUID, Events> entry : new ArrayList<>(SpectatorManager.this.spectatorToEvent.entrySet())) {
+                    UUID spectatorId = (UUID)entry.getKey();
+                    Events event = (Events)entry.getValue();
+                    Player player = Bukkit.getPlayer(spectatorId);
+                    if (player == null || !player.isOnline()) {
+                        SpectatorManager.this.cleanupSpectatorState(spectatorId, event);
+                        continue;
+                    }
+
+                    if (!SpectatorManager.this.isEventTrackable(event) || !event.isActive()) {
+                        SpectatorManager.this.removeSpectator(player);
+                        continue;
+                    }
+
+                    SpectatorManager.this.syncBindingFor(spectatorId, player, event);
+                }
+
+            }
+        }).runTaskTimer(this.plugin, 0L, BINDING_UPDATE_INTERVAL_TICKS);
+    }
+
+    private void cleanupSpectatorState(UUID spectatorId, Events fallbackEvent) {
+        this.spectators.remove(spectatorId);
+        this.previousGameModes.remove(spectatorId);
+        this.spectatorBoundHeat.remove(spectatorId);
+        Events event = (Events)this.spectatorToEvent.remove(spectatorId);
+        if (event == null) {
+            event = fallbackEvent;
+        }
+
+        if (event != null) {
+            Set<UUID> eventSpectators = (Set)this.eventToSpectators.get(event.getId());
+            if (eventSpectators != null) {
+                eventSpectators.remove(spectatorId);
+                if (eventSpectators.isEmpty()) {
+                    this.eventToSpectators.remove(event.getId());
+                }
+            }
+
+            event.removeSpectator(spectatorId);
+        }
+
+    }
+
+    public void handlePlayerDisconnect(UUID spectatorId) {
+        if (this.spectators.containsKey(spectatorId)) {
+            this.cleanupSpectatorState(spectatorId, (Events)this.spectatorToEvent.get(spectatorId));
+        }
+    }
+
+    private boolean isEventTrackable(Events event) {
+        return event != null && this.plugin.getRaceEventManager().getEventById(event.getId()).isPresent();
+    }
+
+    private void syncBindingFor(UUID spectatorId, Player player, Events event) {
+        Heats targetHeat = this.resolveActiveHeat(event);
+        Heats currentHeat = (Heats)this.spectatorBoundHeat.get(spectatorId);
+        if (currentHeat == targetHeat) {
+            return;
+        }
+
+        if (currentHeat != null) {
+            this.plugin.getRaceScoreboardManager().removeSpectator(player);
+        }
+
+        if (targetHeat != null) {
+            this.plugin.getRaceScoreboardManager().addSpectator(player, targetHeat);
+            this.spectatorBoundHeat.put(spectatorId, targetHeat);
+        } else {
+            this.spectatorBoundHeat.remove(spectatorId);
+        }
+
+    }
+
+    private Heats resolveActiveHeat(Events event) {
+        Optional<Heats> currentRoundHeat = event.getEventSchedule().getCurrentRound().flatMap((round) -> round.getActiveHeat());
+        if (currentRoundHeat.isPresent()) {
+            return (Heats)currentRoundHeat.get();
+        } else {
+            for(Rounds round : event.getEventSchedule().getRoundsOrdered()) {
+                Optional<Heats> activeHeat = round.getActiveHeat();
+                if (activeHeat.isPresent()) {
+                    return (Heats)activeHeat.get();
+                }
+            }
+
+            return null;
+        }
     }
 
     public void removeEventSpectators(Events event) {
@@ -212,8 +327,7 @@ public class SpectatorManager {
                 if (player != null && player.isOnline()) {
                     this.removeSpectator(player);
                 } else {
-                    this.spectators.remove(spectatorId);
-                    this.spectatorToEvent.remove(spectatorId);
+                    this.cleanupSpectatorState(spectatorId, event);
                 }
             }
 
@@ -262,7 +376,10 @@ public class SpectatorManager {
             this.followTask.cancel();
         }
 
-        // Corrigido: Especificando o tipo <UUID> na criação da lista para evitar o erro de conversão
+        if (this.bindingTask != null) {
+            this.bindingTask.cancel();
+        }
+
         for (UUID spectatorId : new java.util.ArrayList<>(this.spectators.keySet())) {
             Player player = Bukkit.getPlayer(spectatorId);
             if (player != null && player.isOnline()) {
@@ -273,8 +390,9 @@ public class SpectatorManager {
         this.spectators.clear();
         this.spectatorToEvent.clear();
         this.eventToSpectators.clear();
+        this.spectatorBoundHeat.clear();
+        this.previousGameModes.clear();
 
-        // Simplificado o acesso ao log para ficar mais limpo
         this.debug.logSpectatorSystem("SpectatorManager desligado");
     }
 }

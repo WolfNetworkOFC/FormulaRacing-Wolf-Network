@@ -218,16 +218,6 @@ public class EventCommand extends BaseCommand {
         }
     }
 
-    @Subcommand("leave|quit|exit")
-    @Description("Sai do evento atual")
-    public void onLeave(Player player) {
-        boolean left = this.eventManager.leaveEvent(player);
-        if (!left) {
-            this.plugin.sendMessage(player, "event_not_in_event", new String[0]);
-        }
-
-    }
-
     @Subcommand("sign|join|register")
     @CommandCompletion("@event")
     @Description("Inscreve-se como piloto")
@@ -415,9 +405,19 @@ public class EventCommand extends BaseCommand {
 
         if (event == null) {
             this.plugin.sendMessage(player, "event_none_selected", new String[0]);
+        } else if (this.plugin.getSpectatorManager().isSpectator(player.getUniqueId())) {
+            this.plugin.sendMessage(player, "spectate_already_spectator", new String[0]);
+        } else if (event.getState() != EventState.RUNNING) {
+            this.plugin.sendMessage(player, "spectate_not_running", new String[0]);
+            this.plugin.sendMessage(player, "spectate_state_info", new String[]{"{state}", event.getState().name()});
+        } else if (event.isActivelyRacing(player.getUniqueId())) {
+            this.plugin.sendMessage(player, "spectate_already_driver", new String[0]);
+            this.plugin.sendMessage(player, "spectate_already_driver_desc", new String[0]);
         } else {
             if (!this.plugin.getSpectatorManager().addSpectator(player, event)) {
                 this.plugin.sendMessage(player, "event_spectator_error", new String[0]);
+            } else {
+                this.plugin.sendMessage(player, "event_spectator_joined", new String[]{"{event}", event.getDisplayName()});
             }
 
         }
@@ -426,6 +426,15 @@ public class EventCommand extends BaseCommand {
     @Subcommand("quit|leave")
     @Description("Sai do evento atual")
     public void onQuit(Player player) {
+        if (this.plugin.getSpectatorManager().isSpectator(player.getUniqueId())) {
+            Events watching = this.plugin.getSpectatorManager().getWatchingEvent(player.getUniqueId());
+            if (this.plugin.getSpectatorManager().removeSpectator(player)) {
+                this.plugin.sendMessage(player, "event_left", new String[]{"{event}", watching != null ? watching.getDisplayName() : "-"});
+            }
+
+            return;
+        }
+
         Optional<Events> eventOpt = this.eventManager.getPlayerEvent(player.getUniqueId());
         if (eventOpt.isPresent()) {
             this.eventManager.removePlayerFromEvent(player.getUniqueId());

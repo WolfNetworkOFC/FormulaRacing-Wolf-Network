@@ -43,10 +43,8 @@ scoreboard:
   style:
     accent-marker: "┃"
   v2:
-    enabled: false
+    # Unified scoreboard is always enabled (Race > Duel > TT ownership)
     interval: 500ms
-    canary-percentage: 0
-    fallback-fastboard-enabled: true
     metrics-log-enabled: false
     metrics-log-interval-seconds: 30
 

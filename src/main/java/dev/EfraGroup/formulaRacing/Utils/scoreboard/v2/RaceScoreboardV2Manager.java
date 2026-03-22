@@ -5,6 +5,7 @@ import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardService;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.ScoreboardOwnershipCoordinator;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder.DefaultStateViewModelBuilder;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder.FinishedViewModelBuilder;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder.PracticeViewModelBuilder;
@@ -13,8 +14,6 @@ import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder.RacingViewModelBu
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder.StateViewModelBuilder;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.model.ScoreboardContext;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.model.ScoreboardViewModel;
-import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.FastBoardAdapter;
-import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.MegavexAdapter;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.ScoreboardAdapter;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.render.LineBudgetPolicy;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.render.ScoreboardRenderer;
@@ -35,9 +34,7 @@ import org.bukkit.scheduler.BukkitTask;
 public class RaceScoreboardV2Manager implements RaceScoreboardService {
     private final FormulaRacing plugin;
     private final ScoreboardAdapter primaryAdapter;
-    private final FastBoardAdapter fallbackAdapter;
-    private final boolean fallbackEnabled;
-    private final int canaryPercentage;
+    private final ScoreboardOwnershipCoordinator ownershipCoordinator;
     private final boolean metricsLogEnabled;
     private final long metricsLogIntervalSeconds;
     private final int maxRows;
@@ -57,17 +54,14 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
     private long renderNanosTotal;
     private long renderSamples;
 
-    public RaceScoreboardV2Manager(FormulaRacing plugin) {
+    public RaceScoreboardV2Manager(FormulaRacing plugin, ScoreboardAdapter primaryAdapter, ScoreboardOwnershipCoordinator ownershipCoordinator) {
         this.plugin = plugin;
+        this.primaryAdapter = primaryAdapter;
+        this.ownershipCoordinator = ownershipCoordinator;
         this.maxRows = plugin.getConfig().getInt("scoreboard.max-rows", 15);
         this.updateIntervalMs = parseDurationMillis(plugin.getConfig().getString("scoreboard.v2.interval", "500ms"));
-        this.fallbackEnabled = plugin.getConfig().getBoolean("scoreboard.v2.fallback-fastboard-enabled", true);
-        this.canaryPercentage = plugin.getConfig().getInt("scoreboard.v2.canary-percentage", 0);
         this.metricsLogEnabled = plugin.getConfig().getBoolean("scoreboard.v2.metrics-log-enabled", false);
         this.metricsLogIntervalSeconds = Math.max(5L, plugin.getConfig().getLong("scoreboard.v2.metrics-log-interval-seconds", 30L));
-
-        this.primaryAdapter = new MegavexAdapter(plugin, this.maxRows);
-        this.fallbackAdapter = new FastBoardAdapter();
 
         this.renderer = new ScoreboardRenderer(new LineBudgetPolicy());
         this.builders = List.of(
@@ -91,7 +85,8 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
         }
         this.removePlayer(player);
         this.playerHeats.put(player.getUniqueId(), heat);
-        this.activeAdapter(player).create(player);
+        this.ownershipCoordinator.acquire(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.RACE);
+        this.primaryAdapter.create(player);
         this.renderPlayer(player, heat, false);
     }
 
@@ -101,8 +96,8 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
             return;
         }
         this.playerHeats.remove(player.getUniqueId());
+        this.ownershipCoordinator.release(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.RACE);
         this.primaryAdapter.delete(player);
-        this.fallbackAdapter.delete(player);
     }
 
     @Override
@@ -118,7 +113,7 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player != null) {
                 this.primaryAdapter.delete(player);
-                this.fallbackAdapter.delete(player);
+                this.ownershipCoordinator.release(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.RACE);
             }
             return true;
         });
@@ -130,7 +125,6 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player != null) {
                 this.primaryAdapter.delete(player);
-                this.fallbackAdapter.delete(player);
             }
             return true;
         });
@@ -143,7 +137,8 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
         }
         this.removeSpectator(spectator);
         this.spectatorHeats.put(spectator.getUniqueId(), heat);
-        this.activeAdapter(spectator).create(spectator);
+        this.ownershipCoordinator.acquire(spectator.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.RACE);
+        this.primaryAdapter.create(spectator);
         this.renderPlayer(spectator, heat, true);
     }
 
@@ -153,8 +148,8 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
             return;
         }
         this.spectatorHeats.remove(spectator.getUniqueId());
+        this.ownershipCoordinator.release(spectator.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.RACE);
         this.primaryAdapter.delete(spectator);
-        this.fallbackAdapter.delete(spectator);
     }
 
     @Override
@@ -166,21 +161,14 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
             Player p = Bukkit.getPlayer(uuid);
             if (p != null) {
                 this.primaryAdapter.delete(p);
-                this.fallbackAdapter.delete(p);
             }
         });
         this.spectatorHeats.keySet().forEach(uuid -> {
             Player p = Bukkit.getPlayer(uuid);
             if (p != null) {
                 this.primaryAdapter.delete(p);
-                this.fallbackAdapter.delete(p);
             }
         });
-
-        if (this.primaryAdapter instanceof MegavexAdapter megavexAdapter) {
-            megavexAdapter.shutdown();
-        }
-        this.fallbackAdapter.shutdown();
         this.playerHeats.clear();
         this.spectatorHeats.clear();
     }
@@ -243,15 +231,16 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
     private void renderPlayer(Player player, Heats heat, boolean spectator, List<Driver> sortedDrivers) {
         long startNanos = System.nanoTime();
         Driver viewerDriver = spectator ? null : heat.getDriver(player.getUniqueId());
+        if (!this.ownershipCoordinator.isOwner(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.RACE)) {
+            return;
+        }
         ScoreboardContext context = new ScoreboardContext(this.plugin, heat, player, viewerDriver, spectator, sortedDrivers, this.maxRows);
 
         try {
             ScoreboardViewModel baseModel = this.findBuilder(heat.getHeatState()).build(context);
             ScoreboardViewModel rendered = this.renderer.render(context, baseModel);
-            ScoreboardAdapter adapter = this.activeAdapter(player);
-            adapter.updateTitle(player, rendered.title());
-            adapter.updateLines(player, rendered.lines());
-            this.clearOtherAdapter(player, adapter);
+            this.primaryAdapter.updateTitle(player, rendered.title());
+            this.primaryAdapter.updateLines(player, rendered.lines());
             this.updatesOk++;
         } catch (Exception ex) {
             this.updatesFailed++;
@@ -271,14 +260,7 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
         lines.add("§7Voltas: §f" + heat.getTotalLaps());
         lines.add("§ewolfnetwork.com.br");
 
-        if (this.fallbackEnabled) {
-            this.fallbackActivated++;
-            this.fallbackAdapter.updateTitle(player, this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_title_waiting"));
-            this.fallbackAdapter.updateLines(player, lines);
-            this.primaryAdapter.delete(player);
-            return;
-        }
-
+        this.fallbackActivated++;
         this.primaryAdapter.updateTitle(player, this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_title_waiting"));
         this.primaryAdapter.updateLines(player, lines);
     }
@@ -325,32 +307,6 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
         }
     }
 
-    private ScoreboardAdapter activeAdapter(Player player) {
-        if (this.shouldUsePrimary(player) && this.primaryAdapter.isHealthy(player)) {
-            return this.primaryAdapter;
-        }
-        if (this.fallbackEnabled) {
-            return this.fallbackAdapter;
-        }
-        return this.primaryAdapter;
-    }
-
-    private boolean shouldUsePrimary(Player player) {
-        if (this.canaryPercentage <= 0 || this.canaryPercentage >= 100) {
-            return true;
-        }
-        int bucket = Math.floorMod(player.getUniqueId().hashCode(), 100);
-        return bucket < this.canaryPercentage;
-    }
-
-    private void clearOtherAdapter(Player player, ScoreboardAdapter active) {
-        if (active == this.primaryAdapter) {
-            this.fallbackAdapter.delete(player);
-        } else {
-            this.primaryAdapter.delete(player);
-        }
-    }
-
     private void logMetricsIfNeeded() {
         if (!this.metricsLogEnabled) {
             return;
@@ -366,6 +322,7 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
                         + " fail=" + this.updatesFailed
                         + " fallback=" + this.fallbackActivated
                         + " avgRenderMicros=" + avgMicros
+                        + " ownership{" + this.ownershipCoordinator.metricsSnapshot() + "}"
         );
     }
 }

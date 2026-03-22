@@ -1,22 +1,11 @@
-/*
- * Decompiled with CFR 0.153-SNAPSHOT (d6f6758-dirty).
- *
- * Could not load the following classes:
- *  dev.EfraGroup.formulaRacing.Database.DatabaseManager
- *  org.bukkit.Bukkit
- *  org.bukkit.entity.Player
- *  org.bukkit.plugin.Plugin
- *  org.bukkit.scheduler.BukkitRunnable
- */
 package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
-import dev.EfraGroup.formulaRacing.Utils.TimeTrialDuelsAction;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.ScoreboardOwnershipCoordinator;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.ScoreboardAdapter;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.style.TimingScoreboardStyle;
-import fr.mrmicky.fastboard.FastBoard;
-import fr.mrmicky.fastboard.FastBoardBase;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,15 +21,25 @@ public class ScoreboardDuelsTimeUtils {
     private final FormulaRacing plugin;
     private final DatabaseManager mysql;
     private final TimeTrialDuelsAction ttda;
+    private final ScoreboardAdapter adapter;
+    private final ScoreboardOwnershipCoordinator ownershipCoordinator;
     private TimeTrialDuels timeTrialDuels;
-    private final Map<UUID, FastBoard> boards = new ConcurrentHashMap<UUID, FastBoard>();
-    private final Map<UUID, DuelContext> duelContexts = new ConcurrentHashMap<UUID, DuelContext>();
+    private final Map<UUID, DuelContext> duelContexts = new ConcurrentHashMap<>();
 
-    public ScoreboardDuelsTimeUtils(FormulaRacing plugin, DatabaseManager mysql, TimeTrialDuelsAction ttda, TimeTrialDuels timeTrialDuels) {
+    public ScoreboardDuelsTimeUtils(
+            FormulaRacing plugin,
+            DatabaseManager mysql,
+            TimeTrialDuelsAction ttda,
+            TimeTrialDuels timeTrialDuels,
+            ScoreboardAdapter adapter,
+            ScoreboardOwnershipCoordinator ownershipCoordinator
+    ) {
         this.plugin = plugin;
         this.mysql = mysql;
         this.ttda = ttda;
         this.timeTrialDuels = timeTrialDuels;
+        this.adapter = adapter;
+        this.ownershipCoordinator = ownershipCoordinator;
         this.startAutoUpdateTask();
     }
 
@@ -50,13 +49,30 @@ public class ScoreboardDuelsTimeUtils {
 
     private void startAutoUpdateTask() {
         new BukkitRunnable() {
-
+            @Override
             public void run() {
-                for (UUID uuid : ScoreboardDuelsTimeUtils.this.boards.keySet()) {
-                    Player player = Bukkit.getPlayer((UUID) uuid);
+                for (UUID uuid : ScoreboardDuelsTimeUtils.this.duelContexts.keySet()) {
+                    Player player = Bukkit.getPlayer(uuid);
                     DuelContext ctx = ScoreboardDuelsTimeUtils.this.duelContexts.get(uuid);
                     if (player == null || !player.isOnline() || ctx == null) {
                         ScoreboardDuelsTimeUtils.this.removeBoard(uuid);
+                        continue;
+                    }
+                    if (!ScoreboardDuelsTimeUtils.this.ownershipCoordinator.isOwner(uuid, ScoreboardOwnershipCoordinator.Mode.DUEL)) {
+                        if (!ScoreboardDuelsTimeUtils.this.ownershipCoordinator.acquire(uuid, ScoreboardOwnershipCoordinator.Mode.DUEL)) {
+                            continue;
+                        }
+                        if (!ScoreboardDuelsTimeUtils.this.ownershipCoordinator.isOwner(uuid, ScoreboardOwnershipCoordinator.Mode.DUEL)) {
+                            continue;
+                        }
+                        ScoreboardDuelsTimeUtils.this.adapter.create(player);
+                        ScoreboardDuelsTimeUtils.this.adapter.updateTitle(player,
+                                ScoreboardDuelsTimeUtils.this.boldTitle(
+                                        ScoreboardDuelsTimeUtils.this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_title")
+                                )
+                        );
+                    }
+                    if (!ScoreboardDuelsTimeUtils.this.ownershipCoordinator.isOwner(uuid, ScoreboardOwnershipCoordinator.Mode.DUEL)) {
                         continue;
                     }
                     double elapsedSeconds = ScoreboardDuelsTimeUtils.this.ttda.getPlayerElapsedSeconds(player);
@@ -68,9 +84,11 @@ public class ScoreboardDuelsTimeUtils {
     }
 
     public void applyDuelBoard(Player player, int duelId, int totalLaps, String trackName) {
-        FastBoard board = new FastBoard(player);
-        board.updateTitle(this.boldTitle(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_title", new String[0])));
-        this.boards.put(player.getUniqueId(), board);
+        if (!this.ownershipCoordinator.acquire(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.DUEL)) {
+            return;
+        }
+        this.adapter.create(player);
+        this.adapter.updateTitle(player, this.boldTitle(this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_title")));
         this.duelContexts.put(player.getUniqueId(), new DuelContext(duelId, totalLaps, trackName));
     }
 
@@ -82,13 +100,11 @@ public class ScoreboardDuelsTimeUtils {
     }
 
     public void update(Player player, int duelId, String currentFormattedTime, int lap, int totalLaps, String trackName) {
-        FastBoard board = this.boards.get(player.getUniqueId());
-        if (board == null) {
+        if (!this.ownershipCoordinator.isOwner(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.DUEL)) {
             return;
         }
 
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
-            // CORREÇÃO: Usar String em vez de Object
             String posDisplay;
             String langCode = this.mysql.getPlayerLanguage(player.getUniqueId());
             Double bestLap = this.mysql.getPlayerBestLapTimeInDuel(player.getUniqueId(), duelId);
@@ -108,20 +124,17 @@ public class ScoreboardDuelsTimeUtils {
 
             int timeRemaining = this.timeTrialDuels.getTimeRemaining(duelId);
             String timeRemainingDisplay = "";
-
             if (timeRemaining >= 0) {
                 timeRemainingDisplay = this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_time_remaining")
                         + "§c" + this.formatTimeRemaining(timeRemaining);
             }
 
-            // Variáveis finais para o lambda (efetivamente finais)
             final String finalPB = pbDisplay;
             final String finalPos = posDisplay;
             final String finalTimeRemaining = timeRemainingDisplay;
 
-            // Volta para a Thread Principal (Sync) para atualizar a Scoreboard
             Bukkit.getScheduler().runTask(this.plugin, () ->
-                    this.updateBoardLines(player, board, timeRemaining, finalPos, lap, totalLaps, currentFormattedTime, finalPB, finalTimeRemaining, trackName)
+                    this.updateBoardLines(player, timeRemaining, finalPos, lap, totalLaps, currentFormattedTime, finalPB, finalTimeRemaining, trackName)
             );
         });
     }
@@ -131,16 +144,22 @@ public class ScoreboardDuelsTimeUtils {
     }
 
     private void removeBoard(UUID uuid) {
-        FastBoard board = this.boards.remove(uuid);
-        if (board != null) {
-            board.delete();
+        Player player = Bukkit.getPlayer(uuid);
+        if (player != null) {
+            this.adapter.delete(player);
         }
         this.duelContexts.remove(uuid);
+        this.ownershipCoordinator.release(uuid, ScoreboardOwnershipCoordinator.Mode.DUEL);
     }
 
     public void clearAll() {
-        this.boards.values().forEach(FastBoardBase::delete);
-        this.boards.clear();
+        for (UUID uuid : this.duelContexts.keySet()) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                this.adapter.delete(player);
+            }
+            this.ownershipCoordinator.release(uuid, ScoreboardOwnershipCoordinator.Mode.DUEL);
+        }
         this.duelContexts.clear();
     }
 
@@ -149,24 +168,24 @@ public class ScoreboardDuelsTimeUtils {
         if (pos <= 0) {
             pos = 1;
         }
-        return (switch (pos) {
+        return switch (pos) {
             case 1 -> {
                 positionText = this.plugin.getDirectTranslation("duel_position_1st", langCode);
-                yield "\u00a7a\u00a7l";
+                yield "§a§l" + positionText;
             }
             case 2 -> {
                 positionText = this.plugin.getDirectTranslation("duel_position_2nd", langCode);
-                yield "\u00a7e\u00a7l";
+                yield "§e§l" + positionText;
             }
             case 3 -> {
                 positionText = this.plugin.getDirectTranslation("duel_position_3rd", langCode);
-                yield "\u00a76\u00a7l";
+                yield "§6§l" + positionText;
             }
             default -> {
                 positionText = this.plugin.getTranslation("duel_position_nth", langCode, "{position}", String.valueOf(pos));
-                yield "\u00a7f\u00a7l";
+                yield "§f§l" + positionText;
             }
-        }) + positionText;
+        };
     }
 
     private String formatTime(double seconds) {
@@ -202,18 +221,12 @@ public class ScoreboardDuelsTimeUtils {
         return "§l" + title;
     }
 
-    private void updateBoardLines(Player player, FastBoard board, int timeRemaining, String finalPosDisplay, int lap, int totalLaps, String currentFormattedTime, String finalPB, String finalTimeRemaining, String trackName) {
-        FastBoard currentBoard = this.boards.get(player.getUniqueId());
-
-        // Verifica se o jogador ainda possui uma scoreboard ativa e se é a mesma instância
-        if (currentBoard == null || currentBoard != board) {
+    private void updateBoardLines(Player player, int timeRemaining, String finalPosDisplay, int lap, int totalLaps, String currentFormattedTime, String finalPB, String finalTimeRemaining, String trackName) {
+        if (!this.ownershipCoordinator.isOwner(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.DUEL)) {
             return;
         }
 
-        // CORREÇÃO: Usando List<String> para compatibilidade com board.updateLines
         List<String> lines = new ArrayList<>();
-
-        // Linha de separação padrão
         String separator = this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_common_separator");
         String footer = this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_common_footer");
         String marker = TimingScoreboardStyle.normalizeAccentMarker(this.plugin.getConfig().getString("scoreboard.style.accent-marker", "┃"));
@@ -226,11 +239,9 @@ public class ScoreboardDuelsTimeUtils {
         lines.add("§f§l" + this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_time") + "§b§l" + currentFormattedTime);
         lines.add("§f§l" + this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_record") + finalPB);
 
-        // Se houver tempo restante (ex: contagem regressiva), adicionamos a linha
         if (timeRemaining >= 0 && lines.size() < MAX_LINES - 3) {
             lines.add(finalTimeRemaining);
         }
-
         while (lines.size() > MAX_LINES - 3) {
             lines.remove(lines.size() - 1);
         }
@@ -238,9 +249,7 @@ public class ScoreboardDuelsTimeUtils {
         lines.add("");
         lines.add(separator);
         lines.add(footer);
-
-        // Atualiza as linhas da Scoreboard
-        board.updateLines(lines);
+        this.adapter.updateLines(player, lines);
     }
 
     private static class DuelContext {

@@ -136,6 +136,7 @@ From `.github/copilot-instructions.md`:
 
 ## Agent Workflow Recommendations
 - Before edits, inspect neighboring classes for local conventions.
+- Base new implementations and refactors as much as possible on Frosthex's `TimingSystem` plugin source when patterns are applicable (`C:\Users\vitor\OneDrive\Documentos\Git Repos\TimingSystem`).
 - For behavior changes in listeners/controllers, validate likely tick/thread impact.
 - For persistence changes, verify SQL path and potential migration impact.
 - Prefer compile check after edits: `mvn -DskipTests compile`.

@@ -157,6 +157,10 @@ public class JoinListener implements Listener {
             this.plugin.getRaceEventManager().leaveEvent(player);
         }
 
+        if (this.plugin.getSpectatorManager() != null) {
+            this.plugin.getSpectatorManager().handlePlayerDisconnect(uuid);
+        }
+
         if (player.isInsideVehicle()) {
             player.getVehicle().remove();
         }

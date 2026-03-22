@@ -108,11 +108,6 @@
         </dependency>
 
         <dependency>
-            <groupId>fr.mrmicky</groupId>
-            <artifactId>fastboard</artifactId>
-            <version>2.1.5</version>
-        </dependency>
-        <dependency>
             <groupId>net.megavex</groupId>
             <artifactId>scoreboard-library-api</artifactId>
             <version>2.4.4</version>
@@ -209,11 +204,6 @@
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <finalName>${project.artifactId}-${project.version}</finalName>
                             <relocations>
-                                <!-- FastBoard -->
-                                <relocation>
-                                    <pattern>fr.mrmicky.fastboard</pattern>
-                                    <shadedPattern>dev.efragroup.libs.fastboard</shadedPattern>
-                                </relocation>
                                 <!-- ACF (Aikar Command Framework) -->
                                 <relocation>
                                     <pattern>co.aikar.commands</pattern>
