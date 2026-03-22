@@ -254,6 +254,7 @@ public class SpectatorManager {
         this.spectators.remove(spectatorId);
         this.previousGameModes.remove(spectatorId);
         this.spectatorBoundHeat.remove(spectatorId);
+        this.plugin.getScoreboardOwnershipCoordinator().clear(spectatorId);
         Events event = (Events)this.spectatorToEvent.remove(spectatorId);
         if (event == null) {
             event = fallbackEvent;

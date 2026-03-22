@@ -125,6 +125,7 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player != null) {
                 this.primaryAdapter.delete(player);
+                this.ownershipCoordinator.release(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.RACE);
             }
             return true;
         });

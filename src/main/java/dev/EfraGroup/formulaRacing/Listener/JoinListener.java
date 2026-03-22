@@ -147,6 +147,7 @@ public class JoinListener implements Listener {
 
         if (this.plugin.getRaceScoreboardManager() != null) {
             this.plugin.getRaceScoreboardManager().removePlayer(player);
+            this.plugin.getRaceScoreboardManager().removeSpectator(player);
         }
 
         if (this.plugin.getScoreboardTimeTrialUtils() != null) {
@@ -159,6 +160,10 @@ public class JoinListener implements Listener {
 
         if (this.plugin.getSpectatorManager() != null) {
             this.plugin.getSpectatorManager().handlePlayerDisconnect(uuid);
+        }
+
+        if (this.plugin.getScoreboardOwnershipCoordinator() != null) {
+            this.plugin.getScoreboardOwnershipCoordinator().clear(uuid);
         }
 
         if (player.isInsideVehicle()) {
