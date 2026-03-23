@@ -5,8 +5,10 @@ import dev.EfraGroup.formulaRacing.Heat.Lap;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.style.TimingScoreboardStyle;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.model.ScoreboardContext;
+import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -15,9 +17,12 @@ final class BuilderSupport {
             "§0", "§1", "§2", "§3", "§4", "§5", "§6", "§7",
             "§8", "§9", "§a", "§b", "§c", "§d", "§e", "§f"
     };
+    private static final int MIDDLE_CONTENT_WIDTH = 9;
 
     private BuilderSupport() {
     }
+
+    private static final Map<String, String> SCOREBOARD_FALLBACKS = createScoreboardFallbacks();
 
     static List<String> buildClassificationLines(ScoreboardContext context, boolean qualifyingMode) {
         return buildClassificationLines(context, qualifyingMode, 5);
@@ -85,12 +90,10 @@ final class BuilderSupport {
         for (int i = start; i < end; i++) {
             Driver current = sorted.get(i);
             Driver reference;
-            if (context.spectator()) {
-                if (qualifyingMode) {
-                    reference = i == 0 ? null : leader;
-                } else {
-                    reference = i > 0 ? sorted.get(i - 1) : null;
-                }
+            if (qualifyingMode) {
+                reference = i == 0 ? null : leader;
+            } else if (context.spectator()) {
+                reference = i > 0 ? sorted.get(i - 1) : null;
             } else {
                 reference = referenceDriver;
             }
@@ -173,19 +176,19 @@ final class BuilderSupport {
         if (qualifyingMode) {
             if (reference == null || reference.getUuid().equals(current.getUuid())) {
                 Lap best = current.getFastestLap();
-                return best == null ? " §8--.---   " : " §7" + padRight(formatTime(best.getLapTime()), 8);
+                return best == null ? middleCell("§8", "--.---") : middleCell("§7", formatTime(best.getLapTime()));
             }
             return gapBlock(context, current, reference, true);
         }
 
         if (reference == null || reference.getUuid().equals(current.getUuid())) {
             if (current.isDrsActive()) {
-                return " §a§lDRS§r      ";
+                return middleCell("§a", "DRS");
             }
             if (current.hasDrsPermission()) {
-                return " §f§lDRS§r      ";
+                return middleCell("§f", "DRS");
             }
-            return " §8         ";
+            return middleCell("§8", "");
         }
 
         return gapBlock(context, current, reference, false);
@@ -196,59 +199,100 @@ final class BuilderSupport {
             Lap currentBest = current.getFastestLap();
             Lap referenceBest = reference.getFastestLap();
             if (currentBest == null || referenceBest == null) {
-                return " §8--      ";
+                return middleCell("§8", "--");
             }
             long diff = currentBest.getLapTime() - referenceBest.getLapTime();
-            if (diff > 0L) {
-                return " §a+" + padRight(formatTime(diff), 7);
-            }
-            if (diff < 0L) {
-                return " §c-" + padRight(formatTime(Math.abs(diff)), 7);
-            }
-            return " §e=" + padRight("0.000", 7);
+            return formatSignedGap(diff);
         }
 
-        int currentLaps = current.getLapCount();
-        int currentCp = current.getCheckpointsReached();
+        Long raceDiff = computeRaceGap(current, reference);
+        if (raceDiff != null) {
+            return formatSignedGap(raceDiff);
+        }
 
-        Long currentAtProgress = current.getAbsoluteTimeAtProgress(currentLaps, currentCp);
-        Long referenceAtProgress = reference.getAbsoluteTimeAtProgress(currentLaps, currentCp);
-        if (currentAtProgress != null && referenceAtProgress != null) {
-            long diff = currentAtProgress - referenceAtProgress;
-            if (diff > 0L) {
-                return " §a+" + padRight(formatTime(diff), 7);
+        return middleCell("§8", "--");
+    }
+
+    private static Long computeRaceGap(Driver current, Driver reference) {
+        int maxComparableLap = Math.min(latestComparableLap(current), latestComparableLap(reference));
+        if (maxComparableLap < 0) {
+            return null;
+        }
+
+        for (int lap = maxComparableLap; lap >= 0; lap--) {
+            int maxCpCurrent = maxCheckpointAtLap(current, lap);
+            int maxCpReference = maxCheckpointAtLap(reference, lap);
+            int maxCommonCp = Math.min(maxCpCurrent, maxCpReference);
+
+            for (int cp = maxCommonCp; cp >= 0; cp--) {
+                Long currentAt = current.getAbsoluteTimeAtProgress(lap, cp);
+                Long referenceAt = reference.getAbsoluteTimeAtProgress(lap, cp);
+                if (currentAt != null && referenceAt != null) {
+                    return currentAt - referenceAt;
+                }
             }
-            if (diff < 0L) {
-                return " §c-" + padRight(formatTime(Math.abs(diff)), 7);
-            }
-            return " §e=" + padRight("0.000", 7);
         }
 
         long currentProgressMs = current.getTimeAtLastCheckpoint();
         long referenceProgressMs = reference.getTimeAtLastCheckpoint();
         if (currentProgressMs > 0L && referenceProgressMs > 0L) {
-            long diff = currentProgressMs - referenceProgressMs;
-            if (diff > 0L) {
-                return " §a+" + padRight(formatTime(diff), 7);
-            }
-            if (diff < 0L) {
-                return " §c-" + padRight(formatTime(Math.abs(diff)), 7);
-            }
-            return " §e=" + padRight("0.000", 7);
+            return currentProgressMs - referenceProgressMs;
         }
 
-        return " §8--      ";
+        return null;
+    }
+
+    private static String formatSignedGap(long diffMs) {
+        if (diffMs > 0L) {
+            return middleCell("§a", "+" + formatTime(diffMs));
+        }
+        if (diffMs < 0L) {
+            return middleCell("§c", "-" + formatTime(Math.abs(diffMs)));
+        }
+        return middleCell("§e", "=" + "0.000");
+    }
+
+    private static String middleCell(String color, String content) {
+        return " " + color + padRight(content, MIDDLE_CONTENT_WIDTH);
+    }
+
+    private static int latestComparableLap(Driver driver) {
+        int lapCount = driver.getLapCount();
+        if (driver.getAbsoluteTimeAtProgress(lapCount, 0) != null) {
+            return lapCount;
+        }
+        if (lapCount > 0 && driver.getAbsoluteTimeAtProgress(lapCount - 1, 0) != null) {
+            return lapCount - 1;
+        }
+        return -1;
+    }
+
+    private static int maxCheckpointAtLap(Driver driver, int lapIndex) {
+        if (lapIndex < 0) {
+            return 0;
+        }
+
+        if (lapIndex < driver.getLapCount()) {
+            Lap lap = driver.getLaps().get(lapIndex);
+            return lap.getCheckpointTimes().keySet().stream().mapToInt(Integer::intValue).max().orElse(0);
+        }
+
+        if (lapIndex == driver.getLapCount() && driver.getCurrentLap() != null) {
+            return driver.getCurrentLap().getCheckpointTimes().keySet().stream().mapToInt(Integer::intValue).max().orElse(0);
+        }
+
+        return 0;
     }
 
     private static String statusBlock(ScoreboardContext context, Driver driver, Player player) {
         if (driver.isDnf()) {
-            return " §7" + padRight(tr(context, "scoreboard_status_dnf_short"), 9);
+            return middleCell("§7", tr(context, "scoreboard_status_dnf_short"));
         }
         if (player == null || !player.isOnline()) {
-            return " §7" + padRight(tr(context, "scoreboard_status_offline"), 9);
+            return middleCell("§7", tr(context, "scoreboard_status_offline"));
         }
         if (context.plugin().getPitStopManager() != null && context.plugin().getPitStopManager().isPlayerInPitRegion(driver.getUuid())) {
-            return " §7" + padRight(tr(context, "scoreboard_status_in_pit"), 9);
+            return middleCell("§7", tr(context, "scoreboard_status_in_pit"));
         }
         return "";
     }
@@ -346,7 +390,54 @@ final class BuilderSupport {
     }
 
     private static String tr(ScoreboardContext context, String key, String... placeholders) {
-        return context.plugin().getTranslationUtil().getTranslated(context.viewer(), key, placeholders);
+        String translated = context.plugin().getTranslationUtil().getTranslated(context.viewer(), key, placeholders);
+        if (isMissingTranslation(translated)) {
+            translated = context.plugin().getTranslation(key, "en_US", placeholders);
+        }
+        if (isMissingTranslation(translated)) {
+            translated = applyFallback(key, placeholders);
+        }
+        return translated;
+    }
+
+    private static boolean isMissingTranslation(String translated) {
+        return translated == null || translated.contains("[Lang Error]");
+    }
+
+    private static String applyFallback(String key, String... placeholders) {
+        String template = SCOREBOARD_FALLBACKS.getOrDefault(key, key);
+        if (placeholders != null) {
+            for (int i = 0; i < placeholders.length - 1; i += 2) {
+                template = template.replace(placeholders[i], placeholders[i + 1]);
+            }
+        }
+        return template;
+    }
+
+    private static Map<String, String> createScoreboardFallbacks() {
+        Map<String, String> fallback = new HashMap<>();
+        fallback.put("scoreboard_title_practice", "§d§l FREE PRACTICE");
+        fallback.put("scoreboard_title_qualifying", "§b§l QUALIFYING");
+        fallback.put("scoreboard_title_waiting", "§6§l WAITING");
+        fallback.put("scoreboard_title_race", "§c§l RACE");
+        fallback.put("scoreboard_title_finished", "§a§l FINISHED");
+
+        fallback.put("scoreboard_common_separator", "§7------------------------");
+        fallback.put("scoreboard_common_footer", "§ewolfnetwork.com.br");
+
+        fallback.put("scoreboard_v2_no_active_drivers", "§7No active drivers");
+        fallback.put("scoreboard_v2_best_lap", "§fBest lap: {time}");
+        fallback.put("scoreboard_v2_offline", "Offline");
+        fallback.put("scoreboard_v2_drivers", "§fDrivers: {count}");
+        fallback.put("scoreboard_v2_track", "§fTrack: {track}");
+        fallback.put("scoreboard_v2_laps", "§fLaps: {laps}");
+        fallback.put("scoreboard_v2_position", "§fPosition: {position}");
+        fallback.put("scoreboard_v2_time", "§fTime: {time}");
+
+        fallback.put("scoreboard_status_dnf_short", "DNF");
+        fallback.put("scoreboard_status_offline", "Offline");
+        fallback.put("scoreboard_status_in_pit", "In Pit");
+        return fallback;
     }
 
     static String spacer(int index) {
