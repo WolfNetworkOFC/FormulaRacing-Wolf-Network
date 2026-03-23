@@ -1026,6 +1026,26 @@ public class EventsDatabaseManager {
         });
     }
 
+    public boolean clearHeatDriversSync(int heatId) {
+        String sql = "DELETE FROM fr_drivers WHERE heatId = ?";
+
+        try {
+            Connection conn = this.databaseManager.getOrConnect();
+            if (conn == null) {
+                return false;
+            }
+
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setInt(1, heatId);
+                stmt.executeUpdate();
+                return true;
+            }
+        } catch (SQLException exception) {
+            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Falha sync ao limpar pilotos do heat " + heatId + ": " + exception.getMessage());
+            return false;
+        }
+    }
+
     public void updateHeatLonely(int heatId, boolean lonely) {
         String sql = "UPDATE fr_heats SET lonely = ? WHERE id = ?";
         this.executeAsync(sql, "updateHeatLonely", (stmt) -> {
@@ -1188,6 +1208,50 @@ public class EventsDatabaseManager {
         });
     }
 
+    public boolean addDriverToHeatWithShiftSync(UUID uuid, int heatId, int position) {
+        String shiftSql = "UPDATE fr_drivers SET position = position + 1, startPosition = startPosition + 1 WHERE heatId = ? AND position >= ?";
+        String insertSql = "INSERT INTO fr_drivers (uuid, heatId, position, startPosition, pitstops) VALUES (?, ?, ?, ?, ?)";
+
+        try {
+            Connection conn = this.databaseManager.getOrConnect();
+            if (conn == null) {
+                return false;
+            }
+
+            boolean initialAutoCommit = conn.getAutoCommit();
+            conn.setAutoCommit(false);
+
+            try {
+                try (PreparedStatement shiftStmt = conn.prepareStatement(shiftSql)) {
+                    shiftStmt.setInt(1, heatId);
+                    shiftStmt.setInt(2, position);
+                    shiftStmt.executeUpdate();
+                }
+
+                try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+                    insertStmt.setString(1, uuid.toString());
+                    insertStmt.setInt(2, heatId);
+                    insertStmt.setInt(3, position);
+                    insertStmt.setInt(4, position);
+                    insertStmt.setInt(5, 0);
+                    insertStmt.executeUpdate();
+                }
+
+                conn.commit();
+                return true;
+            } catch (SQLException exception) {
+                conn.rollback();
+                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro sync ao adicionar piloto com shift: " + exception.getMessage());
+                return false;
+            } finally {
+                conn.setAutoCommit(initialAutoCommit);
+            }
+        } catch (SQLException exception) {
+            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Falha sync ao adicionar piloto com shift: " + exception.getMessage());
+            return false;
+        }
+    }
+
     public void removeDriverFromHeatWithShift(UUID uuid, int heatId) {
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
             try {
@@ -1305,6 +1369,64 @@ public class EventsDatabaseManager {
                 this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao remover player do heat com shift: " + e.getMessage());
             }
         });
+    }
+
+    public boolean removeDriverFromHeatWithShiftSync(UUID uuid, int heatId) {
+        String fetchSql = "SELECT position FROM fr_drivers WHERE uuid=? AND heatId=?";
+        String deleteSql = "DELETE FROM fr_drivers WHERE uuid=? AND heatId=?";
+        String shiftSql = "UPDATE fr_drivers SET position = position - 1, startPosition = startPosition - 1 WHERE heatId=? AND position > ?";
+
+        try {
+            Connection conn = this.databaseManager.getOrConnect();
+            if (conn == null) {
+                return false;
+            }
+
+            boolean initialAutoCommit = conn.getAutoCommit();
+            conn.setAutoCommit(false);
+
+            try {
+                int removedPosition = -1;
+                try (PreparedStatement fetchStmt = conn.prepareStatement(fetchSql)) {
+                    fetchStmt.setString(1, uuid.toString());
+                    fetchStmt.setInt(2, heatId);
+                    try (ResultSet rs = fetchStmt.executeQuery()) {
+                        if (rs.next()) {
+                            removedPosition = rs.getInt("position");
+                        }
+                    }
+                }
+
+                if (removedPosition == -1) {
+                    conn.rollback();
+                    return false;
+                }
+
+                try (PreparedStatement deleteStmt = conn.prepareStatement(deleteSql)) {
+                    deleteStmt.setString(1, uuid.toString());
+                    deleteStmt.setInt(2, heatId);
+                    deleteStmt.executeUpdate();
+                }
+
+                try (PreparedStatement shiftStmt = conn.prepareStatement(shiftSql)) {
+                    shiftStmt.setInt(1, heatId);
+                    shiftStmt.setInt(2, removedPosition);
+                    shiftStmt.executeUpdate();
+                }
+
+                conn.commit();
+                return true;
+            } catch (SQLException exception) {
+                conn.rollback();
+                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro sync ao remover piloto com shift: " + exception.getMessage());
+                return false;
+            } finally {
+                conn.setAutoCommit(initialAutoCommit);
+            }
+        } catch (SQLException exception) {
+            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Falha sync ao remover piloto com shift: " + exception.getMessage());
+            return false;
+        }
     }
 
     public void updateHeatGridPositions(int heatId, Map<UUID, Integer> positions) {

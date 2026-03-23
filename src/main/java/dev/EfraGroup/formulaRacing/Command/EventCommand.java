@@ -91,6 +91,11 @@ public class EventCommand extends BaseCommand {
     @CommandCompletion("@event")
     @Description("Seleciona um evento para gerenciar")
     public void onSelect(Player player, Events event) {
+        if (event == null) {
+            this.plugin.sendMessage(player, "event_none_selected", new String[0]);
+            return;
+        }
+
         this.database.setPlayerSelectedEvent(player.getUniqueId(), event);
         this.plugin.sendMessage(player, "event_selected", new String[]{"{event}", event.getDisplayName()});
         this.showEventInfo(player, event);
@@ -116,12 +121,14 @@ public class EventCommand extends BaseCommand {
     @CommandCompletion("@nothing @tracks")
     public void onCreate(Player player, String name, String trackNameWS) {
         this.eventManager.createEvent(player.getUniqueId(), name, trackNameWS).thenAccept((event) -> {
-            if (event != null) {
-                this.plugin.sendMessage(player, "event_created", new String[]{"{event}", name});
-                this.database.setPlayerSelectedEvent(player.getUniqueId(), event);
-            } else {
-                this.plugin.sendMessage(player, "event_create_error", new String[0]);
-            }
+            this.plugin.getServer().getScheduler().runTask(this.plugin, () -> {
+                if (event != null) {
+                    this.plugin.sendMessage(player, "event_created", new String[]{"{event}", name});
+                    this.database.setPlayerSelectedEvent(player.getUniqueId(), event);
+                } else {
+                    this.plugin.sendMessage(player, "event_create_error", new String[0]);
+                }
+            });
 
         });
     }
@@ -154,12 +161,14 @@ public class EventCommand extends BaseCommand {
         }
 
         this.eventManager.createFullEvent(player.getUniqueId(), name, track, practiceTime, qualLaps, qualTime, finalLaps, pits).thenAccept((event) -> {
-            if (event != null) {
-                this.plugin.sendMessage(player, "event_full_created", new String[]{"{event}", name});
-                this.database.setPlayerSelectedEvent(player.getUniqueId(), event);
-            } else {
-                this.plugin.sendMessage(player, "event_full_error", new String[0]);
-            }
+            this.plugin.getServer().getScheduler().runTask(this.plugin, () -> {
+                if (event != null) {
+                    this.plugin.sendMessage(player, "event_full_created", new String[]{"{event}", name});
+                    this.database.setPlayerSelectedEvent(player.getUniqueId(), event);
+                } else {
+                    this.plugin.sendMessage(player, "event_full_error", new String[0]);
+                }
+            });
 
         });
     }
@@ -168,6 +177,11 @@ public class EventCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Remove um evento")
     public void onDelete(Player player, Events event) {
+        if (event == null) {
+            this.plugin.sendMessage(player, "event_none_selected", new String[0]);
+            return;
+        }
+
         if (this.eventManager.deleteEvent(event.getId())) {
             String var10001 = String.valueOf(ChatColor.GREEN);
             player.sendMessage(var10001 + "✓ Evento removido com sucesso: " + String.valueOf(ChatColor.GOLD) + event.getDisplayName());
@@ -460,8 +474,11 @@ public class EventCommand extends BaseCommand {
             this.plugin.sendMessage(player, "event_usage_settrack", new String[0]);
         } else {
             String trackName = String.join(" ", trackArgs);
-            event.setTrack(trackName);
-            this.plugin.sendMessage(player, "event_track_set", new String[]{"{track}", trackName});
+            if (event.setTrack(trackName)) {
+                this.plugin.sendMessage(player, "event_track_set", new String[]{"{track}", trackName});
+            } else {
+                this.plugin.sendMessage(player, "event_create_error", new String[0]);
+            }
         }
     }
 

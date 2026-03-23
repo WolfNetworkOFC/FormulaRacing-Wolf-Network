@@ -7,6 +7,7 @@ package dev.EfraGroup.formulaRacing.Command;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Controllers.RaceEventManager;
+import dev.EfraGroup.formulaRacing.Controllers.HeatDriverCommandService;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Event.Events;
 import dev.EfraGroup.formulaRacing.Heat.CollisionMode;
@@ -36,6 +37,7 @@ import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.ClickEvent.Action;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 
@@ -44,11 +46,13 @@ public class HeatCommand extends BaseCommand {
     private final FormulaRacing plugin;
     private final RaceEventManager eventManager;
     private final DatabaseManager database;
+    private final HeatDriverCommandService heatDriverService;
 
     public HeatCommand(FormulaRacing plugin) {
         this.plugin = plugin;
         this.eventManager = plugin.getRaceEventManager();
         this.database = plugin.getDatabaseManager();
+        this.heatDriverService = new HeatDriverCommandService(plugin);
     }
 
     @Default
@@ -1063,19 +1067,67 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("adddriver|join")
     @CommandCompletion("@heat @players")
     @CommandPermission("formularacing.event.admin")
-    public void onAddDriver(Player player,Heats heat, Player target) {
+    public void onAddDriver(Player player,Heats heat, String targetName) {
         if (heat == null) {
             player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
 
-        int pos = heat.getDrivers().size() + 1;
-        if (heat.addDriver(target.getUniqueId(), pos)) {
-            heat.handleLateJoin(target);
-            player.sendMessage(ChatColor.GREEN + "✓ Piloto " + target.getName() + " adicionado ao heat " + heat.getName() + " na posição " + pos);
-        } else {
-            player.sendMessage(ChatColor.RED + "✗ Falha ao adicionar piloto.");
+        Player onlineTarget = Bukkit.getPlayerExact(targetName);
+        OfflinePlayer offlinePlayer = onlineTarget != null ? onlineTarget : Bukkit.getOfflinePlayer(targetName);
+        UUID targetUuid = offlinePlayer.getUniqueId();
+        String resolvedTargetName = onlineTarget != null ? onlineTarget.getName() : targetName;
+
+        this.heatDriverService.addDriver(heat, targetUuid, resolvedTargetName, null).thenAccept((result) -> {
+            this.plugin.getServer().getScheduler().runTask(this.plugin, () -> {
+                if (result.getStatus() == HeatDriverCommandService.DriverMutationStatus.SUCCESS) {
+                    if (onlineTarget != null && onlineTarget.isOnline()) {
+                        heat.handleLateJoin(onlineTarget);
+                    }
+
+                    player.sendMessage(ChatColor.GREEN + "✓ Piloto " + resolvedTargetName + " adicionado ao heat " + heat.getName() + " na posição " + result.getFinalPosition());
+                    return;
+                }
+
+                player.sendMessage(this.translateDriverMutationFailure(result.getStatus(), heat, resolvedTargetName));
+            });
+        }).exceptionally((exception) -> {
+            this.plugin.getServer().getScheduler().runTask(this.plugin, () -> player.sendMessage(ChatColor.RED + "✗ Falha inesperada ao adicionar piloto."));
+            return null;
+        });
+    }
+
+    @Subcommand("adddriver|join")
+    @CommandCompletion("@heat @players @range:1-100")
+    @CommandPermission("formularacing.event.admin")
+    public void onAddDriverAtPosition(Player player, Heats heat, String targetName, Integer position) {
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
         }
+
+        Player onlineTarget = Bukkit.getPlayerExact(targetName);
+        OfflinePlayer offlinePlayer = onlineTarget != null ? onlineTarget : Bukkit.getOfflinePlayer(targetName);
+        UUID targetUuid = offlinePlayer.getUniqueId();
+        String resolvedTargetName = onlineTarget != null ? onlineTarget.getName() : targetName;
+
+        this.heatDriverService.addDriver(heat, targetUuid, resolvedTargetName, position).thenAccept((result) -> {
+            this.plugin.getServer().getScheduler().runTask(this.plugin, () -> {
+                if (result.getStatus() == HeatDriverCommandService.DriverMutationStatus.SUCCESS) {
+                    if (onlineTarget != null && onlineTarget.isOnline()) {
+                        heat.handleLateJoin(onlineTarget);
+                    }
+
+                    player.sendMessage(ChatColor.GREEN + "✓ Piloto " + resolvedTargetName + " adicionado ao heat " + heat.getName() + " na posição " + result.getFinalPosition());
+                    return;
+                }
+
+                player.sendMessage(this.translateDriverMutationFailure(result.getStatus(), heat, resolvedTargetName));
+            });
+        }).exceptionally((exception) -> {
+            this.plugin.getServer().getScheduler().runTask(this.plugin, () -> player.sendMessage(ChatColor.RED + "✗ Falha inesperada ao adicionar piloto."));
+            return null;
+        });
     }
 
     @Subcommand("removedriver|leave")
@@ -1087,14 +1139,54 @@ public class HeatCommand extends BaseCommand {
             return;
         }
 
-        Player target = Bukkit.getPlayer(targetName);
-        UUID uuid = (target != null) ? target.getUniqueId() : Bukkit.getOfflinePlayer(targetName).getUniqueId();
+        Player onlineTarget = Bukkit.getPlayerExact(targetName);
+        OfflinePlayer offlinePlayer = onlineTarget != null ? onlineTarget : Bukkit.getOfflinePlayer(targetName);
+        UUID targetUuid = offlinePlayer.getUniqueId();
+        String resolvedTargetName = onlineTarget != null ? onlineTarget.getName() : targetName;
 
-        if (heat.removeDriver(uuid)) {
-            if (target != null) heat.handleLateLeave(target);
-            player.sendMessage(ChatColor.GREEN + "✓ Piloto " + targetName + " removido do heat " + heat.getName());
-        } else {
-            player.sendMessage(ChatColor.RED + "✗ Piloto não estava no heat.");
+        this.heatDriverService.removeDriver(heat, targetUuid, resolvedTargetName).thenAccept((result) -> {
+            this.plugin.getServer().getScheduler().runTask(this.plugin, () -> {
+                if (result.getStatus() == HeatDriverCommandService.DriverMutationStatus.SUCCESS) {
+                    if (onlineTarget != null && onlineTarget.isOnline()) {
+                        heat.handleLateLeave(onlineTarget);
+                    }
+
+                    player.sendMessage(ChatColor.GREEN + "✓ Piloto " + resolvedTargetName + " removido do heat " + heat.getName());
+                    return;
+                }
+
+                player.sendMessage(this.translateDriverMutationFailure(result.getStatus(), heat, resolvedTargetName));
+            });
+        }).exceptionally((exception) -> {
+            this.plugin.getServer().getScheduler().runTask(this.plugin, () -> player.sendMessage(ChatColor.RED + "✗ Falha inesperada ao remover piloto."));
+            return null;
+        });
+    }
+
+    private String translateDriverMutationFailure(HeatDriverCommandService.DriverMutationStatus status, Heats heat, String targetName) {
+        switch (status) {
+            case INVALID_CONTEXT:
+                return ChatColor.RED + "✗ Contexto inválido para executar o comando.";
+            case INVALID_HEAT_STATE:
+                return ChatColor.RED + "✗ Heat " + heat.getName() + " não está em estado editável.";
+            case ALREADY_IN_HEAT:
+                return ChatColor.RED + "✗ Piloto " + targetName + " já está neste heat.";
+            case ALREADY_IN_ROUND:
+                return ChatColor.RED + "✗ Piloto " + targetName + " já está em outro heat deste round.";
+            case HEAT_FULL:
+                return ChatColor.RED + "✗ Heat " + heat.getName() + " está lotado.";
+            case INVALID_POSITION:
+                return ChatColor.RED + "✗ Posição inválida para inserção no grid.";
+            case NOT_IN_HEAT:
+                return ChatColor.RED + "✗ Piloto " + targetName + " não está no heat.";
+            case CONFLICT:
+                return ChatColor.YELLOW + "⚠ Outro admin está editando este round agora. Tente novamente em instantes.";
+            case PERSISTENCE_ERROR:
+                return ChatColor.RED + "✗ Falha ao persistir alteração no banco. Nenhuma mudança parcial foi confirmada.";
+            case SYNC_ERROR:
+                return ChatColor.RED + "✗ Alteração persistida, mas falhou sincronização de runtime. Recarregue o heat e tente novamente.";
+            default:
+                return ChatColor.RED + "✗ Falha ao executar operação no heat.";
         }
     }
 }

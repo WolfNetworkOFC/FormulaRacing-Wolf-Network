@@ -6,6 +6,7 @@
 package dev.EfraGroup.formulaRacing.Command;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Controllers.HeatDriverCommandService;
 import dev.EfraGroup.formulaRacing.Controllers.RaceEventManager;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Event.EventState;
@@ -51,11 +52,13 @@ public class RoundCommand extends BaseCommand {
     private final FormulaRacing plugin;
     private final RaceEventManager eventManager;
     private final DatabaseManager database;
+    private final HeatDriverCommandService heatDriverService;
 
     public RoundCommand(FormulaRacing plugin) {
         this.plugin = plugin;
         this.eventManager = plugin.getRaceEventManager();
         this.database = plugin.getDatabaseManager();
+        this.heatDriverService = new HeatDriverCommandService(plugin);
     }
 
     @Default
@@ -326,10 +329,14 @@ public class RoundCommand extends BaseCommand {
             }
 
             for(Heats heat : round.getHeats().values()) {
+                if (!this.plugin.getRaceEventManager().getDatabaseManager().clearHeatDriversSync(heat.getId())) {
+                    String var10002 = String.valueOf(ChatColor.RED);
+                    player.sendMessage(var10002 + "✗ Falha ao limpar pilotos do heat " + heat.getName() + " no banco de dados.");
+                    return;
+                }
+
                 heat.getDrivers().clear();
-                heat.getStartPositions().clear();
-                heat.getLivePositions().clear();
-                this.plugin.getRaceEventManager().getDatabaseManager().clearHeatDrivers(heat.getId());
+                heat.reorderGrid();
             }
 
             String var8 = String.valueOf(ChatColor.GREEN);
@@ -365,6 +372,14 @@ public class RoundCommand extends BaseCommand {
                     var46 = String.valueOf(ChatColor.GRAY);
                     player.sendMessage(var46 + "Use /heat create R" + round.getRoundNumber() + " para criar heats.");
                 } else {
+                    for (Heats heat : heats) {
+                        if (heat.getHeatState() != HeatState.SETUP && heat.getHeatState() != HeatState.LOADED && heat.getHeatState() != HeatState.IDLE) {
+                            String var47 = String.valueOf(ChatColor.RED);
+                            player.sendMessage(var47 + "✗ Não é possível preencher o heat " + heat.getName() + " no estado " + heat.getHeatState().name() + ".");
+                            return;
+                        }
+                    }
+
                     int totalCapacity = heats.stream().mapToInt(Heats::getMaxDrivers).sum();
                     List<UUID> playersToAdd = new ArrayList();
                     List<UUID> excludedPlayers = new ArrayList();
@@ -422,17 +437,17 @@ public class RoundCommand extends BaseCommand {
                             UUID playerUUID = (UUID)playerQueue.poll();
                             Player targetPlayer = this.plugin.getServer().getPlayer(playerUUID);
                             String playerName = targetPlayer != null ? targetPlayer.getName() : this.plugin.getServer().getOfflinePlayer(playerUUID).getName();
-                            boolean success = heat.addDriver(playerUUID, heat.getDriverCount() + 1);
-                            if (success) {
+                            HeatDriverCommandService.DriverMutationResult mutation = this.heatDriverService.addDriverSync(heat, playerUUID, playerName, null);
+                            if (mutation.getStatus() == HeatDriverCommandService.DriverMutationStatus.SUCCESS) {
                                 ++addedCount;
                                 if (targetPlayer != null && targetPlayer.isOnline()) {
                                     heat.handleLateJoin(targetPlayer);
                                 }
 
-                                player.sendMessage(String.valueOf(ChatColor.GREEN) + "  ✓ " + playerName + " → P" + heat.getDriverCount());
+                                player.sendMessage(String.valueOf(ChatColor.GREEN) + "  ✓ " + playerName + " → P" + mutation.getFinalPosition());
                             } else {
                                 var10001 = String.valueOf(ChatColor.RED);
-                                player.sendMessage(var10001 + "  ✗ Falha ao adicionar " + playerName + " (pode já estar em outro heat)");
+                                player.sendMessage(var10001 + "  ✗ Falha ao adicionar " + playerName + " (" + this.describeFillFailure(mutation.getStatus()) + ")");
                             }
                         }
                     }
@@ -520,5 +535,19 @@ public class RoundCommand extends BaseCommand {
         } else {
             return new ArrayList(players);
         }
+    }
+
+    private String describeFillFailure(HeatDriverCommandService.DriverMutationStatus status) {
+        return switch (status) {
+            case ALREADY_IN_HEAT -> "já está no heat";
+            case ALREADY_IN_ROUND -> "já está em outro heat do round";
+            case HEAT_FULL -> "heat lotado";
+            case INVALID_HEAT_STATE -> "estado do heat inválido";
+            case CONFLICT -> "conflito de edição concorrente";
+            case PERSISTENCE_ERROR -> "erro de persistência";
+            case SYNC_ERROR -> "erro de sincronização";
+            case INVALID_POSITION -> "posição inválida";
+            default -> "falha desconhecida";
+        };
     }
 }

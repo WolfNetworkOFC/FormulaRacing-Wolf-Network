@@ -142,7 +142,6 @@
     <factorypathentry kind="VARJAR" id="M2_REPO/com/github/decentsoftware-eu/decentholograms/shared/2.9.6/shared-2.9.6.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/org/geysermc/floodgate/api/2.2.0-SNAPSHOT/api-2.2.0-SNAPSHOT.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/com/github/cryptomorin/XSeries/13.5.1/XSeries-13.5.1.jar" enabled="true" runInBatchMode="false"/>
-    <factorypathentry kind="VARJAR" id="M2_REPO/fr/mrmicky/fastboard/2.1.5/fastboard-2.1.5.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/net/megavex/scoreboard-library-api/2.4.4/scoreboard-library-api-2.4.4.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/net/kyori/adventure-text-serializer-gson/4.24.0/adventure-text-serializer-gson-4.24.0.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/net/kyori/adventure-text-serializer-json/4.24.0/adventure-text-serializer-json-4.24.0.jar" enabled="true" runInBatchMode="false"/>
