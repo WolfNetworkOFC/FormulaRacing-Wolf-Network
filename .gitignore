@@ -59,6 +59,7 @@ Thumbs.db
 Thumbs.db:encryptable
 ehthumbs.db
 ehthumbs_vista.db
+nul
 *.stackdump
 [Dd]esktop.ini
 $RECYCLE.BIN/
@@ -94,4 +95,3 @@ test-output/
 # Build artifacts - keep only source
 original-formularacing-*.jar
 formularacing-*.jar
-
