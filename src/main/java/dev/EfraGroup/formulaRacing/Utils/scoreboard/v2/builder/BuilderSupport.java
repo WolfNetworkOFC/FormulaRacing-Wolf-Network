@@ -387,7 +387,7 @@ final class BuilderSupport {
     }
 
     static String commonSeparator(ScoreboardContext context) {
-        return tr(context, "scoreboard_common_separator");
+        return "§7------------------------";
     }
 
     static String commonFooter(ScoreboardContext context) {
