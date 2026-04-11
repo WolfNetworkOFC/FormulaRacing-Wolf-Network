@@ -89,17 +89,13 @@ commands:
   spectator:
     description: Configuração de áreas de espectadores/arquibancadas
     usage: /spectator <add|remove|list|test> <pista>
-    aliases: [spec, arch]
   spectate:
     description: Modo espectador para assistir corridas
     usage: /spectate <join|leave|follow|unfollow|list|info>
     aliases: [watch, observe]
-  formulamario:
-    description: Base command for formulamario
-    aliases: [fm, fmario, formulam]
   formulawolf:
     description: Base command for formulawolf
-    aliases: [fw, fwolf, formulaw]
+    aliases: [fw]
   settings:
     description: Base command for settings
     aliases: [s]
@@ -112,11 +108,9 @@ commands:
   ghost:
     description: Ghost manual de piloto em corrida
     usage: /ghost <jogador>
-    aliases: [gh]
   unghost:
     description: Remove ghost manual de piloto
     usage: /unghost <jogador>
-    aliases: [ugh]
   daily:
     description: Gerenciamento de Daily Races
     usage: /daily <force|status|reload>
