@@ -139,7 +139,7 @@ public class TimerUtils {
                                 sb.append("0");
                             }
                             sb.append(milli);
-                            sb.append(" \u00a77(C ").append(data.getCheckpointsReached().size()).append("/").append(data.getTotalCheckpoints()).append(")");
+                            sb.append("7(").append(data.getCheckpointsReached().size()).append("/").append(data.getTotalCheckpoints()).append(")");
                             if (lastCp != null && cpTimes != null && cpTimes.containsKey(lastCp.getId())) {
                                 double delta = lastCp.getTime() - cpTimes.get(lastCp.getId());
                                 sb.append(delta < 0.0 ? " \u00a7a-" : " \u00a7c+");

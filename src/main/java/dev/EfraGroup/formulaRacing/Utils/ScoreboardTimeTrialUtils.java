@@ -52,7 +52,7 @@ public class ScoreboardTimeTrialUtils {
                     ScoreboardTimeTrialUtils.this.show(player, trackName);
                 }
             }
-        }.runTaskTimer((Plugin) FormulaRacing.getInstance(), 0L, 20L);
+        }.runTaskTimer( FormulaRacing.getInstance(), 0L, 20L);
     }
 
     public void setPlayerTrack(Player player, String trackName, String ownerName) {
@@ -140,7 +140,7 @@ public class ScoreboardTimeTrialUtils {
 
         TranslationUtil tu = FormulaRacing.getInstance().getTranslationUtil();
         this.adapter.updateTitle(player, this.boldTitle(tu.getTranslated(player, "scoreboard_tt_title")));
-        String separator = tu.getTranslated(player, "scoreboard_common_separator");
+        String separator = "&7------------------";
         String footer = tu.getTranslated(player, "scoreboard_common_footer");
 
         List<String> lines = new ArrayList<>();
