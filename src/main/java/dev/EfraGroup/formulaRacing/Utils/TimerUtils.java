@@ -73,7 +73,7 @@ public class TimerUtils {
                 List cpIds = this.databaseManager.getCheckpointIds(trackName);
                 int realTotalCPs = cpIds != null ? cpIds.size() : 0;
                 RaceSessionCache cache = new RaceSessionCache(pb, cp);
-                Bukkit.getScheduler().runTask((Plugin)this.plugin, () -> {
+                Bukkit.getScheduler().runTask(this.plugin, () -> {
                     PlayerTimerData existingData = this.getTimerData(player, trackName);
                     if (existingData != null) {
                         existingData.setSessionCache(cache);
@@ -139,7 +139,7 @@ public class TimerUtils {
                                 sb.append("0");
                             }
                             sb.append(milli);
-                            sb.append(" \u00a77(CP ").append(data.getCheckpointsReached().size()).append("/").append(data.getTotalCheckpoints()).append(")");
+                            sb.append(" \u00a77(C ").append(data.getCheckpointsReached().size()).append("/").append(data.getTotalCheckpoints()).append(")");
                             if (lastCp != null && cpTimes != null && cpTimes.containsKey(lastCp.getId())) {
                                 double delta = lastCp.getTime() - cpTimes.get(lastCp.getId());
                                 sb.append(delta < 0.0 ? " \u00a7a-" : " \u00a7c+");
