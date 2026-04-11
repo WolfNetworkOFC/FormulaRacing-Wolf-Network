@@ -140,7 +140,7 @@ public class ScoreboardTimeTrialUtils {
 
         TranslationUtil tu = FormulaRacing.getInstance().getTranslationUtil();
         this.adapter.updateTitle(player, this.boldTitle(tu.getTranslated(player, "scoreboard_tt_title")));
-        String separator = "&7------------------";
+        String separator = "\u00a77------------------t";
         String footer = tu.getTranslated(player, "scoreboard_common_footer");
 
         List<String> lines = new ArrayList<>();

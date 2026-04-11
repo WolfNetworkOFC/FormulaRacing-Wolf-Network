@@ -99,10 +99,10 @@ public class TimerUtils {
                     this.cancel();
                     return;
                 }
-                Bukkit.getScheduler().runTaskAsynchronously((Plugin)TimerUtils.this.plugin, () -> {
+                Bukkit.getScheduler().runTaskAsynchronously(TimerUtils.this.plugin, () -> {
                     for (Map.Entry<UUID, Map<String, PlayerTimerData>> playerEntry : TimerUtils.this.activeTimers.entrySet()) {
                         UUID uuid = playerEntry.getKey();
-                        Player player = Bukkit.getPlayer((UUID)uuid);
+                        Player player = Bukkit.getPlayer(uuid);
                         if (player == null || !player.isOnline()) continue;
                         for (Map.Entry<String, PlayerTimerData> trackEntry : playerEntry.getValue().entrySet()) {
                             boolean worstTime;
@@ -139,7 +139,7 @@ public class TimerUtils {
                                 sb.append("0");
                             }
                             sb.append(milli);
-                            sb.append("7(").append(data.getCheckpointsReached().size()).append("/").append(data.getTotalCheckpoints()).append(")");
+                            sb.append("\u00a77(").append(data.getCheckpointsReached().size()).append("/").append(data.getTotalCheckpoints()).append(")");
                             if (lastCp != null && cpTimes != null && cpTimes.containsKey(lastCp.getId())) {
                                 double delta = lastCp.getTime() - cpTimes.get(lastCp.getId());
                                 sb.append(delta < 0.0 ? " \u00a7a-" : " \u00a7c+");
@@ -165,7 +165,7 @@ public class TimerUtils {
                     }
                 });
             }
-        }.runTaskTimer((Plugin)this.plugin, 0L, 1L);
+        }.runTaskTimer(this.plugin, 0L, 1L);
     }
 
     public void stopTimer(Player player) {
