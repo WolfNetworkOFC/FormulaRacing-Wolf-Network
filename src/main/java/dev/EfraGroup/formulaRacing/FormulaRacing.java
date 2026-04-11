@@ -149,11 +149,11 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return this.commandManager;
     }
 
-    public <T> TaskChain<T> newChain() {
+    public <T> TaskChain <T> newChain() {
         return this.taskChainFactory.newChain();
     }
 
-    public <T> TaskChain<T> newSharedChain(String name) {
+    public <T> TaskChain <T> newSharedChain(String name) {
         return this.taskChainFactory.newSharedChain(name);
     }
 
