@@ -21,9 +21,7 @@ public class HotbarItemsCommand extends BaseCommand {
     }
 
     @Default
-    @Description("Restaura os itens da hotbar.")
     public void onCommand(Player player) {
         this.plugin.getHotbarController().giveHotbarItems(player);
-        player.sendMessage("§aItens da hotbar restaurados!");
     }
 }

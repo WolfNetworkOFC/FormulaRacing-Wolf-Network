@@ -126,26 +126,6 @@ public class RaceCommand extends BaseCommand {
         }
     }
 
-    @Subcommand("unvote|novote")
-    @Description("Remove seu voto")
-    public void onUnvote(Player player) {
-        if (this.getVoteManager() == null) {
-            this.plugin.sendMessage(player, "race_propose_disabled", new String[0]);
-        } else {
-            this.getVoteManager().unvote(player);
-        }
-    }
-
-    @Subcommand("proposal|prop|suggestion")
-    @Description("Ver proposta ativa")
-    public void onProposal(Player player) {
-        if (this.getVoteManager() == null) {
-            this.plugin.sendMessage(player, "race_propose_disabled", new String[0]);
-        } else {
-            this.getVoteManager().showProposalStatus(player);
-        }
-    }
-
     @Subcommand("join")
     @Description("Entra na quick race ativa")
     public void onJoin(Player player) {
