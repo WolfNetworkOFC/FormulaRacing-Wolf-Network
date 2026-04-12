@@ -93,10 +93,9 @@ public class RaceCommand extends BaseCommand {
 
         }
     }
-
     @Subcommand("propose|suggest")
     @Description("Propõe uma corrida")
-    @CommandCompletion("@tracks 3|5|10 0|1|2")
+    @CommandCompletion("@tracks laps pits")
     public void onPropose(Player player, String trackName, @Default("3") int laps, @Default("0") int pits) {
         if (this.getVoteManager() == null) {
             this.plugin.sendMessage(player, "race_propose_disabled", new String[0]);

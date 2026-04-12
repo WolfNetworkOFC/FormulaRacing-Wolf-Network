@@ -1,10 +1,7 @@
 package dev.EfraGroup.formulaRacing.Command;
 
 import co.aikar.commands.BaseCommand;
-import co.aikar.commands.annotation.CommandAlias;
-import co.aikar.commands.annotation.CommandPermission;
-import co.aikar.commands.annotation.Description;
-import co.aikar.commands.annotation.Optional;
+import co.aikar.commands.annotation.*;
 import dev.EfraGroup.formulaRacing.Controllers.RaceVoteManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import org.bukkit.entity.Player;
@@ -22,6 +19,7 @@ public class VoteRaceCommand extends BaseCommand {
     @CommandAlias("voterace|vr")
     @Description("Inicia uma votação ou vota em uma corrida ativa.")
     @CommandPermission("formularacing.voterace")
+    @CommandCompletion("@tracks laps pits")
     public void onVoteRace(Player player, @Optional String trackName, @Optional Integer laps, @Optional Integer pits) {
 
         // 1. Se já existe uma votação ativa, o comando serve apenas para votar "Sim"
@@ -36,29 +34,23 @@ public class VoteRaceCommand extends BaseCommand {
             return;
         }
 
-        // --- Lógica de Argumentos Dinâmicos ---
-
-        int finalLaps;
-        int finalPits;
-
-        if (laps == null) {
-            // Caso: /voterace <track>
-            finalLaps = 3;
-            finalPits = 0;
-        } else if (pits == null) {
-            // Caso: /voterace <track> <laps>
-            finalLaps = laps;
-            finalPits = 0;
-        } else {
-            // Caso: /voterace <track> <laps> <pits>
-            finalLaps = laps;
-            finalPits = pits;
+        // --- VALIDAÇÃO DA PISTA ---
+        // Checamos no DatabaseManager se a pista existe antes de continuar
+        if (plugin.getDatabaseManager().getTrackData(trackName) == null) {
+            player.sendMessage("§c§lERRO: §7A pista §f" + trackName + " §7não existe no sistema!");
+            return;
         }
 
-        // Envia a proposta para o manager com os valores calculados
-        voteManager.propose(player, trackName, finalLaps, finalPits);
+        // --- Lógica de Argumentos Dinâmicos ---
+        int finalLaps = (laps == null) ? 3 : laps;
+        int finalPits = (pits == null) ? 0 : pits;
 
-        // Opcional: Avisar no chat o que foi criado para confirmar
-        player.sendMessage(String.format("§aVotação iniciada: %s (%d voltas, %d pits)", trackName, finalLaps, finalPits));
+        // Envia a proposta para o manager com os valores calculados
+        // O propose() agora só será chamado se a pista for válida
+        boolean success = voteManager.propose(player, trackName, finalLaps, finalPits);
+
+        if (success) {
+            player.sendMessage(String.format("§a§lVOTAÇÃO INICIADA: §f%s §7(%d voltas, %d pits)", trackName, finalLaps, finalPits));
+        }
     }
 }
