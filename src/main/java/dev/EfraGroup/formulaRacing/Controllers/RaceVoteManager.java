@@ -63,6 +63,7 @@ public class RaceVoteManager {
         private final String trackName;
         private final int laps;
         private final int pits;
+        private final int requiredVotes; // Nova variável para guardar a meta de votos
         private final Set<UUID> voters = ConcurrentHashMap.newKeySet();
         private boolean expired = false;
         private BukkitTask timeoutTask;
@@ -73,23 +74,33 @@ public class RaceVoteManager {
             this.trackName = trackName;
             this.laps = laps;
             this.pits = pits;
+
+            // Calcula 30% dos jogadores online na hora que a proposta é criada.
+            // O Math.ceil arredonda para cima, e o Math.max garante que precisa de no mínimo 1 voto.
+            int onlinePlayers = Bukkit.getOnlinePlayers().size();
+            this.requiredVotes = Math.max(1, (int) Math.ceil(onlinePlayers * 0.30));
+
             this.voters.add(proposerUUID);
         }
 
         public void start() {
             broadcastProposalCreated();
-            this.timeoutTask = Bukkit.getScheduler().runTaskLater(plugin, () -> { if (!expired) expire(); }, 2400L);
+            // Aprova automaticamente se a pessoa que criou for a única no servidor
+            if (voters.size() >= requiredVotes) {
+                approve();
+            } else {
+                this.timeoutTask = Bukkit.getScheduler().runTaskLater(plugin, () -> { if (!expired) expire(); }, 2400L);
+            }
         }
 
         private void broadcastProposalCreated() {
-            // Linhas normais
             Bukkit.broadcastMessage(" ");
             Bukkit.broadcastMessage("§6§l════════════ NOVA PROPOSTA ════════════");
             Bukkit.broadcastMessage("§f§l" + proposerName + " §7iniciou uma votação para:");
             Bukkit.broadcastMessage("§c§l" + trackName + " §7| §f" + laps + " Voltas §7| §f" + pits + " Pits");
+            Bukkit.broadcastMessage("§7Meta de votos: §a" + voters.size() + "/" + requiredVotes); // Mostra a meta no anúncio inicial
             Bukkit.broadcastMessage(" ");
 
-            // Botão Clicável no seu padrão
             TextComponent clickButton = new TextComponent("[ §a§lCLIQUE PARA VOTAR §r]");
             clickButton.setColor(ChatColor.GREEN);
             clickButton.setBold(true);
@@ -112,17 +123,17 @@ public class RaceVoteManager {
             }
             voters.add(player.getUniqueId());
 
-            // Mensagem de voto secundário (clicável também)
-            TextComponent voteMsg = new TextComponent("§7► §f§l" + player.getName() + " §atambém quer §f" + trackName + " §6[" + voters.size() + "/3]");
+            // Agora o chat atualiza mostrando a meta de votos calculada dinamicamente
+            TextComponent voteMsg = new TextComponent("§7► §f§l" + player.getName() + " §atambém quer §f" + trackName + " §6[" + voters.size() + "/" + requiredVotes + "]");
             voteMsg.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/voterace"));
             voteMsg.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text("§aClique para votar também!")));
 
             for (Player p : Bukkit.getOnlinePlayers()) {
                 p.spigot().sendMessage(voteMsg);
             }
-            player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.2f);
 
-            if (voters.size() >= 3) approve();
+            // Substitui o "3" fixo pela variável
+            if (voters.size() >= requiredVotes) approve();
         }
 
         private void approve() {

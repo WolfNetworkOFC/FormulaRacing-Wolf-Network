@@ -19,7 +19,7 @@ public class VoteRaceCommand extends BaseCommand {
     @CommandAlias("voterace|vr")
     @Description("Inicia uma votação ou vota em uma corrida ativa.")
     @CommandPermission("formularacing.voterace")
-    @CommandCompletion("@tracks laps pits")
+    @CommandCompletion("@tracks <laps> <pits>")
     public void onVoteRace(Player player, @Optional String trackName, @Optional Integer laps, @Optional Integer pits) {
 
         // 1. Se já existe uma votação ativa, o comando serve apenas para votar "Sim"
