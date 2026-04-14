@@ -75,18 +75,20 @@ public class QualificationManager {
         if (finalHeat == null) {
             this.debug.logQualificationSystem("ERRO: Heat final não encontrado!");
         } else {
+            if (finalHeat.getId() > 0) {
+                this.plugin.getRaceEventManager().getDatabaseManager().clearHeatDriversSync(finalHeat.getId());
+            }
             finalHeat.getDrivers().clear();
 
             for(int i = 0; i < results.size(); ++i) {
                 QualificationResult result = (QualificationResult)results.get(i);
                 int gridPosition = i + 1;
-                Driver driver = new Driver(result.getDriverUUID(), finalHeat.getId(), gridPosition);
-                finalHeat.getDrivers().put(result.getDriverUUID(), driver);
-                if (this.plugin.getRaceEventManager() != null && finalHeat.getId() > 0) {
-                    this.plugin.getRaceEventManager().getDatabaseManager().createDriver(driver);
+                boolean added = finalHeat.addDriver(result.getDriverUUID(), gridPosition);
+                if (added) {
+                    this.debug.logQualificationSystem(String.format("Grid P%d: %s (Quali: %s, %d voltas)", gridPosition, result.getDriverUUID(), this.formatTime(result.getBestLapTime()), result.getTotalLaps()));
+                } else {
+                    this.debug.logQualificationSystem(String.format("AVISO: Não foi possível adicionar %s ao grid (limite atingido ou driver já existe)", result.getDriverUUID()));
                 }
-
-                this.debug.logQualificationSystem(String.format("Grid P%d: %s (Quali: %s, %d voltas)", gridPosition, result.getDriverUUID(), this.formatTime(result.getBestLapTime()), result.getTotalLaps()));
             }
 
             this.debug.logQualificationSystem(String.format("%d pilotos adicionados ao grid final", results.size()));

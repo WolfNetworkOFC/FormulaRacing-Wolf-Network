@@ -179,6 +179,9 @@ public abstract class Rounds {
     }
 
     public void setRoundState(RoundState roundState) {
+        if (this.roundState != null) {
+            RoundStateMachine.validateTransition(this.roundState, roundState);
+        }
         this.roundState = roundState;
         if (this.plugin != null && this.id > 0) {
             this.plugin.getRaceEventManager().getDatabaseManager().updateRoundState(this.id, roundState);

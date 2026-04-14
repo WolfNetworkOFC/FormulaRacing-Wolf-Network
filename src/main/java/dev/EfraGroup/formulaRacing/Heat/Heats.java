@@ -365,6 +365,16 @@ public class Heats {
             return false;
         } else {
             this.plugin.getDebugManager().logRaceSystem("Iniciando contagem regressiva do Heat " + this.id + " (" + seconds + "s)...");
+            if (this.id > 0 && this.plugin != null && this.plugin.getRaceEventManager() != null) {
+                this.plugin.getRaceEventManager().getDatabaseManager().updateHeatFullConfig(
+                    this.id, this.totalLaps, this.totalPits, this.timeLimit,
+                    this.startDelay, this.maxDrivers, this.lonely, this.canReset,
+                    true, this.collisionMode, this.drsEnabled,
+                    this.driverswap, this.drsdowntime, this.drsdownpower,
+                    this.reversegrid, this.deltaghosting, this.pushtopass,
+                    this.pushtopasspower, this.realistc
+                );
+            }
             this.setHeatState(HeatState.STARTING);
             this.gridManager.freezePlayers();
             Runnable startAction = this::startRace;

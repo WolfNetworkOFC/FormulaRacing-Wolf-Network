@@ -387,14 +387,42 @@ public class DatabaseManager {
                     "CREATE TABLE IF NOT EXISTS fr_rounds (id INTEGER PRIMARY KEY AUTOINCREMENT, eventId INTEGER NOT NULL, roundIndex INTEGER NOT NULL DEFAULT 1, type TEXT DEFAULT NULL, state TEXT NOT NULL)"
             );
             stmt.executeUpdate(
-                    "CREATE TABLE IF NOT EXISTS fr_heats (id INTEGER PRIMARY KEY AUTOINCREMENT, roundId INTEGER NOT NULL, heatNumber INTEGER NOT NULL, state TEXT NOT NULL, startTime INTEGER DEFAULT NULL, endTime INTEGER DEFAULT NULL, fastestLapUUID TEXT, totalLaps INTEGER DEFAULT NULL, totalPitstops INTEGER DEFAULT NULL, timeLimit INTEGER DEFAULT NULL, startDelay INTEGER DEFAULT NULL, maxDrivers INTEGER DEFAULT NULL, lonely INTEGER DEFAULT NULL, canReset INTEGER DEFAULT NULL, lapReset INTEGER DEFAULT NULL)"
+                    "CREATE TABLE IF NOT EXISTS fr_heats (id INTEGER PRIMARY KEY AUTOINCREMENT, roundId INTEGER NOT NULL, heatNumber INTEGER NOT NULL, state TEXT NOT NULL, startTime INTEGER DEFAULT NULL, endTime INTEGER DEFAULT NULL, fastestLapUUID TEXT, totalLaps INTEGER DEFAULT NULL, totalPitstops INTEGER DEFAULT NULL, timeLimit INTEGER DEFAULT NULL, startDelay INTEGER DEFAULT NULL, maxDrivers INTEGER DEFAULT NULL, lonely INTEGER DEFAULT NULL, canReset INTEGER DEFAULT NULL, lapReset INTEGER DEFAULT NULL, colisao TEXT DEFAULT 'DISABLED', drs INTEGER DEFAULT 0, driverswap INTEGER DEFAULT 0, drsdowntime REAL DEFAULT 0.0, drsdownpower REAL DEFAULT 0.0, reversegrid INTEGER DEFAULT 0, ghostingdelta REAL DEFAULT 0.0, pushtopass INTEGER DEFAULT 0, pushtopasspower REAL DEFAULT 0.0, realistc INTEGER DEFAULT 0)"
             );
+            // Idempotent ALTER TABLE columns for existing databases
+            String[] heatAlterColumns = {
+                "ALTER TABLE fr_heats ADD COLUMN colisao TEXT DEFAULT 'DISABLED'",
+                "ALTER TABLE fr_heats ADD COLUMN drs INTEGER DEFAULT 0",
+                "ALTER TABLE fr_heats ADD COLUMN driverswap INTEGER DEFAULT 0",
+                "ALTER TABLE fr_heats ADD COLUMN drsdowntime REAL DEFAULT 0.0",
+                "ALTER TABLE fr_heats ADD COLUMN drsdownpower REAL DEFAULT 0.0",
+                "ALTER TABLE fr_heats ADD COLUMN reversegrid INTEGER DEFAULT 0",
+                "ALTER TABLE fr_heats ADD COLUMN ghostingdelta REAL DEFAULT 0.0",
+                "ALTER TABLE fr_heats ADD COLUMN pushtopass INTEGER DEFAULT 0",
+                "ALTER TABLE fr_heats ADD COLUMN pushtopasspower REAL DEFAULT 0.0",
+                "ALTER TABLE fr_heats ADD COLUMN realistc INTEGER DEFAULT 0"
+            };
+            for (String alterSql : heatAlterColumns) {
+                try { stmt.executeUpdate(alterSql); } catch (SQLException ignored) {}
+            }
             stmt.executeUpdate(
                     "CREATE TABLE IF NOT EXISTS fr_drivers (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT NOT NULL, heatId INTEGER NOT NULL, position INTEGER NOT NULL, startPosition INTEGER NOT NULL, startTime INTEGER, endTime INTEGER, pitstops INTEGER, qualifyingTime INTEGER)"
             );
             stmt.executeUpdate(
                     "CREATE TABLE IF NOT EXISTS fr_laps (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT NOT NULL, heatId INTEGER NOT NULL, tracknameWS TEXT NOT NULL, lapStart INTEGER, lapEnd INTEGER, pitted INTEGER NOT NULL DEFAULT 0)"
             );
+
+            stmt.executeUpdate(
+                    "CREATE TABLE IF NOT EXISTS fr_event_signups (id INTEGER PRIMARY KEY AUTOINCREMENT, eventId INTEGER NOT NULL, uuid TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'SUBSCRIBER', subscriptionTime INTEGER NOT NULL, confirmed INTEGER NOT NULL DEFAULT 0)"
+            );
+            try { stmt.executeUpdate("ALTER TABLE fr_event_signups ADD COLUMN type TEXT NOT NULL DEFAULT 'SUBSCRIBER'"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE fr_event_signups ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0"); } catch (SQLException ignored) {}
+
+            // Soft-delete columns
+            try { stmt.executeUpdate("ALTER TABLE fr_events ADD COLUMN isRemoved INTEGER NOT NULL DEFAULT 0"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE fr_rounds ADD COLUMN isRemoved INTEGER NOT NULL DEFAULT 0"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE fr_heats ADD COLUMN isRemoved INTEGER NOT NULL DEFAULT 0"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE fr_drivers ADD COLUMN isRemoved INTEGER NOT NULL DEFAULT 0"); } catch (SQLException ignored) {}
 
             // 3. BoatUtils e Checkpoints
             stmt.executeUpdate(

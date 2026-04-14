@@ -137,6 +137,9 @@ public class Events {
             DebugManager var10000 = this.plugin.getDebugManager();
             String var10001 = this.displayName;
             var10000.logRaceSystem("Piloto inscrito no evento " + var10001 + ": " + String.valueOf(playerUUID));
+            if (this.id > 0 && this.raceEventManager != null) {
+                this.raceEventManager.getDatabaseManager().addSignup(this.id, playerUUID, "SUBSCRIBER");
+            }
             if (!this.spectators.containsKey(playerUUID)) {
                 this.addSpectator(playerUUID);
             }
@@ -184,6 +187,9 @@ public class Events {
             DebugManager var10000 = this.plugin.getDebugManager();
             String var10001 = this.displayName;
             var10000.logRaceSystem("Piloto removido do evento " + var10001 + ": " + String.valueOf(playerUUID));
+            if (this.id > 0 && this.raceEventManager != null) {
+                this.raceEventManager.getDatabaseManager().removeSignup(this.id, playerUUID);
+            }
             return true;
         } else {
             return false;
@@ -197,6 +203,9 @@ public class Events {
         } else {
             this.reserves.put(playerUUID, subscriber);
             this.plugin.getDebugManager().logRaceSystem("Piloto movido para reservas: " + String.valueOf(playerUUID));
+            if (this.id > 0 && this.raceEventManager != null) {
+                this.raceEventManager.getDatabaseManager().updateSignupType(this.id, playerUUID, "RESERVE");
+            }
             return true;
         }
     }
@@ -208,6 +217,9 @@ public class Events {
         } else {
             this.subscribers.put(playerUUID, reserve);
             this.plugin.getDebugManager().logRaceSystem("Piloto movido de reservas para inscritos: " + String.valueOf(playerUUID));
+            if (this.id > 0 && this.raceEventManager != null) {
+                this.raceEventManager.getDatabaseManager().updateSignupType(this.id, playerUUID, "SUBSCRIBER");
+            }
             return true;
         }
     }
@@ -301,6 +313,9 @@ public class Events {
     }
 
     public void setState(EventState state) {
+        if (this.state != null && this.id > 0) {
+            EventStateMachine.validateTransition(this.state, state);
+        }
         this.state = state;
         if (this.id > 0 && this.raceEventManager != null) {
             this.raceEventManager.getDatabaseManager().updateEventState(this.id, state);
