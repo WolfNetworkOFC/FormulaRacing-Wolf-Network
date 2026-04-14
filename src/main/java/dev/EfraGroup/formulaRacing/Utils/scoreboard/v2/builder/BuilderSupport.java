@@ -6,6 +6,7 @@ import dev.EfraGroup.formulaRacing.Heat.Lap;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeDefaults;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeResolver;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.style.TimingScoreboardStyle;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.model.ScoreboardContext;
 import java.util.HashMap;
@@ -111,14 +112,14 @@ final class BuilderSupport {
 
     static String stateLabel(HeatState state) {
         return switch (state) {
-            case SETUP -> "§fPreparando";
-            case IDLE -> "§fAguardando";
-            case PRACTICE -> "§fPratica";
-            case QUALIFYING -> "§fQualifying";
-            case LOADED -> "§fGrid montado";
-            case STARTING -> "§fLargada";
-            case RACING -> "§fCorrida";
-            case FINISHED -> "§fFinalizada";
+            case SETUP -> "&2Preparando";
+            case IDLE -> "&2Aguardando";
+            case PRACTICE -> "&2Pratica";
+            case QUALIFYING -> "&2Qualifying";
+            case LOADED -> "&2Grid montado";
+            case STARTING -> "&2Largada";
+            case RACING -> "&2Corrida";
+            case FINISHED -> "&2Finalizada";
         };
     }
 
@@ -426,7 +427,8 @@ final class BuilderSupport {
 
     static Component trComponent(ScoreboardContext context, String key, String... placeholders) {
         String text = tr(context, key, placeholders);
-        return FRThemeParser.parse(text, FRThemeDefaults.getDefaultTheme());
+        var theme = FRThemeResolver.resolveTheme(context.viewer());
+        return FRThemeParser.parse(text, theme);
     }
 
     private static boolean isMissingTranslation(String translated) {
@@ -465,15 +467,15 @@ final class BuilderSupport {
         m.put("scoreboard_title_qualifying", "&b&l QUALIFYING");
         m.put("scoreboard_title_waiting", "&6&l WAITING");
         m.put("scoreboard_title_race", "&c&l RACE");
-        m.put("scoreboard_title_finished", "&a&l FINISHED");
-        m.put("scoreboard_v2_no_active_drivers", "&7No active drivers");
-        m.put("scoreboard_v2_best_lap", "&fBest lap: &2{time}");
+        m.put("scoreboard_title_finished", "&s&l FINISHED");
+        m.put("scoreboard_v2_no_active_drivers", "&2No active drivers");
+        m.put("scoreboard_v2_best_lap", "&2Best lap: &b{time}");
         m.put("scoreboard_v2_offline", "&7Offline");
-        m.put("scoreboard_v2_drivers", "&fDrivers: &2{count}");
-        m.put("scoreboard_v2_track", "&fTrack: &2{track}");
-        m.put("scoreboard_v2_laps", "&fLaps: &2{laps}");
-        m.put("scoreboard_v2_position", "&fPosition: &2{position}");
-        m.put("scoreboard_v2_time", "&fTime: &2{time}");
+        m.put("scoreboard_v2_drivers", "&2Drivers: &b{count}");
+        m.put("scoreboard_v2_track", "&2Track: &b{track}");
+        m.put("scoreboard_v2_laps", "&2Laps: &b{laps}");
+        m.put("scoreboard_v2_position", "&2Position: &b{position}");
+        m.put("scoreboard_v2_time", "&2Time: &b{time}");
         m.put("scoreboard_status_dnf_short", "DNF");
         m.put("scoreboard_status_offline", "Offline");
         m.put("scoreboard_status_in_pit", "In Pit");

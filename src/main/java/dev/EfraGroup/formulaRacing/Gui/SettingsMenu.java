@@ -67,6 +67,11 @@ public class SettingsMenu extends BaseGui {
             String stateStr = newState ? this.plugin.getTranslation("gui_settings_status_on", langCode, new String[0]) : this.plugin.getTranslation("gui_settings_status_off", langCode, new String[0]);
             p.sendMessage(this.plugin.getTranslation("gui_settings_compact_toggled", langCode, new String[]{"{state}", stateStr}));
         });
+        this.addButton(14, Material.PAINTING, this.plugin.getTranslation("gui_settings_color_name", langCode, new String[0]), this.plugin.getTranslation("gui_settings_color_lore", langCode, new String[0]), (event) -> {
+            Player p = (Player)event.getWhoClicked();
+            p.playSound(p.getLocation(), Sound.UI_BUTTON_CLICK, 0.2F, 1.0F);
+            (new ColorSettingsGui(this.plugin, p)).show(p);
+        });
         this.addButton(31, Material.ARROW, this.plugin.getTranslation("gui_settings_back_name", langCode, new String[0]), this.plugin.getTranslation("gui_settings_back_lore", langCode, new String[0]), (event) -> {
             Player p = (Player)event.getWhoClicked();
             (new MainMenu(this.plugin, p)).show(p);

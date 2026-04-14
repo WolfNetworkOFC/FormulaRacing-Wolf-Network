@@ -11,6 +11,7 @@ import dev.EfraGroup.formulaRacing.Heat.PitStopManager;
 import dev.EfraGroup.formulaRacing.Heat.PitStopRegion;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
+import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.CatchUnknown;
@@ -1116,7 +1117,7 @@ public class TrackEditorCommand extends BaseCommand {
                         Location loc = pos.toLocation(this.plugin.getServer());
                         if (loc != null) {
                             player.teleport(loc);
-                            player.sendTitle("§6P" + pos.getPosition(), "§7" + this.formatLocation(loc), 5, 30, 10);
+                            TitleHelper.sendThemedTitle(player, "&wP" + pos.getPosition(), "§7" + this.formatLocation(loc), 5, 30, 10);
                         }
 
                     }, (long)delay);

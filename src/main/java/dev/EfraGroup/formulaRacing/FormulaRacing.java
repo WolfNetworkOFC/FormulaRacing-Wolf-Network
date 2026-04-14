@@ -202,6 +202,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.timeTrialController = new TimeTrialController(this);
             this.debugManager = new DebugManager(this, this.fileManager);
             this.dm = new DatabaseManager(this, this.fileManager);
+            this.dm.migrateNullPlayerColors();
             this.translationUtil = new TranslationUtil(this, this.dm);
             this.tu = new TimeUtils();
             this.worldEditSelect = new WorldEditSelect();

@@ -18,6 +18,7 @@ import dev.EfraGroup.formulaRacing.Heat.Lap;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.RegionMathUtils;
+import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -513,7 +514,7 @@ public class RaceCheckpointListener implements Listener {
                     player.teleport(finishPosLoc);
                     player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0F, 1.0F);
                     String title = "§6§l" + driver.getPosition() + "º LUGAR!";
-                    player.sendTitle("§a§lRACE FINISHED", title, 10, 80, 20);
+                    TitleHelper.sendThemedTitle(player, "&s&lRACE FINISHED", title, 10, 80, 20);
                     return;
                 }
             }
@@ -523,7 +524,7 @@ public class RaceCheckpointListener implements Listener {
                 player.teleport(finishAllLoc);
                 if (driver != null) {
                     String title = "§6§l" + driver.getPosition() + "º LUGAR!";
-                    player.sendTitle("§a§lRACE FINISHED", title, 10, 80, 20);
+                    TitleHelper.sendThemedTitle(player, "&s&lRACE FINISHED", title, 10, 80, 20);
                 }
 
                 this.plugin.sendMessage(player, "race_teleport_stand", new String[0]);

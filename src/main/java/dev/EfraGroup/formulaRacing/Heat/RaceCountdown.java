@@ -7,6 +7,7 @@ package dev.EfraGroup.formulaRacing.Heat;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -81,7 +82,7 @@ public class RaceCountdown {
             Player player = Bukkit.getPlayer(driver.getUuid());
             if (player != null && player.isOnline()) {
                 String subtitle = this.plugin.getTranslation("race_title_prepare_sub", this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId()), new String[0]);
-                player.sendTitle(lights, subtitle, 0, 30, 5);
+                TitleHelper.sendThemedTitle(player, lights, subtitle, 0, 30, 5);
                 player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1.0F, 0.5F);
             }
         }
@@ -99,10 +100,10 @@ public class RaceCountdown {
                 if (this.heat.isLonely()) {
                     String title = this.plugin.getTranslation("quali_title_go", langCode, new String[0]);
                     String subtitle = this.plugin.getTranslation("quali_subtitle_go", langCode, new String[0]);
-                    player.sendTitle(title, subtitle, 5, 20, 10);
+                    TitleHelper.sendThemedTitle(player, title, subtitle, 5, 20, 10);
                 } else {
                     String title = this.plugin.getTranslation("race_title_go", langCode, new String[0]);
-                    player.sendTitle(title, "", 5, 20, 10);
+                    TitleHelper.sendThemedTitle(player, title, "", 5, 20, 10);
                 }
 
                 player.playSound(player.getLocation(), Sound.BLOCK_BELL_USE, 1.0F, 1.5F);

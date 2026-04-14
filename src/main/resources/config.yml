@@ -226,3 +226,20 @@ podium:
       z: 0.0
       yaw: 0.0
       pitch: 0.0
+
+# =========================================================#
+#                         THEME                            #
+# =========================================================#
+# Default theme colors for new players and config fallbacks.
+# Per-player colors are stored in the database and override these defaults.
+theme:
+  primary: "#7bf200"
+  secondary: "#FFFFFF"
+  success: "#55FF55"
+  warning: "#FFFF55"
+  error: "#FF7A75"
+  broadcast: "#55FFFF"
+  award: "#FFD700"
+  title: "#555555"
+  info: "#CC99FF"
+  accent: "#00CC99"

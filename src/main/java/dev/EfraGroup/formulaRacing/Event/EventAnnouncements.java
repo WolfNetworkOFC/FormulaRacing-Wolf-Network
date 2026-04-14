@@ -10,9 +10,16 @@ import dev.EfraGroup.formulaRacing.Controllers.QualificationManager;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.Text;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRTheme;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeResolver;
+import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import dev.EfraGroup.formulaRacing.Utils.TranslationUtil;
 import java.util.List;
 import java.util.UUID;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -97,23 +104,23 @@ public class EventAnnouncements {
             String title = this.t.getTranslated(p, "event_finish_title", new String[0]);
             String subtitleBase = this.t.getTranslated(p, "event_finish_subtitle", new String[]{"{pos}", String.valueOf(position)});
             if (title == null || title.isBlank()) {
-                title = "§a§lFINALIZOU!";
+                title = "&s&lFINALIZOU!";
             }
             if (subtitleBase == null || subtitleBase.isBlank()) {
-                subtitleBase = "§fPosição " + position;
+                subtitleBase = "&fPosição " + position;
             }
 
-            String subtitle = subtitleBase + " §8| §e" + formattedTime;
+            String subtitle = subtitleBase + " &8| &e" + formattedTime;
             if (position == 1) {
-                title = "§6§l[P1] " + title;
+                title = "&6&l[P1] " + title;
                 p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0F, 1.0F);
                 p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0F, 1.4F);
             } else if (position == 2) {
-                title = "§7§l[P2] " + title;
+                title = "&7&l[P2] " + title;
                 p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0F, 1.0F);
                 p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0F, 1.2F);
             } else if (position == 3) {
-                title = "§6§l[P3] " + title;
+                title = "&6&l[P3] " + title;
                 p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0F, 1.0F);
                 p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0F, 1.0F);
             } else {
@@ -121,7 +128,7 @@ public class EventAnnouncements {
             }
 
             p.resetTitle();
-            p.sendTitle(title, subtitle, 5, 80, 15);
+            TitleHelper.sendThemedTitle(p, title, subtitle, 5, 80, 15);
         }
 
     }
@@ -134,7 +141,7 @@ public class EventAnnouncements {
             String title = this.t.getTranslated(p, "event_dnf_title", new String[0]);
             String subtitle = this.t.getTranslated(p, "event_dnf_subtitle", new String[0]);
             p.playSound(p.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0F, 1.0F);
-            p.sendTitle(title, subtitle, 10, 70, 20);
+            TitleHelper.sendThemedTitle(p, title, subtitle, 10, 70, 20);
         }
 
     }
@@ -151,21 +158,26 @@ public class EventAnnouncements {
 
     public void broadcastLapTime(Heats heat, Driver driver, String formattedTime, String delta) {
         String name = Bukkit.getOfflinePlayer(driver.getUuid()).getName();
-        String deltaDisplay;
+        String deltaToken;
         if (delta != null && !delta.isEmpty()) {
             if (delta.startsWith("-")) {
-                deltaDisplay = "§a" + delta;
+                deltaToken = "&s";
             } else {
-                deltaDisplay = "§c" + delta;
+                deltaToken = "&e";
             }
         } else {
-            deltaDisplay = "§7(-)";
+            deltaToken = "&7";
+            delta = "(-)";
         }
 
         for(Driver d : heat.getDrivers().values()) {
             Player p = Bukkit.getPlayer(d.getUuid());
             if (p != null && p.isOnline()) {
-                p.sendMessage(String.format("§e%s §7[Volta %d] §f%s %s", name, driver.getLapCount(), formattedTime, deltaDisplay));
+                FRTheme theme = FRThemeResolver.resolveTheme(p);
+                String message = String.format("&w%s &7[Volta %d] &f%s %s%s", name, driver.getLapCount(), formattedTime, deltaToken, delta);
+                Component comp = FRThemeParser.parseWithLegacy(message, theme);
+                String legacy = LegacyComponentSerializer.legacySection().serialize(comp);
+                p.sendMessage(legacy);
             }
         }
 
@@ -280,7 +292,7 @@ public class EventAnnouncements {
                 if (p != null && p.isOnline()) {
                     String title = this.t.getTranslated(p, "event_session_expired_title", new String[0]);
                     String subtitle = this.t.getTranslated(p, "event_session_expired_subtitle", new String[0]);
-                    p.sendTitle(title, subtitle, 10, 40, 10);
+                    TitleHelper.sendThemedTitle(p, title, subtitle, 10, 40, 10);
                 }
             }
         } else {
@@ -297,7 +309,7 @@ public class EventAnnouncements {
             if (p != null && p.isOnline()) {
                 String title = this.t.getTranslated(p, "event_session_cancelled_title", new String[0]);
                 String subtitle = this.t.getTranslated(p, "event_session_cancelled_subtitle", new String[0]);
-                p.sendTitle(title, subtitle, 10, 60, 20);
+                TitleHelper.sendThemedTitle(p, title, subtitle, 10, 60, 20);
             }
         }
 

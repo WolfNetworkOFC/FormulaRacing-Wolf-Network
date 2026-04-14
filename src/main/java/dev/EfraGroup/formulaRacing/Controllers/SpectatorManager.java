@@ -9,6 +9,7 @@ import dev.EfraGroup.formulaRacing.Participant.Spectator;
 import dev.EfraGroup.formulaRacing.Participant.Spectator.SpectatorMode;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.ScoreboardOwnershipCoordinator;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -141,7 +142,7 @@ public class SpectatorManager {
 
         String title = this.plugin.getTranslation("spectator_title_mode", this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId()), new String[0]);
         String subtitle = this.plugin.getTranslation("spectator_subtitle_mode", this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId()), new String[0]);
-        player.sendTitle(title, subtitle, 10, 60, 20);
+        TitleHelper.sendThemedTitle(player, title, subtitle, 10, 60, 20);
     }
 
     private void restorePlayer(Player player, GameMode previousMode) {

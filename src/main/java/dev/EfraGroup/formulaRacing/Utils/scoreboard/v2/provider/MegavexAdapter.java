@@ -1,12 +1,14 @@
 package dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRTheme;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeResolver;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.megavex.scoreboardlibrary.api.ScoreboardLibrary;
 import net.megavex.scoreboardlibrary.api.exception.NoPacketAdapterAvailableException;
 import net.megavex.scoreboardlibrary.api.noop.NoopScoreboardLibrary;
@@ -60,7 +62,8 @@ public class MegavexAdapter implements ScoreboardAdapter {
         }
 
         if (sidebar != null) {
-            sidebar.title(this.toComponent(title));
+            FRTheme theme = FRThemeResolver.resolveTheme(player);
+            sidebar.title(toComponent(title, theme));
         }
     }
 
@@ -80,10 +83,11 @@ public class MegavexAdapter implements ScoreboardAdapter {
             return;
         }
 
+        FRTheme theme = FRThemeResolver.resolveTheme(player);
         sidebar.clearLines();
         int limit = Math.min(lines.size(), sidebar.maxLines());
         for (int i = 0; i < limit; i++) {
-            sidebar.line(i, this.toComponent(lines.get(i)));
+            sidebar.line(i, toComponent(lines.get(i), theme));
         }
     }
 
@@ -111,10 +115,10 @@ public class MegavexAdapter implements ScoreboardAdapter {
         this.scoreboardLibrary.close();
     }
 
-    private Component toComponent(String line) {
+    private Component toComponent(String line, FRTheme theme) {
         if (line == null) {
             return Component.empty();
         }
-        return LegacyComponentSerializer.legacySection().deserialize(line);
+        return FRThemeParser.parseWithLegacy(line, theme);
     }
 }

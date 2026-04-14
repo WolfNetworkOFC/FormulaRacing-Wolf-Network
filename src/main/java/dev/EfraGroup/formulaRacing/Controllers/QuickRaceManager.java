@@ -18,6 +18,7 @@ import dev.EfraGroup.formulaRacing.Round.RoundState;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -239,7 +240,7 @@ public class QuickRaceManager {
                     boolean added = this.plugin.getSpectatorManager().addSpectator(player, this.currentQuickRace);
                     if (added) {
                         player.sendMessage("§eA corrida já começou! Você entrou como §6ESPECTADOR§e.");
-                        player.sendTitle("§6ESPECTADOR", "§7Acompanhando a corrida...", 10, 60, 20);
+                        TitleHelper.sendThemedTitle(player, "&wESPECTADOR", "§7Acompanhando a corrida...", 10, 60, 20);
                         return false;
                     }
                 }

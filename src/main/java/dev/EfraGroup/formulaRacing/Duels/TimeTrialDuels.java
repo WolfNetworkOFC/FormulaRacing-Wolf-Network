@@ -11,6 +11,7 @@ import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardDuelsTimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimeTrialDuelsAction;
+import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -180,16 +181,16 @@ public class TimeTrialDuels implements Listener {
                 if (p1.isOnline() && p2.isOnline()) {
                     if (this.countdown > 0) {
                         String number = "" + this.countdown;
-                        p1.sendTitle(number, "", 0, 20, 5);
-                        p2.sendTitle(number, "", 0, 20, 5);
+                        TitleHelper.sendThemedTitle(p1, number, "", 0, 20, 5);
+                        TitleHelper.sendThemedTitle(p2, number, "", 0, 20, 5);
                         p1.playSound(p1.getLocation(), Sound.BLOCK_NOTE_BLOCK_HARP, 1.0F, 0.5F);
                         p2.playSound(p2.getLocation(), Sound.BLOCK_NOTE_BLOCK_HARP, 1.0F, 0.5F);
                         --this.countdown;
                     } else {
                         String p1Lang = TimeTrialDuels.this.dm.getPlayerLanguage(p1.getUniqueId());
                         String p2Lang = TimeTrialDuels.this.dm.getPlayerLanguage(p2.getUniqueId());
-                        p1.sendTitle(TimeTrialDuels.this.plugin.getTranslation("duel_countdown_go", p1Lang, new String[0]), "", 0, 20, 5);
-                        p2.sendTitle(TimeTrialDuels.this.plugin.getTranslation("duel_countdown_go", p2Lang, new String[0]), "", 0, 20, 5);
+                        TitleHelper.sendThemedTitle(p1, TimeTrialDuels.this.plugin.getTranslation("duel_countdown_go", p1Lang, new String[0]), "", 0, 20, 5);
+                        TitleHelper.sendThemedTitle(p2, TimeTrialDuels.this.plugin.getTranslation("duel_countdown_go", p2Lang, new String[0]), "", 0, 20, 5);
                         p1.playSound(p1.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.0F);
                         p2.playSound(p2.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.0F);
                         TimeTrialDuels.this.releasePlayers(p1, p2);
@@ -285,7 +286,7 @@ public class TimeTrialDuels implements Listener {
                         String langCode = this.dm.getPlayerLanguage(uuid);
                         String finalLapTitle = this.plugin.getDirectTranslation("duel_final_lap_title", langCode);
                         String finalLapSubtitle = this.plugin.getDirectTranslation("duel_final_lap_subtitle", langCode);
-                        player.sendTitle(finalLapTitle, finalLapSubtitle, 10, 60, 20);
+                        TitleHelper.sendThemedTitle(player, finalLapTitle, finalLapSubtitle, 10, 60, 20);
                         player.sendMessage(" ");
                         player.sendMessage(this.plugin.getDirectTranslation("duel_time_up_message", langCode));
                         player.sendMessage(this.plugin.getDirectTranslation("duel_complete_current_lap", langCode));
@@ -542,7 +543,7 @@ public class TimeTrialDuels implements Listener {
                     this.ttda.resetLapTimer(player);
                     this.plugin.getDebugManager().logDuelSystem("[LAP TIMER] Timer resetado para " + player.getName());
                     String langCode = this.dm.getPlayerLanguage(player.getUniqueId());
-                    player.sendTitle("", this.plugin.getTranslation("duel_lap_first_title", langCode, new String[0]), 0, 15, 5);
+                    TitleHelper.sendThemedTitle(player, "", this.plugin.getTranslation("duel_lap_first_title", langCode, new String[0]), 0, 15, 5);
                     player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0F, 2.0F);
                     DebugManager var33 = this.plugin.getDebugManager();
                     String var38 = player.getName();
@@ -591,7 +592,7 @@ public class TimeTrialDuels implements Listener {
                                 String langCode = this.dm.getPlayerLanguage(player.getUniqueId());
                                 String lapCompleteTitle = this.plugin.getDirectTranslation("duel_lap_completed_title", langCode);
                                 String lapCompleteSubtitle = this.plugin.getTranslation("duel_lap_completed_subtitle", langCode, new String[]{"{time}", this.formatTime(lapTime)});
-                                player.sendTitle(lapCompleteTitle, lapCompleteSubtitle, 10, 60, 20);
+                                TitleHelper.sendThemedTitle(player, lapCompleteTitle, lapCompleteSubtitle, 10, 60, 20);
                                 String separator = this.plugin.getDirectTranslation("duel_separator_line", langCode);
                                 String lapComplete = this.plugin.getTranslation("duel_lap_complete_after_time_limit", langCode, new String[]{"{lap}", String.valueOf(currentLap)});
                                 String lapTime_msg = this.plugin.getTranslation("duel_lap_time_after_time_limit", langCode, new String[]{"{time}", this.formatTime(lapTime)});
@@ -705,7 +706,7 @@ public class TimeTrialDuels implements Listener {
                                 }
                             });
 
-                            player.sendTitle("", "§e§lVOLTA " + newLap, 0, 15, 5);
+                            TitleHelper.sendThemedTitle(player, "", "&w&lVOLTA " + newLap, 0, 15, 5);
                             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0F, 2.0F);
                             this.plugin.getDebugManager().logDuelSystem(player.getName() + " iniciou volta " + newLap + "/" + totalLaps);
                         } else {
@@ -719,7 +720,7 @@ public class TimeTrialDuels implements Listener {
                         var35.logDuelSystem("[CORRIDA] " + var40 + " completou volta " + currentLap + " - Continuando sem lap reset");
                     }
 
-                    player.sendTitle("", "§e§lVOLTA " + newLap, 0, 15, 5);
+                    TitleHelper.sendThemedTitle(player, "", "&w&lVOLTA " + newLap, 0, 15, 5);
                     player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.5F);
                     this.plugin.getDebugManager().logDuelSystem(player.getName() + " iniciou volta " + newLap + "/" + totalLaps);
                 }
@@ -787,7 +788,7 @@ public class TimeTrialDuels implements Listener {
                 duelState.addFinisher(player.getUniqueId());
                 if (duelState.isTimeTrialMode()) {
                     if (!duelState.isTimeLimitReached()) {
-                        player.sendTitle("§a§lFINALIZOU!", "§7Aguardando resultado...", 10, 70, 20);
+                        TitleHelper.sendThemedTitle(player, "&s&lFINALIZOU!", "§7Aguardando resultado...", 10, 70, 20);
                         String langCode = this.dm.getPlayerLanguage(player.getUniqueId());
                         String totalTimeMessage = this.plugin.getTranslation("duel_total_time", langCode, new String[]{"{time}", this.formatTime(totalTime)});
                         String waitingMessage = this.plugin.getDirectTranslation("duel_waiting_others_finish", langCode);
@@ -804,7 +805,7 @@ public class TimeTrialDuels implements Listener {
                     }
                 } else {
                     int finishPosition = duelState.getFinishCount();
-                    player.sendTitle("§a§lFINALIZOU!", "§f" + finishPosition + "º Lugar", 10, 70, 20);
+                    TitleHelper.sendThemedTitle(player, "&s&lFINALIZOU!", "§f" + finishPosition + "º Lugar", 10, 70, 20);
                     String langCode = this.dm.getPlayerLanguage(player.getUniqueId());
                     String totalTimeMessage = this.plugin.getTranslation("duel_total_time", langCode, new String[]{"{time}", this.formatTime(totalTime)});
                     player.sendMessage(totalTimeMessage);
@@ -826,7 +827,7 @@ public class TimeTrialDuels implements Listener {
                     player.sendMessage(lapComplete);
                     player.sendMessage("§e§l⏳ §f" + waitingOthers);
                     player.sendMessage(separator);
-                    player.sendTitle(completedTitle, waitingSubtitle, 10, 100, 20);
+                    TitleHelper.sendThemedTitle(player, completedTitle, waitingSubtitle, 10, 100, 20);
                 } else {
                     if (duelState.isTimeTrialMode()) {
                         boolean allFinished = duelState.getPlayers().stream().allMatch((uuid) -> {
@@ -896,12 +897,12 @@ public class TimeTrialDuels implements Listener {
                             int finalPosition = this.getTimeTrialPosition(duelState, uuid);
                             String langCode = this.dm.getPlayerLanguage(uuid);
                             if (uuid.equals(winnerUUID)) {
-                                p.sendTitle("§6§l\ud83c\udfc6 VITÓRIA!", "§f" + finalPosition + "º Lugar", 10, 70, 20);
+                                TitleHelper.sendThemedTitle(p, "&w&l🏆 VITÓRIA!", "§f" + finalPosition + "º Lugar", 10, 70, 20);
                                 p.sendMessage(" ");
                                 p.sendMessage(this.plugin.getDirectTranslation("duel_victory", langCode));
                                 p.sendMessage(" ");
                             } else {
-                                p.sendTitle("§c§lDERROTA", "§f" + finalPosition + "º Lugar", 10, 70, 20);
+                                TitleHelper.sendThemedTitle(p, "&e&lDERROTA", "§f" + finalPosition + "º Lugar", 10, 70, 20);
                                 p.sendMessage(" ");
                                 p.sendMessage(this.plugin.getDirectTranslation("duel_defeat_second", langCode));
                                 p.sendMessage(" ");
@@ -926,7 +927,7 @@ public class TimeTrialDuels implements Listener {
                                 if (loserState != null && !loserState.isFinished()) {
                                     String defeatTitle = this.plugin.getDirectTranslation("duel_defeat_title", langCode);
                                     String defeatSubtitle = this.plugin.getDirectTranslation("duel_defeat_subtitle", langCode);
-                                    loser.sendTitle(defeatTitle, defeatSubtitle, 10, 70, 20);
+                                    TitleHelper.sendThemedTitle(loser, defeatTitle, defeatSubtitle, 10, 70, 20);
                                     loser.sendMessage(" ");
                                     loser.sendMessage(this.plugin.getDirectTranslation("duel_defeat", langCode));
                                     loser.sendMessage(" ");

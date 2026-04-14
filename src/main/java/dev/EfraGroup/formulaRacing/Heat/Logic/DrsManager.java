@@ -35,7 +35,7 @@ public class DrsManager {
     public void startDrsTask(final Heats heat) {
         final Map<String, Location> regions = heat.getDrsRegions();
         final boolean hasFinishRegion = regions.containsKey("finishMin") && regions.get("finishMin") != null;
-        this.plugin.getLogger().info("§e[DRS-Debug] Iniciando Task. Regiões carregadas: " + String.valueOf(regions.keySet()));
+        this.plugin.getLogger().info("§e[DRS-Debug] Iniciando Task. Regioes carregadas: " + String.valueOf(regions.keySet()));
         (new BukkitRunnable() {
             public void run() {
                 if (heat.getHeatState() != HeatState.RACING) {
@@ -55,7 +55,7 @@ public class DrsManager {
                                 Driver target = DrsManager.this.rs.getDriverAhead(driver, heat);
                                 if (target == null) {
                                     if (player.getTicksLived() % 20 == 0) {
-                                        player.sendMessage("§7[DRS] Na zona de detecção, mas sem piloto à frente.");
+                                        player.sendMessage("§7[DRS] Na zona de deteccao, mas sem piloto a frente.");
                                     }
                                 } else {
                                     double gapValue = DrsManager.this.rs.calculateGap(driver, target, heat);
@@ -63,7 +63,7 @@ public class DrsManager {
                                         driver.setDrsPermission(true);
                                         DrsManager.this.showDrsAvailableBar(player, driver);
                                         Object[] var10002 = new Object[]{gapValue};
-                                        player.sendMessage("§a[DRS] Permissão concedida! Gap: " + String.format("%.3f", var10002));
+                                        player.sendMessage("§a[DRS] Permissao concedida! Gap: " + String.format("%.3f", var10002));
                                     }
                                 }
                             }
@@ -89,7 +89,7 @@ public class DrsManager {
             driver.getDrsBossBar().removeAll();
         }
 
-        BossBar bar = Bukkit.createBossBar("§b§lDRS DISPONÍVEL", BarColor.BLUE, BarStyle.SOLID, new BarFlag[0]);
+        BossBar bar = Bukkit.createBossBar("§b§lDRS DISPONIVEL", BarColor.BLUE, BarStyle.SOLID, new BarFlag[0]);
         bar.addPlayer(player);
         driver.setDrsBossBar(bar);
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5F, 2.0F);
@@ -123,7 +123,7 @@ public class DrsManager {
         driver.setDrsActive(false);
         if (driver.getDrsBossBar() != null) {
             driver.getDrsBossBar().removeAll();
-            driver.setDrsBossBar((BossBar)null);
+            driver.setDrsBossBar(null);
         }
 
         player.sendMessage("§cDRS Finalizado.");

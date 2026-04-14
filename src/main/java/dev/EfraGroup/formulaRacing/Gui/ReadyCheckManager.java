@@ -8,6 +8,7 @@ package dev.EfraGroup.formulaRacing.Gui;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -81,7 +82,7 @@ public class ReadyCheckManager implements Listener {
                             if (p != null && p.isOnline()) {
                                 p.sendMessage(readyText);
                                 p.sendMessage(pressText);
-                                p.sendTitle("§6Você está pronto?", pressText, 10, 280, 10);
+                                TitleHelper.sendThemedTitle(p, "&wVocê está pronto?", pressText, 10, 280, 10);
                                 p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 1.0F);
                             }
                         }

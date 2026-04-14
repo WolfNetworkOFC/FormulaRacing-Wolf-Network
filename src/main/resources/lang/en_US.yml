@@ -455,7 +455,6 @@ race_title_go: "&a&l✓ GO! GO! GO!"
 quali_title_go: "&b&l⏱ GOOD LUCK!"
 quali_subtitle_go: "&7Set your best lap!"
 protection_click_to_leave: "&e&l► CLICK HERE"
-protection_click_to_leave: "&e&l► CLICK HERE"
 protection_leave_suffix: "&e to leave the race"
 protection_hover_leave: "Click to use {command}"
 
@@ -704,7 +703,7 @@ scoreboard_title_qualifying: '&b&l QUALIFYING'
 scoreboard_title_waiting: '&6&l WAITING'
 scoreboard_title_starting: '&6&l STARTING'
 scoreboard_title_race: '&c&l RACE'
-scoreboard_title_finished: '&a&l FINISHED'
+scoreboard_title_finished: '&s&l FINISHED'
 scoreboard_state_preparing: 'Preparing'
 scoreboard_label_track: '&7Track: &f{track}'
 scoreboard_label_laps: '&7Laps: &f{laps}'
@@ -730,7 +729,7 @@ actionbar_qualifying_pos: '&bP{pos}'
 actionbar_grid_pos: '&6 GRID: &fP{pos}'
 actionbar_prepare_start: ' &8| &e&l GET READY!'
 actionbar_lights_out_visual: '&c&l &e&l &6&l &e&l &c&l &f LIGHTS OUT!'
-actionbar_finished_title: '&a Finished: '
+actionbar_finished_title: '&s Finished: '
 actionbar_dnf_title: '&c DNF - Did not finish'
 actionbar_race_finished: '&7Race finished'
 actionbar_info_laps: ' §8| §7Laps: §f{laps}'
@@ -912,11 +911,12 @@ event_click_to_sign: "&b--> Click to sign up for &l{event}&r&b <--"
 event_click_to_sign_hover: "&aClick to sign up for {event}"
 quickrace_already_creating: "&eA Quick Race is already being created. Please wait..."
 quickrace_click_to_join: "&b--> Click to join the Quick Race (&f{track}&b) <--"
-quickrace_click_to_join_hover: "&aJoin the Quick Race
-&7Track: &f{track}
-&7Laps: &f{laps}
-&7Pits: &f{pits}
-&7Drivers: &f{current}&7/&f{max}"
+quickrace_click_to_join_hover:
+  - "&aJoin the Quick Race"
+  - "&7Track: &f{track}"
+  - "&7Laps: &f{laps}"
+  - "&7Pits: &f{pits}"
+  - "&7Drivers: &f{current}&7/&f{max}"
 pit_lane_start: "&eYou entered the pit lane."
 scoreboard_common_separator: "&7------------------------"
 scoreboard_common_footer: "&ewolfnetwork.com.br"
@@ -928,3 +928,12 @@ scoreboard_v2_track: "&1Track: &2{track}"
 scoreboard_v2_laps: "&1Laps: &2{laps}"
 scoreboard_v2_position: "&1Position: &2{position}"
 scoreboard_v2_time: "&1Time: &2{time}"
+
+# Color Settings
+gui_settings_color_name: "&1Color"
+gui_settings_color_lore: "&2Click to choose your theme color"
+gui_color_title: "&1Choose Your Color"
+gui_color_lore: "&aClick to select"
+gui_color_current: "&aCurrent color! &7({color})"
+gui_color_back_name: "&7← Back"
+gui_color_back_lore: "&8Return to settings"

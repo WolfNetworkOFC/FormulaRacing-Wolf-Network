@@ -453,7 +453,6 @@ race_title_go: "&a&l✓ GO! GO! GO!"
 quali_title_go: "&b&l⏱ BOA SORTE!"
 quali_subtitle_go: "&7Faça sua melhor volta!"
 protection_click_to_leave: "&e&l► CLIQUE AQUI"
-protection_click_to_leave: "&e&l► CLIQUE AQUI"
 protection_leave_suffix: "&e para sair da corrida"
 protection_hover_leave: "Clique para usar {command}"
 
@@ -908,11 +907,12 @@ event_click_to_sign: "&b--> Clique para se inscrever em &l{event}&r&b <--"
 event_click_to_sign_hover: "&aClique para se inscrever em {event}"
 quickrace_already_creating: "&eUma Quick Race ja esta sendo criada. Aguarde..."
 quickrace_click_to_join: "&b--> Clique para entrar na Quick Race (&f{track}&b) <--"
-quickrace_click_to_join_hover: "&aEntrar na Quick Race
-&7Pista: &f{track}
-&7Voltas: &f{laps}
-&7Pits: &f{pits}
-&7Pilotos: &f{current}&7/&f{max}"
+quickrace_click_to_join_hover:
+  - "&aEntrar na Quick Race"
+  - "&7Pista: &f{track}"
+  - "&7Voltas: &f{laps}"
+  - "&7Pits: &f{pits}"
+  - "&7Pilotos: &f{current}&7/&f{max}"
 pit_lane_start: "&eVoce entrou no pit lane."
 scoreboard_common_separator: "&7------------------------"
 scoreboard_common_footer: "&ewolfnetwork.com.br"
@@ -924,3 +924,12 @@ scoreboard_v2_track: "&1Pista: &2{track}"
 scoreboard_v2_laps: "&1Voltas: &2{laps}"
 scoreboard_v2_position: "&1Posição: &2{position}"
 scoreboard_v2_time: "&1Tempo: &2{time}"
+
+# Color Settings
+gui_settings_color_name: "&1Cor"
+gui_settings_color_lore: "&2Clique para escolher a cor do seu tema"
+gui_color_title: "&1Escolha Sua Cor"
+gui_color_lore: "&aClique para selecionar"
+gui_color_current: "&aCor atual! &7({color})"
+gui_color_back_name: "&7← Voltar"
+gui_color_back_lore: "&8Voltar às configurações"

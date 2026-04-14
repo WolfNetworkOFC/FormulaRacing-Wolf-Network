@@ -27,6 +27,8 @@ public class DatabaseManager {
     private final Map<UUID, String> languageCache = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> ttEnabledCache = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> compactScoreboardCache = new ConcurrentHashMap<>();
+    private final Map<UUID, String> playerColor1Cache = new ConcurrentHashMap<>();
+    private final Map<UUID, String> playerColor2Cache = new ConcurrentHashMap<>();
 
     public enum DatabaseType {
         SQLITE,
@@ -986,6 +988,100 @@ public class DatabaseManager {
         }
     }
 
+    public synchronized String getPlayerColor1(UUID uuid) {
+        return playerColor1Cache.computeIfAbsent(uuid, id -> {
+            String sql = "SELECT color1 FROM fr_players WHERE uuid = ?";
+            try {
+                Connection conn = getOrConnect();
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, id.toString());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            String color = rs.getString("color1");
+                            return (color != null && !color.isEmpty()) ? color : "#7bf200";
+                        }
+                    }
+                }
+            } catch (SQLException e) {
+                handleSqlError(e);
+            }
+            return "#7bf200";
+        });
+    }
+
+    public synchronized void setPlayerColor1(UUID uuid, String hex) {
+        String sql = "UPDATE fr_players SET color1 = ? WHERE uuid = ?";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, hex);
+                ps.setString(2, uuid.toString());
+                ps.executeUpdate();
+                playerColor1Cache.put(uuid, hex);
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized String getPlayerColor2(UUID uuid) {
+        return playerColor2Cache.computeIfAbsent(uuid, id -> {
+            String sql = "SELECT color2 FROM fr_players WHERE uuid = ?";
+            try {
+                Connection conn = getOrConnect();
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, id.toString());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            String color = rs.getString("color2");
+                            return (color != null && !color.isEmpty()) ? color : "#FFFFFF";
+                        }
+                    }
+                }
+            } catch (SQLException e) {
+                handleSqlError(e);
+            }
+            return "#FFFFFF";
+        });
+    }
+
+    public synchronized void migrateNullPlayerColors() {
+        String sql = "UPDATE fr_players SET color1 = '#7bf200' WHERE color1 IS NULL OR color1 = ''";
+        String sql2 = "UPDATE fr_players SET color2 = '#FFFFFF' WHERE color2 IS NULL OR color2 = ''";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps1 = conn.prepareStatement(sql)) {
+                int updated1 = ps1.executeUpdate();
+                if (updated1 > 0) {
+                    plugin.getDebugManager().logDatabaseOperation("[MIGRATION] Set default color1 for " + updated1 + " players");
+                }
+            }
+            try (PreparedStatement ps2 = conn.prepareStatement(sql2)) {
+                int updated2 = ps2.executeUpdate();
+                if (updated2 > 0) {
+                    plugin.getDebugManager().logDatabaseOperation("[MIGRATION] Set default color2 for " + updated2 + " players");
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation("[MIGRATION] Color migration failed: " + e.getMessage());
+        }
+    }
+
+    public synchronized void setPlayerColor2(UUID uuid, String hex) {
+        String sql = "UPDATE fr_players SET color2 = ? WHERE uuid = ?";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, hex);
+                ps.setString(2, uuid.toString());
+                ps.executeUpdate();
+                playerColor2Cache.put(uuid, hex);
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+    }
+
     /* =======================================================
            MÉTODOS DE DUELOS, BOAT TYPE E PLACAR
 ======================================================= */
@@ -1199,7 +1295,7 @@ public class DatabaseManager {
                 uuid, displayName, color1, color2, baseBoat, timetrial, timetrialScoreboard,
                 announceCheckpoint, announceLap, compactScoreboard, music,
                 animation, horn, hat, boots, lastKnownTrackz, lonelyMode
-            ) VALUES (?, ?, NULL, NULL, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, NULL, 0)
+            ) VALUES (?, ?, '#7bf200', '#FFFFFF', 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, NULL, 0)
             ON CONFLICT(uuid) DO UPDATE SET displayName = excluded.displayName
             """;
         try {

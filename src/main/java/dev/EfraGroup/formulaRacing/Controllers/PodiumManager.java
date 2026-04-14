@@ -3,6 +3,7 @@ package dev.EfraGroup.formulaRacing.Controllers;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Event.Events;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -260,7 +261,7 @@ public class PodiumManager implements Listener {
                 continue;
             }
 
-            p.sendTitle(title, subtitle, 0, 40, 10);
+            TitleHelper.sendThemedTitle(p, title, subtitle, 0, 40, 10);
             p.sendMessage(chat);
             if (soundsEnabled) {
                 if (position <= 3) {
