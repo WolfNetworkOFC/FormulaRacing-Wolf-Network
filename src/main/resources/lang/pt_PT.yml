@@ -947,7 +947,7 @@ quickrace_click_to_join_hover:
   - "&7Pits: &f{pits}"
   - "&7Pilotos: &f{current}&7/&f{max}"
 pit_lane_start: "&eEntraste na pit lane."
-scoreboard_common_separator: "&7------------------------"
+scoreboard_common_separator: "&7----------------------------------------"
 scoreboard_common_footer: "&ewolfnetwork.com.br"
 scoreboard_v2_no_active_drivers: "&7Sem pilotos ativos"
 scoreboard_v2_best_lap: "&1Melhor volta: &2{time}"

@@ -13,6 +13,8 @@ import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRTheme;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeResolver;
+import net.md_5.bungee.api.ChatMessageType;
+import net.md_5.bungee.api.chat.TextComponent;
 import java.util.Map;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
@@ -59,7 +61,10 @@ public class DrsManager {
                                 Driver target = DrsManager.this.rs.getDriverAhead(driver, heat);
                                 if (target == null) {
                                     if (player.getTicksLived() % 20 == 0) {
-                                        player.sendMessage("§7[DRS] Na zona de deteccao, mas sem piloto a frente.");
+                                        FRTheme theme = FRThemeResolver.resolveTheme(player);
+                                        String rawMsg = "&2[DRS] Na zona de deteccao, mas sem piloto a frente.";
+                                        String themed = LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawMsg, theme));
+                                        player.spigot().sendMessage(ChatMessageType.CHAT, new TextComponent(themed));
                                     }
                                 } else {
                                     double gapValue = DrsManager.this.rs.calculateGap(driver, target, heat);
@@ -67,7 +72,10 @@ public class DrsManager {
                                         driver.setDrsPermission(true);
                                         DrsManager.this.showDrsAvailableBar(player, driver);
                                         Object[] var10002 = new Object[]{gapValue};
-                                        player.sendMessage("§a[DRS] Permissao concedida! Gap: " + String.format("%.3f", var10002));
+                                        FRTheme theme = FRThemeResolver.resolveTheme(player);
+                                        String rawMsg = "&s[DRS] Permissao concedida! Gap: " + String.format("%.3f", var10002);
+                                        String themed = LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawMsg, theme));
+                                        player.spigot().sendMessage(ChatMessageType.CHAT, new TextComponent(themed));
                                     }
                                 }
                             }

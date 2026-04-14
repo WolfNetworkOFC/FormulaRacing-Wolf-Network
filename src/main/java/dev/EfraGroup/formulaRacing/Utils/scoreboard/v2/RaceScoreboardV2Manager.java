@@ -17,6 +17,10 @@ import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.model.ScoreboardViewModel
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.ScoreboardAdapter;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.render.LineBudgetPolicy;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.render.ScoreboardRenderer;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRTheme;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeResolver;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -284,12 +288,18 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
     }
 
     private void renderSimplified(Player player, Heats heat) {
+        FRTheme theme = FRThemeResolver.resolveTheme(player);
+        String rawName = "&n" + heat.getName();
+        String rawState = "&2" + heat.getHeatState().name();
+        String rawDrivers = "&2Pilotos: &1" + heat.getDriverCount();
+        String rawLaps = "&2Voltas: &1" + heat.getTotalLaps();
+        String rawSponsor = "&nwolfnetwork.com.br";
         List<String> lines = new ArrayList<>();
-        lines.add("§e" + heat.getName());
-        lines.add("§7" + heat.getHeatState().name());
-        lines.add("§7Pilotos: §f" + heat.getDriverCount());
-        lines.add("§7Voltas: §f" + heat.getTotalLaps());
-        lines.add("§ewolfnetwork.com.br");
+        lines.add(LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawName, theme)));
+        lines.add(LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawState, theme)));
+        lines.add(LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawDrivers, theme)));
+        lines.add(LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawLaps, theme)));
+        lines.add(LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawSponsor, theme)));
 
         this.fallbackActivated++;
         this.primaryAdapter.updateTitle(player, this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_title_waiting"));

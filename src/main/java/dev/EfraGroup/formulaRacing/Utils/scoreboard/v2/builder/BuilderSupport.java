@@ -479,7 +479,7 @@ final class BuilderSupport {
         m.put("scoreboard_status_dnf_short", "DNF");
         m.put("scoreboard_status_offline", "Offline");
         m.put("scoreboard_status_in_pit", "In Pit");
-        m.put("scoreboard_common_separator", "&7------------------------");
+        m.put("scoreboard_common_separator", "&7----------------------------------------");
         m.put("scoreboard_common_footer", "&ewolfnetwork.com.br");
         MINIMAL_FALLBACK = Map.copyOf(m);
     }
