@@ -1043,6 +1043,7 @@ public class Heats {
     }
 
     public void setHeatState(HeatState heatState) {
+        HeatStateMachine.validateTransition(this.heatState, heatState);
         this.previousState = this.heatState;
         this.heatState = heatState;
         if (this.plugin != null && this.id > 0 && this.plugin.getRaceEventManager() != null) {
