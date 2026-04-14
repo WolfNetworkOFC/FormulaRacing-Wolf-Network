@@ -208,6 +208,33 @@ duel_lap_completed_title: "&a&lLAP COMPLETE!"
 duel_lap_completed_subtitle: "&fTime: &e{time}"
 duel_separator_line: "&8&m                                                                  "
 
+# Duel Finish & Lap Titles
+duel_finish_title: "&s&lFINISHED!"
+duel_finish_waiting: "&7Waiting for results..."
+duel_finish_position: "&f{position} Place"
+duel_lap_prefix: "&w&lLAP "
+duel_victory_title: "&w&l🏆 VICTORY!"
+duel_defeat_title: "&e&lDEFEAT"
+
+# Ready Check
+ready_check_title: "&wAre you ready?"
+ready_check_ready_text: "&6  READY CHECK STARTED!"
+ready_check_press_text: "&f  All drivers must press &bSHIFT&f to confirm."
+ready_check_all_ready: "&a✔ All drivers in Heat #{heat} are READY!"
+ready_check_player_ready: "&a✔ You are ready!"
+
+# Spectator Quick Race
+spectator_qr_title: "&wSPECTATOR"
+spectator_qr_subtitle: "&2Watching the race..."
+
+# DRS Messages
+drs_available: "&i&lDRS AVAILABLE"
+drs_activated: "&b&l>>> DRS ACTIVATED!"
+drs_finished: "&cDRS Finished."
+
+# PTP Manager
+ptp_title_prefix: "&w&lPush To Pass: "
+
 # Camera Commands
 cam_started_following: "&aYou started following &e{player} &a(normal mode)."
 cam_stopped_following: "&cYou stopped following (normal mode)."
@@ -910,6 +937,10 @@ event_create_error: "&cError creating event."
 event_click_to_sign: "&b--> Click to sign up for &l{event}&r&b <--"
 event_click_to_sign_hover: "&aClick to sign up for {event}"
 quickrace_already_creating: "&eA Quick Race is already being created. Please wait..."
+quickrace_ptp_adjustment: "&eAdjusting to 1 lap and 0 pits (Point-to-Point track)."
+quickrace_joined_spectator: "&eThe race has already started! You joined as &6SPECTATOR&e."
+quickrace_fast_start: "&e&l⚠ Enough players! The race will start in 15 seconds!"
+quickrace_lobby_countdown: "&eStarting in {0}s..."
 quickrace_click_to_join: "&b--> Click to join the Quick Race (&f{track}&b) <--"
 quickrace_click_to_join_hover:
   - "&aJoin the Quick Race"

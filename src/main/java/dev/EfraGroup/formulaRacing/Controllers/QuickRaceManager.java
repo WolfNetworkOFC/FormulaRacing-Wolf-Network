@@ -75,7 +75,6 @@ public class QuickRaceManager {
 
         if (creating) {
             plugin.sendMessage(creator, "quickrace_already_creating");
-            creator.sendMessage(ChatColor.RED + "Uma Quick Race já está sendo criada. Aguarde...");
             return false;
         }
 
@@ -93,7 +92,8 @@ public class QuickRaceManager {
         // Validação de Circuito vs Point-to-Point
         if (!database.isCircuit(trackNameWS) && (laps > 1 || pits > 0)) {
             plugin.getDebugManager().logRaceSystem("[QuickRace] Pista " + finalTrackName + " não é circuito. Ajustando parâmetros.");
-            creator.sendMessage("§eAjustando para 1 volta e 0 pits (pista Point-to-Point).");
+            String creatorLang = database.getPlayerLanguage(creator.getUniqueId());
+            creator.sendMessage(plugin.getTranslation("quickrace_ptp_adjustment", creatorLang));
             laps = 1;
             pits = 0;
         }
@@ -239,8 +239,12 @@ public class QuickRaceManager {
                 if (this.plugin.getSpectatorManager() != null) {
                     boolean added = this.plugin.getSpectatorManager().addSpectator(player, this.currentQuickRace);
                     if (added) {
-                        player.sendMessage("§eA corrida já começou! Você entrou como §6ESPECTADOR§e.");
-                        TitleHelper.sendThemedTitle(player, "&wESPECTADOR", "§7Acompanhando a corrida...", 10, 60, 20);
+                        String specLang = this.database.getPlayerLanguage(player.getUniqueId());
+                        player.sendMessage(plugin.getTranslation("quickrace_joined_spectator", specLang));
+                        TitleHelper.sendThemedTitle(player,
+                            this.plugin.getTranslation("spectator_qr_title", specLang),
+                            this.plugin.getTranslation("spectator_qr_subtitle", specLang),
+                            10, 60, 20);
                         return false;
                     }
                 }
@@ -543,12 +547,12 @@ public class QuickRaceManager {
         if (this.currentHeat != null) {
             if (this.currentHeat.getDriverCount() >= 4 && this.lobbyTimerSeconds > 15) {
                 this.lobbyTimerSeconds = 15;
-                String msg = "§e§l⚠ Jogadores suficientes! A corrida iniciará em 15 segundos!";
 
                 for(UUID uuid : this.currentHeat.getDrivers().keySet()) {
                     Player p = this.plugin.getServer().getPlayer(uuid);
                     if (p != null) {
-                        p.sendMessage(msg);
+                        String pLang = this.database.getPlayerLanguage(p.getUniqueId());
+                        p.sendMessage(plugin.getTranslation("quickrace_fast_start", pLang));
                     }
                 }
             }
@@ -567,12 +571,11 @@ public class QuickRaceManager {
                 } else {
                     --this.lobbyTimerSeconds;
                     if (this.lobbyTimerSeconds == 30 || this.lobbyTimerSeconds == 15 || this.lobbyTimerSeconds <= 5 && this.lobbyTimerSeconds > 0) {
-                        String msg = "§eIniciando em " + this.lobbyTimerSeconds + "s...";
-
                         for(UUID uuid : this.currentHeat.getDrivers().keySet()) {
                             Player p = this.plugin.getServer().getPlayer(uuid);
                             if (p != null) {
-                                p.sendMessage(msg);
+                                String pLang = this.database.getPlayerLanguage(p.getUniqueId());
+                                p.sendMessage(plugin.getTranslation("quickrace_lobby_countdown", pLang, new String[]{String.valueOf(this.lobbyTimerSeconds)}));
                                 if (this.lobbyTimerSeconds <= 5) {
                                     p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 2.0F);
                                 }

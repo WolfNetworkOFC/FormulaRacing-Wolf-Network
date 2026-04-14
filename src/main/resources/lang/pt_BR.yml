@@ -92,6 +92,33 @@ duel_lap_completed_title: "&a&lVOLTA COMPLETA!"
 duel_lap_completed_subtitle: "&fTempo: &e{time}"
 duel_separator_line: "&8§m                                                                  "
 
+# Duelo Finish & Lap Titles
+duel_finish_title: "&s&lTERMINOU!"
+duel_finish_waiting: "&2Aguardando resultado..."
+duel_lap_prefix: "&w&lVOLTA "
+duel_victory_title: "&w&l🏆 VITÓRIA!"
+duel_defeat_title: "&e&lDERROTA"
+duel_finish_position: "&f{position}º Lugar"
+
+# Ready Check
+ready_check_title: "&wVocê está pronto?"
+ready_check_ready_text: "&6  READY CHECK INICIADO!"
+ready_check_press_text: "&f  Todos os pilotos devem apertar &bSHIFT&f para confirmar."
+ready_check_all_ready: "&a✔ Todos os pilotos do Heat #{heat} estão PRONTOS!"
+ready_check_player_ready: "&a✔ Você está pronto!"
+
+# Espectador Quick Race
+spectator_qr_title: "&wESPECTADOR"
+spectator_qr_subtitle: "&2Acompanhando a corrida..."
+
+# Mensagens DRS
+drs_available: "&i&lDRS DISPONIVEL"
+drs_activated: "&b&l>>> DRS ATIVADO!"
+drs_finished: "&cDRS Finalizado."
+
+# PTP Manager
+ptp_title_prefix: "&w&lPush To Pass: "
+
 # Comandos de Câmera
 cam_started_following: "&aVocê começou a seguir &e{player} &a(modo normal)."
 cam_stopped_following: "&cVocê parou de seguir (modo normal)."
@@ -906,6 +933,10 @@ event_create_error: "&cErro ao criar evento."
 event_click_to_sign: "&b--> Clique para se inscrever em &l{event}&r&b <--"
 event_click_to_sign_hover: "&aClique para se inscrever em {event}"
 quickrace_already_creating: "&eUma Quick Race ja esta sendo criada. Aguarde..."
+quickrace_ptp_adjustment: "&eAjustando para 1 volta e 0 pits (pista Point-to-Point)."
+quickrace_joined_spectator: "&eA corrida ja comecou! Voce entrou como &6ESPECTADOR&e."
+quickrace_fast_start: "&e&l⚠ Jogadores suficientes! A corrida iniciara em 15 segundos!"
+quickrace_lobby_countdown: "&eIniciando em {0}s..."
 quickrace_click_to_join: "&b--> Clique para entrar na Quick Race (&f{track}&b) <--"
 quickrace_click_to_join_hover:
   - "&aEntrar na Quick Race"
