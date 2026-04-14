@@ -4,11 +4,16 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRTheme;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeResolver;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.TextComponent;
@@ -60,6 +65,12 @@ public class RaceActionBarManager {
         }
         String translated = ChatColor.translateAlternateColorCodes('&', raw);
         return translated == null || translated.isBlank() ? fallback : translated;
+    }
+
+    private String buildThemedActionBar(Player viewer, String rawMessage) {
+        FRTheme theme = FRThemeResolver.resolveTheme(viewer);
+        Component comp = FRThemeParser.parseWithLegacy(rawMessage, theme);
+        return LegacyComponentSerializer.legacySection().serialize(comp);
     }
 
     private void startAutoUpdate() {
@@ -246,7 +257,8 @@ public class RaceActionBarManager {
         if (message.equals(previous)) {
             return;
         }
-        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(message));
+        String themedString = buildThemedActionBar(player, message);
+        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(themedString));
         this.lastActionBarMessage.put(player.getUniqueId(), message);
     }
 
@@ -278,18 +290,18 @@ public class RaceActionBarManager {
             remaining = heat.getSessionTimeRemaining();
         }
         if (remaining >= 0L) {
-            sb.append("\u00a7c\u23f1 ").append(this.formatTimeShort(remaining));
+            sb.append("&e⏱ ").append(this.formatTimeShort(remaining));
         }
 
         int currentLap = driver.getLapCount() + 1;
         if (sb.length() > 0) {
-            sb.append(" \u00a78| ");
+            sb.append(" &t| ");
         }
         sb.append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_practice_lap", "{lap}", String.valueOf(currentLap)));
 
         if (driver.getCurrentLap() != null) {
             long lapElapsed = System.currentTimeMillis() - driver.getCurrentLap().getStartTime();
-            sb.append(" \u00a78| \u00a7e\u23f1 ").append(this.formatLapTime(lapElapsed));
+            sb.append(" &t| &w⏱ ").append(this.formatLapTime(lapElapsed));
             String delta = driver.getCachedDelta();
             if (delta != null && !delta.isEmpty()) {
                 sb.append(delta);
@@ -304,18 +316,18 @@ public class RaceActionBarManager {
         StringBuilder sb = new StringBuilder();
         long remaining = heat.getSessionTimeRemaining();
         if (remaining >= 0L) {
-            sb.append("\u00a7c\u23f1 ").append(this.formatTimeShort(remaining));
+            sb.append("&e⏱ ").append(this.formatTimeShort(remaining));
         }
         if (sb.length() > 0) {
-            sb.append(" \u00a78| ");
+            sb.append(" &t| ");
         }
         sb.append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_qualifying_pos", "{pos}", String.valueOf(driver.getPosition())));
         int currentLap = driver.getLapCount() + 1;
-        sb.append(" \u00a78| ").append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_practice_lap", "{lap}", String.valueOf(currentLap)));
+        sb.append(" &t| ").append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_practice_lap", "{lap}", String.valueOf(currentLap)));
 
         if (driver.getCurrentLap() != null) {
             long lapElapsed = System.currentTimeMillis() - driver.getCurrentLap().getStartTime();
-            sb.append(" \u00a78| \u00a7e\u23f1 ").append(this.formatLapTime(lapElapsed));
+            sb.append(" &t| &w⏱ ").append(this.formatLapTime(lapElapsed));
             String delta = driver.getCachedDelta();
             if (delta != null && !delta.isEmpty()) {
                 sb.append(delta);
@@ -350,7 +362,7 @@ public class RaceActionBarManager {
 
         int totalLaps = heat.getTotalLaps();
         int currentLap = driver.getCurrentLap() == null ? 0 : Math.min(totalLaps, driver.getLapCount() + 1);
-        sb.append(" \u00a78| ").append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_practice_lap", "{lap}", currentLap + "\u00a77/\u00a7f" + totalLaps));
+        sb.append(" &t| ").append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_practice_lap", "{lap}", currentLap + "&2&2/" + "&2" + totalLaps));
 
         int totalCheckpoints = this.getTrackCheckpointCount(heat.getTrackNameWS());
         double lapsCompleted = driver.getLapCount();
@@ -365,7 +377,7 @@ public class RaceActionBarManager {
 
         if (driver.getCurrentLap() != null) {
             long lapElapsed = System.currentTimeMillis() - driver.getCurrentLap().getStartTime();
-            sb.append(" \u00a78| \u00a7e\u23f1 ").append(this.formatLapTime(lapElapsed));
+            sb.append(" &t| &w⏱ ").append(this.formatLapTime(lapElapsed));
             String delta = driver.getCachedDelta();
             if (delta != null && !delta.isEmpty()) {
                 sb.append(delta);
@@ -377,7 +389,7 @@ public class RaceActionBarManager {
             if (pitsRemaining > 0) {
                 sb.append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_info_pits", "{pits}", String.valueOf(pitsRemaining)));
             } else {
-                sb.append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_info_pits", "{pits}", "\u00a7a\u2713"));
+                sb.append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_info_pits", "{pits}", "&s✓"));
             }
         }
 
@@ -385,7 +397,7 @@ public class RaceActionBarManager {
         if (heat.getStartTime() != null) {
             elapsed = System.currentTimeMillis() - heat.getStartTime().toEpochMilli();
         }
-        sb.append(" \u00a78| \u00a77").append(this.formatRaceElapsed(elapsed));
+        sb.append(" &t| &2").append(this.formatRaceElapsed(elapsed));
         return sb.toString();
     }
 
@@ -393,7 +405,7 @@ public class RaceActionBarManager {
         if (driver.isFinished()) {
             String posColor = this.getPositionColor(driver.getPosition());
             return String.format(
-                    this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_finished_title", new String[0]) + "%sP%d \u00a78| \u00a77%s",
+                    this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_finished_title", new String[0]) + "%sP%d &t| &2%s",
                     posColor,
                     driver.getPosition(),
                     this.formatTimeShort(driver.getTotalTime())
@@ -407,10 +419,10 @@ public class RaceActionBarManager {
 
     private String getPositionColor(int position) {
         return switch (position) {
-            case 1 -> "\u00a76";
-            case 2 -> "\u00a77";
-            case 3 -> "\u00a7c";
-            default -> "\u00a77";
+            case 1 -> "&v";
+            case 2 -> "&2";
+            case 3 -> "&e";
+            default -> "&2";
         };
     }
 
