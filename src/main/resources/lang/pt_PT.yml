@@ -935,3 +935,13 @@ gui_color_lore: "&aClica para selecionar"
 gui_color_current: "&aCor atual! &7({color})"
 gui_color_back_name: "&7← Voltar"
 gui_color_back_lore: "&8Voltar às definições"
+
+# Scoreboard State Labels
+scoreboard_state_setup: "A configurar"
+scoreboard_state_idle: "Aguardando"
+scoreboard_state_practice: "Prática"
+scoreboard_state_qualifying: "Qualificação"
+scoreboard_state_loaded: "Grelha pronta"
+scoreboard_state_starting: "A iniciar"
+scoreboard_state_racing: "A correr"
+scoreboard_state_finished: "Finalizado"

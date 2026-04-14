@@ -933,3 +933,13 @@ gui_color_lore: "&aClique para selecionar"
 gui_color_current: "&aCor atual! &7({color})"
 gui_color_back_name: "&7← Voltar"
 gui_color_back_lore: "&8Voltar às configurações"
+
+# Scoreboard State Labels
+scoreboard_state_setup: "A configurar"
+scoreboard_state_idle: "Aguardando"
+scoreboard_state_practice: "Prática"
+scoreboard_state_qualifying: "Classificação"
+scoreboard_state_loaded: "Grid montado"
+scoreboard_state_starting: "Largada"
+scoreboard_state_racing: "Corrida"
+scoreboard_state_finished: "Finalizado"

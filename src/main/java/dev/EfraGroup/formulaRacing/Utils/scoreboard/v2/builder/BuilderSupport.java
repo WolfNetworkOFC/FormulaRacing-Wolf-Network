@@ -110,16 +110,16 @@ final class BuilderSupport {
         return lines;
     }
 
-    static String stateLabel(HeatState state) {
+    static String stateLabel(ScoreboardContext context, HeatState state) {
         return switch (state) {
-            case SETUP -> "&2Preparando";
-            case IDLE -> "&2Aguardando";
-            case PRACTICE -> "&2Pratica";
-            case QUALIFYING -> "&2Qualifying";
-            case LOADED -> "&2Grid montado";
-            case STARTING -> "&2Largada";
-            case RACING -> "&2Corrida";
-            case FINISHED -> "&2Finalizada";
+            case SETUP -> "&2" + tr(context, "scoreboard_state_setup");
+            case IDLE -> "&2" + tr(context, "scoreboard_state_idle");
+            case PRACTICE -> "&2" + tr(context, "scoreboard_state_practice");
+            case QUALIFYING -> "&2" + tr(context, "scoreboard_state_qualifying");
+            case LOADED -> "&2" + tr(context, "scoreboard_state_loaded");
+            case STARTING -> "&2" + tr(context, "scoreboard_state_starting");
+            case RACING -> "&2" + tr(context, "scoreboard_state_racing");
+            case FINISHED -> "&2" + tr(context, "scoreboard_state_finished");
         };
     }
 
@@ -378,7 +378,7 @@ final class BuilderSupport {
             return "";
         }
 
-        if (rawName.startsWith("QuickRace_") || rawName.equalsIgnoreCase("QuickRace") || rawName.toLowerCase().startsWith("quickrace")) {
+        if (rawName.startsWith("QuickRace_") || rawName.toLowerCase().startsWith("quickrace")) {
             return "QuickRace";
         }
 
