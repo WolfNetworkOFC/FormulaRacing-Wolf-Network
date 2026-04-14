@@ -216,8 +216,10 @@ public class ScoreboardTimeTrialUtils {
     private String formatRecordLine(DatabaseManager.TrackRecord tr, int pos, String observerName, Player viewer) {
         boolean isMe = tr.getPlayerName().equals(observerName);
         String color;
+        String boldCode = "";
         if (isMe) {
             color = "§e";
+            boldCode = "§l";
         } else {
             switch (pos) {
                 case 1 -> color = "§6";
@@ -227,16 +229,17 @@ public class ScoreboardTimeTrialUtils {
             }
         }
 
-        String timeDisplay = tr.isFinished()
-                ? "§b" + this.formatTime(tr.getTime())
-                : "§6" + tr.getCheckpointsReached() + "CP §7(§f" + this.formatTime(tr.getTime()) + "§7)";
+        String timeRaw = tr.isFinished()
+                ? this.formatTime(tr.getTime())
+                : tr.getCheckpointsReached() + "CP (" + this.formatTime(tr.getTime()) + ")";
+        String timeDisplay = "§b" + TimingScoreboardStyle.padRight(timeRaw, 12);
         String configured = FormulaRacing.getInstance().getConfig().getString("scoreboard.style.accent-marker", "┃");
         String accent = TimingScoreboardStyle.normalizeAccentMarker(configured);
-        String marker = color + "§l" + accent + accent + "§r";
+        String marker = color + boldCode + accent + accent + "§r§l§r";
         String nameBase = isMe
                 ? ChatColor.stripColor(FormulaRacing.getInstance().getTranslationUtil().getTranslated(viewer, "scoreboard_tt_you"))
                 : tr.getPlayerName();
-        String nameDisplay = TimingScoreboardStyle.padRight(nameBase, 14, isMe ? "§e§l" : "§f");
+        String nameDisplay = TimingScoreboardStyle.padRight(nameBase, 14, isMe ? "§e§l" : "§f§r");
         String rank = color + pos + ".§r";
         return rank + " §7| " + timeDisplay + " " + marker + " " + nameDisplay;
     }
