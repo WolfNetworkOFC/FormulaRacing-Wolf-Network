@@ -7,8 +7,12 @@ package dev.EfraGroup.formulaRacing.Event;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Participant.Subscriber;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRTheme;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeDefaults;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
 import java.util.UUID;
 import java.util.function.Consumer;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.boss.BarColor;
@@ -89,7 +93,10 @@ public class EventCountdown {
             displayLabel = this.plugin.getTranslationUtil().getTranslated(this.label, "pt_BR", new String[0]);
         }
 
-        return String.format("%s §e%02d:%02d", displayLabel, minutes, seconds);
+        FRTheme defaultTheme = FRThemeDefaults.getDefaultTheme();
+        String raw = String.format("%s &w%02d:%02d", displayLabel, minutes, seconds);
+        return LegacyComponentSerializer.legacySection().serialize(
+            FRThemeParser.parseWithLegacy(raw, defaultTheme));
     }
 
     private void showToAll() {

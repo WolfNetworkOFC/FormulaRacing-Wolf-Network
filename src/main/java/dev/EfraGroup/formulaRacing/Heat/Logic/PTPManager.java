@@ -9,9 +9,13 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRTheme;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeResolver;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.boss.BarColor;
@@ -70,7 +74,12 @@ public class PTPManager {
     }
 
     private void updatePTP(Player player, Driver driver, Heats heat) {
-        BossBar bar = (BossBar)this.ptpBars.computeIfAbsent(player.getUniqueId(), (id) -> Bukkit.createBossBar("§6§lPush To Pass: 0%", BarColor.YELLOW, BarStyle.SOLID, new BarFlag[0]));
+        FRTheme theme = FRThemeResolver.resolveTheme(player);
+        BossBar bar = (BossBar)this.ptpBars.computeIfAbsent(player.getUniqueId(), (id) -> {
+            String rawTitle = "&w&lPush To Pass: 0%";
+            String title = LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawTitle, theme));
+            return Bukkit.createBossBar(title, BarColor.YELLOW, BarStyle.SOLID, new BarFlag[0]);
+        });
         if (!bar.getPlayers().contains(player)) {
             bar.addPlayer(player);
         }
@@ -91,8 +100,19 @@ public class PTPManager {
 
         driver.setPtpEnergy(energy);
         bar.setProgress(energy / (double)100.0F);
-        bar.setTitle(driver.isPtpActive() ? "§6§lPush To Pass: " + (int)energy + "% ⚡" : "§6§lPush To Pass: " + (int)energy + "%");
-        bar.setColor(driver.isPtpActive() ? BarColor.RED : BarColor.YELLOW);
+        String rawTitle = driver.isPtpActive() ? "&e&lPush To Pass: " + (int)energy + "% ⚡" : "&w&lPush To Pass: " + (int)energy + "%";
+        bar.setTitle(LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawTitle, theme)));
+        BarColor newColor;
+        if (driver.isPtpActive()) {
+            newColor = BarColor.RED;
+        } else if (energy >= 67) {
+            newColor = BarColor.GREEN;
+        } else if (energy >= 33) {
+            newColor = BarColor.YELLOW;
+        } else {
+            newColor = BarColor.RED;
+        }
+        bar.setColor(newColor);
     }
 
     public void togglePTP(Player player, Driver driver, Heats heat) {

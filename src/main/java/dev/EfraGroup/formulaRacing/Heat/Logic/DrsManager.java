@@ -10,7 +10,11 @@ import dev.EfraGroup.formulaRacing.PacketSender;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRTheme;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeResolver;
 import java.util.Map;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Sound;
@@ -89,7 +93,9 @@ public class DrsManager {
             driver.getDrsBossBar().removeAll();
         }
 
-        BossBar bar = Bukkit.createBossBar("§b§lDRS DISPONIVEL", BarColor.BLUE, BarStyle.SOLID, new BarFlag[0]);
+        FRTheme theme = FRThemeResolver.resolveTheme(player);
+        String rawTitle = "&i&lDRS DISPONIVEL";
+        BossBar bar = Bukkit.createBossBar(LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawTitle, theme)), BarColor.BLUE, BarStyle.SOLID, new BarFlag[0]);
         bar.addPlayer(player);
         driver.setDrsBossBar(bar);
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5F, 2.0F);
@@ -98,7 +104,10 @@ public class DrsManager {
     public void applyDrsBoost(Player player, Heats heat, Driver driver, boolean useRegion) {
         if (heat.getPlugin().getPacketSender() != null) {
             if (driver.getDrsBossBar() != null) {
-                driver.getDrsBossBar().setTitle("§a§l>>> DRS ATIVADO <<<");
+                FRTheme theme = FRThemeResolver.resolveTheme(player);
+                String title = LegacyComponentSerializer.legacySection().serialize(
+                    FRThemeParser.parseWithLegacy("&s&l>>> DRS ATIVADO <<<", theme));
+                driver.getDrsBossBar().setTitle(title);
                 driver.getDrsBossBar().setColor(BarColor.GREEN);
             }
 
