@@ -1,5 +1,7 @@
 package dev.EfraGroup.formulaRacing.Utils.scoreboard.style;
 
+import net.md_5.bungee.api.ChatColor;
+
 public final class TimingScoreboardStyle {
     private TimingScoreboardStyle() {
     }
@@ -41,18 +43,29 @@ public final class TimingScoreboardStyle {
     }
 
     public static String padRight(String value, int width) {
+        return padRight(value, width, null);
+    }
+
+    public static String padRight(String value, int width, String colorPrefix) {
         if (value == null) {
             value = "";
         }
-        if (value.length() > width) {
-            value = value.substring(0, width);
+        int visibleLength = value.length();
+        if (colorPrefix != null) {
+            visibleLength = ChatColor.stripColor(value).length();
         }
-        if (value.length() >= width) {
-            return value;
+        if (visibleLength >= width) {
+            return colorPrefix != null ? colorPrefix + value : value;
         }
-        StringBuilder builder = new StringBuilder(value);
-        while (builder.length() < width) {
+        StringBuilder builder = new StringBuilder();
+        if (colorPrefix != null) {
+            builder.append(colorPrefix);
+        }
+        builder.append(value);
+        int currentLength = ChatColor.stripColor(builder.toString()).length();
+        while (currentLength < width) {
             builder.append(' ');
+            currentLength++;
         }
         return builder.toString();
     }

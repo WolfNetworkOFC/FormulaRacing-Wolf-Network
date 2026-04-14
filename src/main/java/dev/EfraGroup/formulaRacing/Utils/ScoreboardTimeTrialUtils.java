@@ -140,7 +140,7 @@ public class ScoreboardTimeTrialUtils {
 
         TranslationUtil tu = FormulaRacing.getInstance().getTranslationUtil();
         this.adapter.updateTitle(player, this.boldTitle(tu.getTranslated(player, "scoreboard_tt_title")));
-        String separator = tu.getTranslated(player, "scoreboard_common_separator");
+        String separator = "§l" + tu.getTranslated(player, "scoreboard_common_separator");
         String footer = "§ewolfnetwork.com.br";
 
         List<String> lines = new ArrayList<>();
@@ -237,10 +237,9 @@ public class ScoreboardTimeTrialUtils {
         String nameDisplay = isMe
                 ? FormulaRacing.getInstance().getTranslationUtil().getTranslated(viewer, "scoreboard_tt_you")
                 : tr.getPlayerName();
-        nameDisplay = TimingScoreboardStyle.padRight(nameDisplay, 14);
+        nameDisplay = TimingScoreboardStyle.padRight(nameDisplay, 14, isMe ? "§e§l" : "§f");
         String rank = bold + color + pos + ".§r";
-        String nameColor = isMe ? "§e§l" : "§f";
-        return rank + " §7| " + timeDisplay + " " + marker + " " + nameColor + nameDisplay;
+        return rank + " §7| " + timeDisplay + " " + marker + " " + nameDisplay;
     }
 
     public String formatTime(double timeInSeconds) {
