@@ -36,6 +36,7 @@ import dev.EfraGroup.formulaRacing.Heat.PitStopManager;
 import dev.EfraGroup.formulaRacing.Heat.Logic.DrsManager;
 import dev.EfraGroup.formulaRacing.Heat.Logic.PTPManager;
 import dev.EfraGroup.formulaRacing.Heat.Logic.RaceSession;
+import dev.EfraGroup.formulaRacing.Participant.DriverLookup;
 import dev.EfraGroup.formulaRacing.Listener.CamListener;
 import dev.EfraGroup.formulaRacing.Listener.DuelProtectionListener;
 import dev.EfraGroup.formulaRacing.Listener.FormulaRacingListener;
@@ -141,6 +142,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private ReadyCheckManager readyCheckManager;
     private RaceCheckpointListener raceCheckpointListener;
     private PodiumManager podiumManager;
+    private DriverLookup driverLookup;
 
     public static FormulaRacing getInstance() {
         return instance;
@@ -194,6 +196,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return this.podiumManager;
     }
 
+    public DriverLookup getDriverLookup() {
+        return this.driverLookup;
+    }
+
     public void onEnable() {
         instance = this;
         FRThemeDefaults.load(this);
@@ -201,6 +207,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.fileManager = new FileManager(this);
             this.timeTrialController = new TimeTrialController(this);
             this.debugManager = new DebugManager(this, this.fileManager);
+            this.driverLookup = new DriverLookup();
             this.dm = new DatabaseManager(this, this.fileManager);
             this.dm.migrateNullPlayerColors();
             this.translationUtil = new TranslationUtil(this, this.dm);

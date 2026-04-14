@@ -16,7 +16,7 @@ import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Heat.Lap;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
-import dev.EfraGroup.formulaRacing.Round.Rounds;
+import dev.EfraGroup.formulaRacing.Participant.DriverLookup;
 import dev.EfraGroup.formulaRacing.Utils.RegionMathUtils;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import java.time.Instant;
@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
@@ -41,6 +40,7 @@ public class RaceCheckpointListener implements Listener {
     private final FormulaRacing plugin;
     private final RaceEventManager raceEventManager;
     private final TrackIntegrationManager trackManager;
+    private final DriverLookup driverLookup;
     private final Map<UUID, Long> lastCheckpointSkip = new ConcurrentHashMap<>();
     private static final long CHECKPOINT_SKIP_COOLDOWN_MS = 2000L;
 
@@ -58,6 +58,7 @@ public class RaceCheckpointListener implements Listener {
         this.plugin = plugin;
         this.raceEventManager = plugin.getRaceEventManager();
         this.trackManager = plugin.getTrackIntegrationManager();
+        this.driverLookup = plugin.getDriverLookup();
     }
 
     @EventHandler(
@@ -70,32 +71,15 @@ public class RaceCheckpointListener implements Listener {
             Object var4 = vehicle.getPassengers().get(0);
             if (var4 instanceof Player) {
                 Player player = (Player)var4;
-                UUID var14 = player.getUniqueId();
-                Heats currentHeat = null;
-                Driver driver = null;
-
-                for(Events raceEvent : this.raceEventManager.getAllEvents()) {
-                    for(Rounds round : raceEvent.getEventSchedule().getRounds().values()) {
-                        Optional<Heats> activeHeatOpt = round.getActiveHeat();
-                        if (!activeHeatOpt.isEmpty()) {
-                            Heats heat = (Heats)activeHeatOpt.get();
-                            if (heat.getHeatState() == HeatState.RACING || heat.getHeatState() == HeatState.PRACTICE || heat.getHeatState() == HeatState.QUALIFYING) {
-                                Driver d = heat.getDriver(var14);
-                                if (d != null) {
-                                    currentHeat = heat;
-                                    driver = d;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    if (currentHeat != null) {
-                        break;
-                    }
-                }
+                UUID playerUUID = player.getUniqueId();
+                Heats currentHeat = this.driverLookup.getHeat(playerUUID);
+                Driver driver = currentHeat != null ? this.driverLookup.getDriver(playerUUID) : null;
 
                 if (currentHeat != null && driver != null) {
+                    HeatState heatState = currentHeat.getHeatState();
+                    if (heatState != HeatState.RACING && heatState != HeatState.PRACTICE && heatState != HeatState.QUALIFYING) {
+                        return;
+                    }
                     if (!driver.isFinished()) {
                         String trackNameWS = currentHeat.getTrackNameWS();
                         if (trackNameWS != null) {

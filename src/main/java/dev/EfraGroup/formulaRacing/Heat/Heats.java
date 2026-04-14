@@ -410,6 +410,11 @@ public class Heats {
             this.plugin.getRegionListener().cleanupHeatPlayers(driverUUIDs);
             this.plugin.getRaceCheckpointListener().cleanupHeatPlayers(driverUUIDs);
             this.plugin.getLonelyController().clearGhostForPlayers(this.drivers.keySet());
+            if (this.plugin != null && this.plugin.getDriverLookup() != null) {
+                for (UUID uuid : driverUUIDs) {
+                    this.plugin.getDriverLookup().unregister(uuid);
+                }
+            }
             if (this.heatState == HeatState.RACING && this.totalPits != null && this.totalPits > 0) {
                 this.validateMandatoryPits();
             }
@@ -619,6 +624,12 @@ public class Heats {
             }
         }
 
+        if (this.plugin != null && this.plugin.getDriverLookup() != null) {
+            for (UUID uuid : this.drivers.keySet()) {
+                this.plugin.getDriverLookup().unregister(uuid);
+            }
+        }
+
         this.setHeatState(HeatState.SETUP);
         this.plugin.getDebugManager().logRaceSystem("✓ Heat " + this.id + " resetado para estado inicial.");
     }
@@ -773,6 +784,9 @@ public class Heats {
 
             Driver driver = new Driver(uuid, this.id, gridPosition);
             this.drivers.put(uuid, driver);
+            if (this.plugin != null && this.plugin.getDriverLookup() != null) {
+                this.plugin.getDriverLookup().register(driver, this);
+            }
             if (this.plugin != null && this.id > 0 && this.plugin.getRaceEventManager() != null) {
                 this.plugin.getRaceEventManager().getDatabaseManager().createDriver(driver);
             }
@@ -783,10 +797,16 @@ public class Heats {
 
     public void addDriverDirect(Driver driver) {
         this.drivers.put(driver.getUuid(), driver);
+        if (this.plugin != null && this.plugin.getDriverLookup() != null) {
+            this.plugin.getDriverLookup().register(driver, this);
+        }
     }
 
     public boolean removeDriver(UUID uuid) {
         this.plugin.getLonelyController().clearGhost(uuid);
+        if (this.plugin != null && this.plugin.getDriverLookup() != null) {
+            this.plugin.getDriverLookup().unregister(uuid);
+        }
         return this.drivers.remove(uuid) != null;
     }
 
