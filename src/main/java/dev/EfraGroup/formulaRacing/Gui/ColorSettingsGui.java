@@ -85,10 +85,8 @@ public class ColorSettingsGui extends BaseGui {
         GuiButton borderButton = new GuiButton(border, e -> {});
 
         for (int i = 0; i < 27; i++) {
-            if (i < 16 || i > 20) {
-                if (i != 22) {
-                    setItem(borderButton, i);
-                }
+            if (i >= 16 && i <= 20 && i != 22) {
+                setItem(borderButton, i);
             }
         }
     }
