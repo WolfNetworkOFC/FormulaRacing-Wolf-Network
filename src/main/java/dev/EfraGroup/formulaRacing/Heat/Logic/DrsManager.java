@@ -94,7 +94,7 @@ public class DrsManager {
         }
 
         FRTheme theme = FRThemeResolver.resolveTheme(player);
-        String rawTitle = "&i&lDRS DISPONIVEL";
+        String rawTitle = plugin.getDirectTranslation("drs_available", plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId()));
         BossBar bar = Bukkit.createBossBar(LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawTitle, theme)), BarColor.BLUE, BarStyle.SOLID, new BarFlag[0]);
         bar.addPlayer(player);
         driver.setDrsBossBar(bar);
@@ -106,7 +106,7 @@ public class DrsManager {
             if (driver.getDrsBossBar() != null) {
                 FRTheme theme = FRThemeResolver.resolveTheme(player);
                 String title = LegacyComponentSerializer.legacySection().serialize(
-                    FRThemeParser.parseWithLegacy("&s&l>>> DRS ATIVADO <<<", theme));
+                    FRThemeParser.parseWithLegacy(plugin.getTranslation("drs_activated", plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId())), theme));
                 driver.getDrsBossBar().setTitle(title);
                 driver.getDrsBossBar().setColor(BarColor.GREEN);
             }
@@ -114,7 +114,7 @@ public class DrsManager {
             driver.setDrsActive(true);
             float drsPower = (float)heat.getDrsdownpower();
             heat.getPlugin().getPacketSender().sendBoatSetting(player, 11, new Object[]{drsPower});
-            player.sendMessage("§b§l>>> DRS ATIVADO!");
+            player.sendMessage(plugin.getTranslation("drs_activated", plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId())));
             if (!useRegion) {
                 Bukkit.getScheduler().runTaskLater(heat.getPlugin(), () -> {
                     if (player.isOnline()) {
@@ -135,6 +135,6 @@ public class DrsManager {
             driver.setDrsBossBar(null);
         }
 
-        player.sendMessage("§cDRS Finalizado.");
+        player.sendMessage(plugin.getTranslation("drs_finished", plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId())));
     }
 }

@@ -68,8 +68,6 @@ public class ReadyCheckManager implements Listener {
             }
         }
 
-        final String readyText = "§6  READY CHECK INICIADO!";
-        final String pressText = "§f  Todos os pilotos devem apertar §bSHIFT§f para confirmar.";
         BukkitTask task = (new BukkitRunnable() {
             public void run() {
                 Set<UUID> ready = (Set)ReadyCheckManager.this.readyPlayersByHeat.get(heatId);
@@ -80,9 +78,13 @@ public class ReadyCheckManager implements Listener {
                         if (!ready.contains(driver.getUuid())) {
                             Player p = Bukkit.getPlayer(driver.getUuid());
                             if (p != null && p.isOnline()) {
-                                p.sendMessage(readyText);
-                                p.sendMessage(pressText);
-                                TitleHelper.sendThemedTitle(p, "&wVocê está pronto?", pressText, 10, 280, 10);
+                                String playerLang = plugin.getDatabaseManager().getPlayerLanguage(p.getUniqueId());
+                                p.sendMessage(plugin.getDirectTranslation("ready_check_ready_text", playerLang));
+                                p.sendMessage(plugin.getDirectTranslation("ready_check_press_text", playerLang));
+                                TitleHelper.sendThemedTitle(p,
+                                    plugin.getTranslation("ready_check_title", playerLang),
+                                    plugin.getDirectTranslation("ready_check_press_text", playerLang),
+                                    10, 280, 10);
                                 p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 1.0F);
                             }
                         }
@@ -114,8 +116,7 @@ public class ReadyCheckManager implements Listener {
     }
 
     private void notifyAllReady(Heats heat) {
-        // Simplificando a criação da mensagem
-        String msg = ChatColor.GREEN + "✔ Todos os pilotos do Heat #" + heat.getId() + " estão PRONTOS!";
+        String msg = plugin.getTranslation("ready_check_all_ready", "en_US", new String[]{"{heat}", String.valueOf(heat.getId())});
 
         // Corrigido: HashSet agora com tipo <Player> definido
         Set<Player> playersToNotify = new HashSet<>();
@@ -167,14 +168,16 @@ public class ReadyCheckManager implements Listener {
                 Set<UUID> ready = entry.getValue();
                 if (!ready.contains(uuid)) {
                     ready.add(uuid);
-                    player.sendMessage(ChatColor.GREEN + "✔ Você está pronto!");
+                    String playerLang = plugin.getDatabaseManager().getPlayerLanguage(uuid);
+                    player.sendMessage(plugin.getDirectTranslation("ready_check_player_ready", playerLang));
                     player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.2F);
                     player.resetTitle();
                     this.updateView(heatId);
                     String name = player.getName();
+                    String readyMsg = plugin.getDirectTranslation("ready_check_player_ready", playerLang);
                     Bukkit.getOnlinePlayers().stream().filter((p) -> p.hasPermission("formularacing.event.admin")).forEach((p) -> {
-                        String var10001 = String.valueOf(ChatColor.GRAY);
-                        p.sendMessage(var10001 + "[ReadyCheck] " + ChatColor.WHITE + name + ChatColor.GREEN + " está pronto.");
+                        String pLang = plugin.getDatabaseManager().getPlayerLanguage(p.getUniqueId());
+                        p.sendMessage(ChatColor.GRAY + "[ReadyCheck] " + ChatColor.WHITE + name + " " + plugin.getDirectTranslation("ready_check_player_ready", pLang));
                     });
                     if (ready.size() >= heat.getDrivers().size()) {
                         this.notifyAllReady(heat);

@@ -706,7 +706,9 @@ public class TimeTrialDuels implements Listener {
                                 }
                             });
 
-                            TitleHelper.sendThemedTitle(player, "", "&w&lVOLTA " + newLap, 0, 15, 5);
+                            String langCode4 = this.dm.getPlayerLanguage(player.getUniqueId());
+                                TitleHelper.sendThemedTitle(player, "",
+                                    this.plugin.getTranslation("duel_lap_prefix", langCode4) + newLap, 0, 15, 5);
                             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0F, 2.0F);
                             this.plugin.getDebugManager().logDuelSystem(player.getName() + " iniciou volta " + newLap + "/" + totalLaps);
                         } else {
@@ -720,7 +722,9 @@ public class TimeTrialDuels implements Listener {
                         var35.logDuelSystem("[CORRIDA] " + var40 + " completou volta " + currentLap + " - Continuando sem lap reset");
                     }
 
-                    TitleHelper.sendThemedTitle(player, "", "&w&lVOLTA " + newLap, 0, 15, 5);
+                    String langCode5 = this.dm.getPlayerLanguage(player.getUniqueId());
+                        TitleHelper.sendThemedTitle(player, "",
+                            this.plugin.getTranslation("duel_lap_prefix", langCode5) + newLap, 0, 15, 5);
                     player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.5F);
                     this.plugin.getDebugManager().logDuelSystem(player.getName() + " iniciou volta " + newLap + "/" + totalLaps);
                 }
@@ -788,7 +792,11 @@ public class TimeTrialDuels implements Listener {
                 duelState.addFinisher(player.getUniqueId());
                 if (duelState.isTimeTrialMode()) {
                     if (!duelState.isTimeLimitReached()) {
-                        TitleHelper.sendThemedTitle(player, "&s&lFINALIZOU!", "§7Aguardando resultado...", 10, 70, 20);
+                        String langCode2 = this.dm.getPlayerLanguage(player.getUniqueId());
+                        TitleHelper.sendThemedTitle(player,
+                            this.plugin.getTranslation("duel_finish_title", langCode2),
+                            this.plugin.getTranslation("duel_finish_waiting", langCode2),
+                            10, 70, 20);
                         String langCode = this.dm.getPlayerLanguage(player.getUniqueId());
                         String totalTimeMessage = this.plugin.getTranslation("duel_total_time", langCode, new String[]{"{time}", this.formatTime(totalTime)});
                         String waitingMessage = this.plugin.getDirectTranslation("duel_waiting_others_finish", langCode);
@@ -805,7 +813,11 @@ public class TimeTrialDuels implements Listener {
                     }
                 } else {
                     int finishPosition = duelState.getFinishCount();
-                    TitleHelper.sendThemedTitle(player, "&s&lFINALIZOU!", "§f" + finishPosition + "º Lugar", 10, 70, 20);
+                    String langCode3 = this.dm.getPlayerLanguage(player.getUniqueId());
+                        TitleHelper.sendThemedTitle(player,
+                            this.plugin.getTranslation("duel_finish_title", langCode3),
+                            this.plugin.getTranslation("duel_finish_position", langCode3, new String[]{"{position}", finishPosition + "º"}),
+                            10, 70, 20);
                     String langCode = this.dm.getPlayerLanguage(player.getUniqueId());
                     String totalTimeMessage = this.plugin.getTranslation("duel_total_time", langCode, new String[]{"{time}", this.formatTime(totalTime)});
                     player.sendMessage(totalTimeMessage);
@@ -897,12 +909,18 @@ public class TimeTrialDuels implements Listener {
                             int finalPosition = this.getTimeTrialPosition(duelState, uuid);
                             String langCode = this.dm.getPlayerLanguage(uuid);
                             if (uuid.equals(winnerUUID)) {
-                                TitleHelper.sendThemedTitle(p, "&w&l🏆 VITÓRIA!", "§f" + finalPosition + "º Lugar", 10, 70, 20);
+                                TitleHelper.sendThemedTitle(p,
+                                    this.plugin.getTranslation("duel_victory_title", langCode),
+                                    this.plugin.getTranslation("duel_finish_position", langCode, new String[]{"{position}", String.valueOf(finalPosition)}),
+                                    10, 70, 20);
                                 p.sendMessage(" ");
                                 p.sendMessage(this.plugin.getDirectTranslation("duel_victory", langCode));
                                 p.sendMessage(" ");
                             } else {
-                                TitleHelper.sendThemedTitle(p, "&e&lDERROTA", "§f" + finalPosition + "º Lugar", 10, 70, 20);
+                                TitleHelper.sendThemedTitle(p,
+                                    this.plugin.getTranslation("duel_defeat_title", langCode),
+                                    this.plugin.getTranslation("duel_finish_position", langCode, new String[]{"{position}", String.valueOf(finalPosition)}),
+                                    10, 70, 20);
                                 p.sendMessage(" ");
                                 p.sendMessage(this.plugin.getDirectTranslation("duel_defeat_second", langCode));
                                 p.sendMessage(" ");

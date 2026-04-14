@@ -75,8 +75,9 @@ public class PTPManager {
 
     private void updatePTP(Player player, Driver driver, Heats heat) {
         FRTheme theme = FRThemeResolver.resolveTheme(player);
+        String ptpPrefix = plugin.getTranslation("ptp_title_prefix", plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId()));
         BossBar bar = (BossBar)this.ptpBars.computeIfAbsent(player.getUniqueId(), (id) -> {
-            String rawTitle = "&w&lPush To Pass: 0%";
+            String rawTitle = ptpPrefix + "0%";
             String title = LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawTitle, theme));
             return Bukkit.createBossBar(title, BarColor.YELLOW, BarStyle.SOLID, new BarFlag[0]);
         });
@@ -100,7 +101,7 @@ public class PTPManager {
 
         driver.setPtpEnergy(energy);
         bar.setProgress(energy / (double)100.0F);
-        String rawTitle = driver.isPtpActive() ? "&e&lPush To Pass: " + (int)energy + "% ⚡" : "&w&lPush To Pass: " + (int)energy + "%";
+        String rawTitle = driver.isPtpActive() ? ptpPrefix + (int)energy + "% ⚡" : ptpPrefix + (int)energy + "%";
         bar.setTitle(LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawTitle, theme)));
         BarColor newColor;
         if (driver.isPtpActive()) {
