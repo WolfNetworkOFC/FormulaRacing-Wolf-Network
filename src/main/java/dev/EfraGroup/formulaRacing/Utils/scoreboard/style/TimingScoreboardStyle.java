@@ -5,16 +5,12 @@ public final class TimingScoreboardStyle {
     }
 
     public static String positionColor(int pos) {
-        if (pos == 1) {
-            return "§6";
-        }
-        if (pos == 2) {
-            return "§7";
-        }
-        if (pos == 3) {
-            return "§c";
-        }
-        return "§7";
+        return switch (pos) {
+            case 1 -> "&v";
+            case 2 -> "&2";
+            case 3 -> "&e";
+            default -> "&2";
+        };
     }
 
     public static String rankTag(int pos, boolean fastestLap, boolean finished) {

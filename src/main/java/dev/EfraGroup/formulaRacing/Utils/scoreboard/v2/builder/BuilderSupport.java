@@ -126,9 +126,9 @@ final class BuilderSupport {
     static String formatBestLap(ScoreboardContext context, Driver driver) {
         Lap bestLap = driver == null ? null : driver.getFastestLap();
         if (bestLap == null) {
-            return tr(context, "scoreboard_v2_best_lap", "{time}", "§7--.---");
+            return tr(context, "scoreboard_v2_best_lap", "{time}", "&2--.---");
         }
-        return tr(context, "scoreboard_v2_best_lap", "{time}", "§b" + formatTime(bestLap.getLapTime()));
+        return tr(context, "scoreboard_v2_best_lap", "{time}", "&i" + formatTime(bestLap.getLapTime()));
     }
 
     static String heatContext(ScoreboardContext context) {
@@ -140,7 +140,7 @@ final class BuilderSupport {
             eventName = eventName.substring(0, 22);
         }
         String heatName = context.heat().getName();
-        return "§e" + heatName + (eventName.isEmpty() ? "" : " §7/ §f" + eventName);
+        return "&w" + heatName + (eventName.isEmpty() ? "" : " &2/ &2" + eventName);
     }
 
     static String formatTime(long timeMs) {
@@ -173,13 +173,13 @@ final class BuilderSupport {
         int nameWidth = compact ? 4 : (showPits ? NAME_CONTENT_WIDTH_WITH_PITS : NAME_CONTENT_WIDTH);
         String pilotName = formatPilotName(name, nameWidth);
         String pits = formatPits(context, current);
-        String divider = compact ? " " : " §7| ";
+        String divider = compact ? " " : " &2| ";
 
         return rank + divider + middle + " " + marker + " " + pilotName + pits;
     }
 
     private static String formatPilotName(String name, int width) {
-        return "§f" + padRight(name, width);
+        return "&2" + padRight(name, width);
     }
 
     private static boolean hasRequiredPits(ScoreboardContext context) {
@@ -196,19 +196,19 @@ final class BuilderSupport {
         if (qualifyingMode) {
             if (reference == null || reference.getUuid().equals(current.getUuid())) {
                 Lap best = current.getFastestLap();
-                return best == null ? middleCell("§8", "--.---") : middleCell("§7", formatTime(best.getLapTime()));
+                return best == null ? middleCell("&t", "--.---") : middleCell("&2", formatTime(best.getLapTime()));
             }
             return gapBlock(context, current, reference, true);
         }
 
         if (reference == null || reference.getUuid().equals(current.getUuid())) {
             if (current.isDrsActive()) {
-                return middleCell("§a", "DRS");
+                return middleCell("&s", "DRS");
             }
             if (current.hasDrsPermission()) {
-                return middleCell("§f", "DRS");
+                return middleCell("&2", "DRS");
             }
-            return middleCell("§8", "");
+            return middleCell("&t", "");
         }
 
         return gapBlock(context, current, reference, false);
@@ -219,7 +219,7 @@ final class BuilderSupport {
             Lap currentBest = current.getFastestLap();
             Lap referenceBest = reference.getFastestLap();
             if (currentBest == null || referenceBest == null) {
-                return middleCell("§8", "--");
+                return middleCell("&t", "--");
             }
             long diff = currentBest.getLapTime() - referenceBest.getLapTime();
             return formatSignedGap(diff);
@@ -230,7 +230,7 @@ final class BuilderSupport {
             return formatSignedGap(raceDiff);
         }
 
-        return middleCell("§8", "--");
+        return middleCell("&t", "--");
     }
 
     private static Long computeRaceGap(Driver current, Driver reference) {
@@ -264,12 +264,12 @@ final class BuilderSupport {
 
     private static String formatSignedGap(long diffMs) {
         if (diffMs > 0L) {
-            return middleCell("§a", "+" + formatTime(diffMs));
+            return middleCell("&s", "+" + formatTime(diffMs));
         }
         if (diffMs < 0L) {
-            return middleCell("§c", "-" + formatTime(Math.abs(diffMs)));
+            return middleCell("&e", "-" + formatTime(Math.abs(diffMs)));
         }
-        return middleCell("§e", "=" + "0.000");
+        return middleCell("&w", "=" + "0.000");
     }
 
     private static String middleCell(String color, String content) {
@@ -306,13 +306,13 @@ final class BuilderSupport {
 
     private static String statusBlock(ScoreboardContext context, Driver driver, Player player) {
         if (driver.isDnf()) {
-            return middleCell("§7", tr(context, "scoreboard_status_dnf_short"));
+            return middleCell("&2", tr(context, "scoreboard_status_dnf_short"));
         }
         if (player == null || !player.isOnline()) {
-            return middleCell("§7", tr(context, "scoreboard_status_offline"));
+            return middleCell("&2", tr(context, "scoreboard_status_offline"));
         }
         if (context.plugin().getPitStopManager() != null && context.plugin().getPitStopManager().isPlayerInPitRegion(driver.getUuid())) {
-            return middleCell("§7", tr(context, "scoreboard_status_in_pit"));
+            return middleCell("&2", tr(context, "scoreboard_status_in_pit"));
         }
         return "";
     }
@@ -341,16 +341,16 @@ final class BuilderSupport {
         }
         int pits = driver.getPitstops();
 
-        String pitsColor = "§f";
+        String pitsColor = "&2";
         if (pits >= requiredPits) {
-            pitsColor = "§a";
+            pitsColor = "&s";
         } else if (pits > 0) {
-            pitsColor = "§6";
+            pitsColor = "&v";
         } else {
-            pitsColor = "§c";
+            pitsColor = "&e";
         }
 
-        return " §8P: " + pitsColor + pits;
+        return " &tP: " + pitsColor + pits;
     }
 
     static String scoreboardTitle(ScoreboardContext context, String baseKey) {
@@ -368,9 +368,9 @@ final class BuilderSupport {
         }
 
         if (eventName.isEmpty()) {
-            return base + " §8| §7" + heatName;
+            return base + " &t| &2" + heatName;
         }
-        return base + " §8| §7" + heatName + " §8| §f" + eventName;
+        return base + " &t| &2" + heatName + " &t| &2" + eventName;
     }
 
     private static String normalizeEventName(String rawName) {
