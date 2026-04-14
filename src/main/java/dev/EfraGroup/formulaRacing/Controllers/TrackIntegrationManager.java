@@ -99,13 +99,11 @@ public class TrackIntegrationManager {
         if (checkpoints == null || checkpoints.isEmpty()) {
             return 0;
         }
-        int maxCheckpointId = 0;
+        java.util.Set<Integer> uniqueIds = new java.util.HashSet<>();
         for (DatabaseManager.RegionData region : checkpoints) {
-            if (region.getId() > maxCheckpointId) {
-                maxCheckpointId = region.getId();
-            }
+            uniqueIds.add(region.getId());
         }
-        return maxCheckpointId + 1;
+        return uniqueIds.size();
     }
 
     public Map<Integer, List<DatabaseManager.RegionData>> getCheckpointsById(String trackNameWS) {

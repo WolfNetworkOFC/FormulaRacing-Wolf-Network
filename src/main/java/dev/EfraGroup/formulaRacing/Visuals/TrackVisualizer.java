@@ -41,7 +41,7 @@ public class TrackVisualizer {
             List<DatabaseManager.RegionData> se = new ArrayList();
 
             for(DatabaseManager.RegionData r : all) {
-                if (r.getTrackName().equalsIgnoreCase(trackNameWS)) {
+                if (r.getTrackNameWS().equalsIgnoreCase(trackNameWS)) {
                     se.add(r);
                 }
             }

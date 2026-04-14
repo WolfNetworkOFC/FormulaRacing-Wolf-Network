@@ -679,7 +679,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("checkpoint remove")
-    @Description("Remove um checkpoint")
+    @Description("Remove um checkpoint por checkpointId")
     @CommandCompletion("@nothing @tracks")
     public void onCheckpointRemove(Player player, int id, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -692,6 +692,19 @@ public class TrackEditorCommand extends BaseCommand {
                 this.plugin.sendMessage(player, "te_checkpoint_error", new String[]{"{id}", String.valueOf(id)});
             }
 
+        }
+    }
+
+    @Subcommand("checkpoint removeid")
+    @Description("Remove um checkpoint por ID da base de dados (para remover duplicados)")
+    @CommandCompletion("@nothing")
+    public void onCheckpointRemoveById(Player player, int dbId) {
+        boolean success = this.mysql.removeCheckpointById(dbId);
+        if (success) {
+            this.plugin.sendMessage(player, "te_checkpoint_removed", new String[]{"{id}", String.valueOf(dbId), "{track}", ""});
+            this.plugin.getTrackIntegrationManager().clearCheckpointCache(null);
+        } else {
+            this.plugin.sendMessage(player, "te_checkpoint_error", new String[]{"{id}", String.valueOf(dbId)});
         }
     }
 

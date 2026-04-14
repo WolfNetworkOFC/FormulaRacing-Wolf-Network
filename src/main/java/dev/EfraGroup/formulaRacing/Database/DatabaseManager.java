@@ -443,6 +443,13 @@ public class DatabaseManager {
                     )"""
             );
 
+            try {
+                stmt.executeUpdate("ALTER TABLE fr_checkpoint ADD COLUMN shape TEXT DEFAULT 'AABB'");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.executeUpdate("ALTER TABLE fr_checkpoint ADD COLUMN points TEXT");
+            } catch (SQLException ignored) {}
+
             stmt.executeUpdate(
                     """
                     CREATE TABLE IF NOT EXISTS fr_checkpoint_times (
@@ -1680,6 +1687,20 @@ public class DatabaseManager {
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, trackName.replaceAll("\\s+", ""));
                 stmt.setInt(2, checkpointId);
+                return stmt.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
+    }
+
+    public synchronized boolean removeCheckpointById(int id) {
+        String sql = "DELETE FROM fr_checkpoint WHERE id = ?";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setInt(1, id);
                 return stmt.executeUpdate() > 0;
             }
         } catch (SQLException e) {
