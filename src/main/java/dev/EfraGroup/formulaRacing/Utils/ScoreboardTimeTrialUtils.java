@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -215,10 +216,8 @@ public class ScoreboardTimeTrialUtils {
     private String formatRecordLine(DatabaseManager.TrackRecord tr, int pos, String observerName, Player viewer) {
         boolean isMe = tr.getPlayerName().equals(observerName);
         String color;
-        String bold = "";
         if (isMe) {
             color = "§e";
-            bold = "§l";
         } else {
             switch (pos) {
                 case 1 -> color = "§6";
@@ -233,12 +232,12 @@ public class ScoreboardTimeTrialUtils {
                 : "§6" + tr.getCheckpointsReached() + "CP §7(§f" + this.formatTime(tr.getTime()) + "§7)";
         String configured = FormulaRacing.getInstance().getConfig().getString("scoreboard.style.accent-marker", "┃");
         String accent = TimingScoreboardStyle.normalizeAccentMarker(configured);
-        String marker = bold + accent + accent + "§r";
-        String nameDisplay = isMe
-                ? FormulaRacing.getInstance().getTranslationUtil().getTranslated(viewer, "scoreboard_tt_you")
+        String marker = color + "§l" + accent + accent + "§r";
+        String nameBase = isMe
+                ? ChatColor.stripColor(FormulaRacing.getInstance().getTranslationUtil().getTranslated(viewer, "scoreboard_tt_you"))
                 : tr.getPlayerName();
-        nameDisplay = TimingScoreboardStyle.padRight(nameDisplay, 14, isMe ? "§e§l" : "§f");
-        String rank = bold + color + pos + ".§r";
+        String nameDisplay = TimingScoreboardStyle.padRight(nameBase, 14, isMe ? "§e§l" : "§f");
+        String rank = color + pos + ".§r";
         return rank + " §7| " + timeDisplay + " " + marker + " " + nameDisplay;
     }
 
