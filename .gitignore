@@ -95,3 +95,6 @@ test-output/
 # Build artifacts - keep only source
 original-formularacing-*.jar
 formularacing-*.jar
+
+# Worktrees
+.worktrees/
