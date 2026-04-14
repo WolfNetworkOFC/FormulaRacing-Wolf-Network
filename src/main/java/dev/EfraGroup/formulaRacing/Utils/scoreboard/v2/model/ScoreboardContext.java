@@ -13,6 +13,7 @@ public record ScoreboardContext(
         Driver viewerDriver,
         boolean spectator,
         List<Driver> sortedDrivers,
-        int maxRows
+        int maxRows,
+        boolean compact
 ) {
 }

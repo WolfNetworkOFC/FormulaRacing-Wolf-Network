@@ -57,6 +57,16 @@ public class SettingsMenu extends BaseGui {
             p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 1.0F);
             p.sendMessage(this.plugin.getTranslation("gui_settings_sounds_wip", langCode, new String[0]));
         });
+        boolean compact = this.dm.getPlayerCompactMode(player.getUniqueId());
+        String compactName = this.plugin.getTranslation("gui_settings_compact_name", langCode, new String[0]);
+        this.addToggle(12, Material.MAP, compactName, compact, player, (event) -> {
+            Player p = (Player)event.getWhoClicked();
+            boolean newState = !this.dm.getPlayerCompactMode(p.getUniqueId());
+            this.dm.setPlayerCompactMode(p.getUniqueId(), newState);
+            this.setupContent(p);
+            String stateStr = newState ? this.plugin.getTranslation("gui_settings_status_on", langCode, new String[0]) : this.plugin.getTranslation("gui_settings_status_off", langCode, new String[0]);
+            p.sendMessage(this.plugin.getTranslation("gui_settings_compact_toggled", langCode, new String[]{"{state}", stateStr}));
+        });
         this.addButton(31, Material.ARROW, this.plugin.getTranslation("gui_settings_back_name", langCode, new String[0]), this.plugin.getTranslation("gui_settings_back_lore", langCode, new String[0]), (event) -> {
             Player p = (Player)event.getWhoClicked();
             (new MainMenu(this.plugin, p)).show(p);

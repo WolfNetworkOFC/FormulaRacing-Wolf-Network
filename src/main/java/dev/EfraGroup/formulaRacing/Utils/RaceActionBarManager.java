@@ -407,10 +407,10 @@ public class RaceActionBarManager {
 
     private String getPositionColor(int position) {
         return switch (position) {
-            case 1 -> "\u00a7a";
-            case 2 -> "\u00a7e";
-            case 3 -> "\u00a76";
-            default -> "\u00a7f";
+            case 1 -> "\u00a76";
+            case 2 -> "\u00a77";
+            case 3 -> "\u00a7c";
+            default -> "\u00a77";
         };
     }
 

@@ -1,14 +1,18 @@
 package dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder;
 
+import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Lap;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeDefaults;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.style.TimingScoreboardStyle;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.model.ScoreboardContext;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -164,10 +168,13 @@ final class BuilderSupport {
         String middle = middleBlock(context, current, reference, p, qualifyingMode);
         String marker = teamMarker(accentMarker, pos);
         boolean showPits = hasRequiredPits(context);
-        String pilotName = formatPilotName(name, showPits ? NAME_CONTENT_WIDTH_WITH_PITS : NAME_CONTENT_WIDTH);
+        boolean compact = context.compact();
+        int nameWidth = compact ? 4 : (showPits ? NAME_CONTENT_WIDTH_WITH_PITS : NAME_CONTENT_WIDTH);
+        String pilotName = formatPilotName(name, nameWidth);
         String pits = formatPits(context, current);
+        String divider = compact ? " " : " §7| ";
 
-        return rank + " §7|" + middle + " " + marker + " " + pilotName + pits;
+        return rank + divider + middle + " " + marker + " " + pilotName + pits;
     }
 
     private static String formatPilotName(String name, int width) {
@@ -347,6 +354,9 @@ final class BuilderSupport {
 
     static String scoreboardTitle(ScoreboardContext context, String baseKey) {
         String base = context.plugin().getTranslationUtil().getTranslated(context.viewer(), baseKey);
+        if (context.compact() && base.length() > 8) {
+            base = base.substring(0, 8);
+        }
         String heatName = context.heat().getName();
         String eventName = "";
         if (context.heat().getRound() != null && context.heat().getRound().getEvent() != null) {
@@ -387,10 +397,12 @@ final class BuilderSupport {
     }
 
     static String commonSeparator(ScoreboardContext context) {
-        return "§7------------------------";
+        if (context.compact()) return spacer(0);
+        return tr(context, "scoreboard_common_separator");
     }
 
     static String commonFooter(ScoreboardContext context) {
+        if (context.compact()) return spacer(1);
         return tr(context, "scoreboard_common_footer");
     }
 
@@ -412,43 +424,87 @@ final class BuilderSupport {
         return translated;
     }
 
+    static Component trComponent(ScoreboardContext context, String key, String... placeholders) {
+        String text = tr(context, key, placeholders);
+        return FRThemeParser.parse(text, FRThemeDefaults.getDefaultTheme());
+    }
+
     private static boolean isMissingTranslation(String translated) {
         return translated == null || translated.contains("[Lang Error]");
     }
 
     private static String applyFallback(String key, String... placeholders) {
-        String template = SCOREBOARD_FALLBACKS.getOrDefault(key, key);
-        if (placeholders != null) {
-            for (int i = 0; i < placeholders.length - 1; i += 2) {
-                template = template.replace(placeholders[i], placeholders[i + 1]);
+        String langKey = SCOREBOARD_FALLBACKS.getOrDefault(key, key);
+        String langCode = "en_US";
+        String translated = langKey;
+
+        try {
+            FormulaRacing plugin = FormulaRacing.getInstance();
+            if (plugin != null) {
+                translated = plugin.getTranslation(langKey, langCode, placeholders);
+            }
+        } catch (Exception ignored) {
+        }
+
+        if (translated == null || translated.contains("[Lang Error]") || translated.equals(langKey)) {
+            translated = MINIMAL_FALLBACK.getOrDefault(key, key);
+            if (placeholders != null) {
+                for (int i = 0; i < placeholders.length - 1; i += 2) {
+                    translated = translated.replace(placeholders[i], placeholders[i + 1]);
+                }
             }
         }
-        return template;
+
+        return translated;
+    }
+
+    private static final Map<String, String> MINIMAL_FALLBACK;
+    static {
+        Map<String, String> m = new HashMap<>();
+        m.put("scoreboard_title_practice", "&d&l FREE PRACTICE");
+        m.put("scoreboard_title_qualifying", "&b&l QUALIFYING");
+        m.put("scoreboard_title_waiting", "&6&l WAITING");
+        m.put("scoreboard_title_race", "&c&l RACE");
+        m.put("scoreboard_title_finished", "&a&l FINISHED");
+        m.put("scoreboard_v2_no_active_drivers", "&7No active drivers");
+        m.put("scoreboard_v2_best_lap", "&fBest lap: &2{time}");
+        m.put("scoreboard_v2_offline", "&7Offline");
+        m.put("scoreboard_v2_drivers", "&fDrivers: &2{count}");
+        m.put("scoreboard_v2_track", "&fTrack: &2{track}");
+        m.put("scoreboard_v2_laps", "&fLaps: &2{laps}");
+        m.put("scoreboard_v2_position", "&fPosition: &2{position}");
+        m.put("scoreboard_v2_time", "&fTime: &2{time}");
+        m.put("scoreboard_status_dnf_short", "DNF");
+        m.put("scoreboard_status_offline", "Offline");
+        m.put("scoreboard_status_in_pit", "In Pit");
+        m.put("scoreboard_common_separator", "&7------------------------");
+        m.put("scoreboard_common_footer", "&ewolfnetwork.com.br");
+        MINIMAL_FALLBACK = Map.copyOf(m);
     }
 
     private static Map<String, String> createScoreboardFallbacks() {
         Map<String, String> fallback = new HashMap<>();
-        fallback.put("scoreboard_title_practice", "§d§l FREE PRACTICE");
-        fallback.put("scoreboard_title_qualifying", "§b§l QUALIFYING");
-        fallback.put("scoreboard_title_waiting", "§6§l WAITING");
-        fallback.put("scoreboard_title_race", "§c§l RACE");
-        fallback.put("scoreboard_title_finished", "§a§l FINISHED");
+        fallback.put("scoreboard_title_practice", "scoreboard_title_practice");
+        fallback.put("scoreboard_title_qualifying", "scoreboard_title_qualifying");
+        fallback.put("scoreboard_title_waiting", "scoreboard_title_waiting");
+        fallback.put("scoreboard_title_race", "scoreboard_title_race");
+        fallback.put("scoreboard_title_finished", "scoreboard_title_finished");
 
-        fallback.put("scoreboard_common_separator", "§7------------------------");
-        fallback.put("scoreboard_common_footer", "§ewolfnetwork.com.br");
+        fallback.put("scoreboard_common_separator", "scoreboard_common_separator");
+        fallback.put("scoreboard_common_footer", "scoreboard_common_footer");
 
-        fallback.put("scoreboard_v2_no_active_drivers", "§7No active drivers");
-        fallback.put("scoreboard_v2_best_lap", "§fBest lap: {time}");
-        fallback.put("scoreboard_v2_offline", "Offline");
-        fallback.put("scoreboard_v2_drivers", "§fDrivers: {count}");
-        fallback.put("scoreboard_v2_track", "§fTrack: {track}");
-        fallback.put("scoreboard_v2_laps", "§fLaps: {laps}");
-        fallback.put("scoreboard_v2_position", "§fPosition: {position}");
-        fallback.put("scoreboard_v2_time", "§fTime: {time}");
+        fallback.put("scoreboard_v2_no_active_drivers", "scoreboard_v2_no_active_drivers");
+        fallback.put("scoreboard_v2_best_lap", "scoreboard_v2_best_lap");
+        fallback.put("scoreboard_v2_offline", "scoreboard_v2_offline");
+        fallback.put("scoreboard_v2_drivers", "scoreboard_v2_drivers");
+        fallback.put("scoreboard_v2_track", "scoreboard_v2_track");
+        fallback.put("scoreboard_v2_laps", "scoreboard_v2_laps");
+        fallback.put("scoreboard_v2_position", "scoreboard_v2_position");
+        fallback.put("scoreboard_v2_time", "scoreboard_v2_time");
 
-        fallback.put("scoreboard_status_dnf_short", "DNF");
-        fallback.put("scoreboard_status_offline", "Offline");
-        fallback.put("scoreboard_status_in_pit", "In Pit");
+        fallback.put("scoreboard_status_dnf_short", "scoreboard_status_dnf_short");
+        fallback.put("scoreboard_status_offline", "scoreboard_status_offline");
+        fallback.put("scoreboard_status_in_pit", "scoreboard_status_in_pit");
         return fallback;
     }
 

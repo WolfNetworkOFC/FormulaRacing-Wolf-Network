@@ -107,4 +107,15 @@ public class SettingsCommand extends BaseCommand {
         String var10001 = String.valueOf(ChatColor.GREEN);
         player.sendMessage(var10001 + "✅ Scoreboard do Time Trial " + (newValue ? "ATIVADO" : "DESATIVADO"));
     }
+
+    @Subcommand("compact")
+    @CommandCompletion("true|false")
+    @Description("Ativa ou desativa o modo compacto do scoreboard")
+    public void onCompact(Player player, @Optional Boolean value) {
+        UUID uuid = player.getUniqueId();
+        boolean newValue = value != null ? value : !this.databaseManager.getPlayerCompactMode(uuid);
+        this.databaseManager.setPlayerCompactMode(uuid, newValue);
+        String var10001 = String.valueOf(ChatColor.GREEN);
+        player.sendMessage(var10001 + "✅ Scoreboard " + (newValue ? "COMPACTO" : "NORMAL"));
+    }
 }

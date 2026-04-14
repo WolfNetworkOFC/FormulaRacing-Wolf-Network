@@ -26,6 +26,7 @@ public class DatabaseManager {
     private final Map<UUID, Boolean> ttScoreboardCache = new ConcurrentHashMap<>();
     private final Map<UUID, String> languageCache = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> ttEnabledCache = new ConcurrentHashMap<>();
+    private final Map<UUID, Boolean> compactScoreboardCache = new ConcurrentHashMap<>();
 
     public enum DatabaseType {
         SQLITE,
@@ -1286,6 +1287,47 @@ public class DatabaseManager {
                 ps.setString(2, playerUUID.toString());
                 ps.executeUpdate();
                 ttEnabledCache.put(playerUUID, enabled);
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized boolean getPlayerCompactMode(UUID uuid) {
+        if (compactScoreboardCache.containsKey(uuid)) {
+            return compactScoreboardCache.get(uuid);
+        }
+
+        String sql = "SELECT compactScoreboard FROM fr_players WHERE uuid = ?";
+        boolean compact = false;
+
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        compact = rs.getInt("compactScoreboard") == 1;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+
+        compactScoreboardCache.put(uuid, compact);
+        return compact;
+    }
+
+    public synchronized void setPlayerCompactMode(UUID uuid, boolean compact) {
+        String sql = "UPDATE fr_players SET compactScoreboard = ? WHERE uuid = ?";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, compact ? 1 : 0);
+                ps.setString(2, uuid.toString());
+                ps.executeUpdate();
+                compactScoreboardCache.put(uuid, compact);
             }
         } catch (SQLException e) {
             handleSqlError(e);

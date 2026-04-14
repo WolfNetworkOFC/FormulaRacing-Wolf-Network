@@ -264,7 +264,8 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
         if (!this.ownershipCoordinator.isOwner(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.RACE)) {
             return;
         }
-        ScoreboardContext context = new ScoreboardContext(this.plugin, heat, player, viewerDriver, spectator, sortedDrivers, this.maxRows);
+        boolean compact = this.plugin.getDatabaseManager().getPlayerCompactMode(player.getUniqueId());
+        ScoreboardContext context = new ScoreboardContext(this.plugin, heat, player, viewerDriver, spectator, sortedDrivers, this.maxRows, compact);
 
         try {
             ScoreboardViewModel baseModel = this.findBuilder(heat.getHeatState()).build(context);

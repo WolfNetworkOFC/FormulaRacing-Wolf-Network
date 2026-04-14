@@ -58,6 +58,7 @@ import dev.EfraGroup.formulaRacing.Utils.ScoreboardDuelsTimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardTimeTrialUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimeTrialDuelsAction;
 import dev.EfraGroup.formulaRacing.Utils.TimeUtils;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeDefaults;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.TranslationUtil;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
@@ -195,7 +196,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     public void onEnable() {
         instance = this;
-   //opa vitor kakakakakakkaka
+        FRThemeDefaults.load(this);
         try {
             this.fileManager = new FileManager(this);
             this.timeTrialController = new TimeTrialController(this);
