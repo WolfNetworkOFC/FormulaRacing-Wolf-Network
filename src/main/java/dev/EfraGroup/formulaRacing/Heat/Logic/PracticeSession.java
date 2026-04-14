@@ -71,7 +71,7 @@ public class PracticeSession implements SessionLogic {
             heat.updateLivePositions();
             return true;
         } else {
-            int totalCheckpoints = heat.getPlugin().getTrackIntegrationManager().getTrackCheckpoints(heat.getTrackNameWS()).size();
+            int totalCheckpoints = heat.getPlugin().getTrackIntegrationManager().getCheckpointCount(heat.getTrackNameWS());
             if (!driver.hasPassedAllCheckpoints(totalCheckpoints)) {
                 heat.getPlugin().sendMessage(player, "timetrial_incomplete_lap", new String[]{"{count}", String.valueOf(driver.getCheckpointsReached()), "{total}", String.valueOf(totalCheckpoints)});
                 return false;
@@ -93,7 +93,7 @@ public class PracticeSession implements SessionLogic {
         if (player == null) {
             return false;
         } else {
-            int totalCheckpoints = heat.getPlugin().getTrackIntegrationManager().getTrackCheckpoints(heat.getTrackNameWS()).size();
+            int totalCheckpoints = heat.getPlugin().getTrackIntegrationManager().getCheckpointCount(heat.getTrackNameWS());
             if (driver.getCurrentLap() == null) {
                 heat.getPlugin().getDebugManager().logRaceSystem("[PRACTICE] PRECISE START " + player.getName());
                 double proportion = RegionMathUtils.calculateRegionEntryProportion(from, to, region);

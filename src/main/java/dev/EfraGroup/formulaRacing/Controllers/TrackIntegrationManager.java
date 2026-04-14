@@ -11,6 +11,7 @@ import dev.EfraGroup.formulaRacing.Database.GridPosition;
 import dev.EfraGroup.formulaRacing.Database.Track;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,6 +21,9 @@ public class TrackIntegrationManager {
     private final FormulaRacing plugin;
     private final DatabaseManager databaseManager;
     private final Map<String, List<DatabaseManager.RegionData>> checkpointCache = new ConcurrentHashMap();
+    private final Map<String, List<DatabaseManager.RegionData>> regionsCache = new ConcurrentHashMap();
+    private final Map<String, Map<Integer, List<DatabaseManager.RegionData>>> checkpointsByIdCache = new ConcurrentHashMap();
+    private final Map<String, Boolean> noResetOnFutureCheckpointTracks = new ConcurrentHashMap<>();
 
     public TrackIntegrationManager(FormulaRacing plugin) {
         this.plugin = plugin;
@@ -29,10 +33,26 @@ public class TrackIntegrationManager {
     public void clearCheckpointCache(String trackNameWS) {
         if (trackNameWS == null) {
             this.checkpointCache.clear();
+            this.checkpointsByIdCache.clear();
+            this.regionsCache.clear();
         } else {
             this.checkpointCache.remove(trackNameWS);
+            this.checkpointsByIdCache.remove(trackNameWS);
+            this.regionsCache.remove(trackNameWS);
         }
 
+    }
+
+    public void clearRegionsCache() {
+        this.regionsCache.clear();
+    }
+
+    public void clearRegionsCache(String trackNameWS) {
+        if (trackNameWS == null) {
+            this.regionsCache.clear();
+        } else {
+            this.regionsCache.remove(trackNameWS);
+        }
     }
 
     public TrackValidationResult validateTrack(String trackNameWS) {
@@ -68,12 +88,71 @@ public class TrackIntegrationManager {
     }
 
     public List<DatabaseManager.RegionData> getTrackCheckpoints(String trackNameWS) {
-        return (List)this.checkpointCache.computeIfAbsent(trackNameWS, (k) -> this.databaseManager.getCheckpoints(k));
+        return (List)this.checkpointCache.computeIfAbsent(trackNameWS, (k) -> {
+            List<DatabaseManager.RegionData> regions = this.databaseManager.getCheckpoints(k);
+            return regions != null ? regions : new ArrayList<>();
+        });
     }
 
     public int getCheckpointCount(String trackNameWS) {
         List<DatabaseManager.RegionData> checkpoints = this.getTrackCheckpoints(trackNameWS);
-        return checkpoints != null ? checkpoints.size() : 0;
+        if (checkpoints == null || checkpoints.isEmpty()) {
+            return 0;
+        }
+        int maxCheckpointId = 0;
+        for (DatabaseManager.RegionData region : checkpoints) {
+            if (region.getId() > maxCheckpointId) {
+                maxCheckpointId = region.getId();
+            }
+        }
+        return maxCheckpointId + 1;
+    }
+
+    public Map<Integer, List<DatabaseManager.RegionData>> getCheckpointsById(String trackNameWS) {
+        return this.checkpointsByIdCache.computeIfAbsent(trackNameWS, k -> {
+            List<DatabaseManager.RegionData> checkpoints = this.getTrackCheckpoints(k);
+            Map<Integer, List<DatabaseManager.RegionData>> grouped = new HashMap<>();
+            for (DatabaseManager.RegionData region : checkpoints) {
+                int cpId = region.getId();
+                grouped.computeIfAbsent(cpId, id -> new ArrayList<>()).add(region);
+            }
+            return grouped;
+        });
+    }
+
+    public List<DatabaseManager.RegionData> getCheckpointById(String trackNameWS, int checkpointId) {
+        return getCheckpointsById(trackNameWS).get(checkpointId);
+    }
+
+    public List<DatabaseManager.RegionData> getTrackRegionsByType(String trackNameWS, String regionType) {
+        List<DatabaseManager.RegionData> allRegions = this.regionsCache.computeIfAbsent(trackNameWS, k -> {
+            List<DatabaseManager.RegionData> regions = this.databaseManager.getAllRegions();
+            return regions.stream()
+                    .filter(r -> r.getTrackNameWS().equalsIgnoreCase(trackNameWS))
+                    .toList();
+        });
+        if (regionType == null) {
+            return allRegions;
+        }
+        return allRegions.stream()
+                .filter(r -> r.getType().equalsIgnoreCase(regionType))
+                .toList();
+    }
+
+    public boolean hasLagStartRegion(String trackNameWS) {
+        return !getTrackRegionsByType(trackNameWS, "LAGSTART").isEmpty();
+    }
+
+    public boolean hasLagEndRegion(String trackNameWS) {
+        return !getTrackRegionsByType(trackNameWS, "LAGEND").isEmpty();
+    }
+
+    public boolean getNoResetOnFutureCheckpoint(String trackNameWS) {
+        return this.noResetOnFutureCheckpointTracks.getOrDefault(trackNameWS, false);
+    }
+
+    public void setNoResetOnFutureCheckpoint(String trackNameWS, boolean value) {
+        this.noResetOnFutureCheckpointTracks.put(trackNameWS, value);
     }
 
     public List<Location> generateGridPositions(String trackNameWS, int maxPositions) {
@@ -163,7 +242,13 @@ public class TrackIntegrationManager {
                 double px = playerLocation.getX();
                 double py = playerLocation.getY();
                 double pz = playerLocation.getZ();
-                return px >= checkpoint.getMinX() && px <= checkpoint.getMaxX() && py >= checkpoint.getMinY() && py <= checkpoint.getMaxY() && pz >= checkpoint.getMinZ() && pz <= checkpoint.getMaxZ();
+                double minX = Math.min(checkpoint.getMinX(), checkpoint.getMaxX());
+                double maxX = Math.max(checkpoint.getMinX(), checkpoint.getMaxX());
+                double minY = Math.min(checkpoint.getMinY(), checkpoint.getMaxY());
+                double maxY = Math.max(checkpoint.getMinY(), checkpoint.getMaxY());
+                double minZ = Math.min(checkpoint.getMinZ(), checkpoint.getMaxZ());
+                double maxZ = Math.max(checkpoint.getMinZ(), checkpoint.getMaxZ());
+                return px >= minX && px <= maxX && py >= minY && py <= maxY && pz >= minZ && pz <= maxZ;
             }
         } else {
             return false;

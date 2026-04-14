@@ -5,9 +5,9 @@
 
 package dev.EfraGroup.formulaRacing.Heat;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Lap {
     private final UUID playerUUID;
@@ -27,7 +27,7 @@ public class Lap {
         this.lapEnd = 0L;
         this.pitted = false;
         this.saved = false;
-        this.checkpointTimes = new HashMap();
+        this.checkpointTimes = new ConcurrentHashMap<>();
     }
 
     public Lap(long startTime) {
@@ -38,7 +38,7 @@ public class Lap {
         this.lapEnd = 0L;
         this.pitted = false;
         this.saved = false;
-        this.checkpointTimes = new HashMap();
+        this.checkpointTimes = new ConcurrentHashMap<>();
     }
 
     public Lap(int id, UUID playerUUID, int heatId, String trackNameWS, long lapStart, long lapEnd, boolean pitted) {
@@ -49,7 +49,7 @@ public class Lap {
         this.lapEnd = lapEnd;
         this.pitted = pitted;
         this.saved = true;
-        this.checkpointTimes = new HashMap();
+        this.checkpointTimes = new ConcurrentHashMap<>();
     }
 
     public UUID getPlayerUUID() {
@@ -109,7 +109,7 @@ public class Lap {
     }
 
     public Map<Integer, Long> getRelativeCheckpointTimes() {
-        Map<Integer, Long> relative = new HashMap();
+        Map<Integer, Long> relative = new ConcurrentHashMap<>();
 
         for(Map.Entry<Integer, Long> entry : this.checkpointTimes.entrySet()) {
             relative.put((Integer)entry.getKey(), (Long)entry.getValue() - this.lapStart);

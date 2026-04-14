@@ -406,6 +406,9 @@ public class Heats {
         if (this.heatState != HeatState.RACING && this.heatState != HeatState.PRACTICE && this.heatState != HeatState.QUALIFYING) {
             this.plugin.getDebugManager().logRaceSystem("Heat " + this.id + " não está em corrida, treino ou quali!");
         } else {
+            java.util.List<java.util.UUID> driverUUIDs = new java.util.ArrayList<>(this.drivers.keySet());
+            this.plugin.getRegionListener().cleanupHeatPlayers(driverUUIDs);
+            this.plugin.getRaceCheckpointListener().cleanupHeatPlayers(driverUUIDs);
             this.plugin.getLonelyController().clearGhostForPlayers(this.drivers.keySet());
             if (this.heatState == HeatState.RACING && this.totalPits != null && this.totalPits > 0) {
                 this.validateMandatoryPits();
@@ -422,14 +425,10 @@ public class Heats {
 
             this.gridManager.clear();
             if (this.plugin.getPacketSender() != null) {
-                List<UUID> driverUUIDs = new ArrayList();
-
                 for(Driver driver : this.drivers.values()) {
                     if (!driver.isFinished() && !driver.isDnf()) {
                         driver.setFinished(true);
                     }
-
-                    driverUUIDs.add(driver.getUuid());
                 }
 
                 Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {

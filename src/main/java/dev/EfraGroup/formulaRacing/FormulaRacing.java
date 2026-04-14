@@ -689,7 +689,8 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
-        setPlayerHasMod(event.getPlayer().getUniqueId(), false);
+        UUID uuid = event.getPlayer().getUniqueId();
+        setPlayerHasMod(uuid, false);
         if (this.trackVisualizer != null) {
             this.trackVisualizer.stopView(event.getPlayer());
         }
@@ -698,6 +699,8 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.spectatorManager.removeSpectator(event.getPlayer());
         }
 
+        this.rcl.cleanupPlayer(uuid);
+        this.raceCheckpointListener.cleanupPlayer(uuid);
     }
 
     private void registerCommandContexts() {

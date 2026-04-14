@@ -118,7 +118,7 @@
                 TimerUtils.PlayerTimerData data = this.timerUtils.getTimerData(player, lastTrack);
                 if (data != null) {
                     double elapsedTime = this.timerUtils.getPlayerElapsedTimeUntilLastCheckpoint(player, lastTrack);
-                    int checkpoints = data.getCheckpointsReached().size();
+                    int checkpoints = data.getCheckpointsReached();
                     if (checkpoints > 0) {
                         this.mysql.savePartialTime(player.getUniqueId(), player.getName(), lastTrack, elapsedTime, checkpoints);
                     }
@@ -295,7 +295,7 @@
 
                                 TimerUtils.PlayerTimerData data = this.timerUtils.getTimerData(player, activeTimerTrack);
                                 if (data != null) {
-                                    int lastCheckpointIndex = data.getCheckpointsReached().size();
+                                    int lastCheckpointIndex = data.getCheckpointsReached();
                                     if (lastCheckpointIndex > 0) {
                                         double elapsedTime = this.timerUtils.getPlayerElapsedTimeUntilLastCheckpoint(player, activeTimerTrack);
                                         this.mysql.savePartialTime(player.getUniqueId(), player.getName(), trackName, elapsedTime, lastCheckpointIndex);

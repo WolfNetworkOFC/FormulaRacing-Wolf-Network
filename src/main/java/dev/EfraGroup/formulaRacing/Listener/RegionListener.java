@@ -27,6 +27,7 @@ import dev.EfraGroup.formulaRacing.Utils.TimeTrialDuelsAction;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -58,19 +59,40 @@ public class RegionListener implements Listener {
     private final TimeTrialDuelsAction DuelsTimer;
     private final TimeTrialDuels timeTrialDuels;
     private final TimeTrialController timeTrialController;
-    private final Map<UUID, String> playerRegion = new HashMap();
-    private final Map<String, List<DatabaseManager.RegionData>> regions = new ConcurrentHashMap();
-    private final Set<String> warnedWorlds = new HashSet();
-    private final Map<UUID, Location> lastLocation = new HashMap();
-    private final Map<UUID, Long> lastStartEndCross = new HashMap();
-    private static final long START_END_DEBOUNCE_MS = 2000L;
-    private final Map<UUID, Long> lastDuelRegionCross = new HashMap();
+    private final Map<UUID, String> playerRegion = new ConcurrentHashMap<>();
+    private final Map<String, List<DatabaseManager.RegionData>> regions = new ConcurrentHashMap<>();
+    private final Set<String> warnedWorlds = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Map<UUID, Location> lastLocation = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastStartEndCross = new ConcurrentHashMap<>();
+    private static final long START_END_DEBOUNCE_MS = 1000L;
+    private final Map<UUID, Long> lastDuelRegionCross = new ConcurrentHashMap<>();
     private static final long DUEL_REGION_DEBOUNCE_MS = 500L;
-    private final Map<UUID, Long> lastTimeLimitLog = new HashMap();
+    private final Map<UUID, Long> lastTimeLimitLog = new ConcurrentHashMap<>();
     private static final long TIME_LIMIT_LOG_DEBOUNCE_MS = 2000L;
-    private final Set<UUID> justTeleported = new HashSet();
-    private final Map<UUID, Long> lastTTDisabledWarning = new HashMap();
+    private final Set<UUID> justTeleported = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Map<UUID, Long> lastTTDisabledWarning = new ConcurrentHashMap<>();
     private static final long TT_DISABLED_WARNING_COOLDOWN = 60000L;
+
+    public void cleanupPlayer(UUID uuid) {
+        this.playerRegion.remove(uuid);
+        this.lastLocation.remove(uuid);
+        this.lastStartEndCross.remove(uuid);
+        this.lastDuelRegionCross.remove(uuid);
+        this.lastTimeLimitLog.remove(uuid);
+        this.justTeleported.remove(uuid);
+        this.lastTTDisabledWarning.remove(uuid);
+    }
+
+    public void cleanupHeatPlayers(java.util.Collection<UUID> uuids) {
+        for (UUID uuid : uuids) {
+            this.lastLocation.remove(uuid);
+            this.lastStartEndCross.remove(uuid);
+            this.lastDuelRegionCross.remove(uuid);
+            this.lastTimeLimitLog.remove(uuid);
+            this.justTeleported.remove(uuid);
+            this.lastTTDisabledWarning.remove(uuid);
+        }
+    }
 
     public RegionListener(FormulaRacing plugin, DatabaseManager database, TimerUtils timerUtils, PacketSender packetSender, ScoreboardTimeTrialUtils stt, TimeTrialDuelsAction DuelsTimer, TimeTrialDuels timeTrialDuels, TimeTrialController timeTrialController) {
         this.plugin = plugin;
@@ -235,10 +257,10 @@ public class RegionListener implements Listener {
                                 if (!isInDuel && activeTrack != null) {
                                     TimerUtils.PlayerTimerData data = this.timerUtils.getTimerData(player, activeTrack);
                                     if (data != null) {
-                                        int nextExpectedIndex = data.getCheckpointsReached().size();
+                                        int nextExpectedIndex = data.getCheckpointsReached();
                                         if (nextExpectedIndex < checkpoints.size()) {
                                             DatabaseManager.RegionData nextCp = (DatabaseManager.RegionData)checkpoints.get(nextExpectedIndex);
-                                            if (this.intersectsRegion(previous, current, nextCp)) {
+                                            if (RegionMathUtils.intersectsRegion(previous, current, nextCp)) {
                                                 double proportion = RegionMathUtils.calculateRegionEntryProportion(previous, current, nextCp);
                                                 long tickDurationMs = 50L;
                                                 long adjustmentMs = (long)(((double)1.0F - proportion) * (double)tickDurationMs);
@@ -290,7 +312,7 @@ public class RegionListener implements Listener {
                                     int nextExpectedIndex = collectedCheckpoints.size();
                                     if (nextExpectedIndex < checkpoints.size()) {
                                         DatabaseManager.RegionData nextCp = (DatabaseManager.RegionData)checkpoints.get(nextExpectedIndex);
-                                        if (this.intersectsRegion(previous, current, nextCp)) {
+                                        if (RegionMathUtils.intersectsRegion(previous, current, nextCp)) {
                                             double elapsedTime = this.DuelsTimer.getPlayerLapElapsedSeconds(player);
                                             int cpId = nextCp.getId();
                                             Bukkit.getScheduler().runTask(this.plugin, () -> {
@@ -331,26 +353,32 @@ public class RegionListener implements Listener {
                 boolean isRunningSolo = this.timerUtils.isTimerRunning(player, regionTrackWS);
                 boolean ttEnabled = this.database.getTimeTrialEnabled(uuid);
                 this.plugin.getDebugManager().logTimeTrialSystem(String.format("[AUTO TT] %s - handleRegion: track=%s, trackWS=%s, type=%s, duelId=%d, runningSolo=%b, ttEnabled=%b", player.getName(), regionTrackDisplayName, regionTrackWS, type, activeDuelId, isRunningSolo, ttEnabled));
-                if (type.equals("RESET")) {
-                    Location targetLoc = null;
-                    if (!isRunningDuel) {
-                        Optional<Heats> heatOpt = this.plugin.getRaceEventManager().getPlayerActiveHeat(player.getUniqueId());
-                        if (heatOpt.isPresent()) {
-                            Heats heat = (Heats)heatOpt.get();
-                            Driver driver = heat.getDriver(player.getUniqueId());
-                            if (driver != null) {
-                                regionTrackWS = heat.getTrackNameWS();
-                                int checkpointsReached = driver.getCheckpointsReached();
-                                List<DatabaseManager.RegionData> checkpoints = this.database.getCheckpoints(regionTrackWS);
-                                if (checkpointsReached > 0 && checkpointsReached <= checkpoints.size()) {
-                                    DatabaseManager.RegionData cp = (DatabaseManager.RegionData)checkpoints.get(checkpointsReached - 1);
-                                    targetLoc = new Location(Bukkit.getWorld(cp.getWorld()), (cp.getMinX() + cp.getMaxX()) / (double)2.0F, cp.getMaxY() - (double)0.5F, (cp.getMinZ() + cp.getMaxZ()) / (double)2.0F, player.getLocation().getYaw(), player.getLocation().getPitch());
-                                    DebugManager var10000 = this.plugin.getDebugManager();
-                                    String var10001 = player.getName();
-                                    var10000.logRaceSystem("[RESET-HEAT] " + var10001 + " -> CP " + checkpointsReached);
+                        if (type.equals("RESET")) {
+                            Location targetLoc = null;
+                            if (!isRunningDuel) {
+                                Optional<Heats> heatOpt = this.plugin.getRaceEventManager().getPlayerActiveHeat(player.getUniqueId());
+                                if (heatOpt.isPresent()) {
+                                    Heats heat = (Heats)heatOpt.get();
+                                    Driver driver = heat.getDriver(player.getUniqueId());
+                                    if (driver != null) {
+                                        regionTrackWS = heat.getTrackNameWS();
+                                        int checkpointsReached = driver.getCheckpointsReached();
+                                        List<DatabaseManager.RegionData> checkpointByIdList = this.plugin.getTrackIntegrationManager().getCheckpointById(regionTrackWS, checkpointsReached - 1);
+                                        if (driver.getResetCount() == 0 && checkpointsReached > 0 && checkpointByIdList != null && !checkpointByIdList.isEmpty()) {
+                                            DatabaseManager.RegionData cp = checkpointByIdList.get(0);
+                                            targetLoc = new Location(Bukkit.getWorld(cp.getWorld()), (cp.getMinX() + cp.getMaxX()) / (double)2.0F, cp.getMaxY() - (double)0.5F, (cp.getMinZ() + cp.getMaxZ()) / (double)2.0F, player.getLocation().getYaw(), player.getLocation().getPitch());
+                                            driver.incrementResetCount();
+                                            DebugManager var10000 = this.plugin.getDebugManager();
+                                            String var10001 = player.getName();
+                                            var10000.logRaceSystem("[RESET-HEAT] " + var10001 + " -> CP " + checkpointsReached + " (resetCount=" + driver.getResetCount() + ")");
+                                        } else if (driver.getResetCount() >= 1) {
+                                            targetLoc = this.plugin.getTrackIntegrationManager().getTrackSpawn(regionTrackWS);
+                                            DebugManager var10000 = this.plugin.getDebugManager();
+                                            String var10001 = player.getName();
+                                            var10000.logRaceSystem("[RESET-HEAT] " + var10001 + " -> Track Spawn (resetCount=" + driver.getResetCount() + ")");
+                                        }
+                                    }
                                 }
-                            }
-                        }
 
                         if (targetLoc == null) {
                             String activeTrackKey = this.timerUtils.getActiveTrack(player);
@@ -358,10 +386,10 @@ public class RegionListener implements Listener {
                                 TimerUtils.PlayerTimerData data = this.timerUtils.getTimerData(player, activeTrackKey);
                                 if (data != null) {
                                     regionTrackWS = activeTrackKey;
-                                    int checkpointsReached = data.getCheckpointsReached().size();
-                                    List<DatabaseManager.RegionData> checkpoints = this.database.getCheckpoints(activeTrackKey);
-                                    if (checkpointsReached > 0 && checkpointsReached <= checkpoints.size()) {
-                                        DatabaseManager.RegionData cp = (DatabaseManager.RegionData)checkpoints.get(checkpointsReached - 1);
+                                    int checkpointsReached = data.getCheckpointsReached();
+                                    List<DatabaseManager.RegionData> checkpointByIdList = this.plugin.getTrackIntegrationManager().getCheckpointById(activeTrackKey, checkpointsReached - 1);
+                                    if (checkpointsReached > 0 && checkpointByIdList != null && !checkpointByIdList.isEmpty()) {
+                                        DatabaseManager.RegionData cp = checkpointByIdList.get(0);
                                         targetLoc = new Location(Bukkit.getWorld(cp.getWorld()), (cp.getMinX() + cp.getMaxX()) / (double)2.0F, cp.getMaxY() - (double)0.5F, (cp.getMinZ() + cp.getMaxZ()) / (double)2.0F, player.getLocation().getYaw(), player.getLocation().getPitch());
                                         DebugManager var64 = this.plugin.getDebugManager();
                                         String var67 = player.getName();
@@ -591,7 +619,7 @@ public class RegionListener implements Listener {
                 TimerUtils.PlayerTimerData data = this.timerUtils.getTimerData(player, regionTrackWS);
                 if (data != null) {
                     double rawElapsed = this.timerUtils.getPlayerElapsedTime(player, regionTrackWS);
-                    int checkpoints = data.getCheckpointsReached().size();
+                    int checkpoints = data.getCheckpointsReached();
                     int totalCheckpoints = this.database.getCheckpointCount(regionTrackWS);
                     if (checkpoints >= totalCheckpoints) {
                         double proportion = RegionMathUtils.calculateRegionEntryProportion(from, to, region);
@@ -718,62 +746,10 @@ public class RegionListener implements Listener {
         return minutes > 0L ? String.format("%02d:%02d.%03d", minutes, seconds, millis) : String.format("%02d.%03d", seconds, millis);
     }
 
-    private boolean intersectsRegion(Location from, Location to, DatabaseManager.RegionData r) {
-        double minX = Math.min(r.getMinX(), r.getMaxX());
-        double maxX = Math.max(r.getMinX(), r.getMaxX());
-        double minY = Math.min(r.getMinY(), r.getMaxY());
-        double maxY = Math.max(r.getMinY(), r.getMaxY());
-        double minZ = Math.min(r.getMinZ(), r.getMaxZ());
-        double maxZ = Math.max(r.getMinZ(), r.getMaxZ());
-        double fx = from.getX();
-        double fy = from.getY();
-        double fz = from.getZ();
-        double tx = to.getX();
-        double ty = to.getY();
-        double tz = to.getZ();
-        if (tx >= minX && tx <= maxX && ty >= minY && ty <= maxY && tz >= minZ && tz <= maxZ) {
-            return true;
-        } else {
-            double dx = tx - fx;
-            double dy = ty - fy;
-            double dz = tz - fz;
-            double tmin = (double)0.0F;
-            double tmax = (double)1.0F;
-            if (Math.abs(dx) > 1.0E-7) {
-                double t1 = (minX - fx) / dx;
-                double t2 = (maxX - fx) / dx;
-                tmin = Math.max(tmin, Math.min(t1, t2));
-                tmax = Math.min(tmax, Math.max(t1, t2));
-            } else if (fx < minX || fx > maxX) {
-                return false;
-            }
-
-            if (Math.abs(dy) > 1.0E-7) {
-                double t1 = (minY - fy) / dy;
-                double t2 = (maxY - fy) / dy;
-                tmin = Math.max(tmin, Math.min(t1, t2));
-                tmax = Math.min(tmax, Math.max(t1, t2));
-            } else if (fy < minY || fy > maxY) {
-                return false;
-            }
-
-            if (Math.abs(dz) > 1.0E-7) {
-                double t1 = (minZ - fz) / dz;
-                double t2 = (maxZ - fz) / dz;
-                tmin = Math.max(tmin, Math.min(t1, t2));
-                tmax = Math.min(tmax, Math.max(t1, t2));
-            } else if (fz < minZ || fz > maxZ) {
-                return false;
-            }
-
-            return tmin <= tmax;
-        }
-    }
-
     private DatabaseManager.RegionData getRegionAtLine(Location from, Location to, List<DatabaseManager.RegionData> worldRegions) {
         for(DatabaseManager.RegionData r : worldRegions) {
             String type = r.getType().toUpperCase();
-            if ((type.equals("START") || type.equals("END") || type.equals("RESET")) && this.intersectsRegion(from, to, r)) {
+            if ((type.equals("START") || type.equals("END") || type.equals("RESET")) && RegionMathUtils.intersectsRegion(from, to, r)) {
                 return r;
             }
         }
@@ -788,6 +764,20 @@ public class RegionListener implements Listener {
         if (lastCross == null || now - lastCross >= 2000L) {
             this.lastStartEndCross.put(uuid, now);
             if (!driver.isFinished() && !driver.isDnf()) {
+                String trackNameWS = heat.getTrackNameWS();
+                boolean hasLagStart = this.plugin.getTrackIntegrationManager().hasLagStartRegion(trackNameWS);
+                boolean hasLagEnd = this.plugin.getTrackIntegrationManager().hasLagEndRegion(trackNameWS);
+                if (hasLagStart && !driver.hasPassedLagStart()) {
+                    this.plugin.getDebugManager().logRaceSystem(String.format("§c[LAP BLOCKED] %s tentou completar volta sem passar LAGSTART", player.getName()));
+                    this.plugin.sendMessage(player, "race_checkpoint_missed", new String[]{"{expected}", "LAGSTART"});
+                    return;
+                }
+                if (hasLagEnd && !driver.hasPassedLagEnd()) {
+                    this.plugin.getDebugManager().logRaceSystem(String.format("§c[LAP BLOCKED] %s tentou completar volta sem passar LAGEND", player.getName()));
+                    this.plugin.sendMessage(player, "race_checkpoint_missed", new String[]{"{expected}", "LAGEND"});
+                    return;
+                }
+                driver.setResetCount(0);
                 this.plugin.getDebugManager().logRaceSystem(String.format("[RACE LAP] %s cruzou START/END - Delegando para lógica do Heat logic...", player.getName()));
                 Location min = new Location(from.getWorld(), regionData.getMinX(), regionData.getMinY(), regionData.getMinZ());
                 Location max = new Location(from.getWorld(), regionData.getMaxX(), regionData.getMaxY(), regionData.getMaxZ());

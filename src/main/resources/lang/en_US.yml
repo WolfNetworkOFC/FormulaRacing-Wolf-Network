@@ -87,6 +87,7 @@ race_heat_finished: "&a✓ RACE FINISHED!"
 race_lap_completed: "&7Lap &f{lap}&7/&f{total} &acompleted!"
 race_lap_fastest: "&6⚡ Fastest lap: &e{time}"
 race_lap_personal_best: "&a★ Personal best lap!"
+race_checkpoint_missed: "&c✗ Checkpoint &e{expected} &cmissed! Teleported back to last checkpoint."
 
 # Race - Pit Stops
 race_pit_required: "&cYou need to complete &e{pits} &cmore pit stop(s)!"

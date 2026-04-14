@@ -435,6 +435,8 @@ public class DatabaseManager {
                         trackNameWS TEXT DEFAULT NULL,
                         checkpointId INTEGER NOT NULL,
                         worldName TEXT NOT NULL,
+                        shape TEXT DEFAULT 'AABB',
+                        points TEXT,
                         min_x REAL NOT NULL, min_y REAL NOT NULL, min_z REAL NOT NULL,
                         max_x REAL NOT NULL, max_y REAL NOT NULL, max_z REAL NOT NULL
                     )"""
@@ -1300,7 +1302,7 @@ public class DatabaseManager {
 
         List<RegionData> checkpoints = new ArrayList<>();
         String sql =
-                "SELECT checkpointId, worldName, min_x, min_y, min_z, max_x, max_y, max_z " +
+                "SELECT checkpointId, worldName, shape, points, min_x, min_y, min_z, max_x, max_y, max_z " +
                         "FROM fr_checkpoint WHERE LOWER(trackNameWS) = LOWER(?) ORDER BY checkpointId ASC";
 
         String trackNameDisplay = trackNameWS;
@@ -1318,12 +1320,18 @@ public class DatabaseManager {
                         String worldName = rs.getString("worldName");
                         if (Bukkit.getWorld(worldName) == null) continue;
 
+                        String shape = rs.getString("shape");
+                        if (shape == null) shape = "AABB";
+                        String points = rs.getString("points");
+
                         checkpoints.add(
                                 new RegionData(
                                         rs.getInt("checkpointId"),
                                         trackNameDisplay,
                                         trackNameWS,
                                         "CHECKPOINT",
+                                        shape,
+                                        points,
                                         rs.getDouble("min_x"),
                                         rs.getDouble("min_y"),
                                         rs.getDouble("min_z"),
@@ -1442,6 +1450,70 @@ public class DatabaseManager {
                     ps.setDouble(7, maxX);
                     ps.setDouble(8, maxY);
                     ps.setDouble(9, maxZ);
+                    ps.executeUpdate();
+                }
+
+                conn.commit();
+                return true;
+            } catch (SQLException ex) {
+                conn.rollback();
+                throw ex;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
+    }
+
+    public synchronized boolean addCheckpointPoly(int checkpointId, String trackNameWS, Player player, String points) {
+        if (!WorldEditSelect.hasSelection(player)) return false;
+
+        Location selMin = WorldEditSelect.getMin(player);
+        Location selMax = WorldEditSelect.getMax(player);
+        String world = selMin.getWorld().getName();
+
+        double minX = Math.min(selMin.getX(), selMax.getX());
+        double minY = Math.min(selMin.getY(), selMax.getY());
+        double minZ = Math.min(selMin.getZ(), selMax.getZ());
+        double maxX = Math.max(selMin.getX(), selMax.getX());
+        double maxY = Math.max(selMin.getY(), selMax.getY());
+        double maxZ = Math.max(selMin.getZ(), selMax.getZ());
+
+        try {
+            Connection conn = getOrConnect();
+            conn.setAutoCommit(false);
+
+            try {
+                int finalId = checkpointId;
+                if (finalId <= 0) {
+                    try (
+                            PreparedStatement ps = conn.prepareStatement(
+                                    "SELECT MAX(checkpointId) FROM fr_checkpoint WHERE LOWER(trackNameWS) = LOWER(?)"
+                            )
+                    ) {
+                        ps.setString(1, trackNameWS);
+                        try (ResultSet rs = ps.executeQuery()) {
+                            finalId = rs.next() ? rs.getInt(1) + 1 : 1;
+                        }
+                    }
+                }
+
+                String sqlInsert =
+                        "INSERT INTO fr_checkpoint (checkpointId, trackNameWS, worldName, shape, points, min_x, min_y, min_z, max_x, max_y, max_z) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                try (PreparedStatement ps = conn.prepareStatement(sqlInsert)) {
+                    ps.setInt(1, finalId);
+                    ps.setString(2, trackNameWS);
+                    ps.setString(3, world);
+                    ps.setString(4, "POLY");
+                    ps.setString(5, points);
+                    ps.setDouble(6, minX);
+                    ps.setDouble(7, minY);
+                    ps.setDouble(8, minZ);
+                    ps.setDouble(9, maxX);
+                    ps.setDouble(10, maxY);
+                    ps.setDouble(11, maxZ);
                     ps.executeUpdate();
                 }
 
@@ -5910,6 +5982,8 @@ public class DatabaseManager {
         private final String trackNameWS; // Internal Name (sem espaços)
         private final String type; // START, END, etc.
         private final String world;
+        private final String shape; // AABB or POLY
+        private final String points; // For POLY: "x1,z1;x2,z2;x3,z3..."
         private final double minX, minY, minZ;
         private final double maxX, maxY, maxZ;
 
@@ -5926,10 +6000,30 @@ public class DatabaseManager {
                 double maxZ,
                 String world
         ) {
+            this(id, trackName, trackNameWS, type, "AABB", null, minX, minY, minZ, maxX, maxY, maxZ, world);
+        }
+
+        public RegionData(
+                int id,
+                String trackName,
+                String trackNameWS,
+                String type,
+                String shape,
+                String points,
+                double minX,
+                double minY,
+                double minZ,
+                double maxX,
+                double maxY,
+                double maxZ,
+                String world
+        ) {
             this.id = id;
             this.trackName = trackName;
             this.trackNameWS = trackNameWS;
             this.type = type.toUpperCase();
+            this.shape = shape != null ? shape.toUpperCase() : "AABB";
+            this.points = points;
             this.minX = Math.min(minX, maxX);
             this.minY = Math.min(minY, maxY);
             this.minZ = Math.min(minZ, maxZ);
@@ -5957,6 +6051,33 @@ public class DatabaseManager {
 
         public String getWorld() {
             return world;
+        }
+
+        public String getShape() {
+            return shape;
+        }
+
+        public boolean isPoly() {
+            return "POLY".equals(shape);
+        }
+
+        public String getPoints() {
+            return points;
+        }
+
+        public double[][] getPolyPoints() {
+            if (points == null || points.isEmpty()) {
+                return new double[0][];
+            }
+            String[] pairs = points.split(";");
+            double[][] result = new double[pairs.length][];
+            for (int i = 0; i < pairs.length; i++) {
+                String[] coords = pairs[i].split(",");
+                if (coords.length == 2) {
+                    result[i] = new double[]{Double.parseDouble(coords[0]), Double.parseDouble(coords[1])};
+                }
+            }
+            return result;
         }
 
         public double getMinX() {

@@ -200,6 +200,7 @@ race_heat_finished: "&a✓ CORRIDA FINALIZADA!"
 race_lap_completed: "&7Volta &f{lap}&7/&f{total} &acompleta!"
 race_lap_fastest: "&6⚡ Volta mais rápida: &e{time}"
 race_lap_personal_best: "&a★ Melhor volta pessoal!"
+race_checkpoint_missed: "&c✗ Checkpoint &e{expected} &cSaltado! Teleportado de volta ao último checkpoint."
 
 # Corrida - Pit Stops
 race_pit_required: "&cPrecisas completar mais &e{pits} &cpit stop(s)!"

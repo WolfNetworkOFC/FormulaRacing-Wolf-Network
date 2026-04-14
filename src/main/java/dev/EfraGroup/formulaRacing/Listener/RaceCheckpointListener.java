@@ -9,6 +9,7 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Controllers.RaceEventManager;
 import dev.EfraGroup.formulaRacing.Controllers.TrackIntegrationManager;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Event.Driver.DriverPassCheckpointEvent;
 import dev.EfraGroup.formulaRacing.Event.EventAnnouncements;
 import dev.EfraGroup.formulaRacing.Event.Events;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
@@ -16,11 +17,16 @@ import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Heat.Lap;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
+import dev.EfraGroup.formulaRacing.Utils.RegionMathUtils;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -34,6 +40,18 @@ public class RaceCheckpointListener implements Listener {
     private final FormulaRacing plugin;
     private final RaceEventManager raceEventManager;
     private final TrackIntegrationManager trackManager;
+    private final Map<UUID, Long> lastCheckpointSkip = new ConcurrentHashMap<>();
+    private static final long CHECKPOINT_SKIP_COOLDOWN_MS = 2000L;
+
+    public void cleanupPlayer(UUID uuid) {
+        this.lastCheckpointSkip.remove(uuid);
+    }
+
+    public void cleanupHeatPlayers(java.util.Collection<UUID> uuids) {
+        for (UUID uuid : uuids) {
+            this.lastCheckpointSkip.remove(uuid);
+        }
+    }
 
     public RaceCheckpointListener(FormulaRacing plugin) {
         this.plugin = plugin;
@@ -80,17 +98,58 @@ public class RaceCheckpointListener implements Listener {
                     if (!driver.isFinished()) {
                         String trackNameWS = currentHeat.getTrackNameWS();
                         if (trackNameWS != null) {
-                            List<DatabaseManager.RegionData> checkpoints = this.trackManager.getTrackCheckpoints(trackNameWS);
-                            if (!checkpoints.isEmpty()) {
-                                Location playerLoc = player.getLocation();
-                                int totalCheckpoints = checkpoints.size();
+                            Map<Integer, List<DatabaseManager.RegionData>> checkpointsById = this.trackManager.getCheckpointsById(trackNameWS);
+                            if (!checkpointsById.isEmpty()) {
+                                int totalCheckpoints = this.trackManager.getCheckpointCount(trackNameWS);
+                                Location from = event.getFrom();
+                                Location to = event.getTo();
+                                if (this.trackManager.hasLagStartRegion(trackNameWS) && !driver.hasPassedLagStart()) {
+                                    List<DatabaseManager.RegionData> lagStartRegions = this.trackManager.getTrackRegionsByType(trackNameWS, "LAGSTART");
+                                    for (DatabaseManager.RegionData lagStartRegion : lagStartRegions) {
+                                        if (RegionMathUtils.intersectsRegion(from, to, lagStartRegion)) {
+                                            driver.setLagStartPassed(true);
+                                            this.plugin.getDebugManager().logRaceSystem("§a[LAG] " + player.getName() + " passou LAGSTART");
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (this.trackManager.hasLagEndRegion(trackNameWS) && !driver.hasPassedLagEnd()) {
+                                    List<DatabaseManager.RegionData> lagEndRegions = this.trackManager.getTrackRegionsByType(trackNameWS, "LAGEND");
+                                    for (DatabaseManager.RegionData lagEndRegion : lagEndRegions) {
+                                        if (RegionMathUtils.intersectsRegion(from, to, lagEndRegion)) {
+                                            driver.setLagEndPassed(true);
+                                            this.plugin.getDebugManager().logRaceSystem("§a[LAG] " + player.getName() + " passou LAGEND");
+                                            break;
+                                        }
+                                    }
+                                }
                                 int nextExpectedCheckpoint = driver.getCheckpointsReached();
                                 if (nextExpectedCheckpoint < totalCheckpoints) {
-                                    DatabaseManager.RegionData expectedCheckpoint = (DatabaseManager.RegionData)checkpoints.get(nextExpectedCheckpoint);
-                                    if (this.trackManager.isPlayerInCheckpoint(playerLoc, expectedCheckpoint)) {
-                                        this.handleCheckpointReached(driver, currentHeat, nextExpectedCheckpoint, totalCheckpoints, player);
+                                    List<DatabaseManager.RegionData> expectedRegions = checkpointsById.get(nextExpectedCheckpoint);
+                                    if (expectedRegions != null) {
+                                        for (DatabaseManager.RegionData expectedRegion : expectedRegions) {
+                                            if (RegionMathUtils.intersectsRegion(from, to, expectedRegion)) {
+                                                this.handleCheckpointReached(driver, currentHeat, nextExpectedCheckpoint, totalCheckpoints, player, from, to, expectedRegion);
+                                                return;
+                                            }
+                                        }
                                     }
-
+                                }
+                                for (int i = nextExpectedCheckpoint + 1; i < totalCheckpoints; i++) {
+                                    List<DatabaseManager.RegionData> skipRegions = checkpointsById.get(i);
+                                    if (skipRegions == null) continue;
+                                    for (DatabaseManager.RegionData skipRegion : skipRegions) {
+                                        if (RegionMathUtils.intersectsRegion(from, to, skipRegion)) {
+                                            UUID playerUuid = player.getUniqueId();
+                                            long now = System.currentTimeMillis();
+                                            Long lastSkip = this.lastCheckpointSkip.get(playerUuid);
+                                            if (lastSkip != null && now - lastSkip < CHECKPOINT_SKIP_COOLDOWN_MS) {
+                                                return;
+                                            }
+                                            this.handleCheckpointSkipped(driver, currentHeat, player, i, nextExpectedCheckpoint);
+                                            return;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -100,11 +159,65 @@ public class RaceCheckpointListener implements Listener {
         }
     }
 
-    private void handleCheckpointReached(Driver driver, Heats heat, int checkpointId, int totalCheckpoints, Player player) {
+    private void handleCheckpointReached(Driver driver, Heats heat, int checkpointId, int totalCheckpoints, Player player, Location from, Location to, DatabaseManager.RegionData checkpointRegion) {
+        double proportion = RegionMathUtils.calculateRegionEntryProportion(from, to, checkpointRegion);
+        long tickDurationMs = 50L;
+        long adjustmentMs = (long)(((double)1.0F - proportion) * (double)tickDurationMs);
+        long preciseTimeMs = System.currentTimeMillis() - adjustmentMs;
         driver.incrementCheckpoint();
         this.plugin.getDebugManager().logRaceSystem(String.format("§e[CHECKPOINT] %s passou por CP%d - Progresso: %d/%d", player.getName(), checkpointId, driver.getCheckpointsReached(), totalCheckpoints));
+        DriverPassCheckpointEvent event = new DriverPassCheckpointEvent(driver, heat, checkpointId, totalCheckpoints, checkpointRegion, from.clone(), to.clone(), preciseTimeMs);
+        Bukkit.getPluginManager().callEvent(event);
         this.updateDelta(driver, player);
         heat.updateLivePositions();
+    }
+
+    private void handleCheckpointSkipped(Driver driver, Heats heat, Player player, int detectedCheckpointId, int expectedCheckpointId) {
+        this.plugin.getDebugManager().logRaceSystem(String.format("§c[CHECKPOINT SKIP] %s saltou CP%d (esperado CP%d) - Resetando", player.getName(), detectedCheckpointId, expectedCheckpointId));
+        this.lastCheckpointSkip.put(player.getUniqueId(), System.currentTimeMillis());
+        driver.resetLagFlags();
+        if (this.trackManager.getNoResetOnFutureCheckpoint(heat.getTrackNameWS())) {
+            this.plugin.sendMessage(player, "race_checkpoint_missed", new String[]{"{expected}", String.valueOf(expectedCheckpointId)});
+            return;
+        }
+        Map<Integer, List<DatabaseManager.RegionData>> checkpointsById = this.trackManager.getCheckpointsById(heat.getTrackNameWS());
+        Location targetLoc;
+        if (expectedCheckpointId == 0) {
+            targetLoc = this.trackManager.getTrackSpawn(heat.getTrackNameWS());
+            if (targetLoc != null) {
+                targetLoc = new Location(targetLoc.getWorld(), targetLoc.getX(), targetLoc.getY(), targetLoc.getZ(), player.getLocation().getYaw(), player.getLocation().getPitch());
+            }
+        } else {
+            int targetCheckpoint = expectedCheckpointId - 1;
+            List<DatabaseManager.RegionData> targetRegions = checkpointsById.get(targetCheckpoint);
+            if (targetRegions != null && !targetRegions.isEmpty()) {
+                DatabaseManager.RegionData cp = targetRegions.get(0);
+                double tpX = (cp.getMinX() + cp.getMaxX()) / 2.0;
+                double tpZ = (cp.getMinZ() + cp.getMaxZ()) / 2.0;
+                org.bukkit.World world = Bukkit.getWorld(cp.getWorld());
+                int safeY = world != null ? world.getHighestBlockYAt((int) tpX, (int) tpZ) + 2 : (int) Math.max(cp.getMinY(), cp.getMaxY());
+                double tpY = safeY;
+                targetLoc = new Location(world, tpX, tpY, tpZ, player.getLocation().getYaw(), player.getLocation().getPitch());
+            } else {
+                targetLoc = this.trackManager.getTrackSpawn(heat.getTrackNameWS());
+                if (targetLoc != null) {
+                    targetLoc = new Location(targetLoc.getWorld(), targetLoc.getX(), targetLoc.getY(), targetLoc.getZ(), player.getLocation().getYaw(), player.getLocation().getPitch());
+                }
+            }
+        }
+        if (targetLoc == null) {
+            return;
+        }
+        final Location finalTargetLoc = targetLoc;
+        this.plugin.getServer().getScheduler().runTaskLater(this.plugin, () -> {
+            if (player.isOnline()) {
+                this.plugin.getAPI().recoverPlayerBoatState(player);
+                player.teleport(finalTargetLoc);
+                player.playSound(finalTargetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
+                this.plugin.getAPI().spawnBoat(player, false, false, false);
+            }
+        }, 1L);
+        this.plugin.sendMessage(player, "race_checkpoint_missed", new String[]{"{expected}", String.valueOf(expectedCheckpointId)});
     }
 
     private void updateDelta(Driver driver, Player player) {
@@ -194,6 +307,15 @@ public class RaceCheckpointListener implements Listener {
                 }
             }
 
+            if (heat.getHeatState() == HeatState.RACING) {
+                int completedLaps = driver.getLaps().size();
+                int totalLaps = heat.getTotalLaps() != null ? heat.getTotalLaps() : 0;
+                if (totalLaps > 0 && completedLaps >= totalLaps) {
+                    this.handleDriverFinished(driver, heat, player);
+                    return;
+                }
+            }
+
             driver.newLap();
             if (heat.getHeatState() == HeatState.RACING && heat.getTotalPits() > 0) {
                 int pitsRemaining = heat.getTotalPits() - driver.getPitstops();
@@ -202,10 +324,6 @@ public class RaceCheckpointListener implements Listener {
                 } else {
                     this.plugin.sendMessage(player, "race_pitstops_complete", new String[0]);
                 }
-            }
-
-            if (heat.getHeatState() == HeatState.RACING && driver.getLapCount() >= heat.getTotalLaps()) {
-                this.handleDriverFinished(driver, heat, player);
             }
 
             this.plugin.getDebugManager().logRaceSystem(String.format("§a[LAP] %s completou volta %d em %s", player.getName(), lapNumber, lapTime));
@@ -267,6 +385,38 @@ public class RaceCheckpointListener implements Listener {
             driver.setPtpEnergy((double)0.0F);
         }
 
+        String trackNameWS = heat.getTrackNameWS();
+        if (this.trackManager.hasLagStartRegion(trackNameWS) && !driver.hasPassedLagStart()) {
+            this.plugin.getDebugManager().logRaceSystem("§c[LAG] " + player.getName() + " tentou finish sem passar LAGSTART - DNF");
+            driver.setDnf(true);
+            driver.setFinished(false);
+            driver.setEndTime(finishTime);
+            EventAnnouncements announcements = heat.getRound() != null && heat.getRound().getEvent() != null ? heat.getRound().getEvent().getAnnouncements() : this.plugin.getEventAnnouncements();
+            announcements.broadcastDNF(heat, driver, "Lag detection: LAGSTART not passed");
+            if (heat.getId() > 0 && driver.getId() > 0) {
+                this.plugin.getRaceEventManager().getDatabaseManager().updateDriverTimes(driver.getId(), Instant.ofEpochMilli(driver.getStartTime()), Instant.ofEpochMilli(finishTime));
+            }
+            if (player.isOnline()) {
+                this.plugin.getRaceActionBarManager().removePlayer(player);
+            }
+            return;
+        }
+        if (this.trackManager.hasLagEndRegion(trackNameWS) && !driver.hasPassedLagEnd()) {
+            this.plugin.getDebugManager().logRaceSystem("§c[LAG] " + player.getName() + " tentou finish sem passar LAGEND - DNF");
+            driver.setDnf(true);
+            driver.setFinished(false);
+            driver.setEndTime(finishTime);
+            EventAnnouncements announcements = heat.getRound() != null && heat.getRound().getEvent() != null ? heat.getRound().getEvent().getAnnouncements() : this.plugin.getEventAnnouncements();
+            announcements.broadcastDNF(heat, driver, "Lag detection: LAGEND not passed");
+            if (heat.getId() > 0 && driver.getId() > 0) {
+                this.plugin.getRaceEventManager().getDatabaseManager().updateDriverTimes(driver.getId(), Instant.ofEpochMilli(driver.getStartTime()), Instant.ofEpochMilli(finishTime));
+            }
+            if (player.isOnline()) {
+                this.plugin.getRaceActionBarManager().removePlayer(player);
+            }
+            return;
+        }
+
         driver.setEndTime(finishTime);
         if (heat.getTotalPits() > 0 && driver.getPitstops() < heat.getTotalPits()) {
             driver.setDnf(true);
@@ -284,8 +434,8 @@ public class RaceCheckpointListener implements Listener {
             }
 
         } else {
+            int position = (int)heat.getDrivers().values().stream().filter(Driver::isFinished).filter((d) -> !d.isDnf()).count() + 1;
             driver.setFinished(true);
-            int position = (int)heat.getDrivers().values().stream().filter(Driver::isFinished).filter((d) -> !d.isDnf()).count();
             driver.setPosition(position);
             EventAnnouncements announcements = heat.getRound() != null && heat.getRound().getEvent() != null ? heat.getRound().getEvent().getAnnouncements() : this.plugin.getEventAnnouncements();
             announcements.broadcastFinish(heat, driver, this.formatTime(driver.getTotalTime()));

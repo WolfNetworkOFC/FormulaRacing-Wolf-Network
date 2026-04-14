@@ -71,7 +71,7 @@ public class QualifyingSession implements SessionLogic {
             Bukkit.getPluginManager().callEvent(new DriverNewLapEvent(driver, driver.getCurrentLap()));
             return true;
         } else {
-            int totalCheckpoints = heat.getPlugin().getTrackIntegrationManager().getTrackCheckpoints(heat.getTrackNameWS()).size();
+            int totalCheckpoints = heat.getPlugin().getTrackIntegrationManager().getCheckpointCount(heat.getTrackNameWS());
             if (!driver.hasPassedAllCheckpoints(totalCheckpoints)) {
                 heat.getPlugin().sendMessage(player, "timetrial_incomplete_lap", new String[]{"{count}", String.valueOf(driver.getCheckpointsReached()), "{total}", String.valueOf(totalCheckpoints)});
                 return false;
@@ -100,7 +100,7 @@ public class QualifyingSession implements SessionLogic {
             Bukkit.getPluginManager().callEvent(new DriverNewLapEvent(driver, driver.getCurrentLap()));
             return true;
         } else {
-            int totalCheckpoints = heat.getPlugin().getTrackIntegrationManager().getTrackCheckpoints(heat.getTrackNameWS()).size();
+            int totalCheckpoints = heat.getPlugin().getTrackIntegrationManager().getCheckpointCount(heat.getTrackNameWS());
             if (!driver.hasPassedAllCheckpoints(totalCheckpoints)) {
                 heat.getPlugin().sendMessage(player, "timetrial_incomplete_lap", new String[]{"{count}", String.valueOf(driver.getCheckpointsReached()), "{total}", String.valueOf(totalCheckpoints)});
                 return false;

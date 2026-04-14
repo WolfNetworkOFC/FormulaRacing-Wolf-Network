@@ -440,7 +440,7 @@ public class RaceActionBarManager {
     }
 
     private int getTrackCheckpointCount(String trackNameWS) {
-        return this.trackCheckpointCountCache.computeIfAbsent(trackNameWS, track -> this.plugin.getTrackIntegrationManager().getTrackCheckpoints(track).size());
+        return this.trackCheckpointCountCache.computeIfAbsent(trackNameWS, track -> this.plugin.getTrackIntegrationManager().getCheckpointCount(track));
     }
 
     private String formatLapTime(long timeMs) {

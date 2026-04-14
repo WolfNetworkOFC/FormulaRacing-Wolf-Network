@@ -52,7 +52,7 @@ public class ResetCommand implements CommandExecutor {
         // =========================
         TimerUtils.PlayerTimerData data = timerUtils.getTimerData(player, lastTrack);
         if (data != null) {
-            int lastCheckpointIndex = data.getCheckpointsReached().size();
+            int lastCheckpointIndex = data.getCheckpointsReached();
             if (lastCheckpointIndex > 0) {
                 double elapsedTime = timerUtils.getPlayerElapsedTimeUntilLastCheckpoint(player, lastTrack);
                 mysql.savePartialTime(player.getUniqueId(), player.getName(), lastTrack, elapsedTime, lastCheckpointIndex);

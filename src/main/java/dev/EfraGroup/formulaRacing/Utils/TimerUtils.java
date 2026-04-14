@@ -139,7 +139,7 @@ public class TimerUtils {
                                 sb.append("0");
                             }
                             sb.append(milli);
-                            sb.append("\u00a77(").append(data.getCheckpointsReached().size()).append("/").append(data.getTotalCheckpoints()).append(")");
+                            sb.append("\u00a77(").append(data.getCheckpointsReached()).append("/").append(data.getTotalCheckpoints()).append(")");
                             if (lastCp != null && cpTimes != null && cpTimes.containsKey(lastCp.getId())) {
                                 double delta = lastCp.getTime() - cpTimes.get(lastCp.getId());
                                 sb.append(delta < 0.0 ? " \u00a7a-" : " \u00a7c+");
@@ -278,7 +278,7 @@ public class TimerUtils {
             return;
         }
         double partialTime = this.getPlayerElapsedTimeUntilLastCheckpoint(player, trackName);
-        int checkpointsReached = data.getCheckpointsReached().size();
+        int checkpointsReached = data.getCheckpointsReached();
         this.databaseManager.savePartialTime(player.getUniqueId(), player.getName(), trackName, partialTime, checkpointsReached);
     }
 
@@ -296,7 +296,7 @@ public class TimerUtils {
         }
         UUID uuid = player.getUniqueId();
         double elapsedSeconds = (double)(System.nanoTime() - data.getStartNanoTime()) / 1.0E9;
-        int checkpointCount = data.getCheckpointsReached().size();
+        int checkpointCount = data.getCheckpointsReached();
         int totalCheckpoints = data.getTotalCheckpoints();
         if (totalCheckpoints == 0) {
             totalCheckpoints = checkpointcount;
@@ -453,7 +453,7 @@ public class TimerUtils {
         private int totalCheckpoints;
         private final int attemptId;
         private final List<Double> checkpointTimes = new ArrayList<Double>();
-        private final Set<Integer> checkpointsReached = new HashSet<Integer>();
+        private int checkpointsReached;
         private Double lastDelta;
         private boolean finished = false;
         private double finalTime = 0.0;
@@ -465,6 +465,7 @@ public class TimerUtils {
             this.totalCheckpoints = totalCheckpoints;
             this.attemptId = attemptId;
             this.lastDelta = Double.NaN;
+            this.checkpointsReached = 0;
         }
 
         public void setSessionCache(RaceSessionCache sessionCache) {
@@ -495,7 +496,7 @@ public class TimerUtils {
             return this.checkpointTimes;
         }
 
-        public Set<Integer> getCheckpointsReached() {
+        public int getCheckpointsReached() {
             return this.checkpointsReached;
         }
 
@@ -512,7 +513,7 @@ public class TimerUtils {
         }
 
         public void addCheckpoint(int id, double elapsedTime) {
-            this.checkpointsReached.add(id);
+            ++this.checkpointsReached;
             this.checkpointTimes.add(elapsedTime);
         }
 

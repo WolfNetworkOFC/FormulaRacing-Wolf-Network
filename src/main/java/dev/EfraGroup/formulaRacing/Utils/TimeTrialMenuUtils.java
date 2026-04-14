@@ -189,10 +189,10 @@
          String lastTrack = this.plugin.getLastTimeTrialTrack(player.getUniqueId());
          if (lastTrack != null && !lastTrack.equals(trackName)) {
              TimerUtils.PlayerTimerData data = this.timerUtils.getTimerData(player, lastTrack);
-             if (data != null && !data.getCheckpointsReached().isEmpty()) {
-                 boolean shouldSave;
-                 double currentTime = this.timerUtils.getPlayerElapsedTime(player, lastTrack);
-                 int checkpoints = data.getCheckpointsReached().size();
+              if (data != null && data.getCheckpointsReached() > 0) {
+                  boolean shouldSave;
+                  double currentTime = this.timerUtils.getPlayerElapsedTime(player, lastTrack);
+                  int checkpoints = data.getCheckpointsReached();
                  Object[] bestData = this.mysql.getPlayerBestTime(player.getUniqueId().toString(), lastTrack);
                  double bestTime = bestData != null ? (Double)bestData[0] : Double.MAX_VALUE;
                  int bestCheckpoints = bestData != null ? (Integer)bestData[1] : 0;

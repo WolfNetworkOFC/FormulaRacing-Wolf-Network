@@ -9,7 +9,6 @@ import dev.EfraGroup.formulaRacing.RegionBox;
 import dev.EfraGroup.formulaRacing.Event.Driver.DriverFinishLapEvent;
 import dev.EfraGroup.formulaRacing.Heat.Lap;
 import dev.EfraGroup.formulaRacing.Heat.PitStopManager;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -44,6 +43,9 @@ public class Driver {
     private Map<Integer, Long> bestLapCheckpointTimes;
     private final Map<Integer, Long> sessionCheckpointTimes;
     private long lastCheckpointTime;
+    private int resetCount;
+    private boolean lagStartPassed;
+    private boolean lagEndPassed;
 
     public Driver(UUID uuid, int heatId, int startPosition) {
         this.state = DriverState.SETUP;
@@ -57,13 +59,14 @@ public class Driver {
         this.bestLapCheckpointTimes = new HashMap();
         this.sessionCheckpointTimes = new HashMap();
         this.lastCheckpointTime = 0L;
+        this.lagStartPassed = false;
+        this.lagEndPassed = false;
         this.uuid = uuid;
         this.heatId = heatId;
         this.startPosition = startPosition;
         this.position = startPosition;
         this.pitstops = 0;
         this.laps = new ArrayList();
-        this.checkpointsReached = 0;
         this.checkpointsReached = 0;
         this.state = DriverState.SETUP;
     }
@@ -231,6 +234,8 @@ public class Driver {
         if (this.currentLap != null) {
             long timestamp = System.currentTimeMillis();
             this.currentLap.recordCheckpointTime(this.checkpointsReached, timestamp);
+        } else {
+            Bukkit.getLogger().warning("[FormulaRacing] Driver " + this.uuid + " incremented checkpoint but currentLap was null!");
         }
 
     }
@@ -394,6 +399,8 @@ public class Driver {
         long currentTime = System.currentTimeMillis();
         this.currentLap = new Lap(currentTime);
         this.checkpointsReached = 0;
+        this.resetLagFlags();
+        this.lastProcessedCheckpointId = -1;
     }
 
     public void forceCompleteCheckpoints(int totalCheckpoints) {
@@ -413,7 +420,7 @@ public class Driver {
     }
 
     public boolean hasPassedAllCheckpoints(int totalCheckpoints) {
-        return this.checkpointsReached >= totalCheckpoints;
+        return totalCheckpoints > 0 && this.checkpointsReached >= totalCheckpoints;
     }
 
     public void reset() {
@@ -431,6 +438,42 @@ public class Driver {
         this.ptpEnergy = (double)0.0F;
         this.ptpActive = false;
         this.state = DriverState.SETUP;
+        this.resetCount = 0;
+        this.lagStartPassed = false;
+        this.lagEndPassed = false;
+    }
+
+    public int getResetCount() {
+        return this.resetCount;
+    }
+
+    public void incrementResetCount() {
+        ++this.resetCount;
+    }
+
+    public void setResetCount(int count) {
+        this.resetCount = count;
+    }
+
+    public boolean hasPassedLagStart() {
+        return this.lagStartPassed;
+    }
+
+    public void setLagStartPassed(boolean passed) {
+        this.lagStartPassed = passed;
+    }
+
+    public boolean hasPassedLagEnd() {
+        return this.lagEndPassed;
+    }
+
+    public void setLagEndPassed(boolean passed) {
+        this.lagEndPassed = passed;
+    }
+
+    public void resetLagFlags() {
+        this.lagStartPassed = false;
+        this.lagEndPassed = false;
     }
 
     public String toString() {
@@ -441,15 +484,15 @@ public class Driver {
     public void finishLap(Location from, Location to, RegionBox region) {
         if (this.currentLap != null) {
             long now = System.currentTimeMillis();
-            Instant preciseEndTime = Instant.ofEpochMilli(now);
+            long preciseEndTime = now;
             if (from != null && to != null && region != null) {
                 double proportion = calculateRegionEntryProportion(from, to, region);
-                long tickDurationNanos = 50000000L;
-                long adjustmentNanos = (long)(((double)1.0F - proportion) * (double)tickDurationNanos);
-                preciseEndTime = preciseEndTime.minusNanos(adjustmentNanos);
+                long tickDurationMs = 50L;
+                long adjustmentMs = (long)(((double)1.0F - proportion) * (double)tickDurationMs);
+                preciseEndTime = now - adjustmentMs;
             }
 
-            this.currentLap.finishLap(preciseEndTime.toEpochMilli());
+            this.currentLap.finishLap(preciseEndTime);
             this.laps.add(this.currentLap);
             DriverFinishLapEvent event = new DriverFinishLapEvent(this, this.currentLap, false);
             Bukkit.getPluginManager().callEvent(event);
