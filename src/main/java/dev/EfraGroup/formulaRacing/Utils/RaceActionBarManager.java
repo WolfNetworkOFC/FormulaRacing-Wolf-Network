@@ -100,7 +100,6 @@ public class RaceActionBarManager {
                     }
                     SpectatorTarget target = entry.getValue();
                     if (target == null || target.heat == null || target.driverId == null) {
-                        RaceActionBarManager.this.clearSpectatorTarget(spectator);
                         continue;
                     }
                     Driver driver = target.heat.getDriver(target.driverId);
@@ -371,8 +370,13 @@ public class RaceActionBarManager {
             int checkpointsInCurrentLap = Math.min(driver.getCheckpointsReached(), totalCheckpoints);
             currentLapProgress = (double) checkpointsInCurrentLap / (double) totalCheckpoints;
         }
-        double totalProgress = (lapsCompleted + currentLapProgress) / (double) totalLaps;
-        totalProgress = Math.max(0.0, Math.min(1.0, totalProgress));
+        double totalProgress;
+        if (totalLaps <= 0) {
+            totalProgress = 0.0;
+        } else {
+            totalProgress = (lapsCompleted + currentLapProgress) / (double) totalLaps;
+            totalProgress = Math.max(0.0, Math.min(1.0, totalProgress));
+        }
         sb.append(" ").append(this.buildProgressBar(totalProgress, this.progressBarLength));
 
         if (driver.getCurrentLap() != null) {
