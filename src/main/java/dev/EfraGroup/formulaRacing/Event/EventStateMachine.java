@@ -15,6 +15,9 @@ public class EventStateMachine {
     }
 
     public static void validateTransition(EventState from, EventState to) {
+        if (from == to) {
+            return;
+        }
         if (!canTransition(from, to)) {
             throw new IllegalStateException(
                 "Illegal EventState transition: " + from + " -> " + to
