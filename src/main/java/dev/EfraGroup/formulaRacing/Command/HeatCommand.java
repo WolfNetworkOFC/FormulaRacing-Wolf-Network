@@ -222,10 +222,13 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("create|new")
-    @CommandCompletion("@event @round")
+    @CommandCompletion("@nothing")
     @CommandPermission("formularacing.event.admin")
     @Description("Cria um novo heat no round")
-    public void onCreate(Player player, Rounds round) {
+    public void onCreate(
+        Player player,
+        @co.aikar.commands.annotation.Optional Rounds round
+    ) {
         if (round == null) {
             Events event = this.database.getPlayerSelectedEvent(
                 player.getUniqueId()

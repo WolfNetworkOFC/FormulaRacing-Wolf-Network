@@ -99,13 +99,13 @@ public class RoundCommand extends BaseCommand {
     }
 
     @Subcommand("create|new")
-    @CommandCompletion("@event PRACTICE|QUALIFICATION|FINAL")
+    @CommandCompletion("PRACTICE|QUALIFICATION|FINAL @event")
     @CommandPermission("formularacing.event.admin")
     @Description("Cria um novo round no evento")
     public void onCreate(
         Player player,
-        @co.aikar.commands.annotation.Optional Events event,
-        RoundType type
+        RoundType type,
+        @co.aikar.commands.annotation.Optional Events event
     ) {
         if (event == null) {
             event = this.database.getPlayerSelectedEvent(
