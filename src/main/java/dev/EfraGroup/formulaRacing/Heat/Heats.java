@@ -1062,6 +1062,10 @@ public class Heats {
 
     }
 
+    public void setHeatStateForLoad(HeatState heatState) {
+        this.heatState = heatState;
+    }
+
     public void startSessionTimer() {
         this.stopSessionTimer();
         if (this.timeLimit != null && this.timeLimit > 0) {

@@ -384,7 +384,7 @@ public class EventsDatabaseManager {
                             int heatNumber = rs.getInt("heatNumber");
                             Heats heat = new Heats(this.plugin, heatId, (Rounds)null, heatNumber);
                             heat.setRoundId(hroundId);
-                            heat.setHeatState(HeatState.valueOf(rs.getString("state")));
+                            heat.setHeatStateForLoad(HeatState.valueOf(rs.getString("state")));
                             long startTimeValue = rs.getLong("startTime");
                             long endTimeValue = rs.getLong("endTime");
                             if (startTimeValue > 0L) {
@@ -588,7 +588,7 @@ public class EventsDatabaseManager {
                             int heatNumber = rs.getInt("heatNumber");
                             Heats heat = new Heats(this.plugin, heatId, (Rounds)null, heatNumber);
                             heat.setRoundId(hroundId);
-                            heat.setHeatState(HeatState.valueOf(rs.getString("state")));
+                            heat.setHeatStateForLoad(HeatState.valueOf(rs.getString("state")));
                             long startTimeValue = rs.getLong("startTime");
                             long endTimeValue = rs.getLong("endTime");
                             if (startTimeValue > 0L) {
@@ -1233,7 +1233,7 @@ public class EventsDatabaseManager {
         int heatNumber = rs.getInt("heatNumber");
         Heats heat = new Heats(this.plugin, heatId, (Rounds)null, heatNumber);
         heat.setRoundId(roundId);
-        heat.setHeatState(HeatState.valueOf(rs.getString("state")));
+        heat.setHeatStateForLoad(HeatState.valueOf(rs.getString("state")));
         long startTimestamp = rs.getLong("startTime");
         if (startTimestamp > 0L) {
             heat.setStartTime(Instant.ofEpochSecond(startTimestamp));
