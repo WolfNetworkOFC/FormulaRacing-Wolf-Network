@@ -128,7 +128,10 @@ public class EventCommand extends BaseCommand {
     @Subcommand("select")
     @CommandCompletion("@event")
     @Description("Seleciona um evento para gerenciar")
-    public void onSelect(Player player, Events event) {
+    public void onSelect(
+        Player player,
+        @co.aikar.commands.annotation.Optional Events event
+    ) {
         if (event == null) {
             this.plugin.sendMessage(
                 player,
@@ -145,7 +148,10 @@ public class EventCommand extends BaseCommand {
     @Subcommand("info|view")
     @CommandCompletion("@event")
     @Description("Mostra informações do evento")
-    public void onInfo(Player player, Events event) {
+    public void onInfo(
+        Player player,
+        @co.aikar.commands.annotation.Optional Events event
+    ) {
         if (event == null) {
             event = database
                 .getPlayerSelectedEvent(player.getUniqueId())
@@ -273,7 +279,10 @@ public class EventCommand extends BaseCommand {
     @CommandCompletion("@event")
     @CommandPermission("formularacing.event.admin")
     @Description("Remove um evento")
-    public void onDelete(Player player, Events event) {
+    public void onDelete(
+        Player player,
+        @co.aikar.commands.annotation.Optional Events event
+    ) {
         if (event == null) {
             this.plugin.sendMessage(
                 player,
@@ -304,7 +313,10 @@ public class EventCommand extends BaseCommand {
     @CommandCompletion("@event")
     @CommandPermission("formularacing.event.admin")
     @Description("Inicia um evento")
-    public void onStart(Player player, Events event) {
+    public void onStart(
+        Player player,
+        @co.aikar.commands.annotation.Optional Events event
+    ) {
         if (event == null) {
             event = database
                 .getPlayerSelectedEvent(player.getUniqueId())
@@ -334,7 +346,10 @@ public class EventCommand extends BaseCommand {
     @CommandCompletion("@event")
     @CommandPermission("formularacing.event.admin")
     @Description("Finaliza um evento")
-    public void onFinish(Player player, Events event) {
+    public void onFinish(
+        Player player,
+        @co.aikar.commands.annotation.Optional Events event
+    ) {
         if (event == null) {
             event = database
                 .getPlayerSelectedEvent(player.getUniqueId())
@@ -367,7 +382,10 @@ public class EventCommand extends BaseCommand {
     @Subcommand("sign|join|register")
     @CommandCompletion("@event")
     @Description("Inscreve-se como piloto")
-    public void onSign(Player player, Events event) {
+    public void onSign(
+        Player player,
+        @co.aikar.commands.annotation.Optional Events event
+    ) {
         if (event == null) {
             event = database
                 .getPlayerSelectedEvent(player.getUniqueId())
@@ -509,7 +527,10 @@ public class EventCommand extends BaseCommand {
     @Subcommand("reserve")
     @CommandCompletion("@event")
     @Description("Inscreve-se como reserva")
-    public void onReserve(Player player, Events event) {
+    public void onReserve(
+        Player player,
+        @co.aikar.commands.annotation.Optional Events event
+    ) {
         if (event == null) {
             event = database
                 .getPlayerSelectedEvent(player.getUniqueId())
@@ -562,7 +583,10 @@ public class EventCommand extends BaseCommand {
     @Subcommand("signs|subscribers")
     @CommandCompletion("@event")
     @Description("Lista inscritos e reservas do evento")
-    public void onSigns(Player player, Events event) {
+    public void onSigns(
+        Player player,
+        @co.aikar.commands.annotation.Optional Events event
+    ) {
         if (event == null) {
             event = database
                 .getPlayerSelectedEvent(player.getUniqueId())
@@ -640,7 +664,10 @@ public class EventCommand extends BaseCommand {
     @CommandCompletion("@event")
     @CommandPermission("formularacing.event.admin")
     @Description("Envia mensagem clicável para inscrição")
-    public void onBroadcast(Player player, Events event) {
+    public void onBroadcast(
+        Player player,
+        @co.aikar.commands.annotation.Optional Events event
+    ) {
         if (event == null) {
             event = database
                 .getPlayerSelectedEvent(player.getUniqueId())
@@ -710,7 +737,10 @@ public class EventCommand extends BaseCommand {
     @Subcommand("spectate|watch")
     @CommandCompletion("@event")
     @Description("Entra como espectador")
-    public void onSpectate(Player player, Events event) {
+    public void onSpectate(
+        Player player,
+        @co.aikar.commands.annotation.Optional Events event
+    ) {
         if (event == null) {
             event = database
                 .getPlayerSelectedEvent(player.getUniqueId())
@@ -822,7 +852,11 @@ public class EventCommand extends BaseCommand {
     @CommandCompletion("@event @tracks")
     @CommandPermission("formularacing.event.admin")
     @Description("Define a pista do evento")
-    public void onSetTrack(Player player, Events event, String[] trackArgs) {
+    public void onSetTrack(
+        Player player,
+        @co.aikar.commands.annotation.Optional Events event,
+        String[] trackArgs
+    ) {
         if (event == null) {
             event = database
                 .getPlayerSelectedEvent(player.getUniqueId())
