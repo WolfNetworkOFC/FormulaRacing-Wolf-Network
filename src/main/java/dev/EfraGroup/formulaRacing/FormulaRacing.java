@@ -244,6 +244,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.raceEventManager = new RaceEventManager(this);
             this.spectatorManager = new SpectatorManager(this);
             this.readyCheckManager = new ReadyCheckManager(this);
+            this.raceCheckpointListener = new RaceCheckpointListener(this);
             this.raceActionBarManager = new RaceActionBarManager(this);
             this.raceScoreboardManager = new RaceScoreboardV2Manager(
                 this,
@@ -428,7 +429,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this
         );
         Bukkit.getPluginManager().registerEvents(
-            new RaceCheckpointListener(this),
+            this.raceCheckpointListener,
             this
         );
         Bukkit.getPluginManager().registerEvents(

@@ -1,17 +1,17 @@
 package dev.EfraGroup.formulaRacing.Utils.Theme;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
 public class FRThemeParser {
 
-    private static final Map<Character, NamedTextColor> LEGACY_COLORS = Map.ofEntries(
+    private static final Map<Character, NamedTextColor> LEGACY_COLORS =
+        Map.ofEntries(
             Map.entry('0', NamedTextColor.BLACK),
             Map.entry('1', NamedTextColor.DARK_BLUE),
             Map.entry('2', NamedTextColor.DARK_GREEN),
@@ -28,7 +28,7 @@ public class FRThemeParser {
             Map.entry('d', NamedTextColor.LIGHT_PURPLE),
             Map.entry('e', NamedTextColor.YELLOW),
             Map.entry('f', NamedTextColor.WHITE)
-    );
+        );
 
     public static Component parse(String text, FRTheme theme) {
         if (text == null || text.isEmpty()) {
@@ -114,6 +114,7 @@ public class FRThemeParser {
                 NamedTextColor mcColor = LEGACY_COLORS.get(code);
                 if (mcColor != null) {
                     currentColor = mcColor;
+                    decorations.clear();
                     i += 2;
                     continue;
                 } else if (code == 'l') {
@@ -142,18 +143,21 @@ public class FRThemeParser {
                     i += 2;
                     continue;
                 } else {
-                    result = result.append(Component.text("§").color(currentColor));
+                    result = result.append(
+                        Component.text("§").color(currentColor)
+                    );
                     i++;
                     continue;
                 }
             }
 
             if (c == '&' && i + 1 < length) {
-                char code = text.charAt(i + 1);
+                char code = Character.toLowerCase(text.charAt(i + 1));
 
                 TextColor themeColor = getThemeColor(code, theme);
                 if (themeColor != null) {
                     currentColor = themeColor;
+                    decorations.clear();
                     i += 2;
                     continue;
                 }
@@ -178,6 +182,7 @@ public class FRThemeParser {
                 NamedTextColor mcColor = LEGACY_COLORS.get(code);
                 if (mcColor != null) {
                     currentColor = mcColor;
+                    decorations.clear();
                     i += 2;
                     continue;
                 }
@@ -187,10 +192,13 @@ public class FRThemeParser {
                 continue;
             }
 
-            result = result.append(Component.text(String.valueOf(c)).color(currentColor));
+            Component built = Component.text(String.valueOf(c)).color(
+                currentColor
+            );
             for (TextDecoration dec : decorations) {
-                result = result.decorate(dec);
+                built = built.decorate(dec);
             }
+            result = result.append(built);
             i++;
         }
 
@@ -213,7 +221,10 @@ public class FRThemeParser {
         };
     }
 
-    private static void addDecoration(List<TextDecoration> decorations, TextDecoration dec) {
+    private static void addDecoration(
+        List<TextDecoration> decorations,
+        TextDecoration dec
+    ) {
         if (!decorations.contains(dec)) {
             decorations.add(dec);
         }

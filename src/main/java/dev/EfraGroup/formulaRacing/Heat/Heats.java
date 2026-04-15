@@ -5,19 +5,18 @@
 
 package dev.EfraGroup.formulaRacing.Heat;
 
-import dev.EfraGroup.formulaRacing.FormulaRacing;
-import dev.EfraGroup.formulaRacing.RegionBox;
 import dev.EfraGroup.formulaRacing.Event.EventAnnouncements;
+import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.Logic.PracticeSession;
 import dev.EfraGroup.formulaRacing.Heat.Logic.QualifyingSession;
 import dev.EfraGroup.formulaRacing.Heat.Logic.RaceSession;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.RegionBox;
 import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.RaceActionBarManager;
 import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardService;
-
 import java.lang.MatchException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,6 +33,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 
 public class Heats {
+
     private final FormulaRacing plugin;
     private int id;
     private int roundId;
@@ -91,7 +91,7 @@ public class Heats {
         this.drsEnabled = false;
         this.pushtopass = true;
         this.driverswap = false;
-        this.drsdowntime = (double)3.0F;
+        this.drsdowntime = (double) 3.0F;
         this.drsdownpower = 0.052;
         this.realistc = true;
         this.pushtopasspower = 0.05;
@@ -202,24 +202,37 @@ public class Heats {
                 modeValue = 4;
             }
 
-            this.plugin.getPacketSender().sendBoatSetting(player, 27, new Object[]{modeValue});
+            this.plugin.getPacketSender().sendBoatSetting(
+                player,
+                27,
+                new Object[] { modeValue }
+            );
         }
     }
 
     public void onFirstPlayerCrossStartLine(Player player) {
         if (this.startTime == null) {
             this.startTime = Instant.now();
-            this.plugin.getDebugManager().logRaceSystem("[HEAT] Cronômetro da sessão iniciado por " + player.getName());
-            if (this.plugin != null && this.id > 0 && this.plugin.getRaceEventManager() != null) {
-                this.plugin.getRaceEventManager().getDatabaseManager().updateHeatTimes(this.id, this.startTime, (Instant)null);
+            this.plugin.getDebugManager().logRaceSystem(
+                "[HEAT] Cronômetro da sessão iniciado por " + player.getName()
+            );
+            if (
+                this.plugin != null &&
+                this.id > 0 &&
+                this.plugin.getRaceEventManager() != null
+            ) {
+                this.plugin.getRaceEventManager()
+                    .getDatabaseManager()
+                    .updateHeatTimes(this.id, this.startTime, (Instant) null);
             }
         }
-
     }
 
     public void setupDrs() {
         if (this.drsEnabled) {
-            this.drsRegions = this.plugin.getRaceEventManager().getDatabaseManager().getDrsRegions(this.trackNameWS);
+            this.drsRegions = this.plugin.getRaceEventManager()
+                .getDatabaseManager()
+                .getDrsRegions(this.trackNameWS);
         }
     }
 
@@ -229,151 +242,297 @@ public class Heats {
 
     public void reorderGrid() {
         this.startPositions = new ArrayList(this.drivers.values());
-        this.startPositions.sort(Comparator.comparingInt(Driver::getStartPosition));
+        this.startPositions.sort(
+            Comparator.comparingInt(Driver::getStartPosition)
+        );
         this.livePositions = new ArrayList(this.startPositions);
-        if (this.heatState == HeatState.LOADED || this.heatState == HeatState.STARTING) {
-            boolean isQuali = this.round != null && this.round.getRoundType() == RoundType.QUALIFICATION;
+        if (
+            this.heatState == HeatState.LOADED ||
+            this.heatState == HeatState.STARTING
+        ) {
+            boolean isQuali =
+                this.round != null &&
+                this.round.getRoundType() == RoundType.QUALIFICATION;
             if (!isQuali) {
                 this.gridManager.teleportDriversToGrid();
             }
         }
-
     }
 
     public boolean loadHeat() {
         DebugManager var10000 = this.plugin.getDebugManager();
         int var10001 = this.id;
-        var10000.logRaceSystem("[LOAD DEBUG] Tentando carregar heat " + var10001 + " (estado atual: " + String.valueOf(this.heatState) + ") - HeatObj: " + System.identityHashCode(this));
-        if (this.heatState != HeatState.SETUP && this.heatState != HeatState.IDLE) {
+        var10000.logRaceSystem(
+            "[LOAD DEBUG] Tentando carregar heat " +
+                var10001 +
+                " (estado atual: " +
+                String.valueOf(this.heatState) +
+                ") - HeatObj: " +
+                System.identityHashCode(this)
+        );
+        if (
+            this.heatState != HeatState.SETUP &&
+            this.heatState != HeatState.IDLE
+        ) {
             var10000 = this.plugin.getDebugManager();
             var10001 = this.id;
-            var10000.logRaceSystem("Heat " + var10001 + " está em estado " + String.valueOf(this.heatState) + " - resetando automaticamente...");
+            var10000.logRaceSystem(
+                "Heat " +
+                    var10001 +
+                    " está em estado " +
+                    String.valueOf(this.heatState) +
+                    " - resetando automaticamente..."
+            );
             this.resetHeat();
-            this.plugin.getDebugManager().logRaceSystem("Heat " + this.id + " resetado, continuando carregamento...");
+            this.plugin.getDebugManager().logRaceSystem(
+                "Heat " + this.id + " resetado, continuando carregamento..."
+            );
         }
 
         if (this.drivers.isEmpty()) {
-            this.plugin.getDebugManager().logRaceSystem("Heat " + this.id + " não possui pilotos!");
+            this.plugin.getDebugManager().logRaceSystem(
+                "Heat " + this.id + " não possui pilotos!"
+            );
             return false;
         } else {
             var10000 = this.plugin.getDebugManager();
             var10001 = this.id;
-            var10000.logRaceSystem("[LOAD DEBUG] Heat " + var10001 + " possui " + this.drivers.size() + " pilotos");
+            var10000.logRaceSystem(
+                "[LOAD DEBUG] Heat " +
+                    var10001 +
+                    " possui " +
+                    this.drivers.size() +
+                    " pilotos"
+            );
             if (this.round != null && this.round.getEvent() != null) {
                 String eventTrack = this.round.getEvent().getTrackNameWS();
                 if (eventTrack == null || eventTrack.isEmpty()) {
-                    this.plugin.getDebugManager().logRaceSystem("Evento não possui pista definida!");
+                    this.plugin.getDebugManager().logRaceSystem(
+                        "Evento não possui pista definida!"
+                    );
                     return false;
                 }
 
                 if (!eventTrack.equals(this.trackNameWS)) {
-                    this.plugin.getDebugManager().logRaceSystem("[LOAD DEBUG] Pista do heat atualizada: " + this.trackNameWS + " -> " + eventTrack);
+                    this.plugin.getDebugManager().logRaceSystem(
+                        "[LOAD DEBUG] Pista do heat atualizada: " +
+                            this.trackNameWS +
+                            " -> " +
+                            eventTrack
+                    );
                     this.trackNameWS = eventTrack;
                     this.gridManager.clear();
                 }
             } else if (this.trackNameWS == null || this.trackNameWS.isEmpty()) {
-                this.plugin.getDebugManager().logRaceSystem("Heat não está associado a um evento válido e não tem pista definida!");
+                this.plugin.getDebugManager().logRaceSystem(
+                    "Heat não está associado a um evento válido e não tem pista definida!"
+                );
                 return false;
             }
 
-            this.plugin.getDebugManager().logRaceSystem("[LOAD DEBUG] Pista configurada: " + this.trackNameWS);
+            this.plugin.getDebugManager().logRaceSystem(
+                "[LOAD DEBUG] Pista configurada: " + this.trackNameWS
+            );
             this.startPositions = new ArrayList(this.drivers.values());
-            this.startPositions.sort(Comparator.comparingInt(Driver::getStartPosition));
+            this.startPositions.sort(
+                Comparator.comparingInt(Driver::getStartPosition)
+            );
             this.livePositions = new ArrayList(this.startPositions);
-            this.plugin.getDebugManager().logRaceSystem("[LOAD DEBUG] Posições de largada organizadas");
-            boolean isQuali = this.round != null && this.round.getRoundType() == RoundType.QUALIFICATION;
+            this.plugin.getDebugManager().logRaceSystem(
+                "[LOAD DEBUG] Posições de largada organizadas"
+            );
+            boolean isQuali =
+                this.round != null &&
+                this.round.getRoundType() == RoundType.QUALIFICATION;
             if (isQuali) {
-                Location spawnLoc = this.plugin.getTrackIntegrationManager().getTrackSpawn(this.trackNameWS);
+                Location spawnLoc =
+                    this.plugin.getTrackIntegrationManager().getTrackSpawn(
+                        this.trackNameWS
+                    );
                 if (spawnLoc == null) {
-                    this.plugin.getDebugManager().logRaceSystem("Falha ao obter spawn da pista para Qualificatória!");
+                    this.plugin.getDebugManager().logRaceSystem(
+                        "Falha ao obter spawn da pista para Qualificatória!"
+                    );
                     return false;
                 }
 
-                for(Driver driver : this.drivers.values()) {
+                for (Driver driver : this.drivers.values()) {
                     Player player = Bukkit.getPlayer(driver.getUuid());
                     if (player != null && player.isOnline()) {
                         this.plugin.getAPI().recoverPlayerBoatState(player);
 
                         player.teleport(spawnLoc);
-                        this.plugin.getLonelyController().updatePlayersVisibility(player);
-                        this.plugin.getServer().getScheduler().runTaskLater(this.plugin, () -> {
-                            if (player.isOnline()) {
-                                if (this.plugin.getPacketSender() != null) {
-                                    this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
-                                    this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, this.trackNameWS);
-                                    this.applyCollisionModeToPlayer(player);
-                                }
+                        this.plugin.getLonelyController().updatePlayersVisibility(
+                            player
+                        );
+                        this.plugin.getServer()
+                            .getScheduler()
+                            .runTaskLater(
+                                this.plugin,
+                                () -> {
+                                    if (player.isOnline()) {
+                                        if (
+                                            this.plugin.getPacketSender() !=
+                                            null
+                                        ) {
+                                            this.plugin.getPacketSender().resetBoatUtilsToVanilla(
+                                                player
+                                            );
+                                            this.plugin.getPacketSender().applyBoatUtilsToPlayer(
+                                                player,
+                                                this.trackNameWS
+                                            );
+                                            this.applyCollisionModeToPlayer(
+                                                player
+                                            );
+                                        }
 
-                                this.plugin.getAPI().spawnBoat(player, false, true, false);
-                            }
-                        }, 10L);
+                                        this.plugin.getAPI().spawnBoat(
+                                            player,
+                                            false,
+                                            true,
+                                            false
+                                        );
+                                    }
+                                },
+                                10L
+                            );
                     }
                 }
 
-                this.plugin.getDebugManager().logRaceSystem("Pilotos teleportados para o SPAWN para Qualificatória.");
+                this.plugin.getDebugManager().logRaceSystem(
+                    "Pilotos teleportados para o SPAWN para Qualificatória."
+                );
             } else {
-                for(Driver driver : this.drivers.values()) {
+                for (Driver driver : this.drivers.values()) {
                     Player player = Bukkit.getPlayer(driver.getUuid());
                     if (player != null && player.isOnline()) {
-                        this.plugin.getLonelyController().updatePlayersVisibility(player);
+                        this.plugin.getLonelyController().updatePlayersVisibility(
+                            player
+                        );
                     }
                 }
 
                 if (!this.gridManager.generateGrid()) {
-                    this.plugin.getDebugManager().logRaceSystem("Falha ao gerar grid para Heat " + this.id);
+                    this.plugin.getDebugManager().logRaceSystem(
+                        "Falha ao gerar grid para Heat " + this.id
+                    );
                     return false;
                 }
 
-                this.plugin.getDebugManager().logRaceSystem("[LOAD DEBUG] Grid gerado com sucesso");
+                this.plugin.getDebugManager().logRaceSystem(
+                    "[LOAD DEBUG] Grid gerado com sucesso"
+                );
                 int teleported = this.gridManager.teleportDriversToGrid();
-                this.plugin.getDebugManager().logRaceSystem("Heat " + this.id + " carregado: " + teleported + "/" + this.drivers.size() + " pilotos no grid");
+                this.plugin.getDebugManager().logRaceSystem(
+                    "Heat " +
+                        this.id +
+                        " carregado: " +
+                        teleported +
+                        "/" +
+                        this.drivers.size() +
+                        " pilotos no grid"
+                );
                 if (teleported == 0) {
-                    this.plugin.getDebugManager().logRaceSystem("Nenhum piloto foi teleportado!");
+                    this.plugin.getDebugManager().logRaceSystem(
+                        "Nenhum piloto foi teleportado!"
+                    );
                     return false;
                 }
             }
 
-            for(Driver driver : this.drivers.values()) {
+            for (Driver driver : this.drivers.values()) {
                 Player player = Bukkit.getPlayer(driver.getUuid());
                 if (player != null && player.isOnline()) {
                     this.stopTimeTrialTimer(player);
-                    this.plugin.getRaceScoreboardManager().addPlayer(player, this);
-                    this.plugin.getRaceActionBarManager().addPlayer(player, this);
+                    this.plugin.getRaceScoreboardManager().addPlayer(
+                        player,
+                        this
+                    );
+                    this.plugin.getRaceActionBarManager().addPlayer(
+                        player,
+                        this
+                    );
                 }
             }
 
             this.setHeatState(HeatState.LOADED);
             var10000 = this.plugin.getDebugManager();
             var10001 = this.id;
-            var10000.logRaceSystem("✓ Heat " + var10001 + " carregado com " + this.drivers.size() + " pilotos.");
+            var10000.logRaceSystem(
+                "✓ Heat " +
+                    var10001 +
+                    " carregado com " +
+                    this.drivers.size() +
+                    " pilotos."
+            );
             return true;
         }
     }
 
     public boolean startCountdown() {
-        return this.startCountdown(this.startDelay != null ? this.startDelay : 5);
+        return this.startCountdown(
+            this.startDelay != null ? this.startDelay : 5
+        );
     }
 
     public boolean startCountdown(int seconds) {
         DebugManager var10000 = this.plugin.getDebugManager();
         int var10001 = this.id;
-        var10000.logRaceSystem("[START DEBUG] Tentando iniciar countdown heat " + var10001 + " (estado atual: " + String.valueOf(this.heatState) + ") - HeatObj: " + System.identityHashCode(this));
+        var10000.logRaceSystem(
+            "[START DEBUG] Tentando iniciar countdown heat " +
+                var10001 +
+                " (estado atual: " +
+                String.valueOf(this.heatState) +
+                ") - HeatObj: " +
+                System.identityHashCode(this)
+        );
         if (this.heatState != HeatState.LOADED) {
             var10000 = this.plugin.getDebugManager();
             var10001 = this.id;
-            var10000.logRaceSystem("Heat " + var10001 + " precisa estar LOADED para iniciar! Estado atual: " + String.valueOf(this.heatState));
+            var10000.logRaceSystem(
+                "Heat " +
+                    var10001 +
+                    " precisa estar LOADED para iniciar! Estado atual: " +
+                    String.valueOf(this.heatState)
+            );
             return false;
         } else {
-            this.plugin.getDebugManager().logRaceSystem("Iniciando contagem regressiva do Heat " + this.id + " (" + seconds + "s)...");
-            if (this.id > 0 && this.plugin != null && this.plugin.getRaceEventManager() != null) {
-                this.plugin.getRaceEventManager().getDatabaseManager().updateHeatFullConfig(
-                    this.id, this.totalLaps, this.totalPits, this.timeLimit,
-                    this.startDelay, this.maxDrivers, this.lonely, this.canReset,
-                    true, this.collisionMode, this.drsEnabled,
-                    this.driverswap, this.drsdowntime, this.drsdownpower,
-                    this.reversegrid, this.deltaghosting, this.pushtopass,
-                    this.pushtopasspower, this.realistc
-                );
+            this.plugin.getDebugManager().logRaceSystem(
+                "Iniciando contagem regressiva do Heat " +
+                    this.id +
+                    " (" +
+                    seconds +
+                    "s)..."
+            );
+            if (
+                this.id > 0 &&
+                this.plugin != null &&
+                this.plugin.getRaceEventManager() != null
+            ) {
+                this.plugin.getRaceEventManager()
+                    .getDatabaseManager()
+                    .updateHeatFullConfig(
+                        this.id,
+                        this.totalLaps,
+                        this.totalPits,
+                        this.timeLimit,
+                        this.startDelay,
+                        this.maxDrivers,
+                        this.lonely,
+                        this.canReset,
+                        true,
+                        this.collisionMode,
+                        this.drsEnabled,
+                        this.driverswap,
+                        this.drsdowntime,
+                        this.drsdownpower,
+                        this.reversegrid,
+                        this.deltaghosting,
+                        this.pushtopass,
+                        this.pushtopasspower,
+                        this.realistc
+                    );
             }
             this.setHeatState(HeatState.STARTING);
             this.gridManager.freezePlayers();
@@ -382,7 +541,12 @@ public class Heats {
                 startAction = () -> this.round.getSessionLogic().start(this);
             }
 
-            RaceCountdown countdown = new RaceCountdown(this.plugin, this, seconds, startAction);
+            RaceCountdown countdown = new RaceCountdown(
+                this.plugin,
+                this,
+                seconds,
+                startAction
+            );
             countdown.start();
             return true;
         }
@@ -401,11 +565,32 @@ public class Heats {
     }
 
     public boolean passLap(Driver driver) {
-        return this.round != null ? this.round.getSessionLogic().passLap(this, driver) : (new RaceSession(this.plugin)).passLap(this, driver);
+        return this.round != null
+            ? this.round.getSessionLogic().passLap(this, driver)
+            : (new RaceSession(this.plugin)).passLap(this, driver);
     }
 
-    public boolean passLap(Driver driver, Location from, Location to, RegionBox region) {
-        return this.round != null ? this.round.getSessionLogic().passLap(this, driver, from, to, region) : (new RaceSession(this.plugin)).passLap(this, driver, from, to, region);
+    public boolean passLap(
+        Driver driver,
+        Location from,
+        Location to,
+        RegionBox region
+    ) {
+        return this.round != null
+            ? this.round.getSessionLogic().passLap(
+                  this,
+                  driver,
+                  from,
+                  to,
+                  region
+              )
+            : (new RaceSession(this.plugin)).passLap(
+                  this,
+                  driver,
+                  from,
+                  to,
+                  region
+              );
     }
 
     public void finishHeat() {
@@ -413,19 +598,38 @@ public class Heats {
     }
 
     public void finishHeat(boolean teleportToSpawn) {
-        if (this.heatState != HeatState.RACING && this.heatState != HeatState.PRACTICE && this.heatState != HeatState.QUALIFYING) {
-            this.plugin.getDebugManager().logRaceSystem("Heat " + this.id + " não está em corrida, treino ou quali!");
+        if (
+            this.heatState != HeatState.RACING &&
+            this.heatState != HeatState.PRACTICE &&
+            this.heatState != HeatState.QUALIFYING
+        ) {
+            this.plugin.getDebugManager().logRaceSystem(
+                "Heat " + this.id + " não está em corrida, treino ou quali!"
+            );
         } else {
-            java.util.List<java.util.UUID> driverUUIDs = new java.util.ArrayList<>(this.drivers.keySet());
-            this.plugin.getRegionListener().cleanupHeatPlayers(driverUUIDs);
-            this.plugin.getRaceCheckpointListener().cleanupHeatPlayers(driverUUIDs);
-            this.plugin.getLonelyController().clearGhostForPlayers(this.drivers.keySet());
+            java.util.List<java.util.UUID> driverUUIDs =
+                new java.util.ArrayList<>(this.drivers.keySet());
+            if (this.plugin.getRegionListener() != null) {
+                this.plugin.getRegionListener().cleanupHeatPlayers(driverUUIDs);
+            }
+            if (this.plugin.getRaceCheckpointListener() != null) {
+                this.plugin.getRaceCheckpointListener().cleanupHeatPlayers(
+                    driverUUIDs
+                );
+            }
+            this.plugin.getLonelyController().clearGhostForPlayers(
+                this.drivers.keySet()
+            );
             if (this.plugin != null && this.plugin.getDriverLookup() != null) {
                 for (UUID uuid : driverUUIDs) {
                     this.plugin.getDriverLookup().unregister(uuid);
                 }
             }
-            if (this.heatState == HeatState.RACING && this.totalPits != null && this.totalPits > 0) {
+            if (
+                this.heatState == HeatState.RACING &&
+                this.totalPits != null &&
+                this.totalPits > 0
+            ) {
                 this.validateMandatoryPits();
             }
 
@@ -440,7 +644,7 @@ public class Heats {
 
             this.gridManager.clear();
             if (this.plugin.getPacketSender() != null) {
-                for(Driver driver : this.drivers.values()) {
+                for (Driver driver : this.drivers.values()) {
                     if (!driver.isFinished() && !driver.isDnf()) {
                         driver.setFinished(true);
                     }
@@ -449,24 +653,32 @@ public class Heats {
                 Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
                     Map<UUID, Boolean> lonelyStates = new HashMap();
 
-                    for(UUID uuid : driverUUIDs) {
-                        boolean dbLonely = this.plugin.getDatabaseManager().getLonelyModePlayer(uuid);
+                    for (UUID uuid : driverUUIDs) {
+                        boolean dbLonely =
+                            this.plugin.getDatabaseManager().getLonelyModePlayer(
+                                uuid
+                            );
                         lonelyStates.put(uuid, dbLonely);
                     }
 
                     Bukkit.getScheduler().runTask(this.plugin, () -> {
-                        for(Map.Entry<UUID, Boolean> entry : lonelyStates.entrySet()) {
-                            Player p = Bukkit.getPlayer((UUID)entry.getKey());
+                        for (Map.Entry<
+                            UUID,
+                            Boolean
+                        > entry : lonelyStates.entrySet()) {
+                            Player p = Bukkit.getPlayer((UUID) entry.getKey());
                             if (p != null && p.isOnline()) {
-                                this.plugin.getLonelyController().setLonelyMode(p, (Boolean)entry.getValue());
+                                this.plugin.getLonelyController().setLonelyMode(
+                                    p,
+                                    (Boolean) entry.getValue()
+                                );
                             }
                         }
-
                     });
                 });
             }
 
-            for(Driver driver : this.drivers.values()) {
+            for (Driver driver : this.drivers.values()) {
                 Player player = Bukkit.getPlayer(driver.getUuid());
                 if (player != null && player.isOnline()) {
                     if (this.plugin.getPTP() != null) {
@@ -476,17 +688,34 @@ public class Heats {
                 }
             }
 
-            this.plugin.getServer().getScheduler().runTaskLater(this.plugin, () -> {
-                this.plugin.getRaceScoreboardManager().removeHeat(this);
-                this.plugin.getRaceActionBarManager().removeHeat(this);
-            }, 60L);
-            if (this.plugin != null && this.id > 0 && this.plugin.getRaceEventManager() != null) {
-                this.plugin.getRaceEventManager().getDatabaseManager().updateHeatTimes(this.id, this.startTime, this.endTime);
+            this.plugin.getServer()
+                .getScheduler()
+                .runTaskLater(
+                    this.plugin,
+                    () -> {
+                        this.plugin.getRaceScoreboardManager().removeHeat(this);
+                        this.plugin.getRaceActionBarManager().removeHeat(this);
+                    },
+                    60L
+                );
+            if (
+                this.plugin != null &&
+                this.id > 0 &&
+                this.plugin.getRaceEventManager() != null
+            ) {
+                this.plugin.getRaceEventManager()
+                    .getDatabaseManager()
+                    .updateHeatTimes(this.id, this.startTime, this.endTime);
             }
 
-            this.plugin.getDebugManager().logRaceSystem("Heat " + this.id + " finalizado!");
+            this.plugin.getDebugManager().logRaceSystem(
+                "Heat " + this.id + " finalizado!"
+            );
             if (this.round != null) {
-                boolean allHeatsFinished = this.round.getHeats().values().stream().allMatch((h) -> h.getHeatState() == HeatState.FINISHED);
+                boolean allHeatsFinished = this.round.getHeats()
+                    .values()
+                    .stream()
+                    .allMatch(h -> h.getHeatState() == HeatState.FINISHED);
                 if (allHeatsFinished) {
                     this.round.finishRound();
                 }
@@ -494,13 +723,19 @@ public class Heats {
 
             this.displayFinalStandings();
             if (teleportToSpawn) {
-                Location targetLoc = this.plugin.getDatabaseManager().getTrackFinishAll(this.trackNameWS);
+                Location targetLoc =
+                    this.plugin.getDatabaseManager().getTrackFinishAll(
+                        this.trackNameWS
+                    );
                 if (targetLoc == null) {
-                    targetLoc = this.plugin.getTrackIntegrationManager().getTrackSpawn(this.trackNameWS);
+                    targetLoc =
+                        this.plugin.getTrackIntegrationManager().getTrackSpawn(
+                            this.trackNameWS
+                        );
                 }
 
                 if (targetLoc != null) {
-                    for(Driver d : this.drivers.values()) {
+                    for (Driver d : this.drivers.values()) {
                         if (!d.isFinished()) {
                             Player p = Bukkit.getPlayer(d.getUuid());
                             if (p != null && p.isOnline()) {
@@ -511,13 +746,15 @@ public class Heats {
                     }
                 }
             }
-
         }
     }
 
     private void displayFinalStandings() {
         List<Driver> results = new ArrayList(this.drivers.values());
-        if (this.previousState != HeatState.QUALIFYING && this.previousState != HeatState.PRACTICE) {
+        if (
+            this.previousState != HeatState.QUALIFYING &&
+            this.previousState != HeatState.PRACTICE
+        ) {
             results.sort((d1, d2) -> {
                 int g1 = this.getFinalRaceGroup(d1);
                 int g2 = this.getFinalRaceGroup(d2);
@@ -529,18 +766,30 @@ public class Heats {
                     return Integer.compare(d1.getPosition(), d2.getPosition());
                 }
 
-                int lapCompare = Integer.compare(d2.getLapCount(), d1.getLapCount());
+                int lapCompare = Integer.compare(
+                    d2.getLapCount(),
+                    d1.getLapCount()
+                );
                 if (lapCompare != 0) {
                     return lapCompare;
                 }
 
-                int cpCompare = Integer.compare(d2.getCheckpointsReached(), d1.getCheckpointsReached());
+                int cpCompare = Integer.compare(
+                    d2.getCheckpointsReached(),
+                    d1.getCheckpointsReached()
+                );
                 if (cpCompare != 0) {
                     return cpCompare;
                 }
 
-                Long time1 = d1.getAbsoluteTimeAtProgress(d1.getLapCount(), d1.getCheckpointsReached());
-                Long time2 = d2.getAbsoluteTimeAtProgress(d2.getLapCount(), d2.getCheckpointsReached());
+                Long time1 = d1.getAbsoluteTimeAtProgress(
+                    d1.getLapCount(),
+                    d1.getCheckpointsReached()
+                );
+                Long time2 = d2.getAbsoluteTimeAtProgress(
+                    d2.getLapCount(),
+                    d2.getCheckpointsReached()
+                );
                 if (time1 != null && time2 != null) {
                     int timeCompare = Long.compare(time1, time2);
                     if (timeCompare != 0) {
@@ -552,35 +801,62 @@ public class Heats {
             });
         } else {
             results.sort((d1, d2) -> {
-                long t1 = d1.getFastestLap() != null ? d1.getFastestLap().getLapTime() : Long.MAX_VALUE;
-                long t2 = d2.getFastestLap() != null ? d2.getFastestLap().getLapTime() : Long.MAX_VALUE;
+                long t1 =
+                    d1.getFastestLap() != null
+                        ? d1.getFastestLap().getLapTime()
+                        : Long.MAX_VALUE;
+                long t2 =
+                    d2.getFastestLap() != null
+                        ? d2.getFastestLap().getLapTime()
+                        : Long.MAX_VALUE;
                 return Long.compare(t1, t2);
             });
         }
 
-        for(int i = 0; i < results.size(); ++i) {
-            ((Driver)results.get(i)).setPosition(i + 1);
+        for (int i = 0; i < results.size(); ++i) {
+            ((Driver) results.get(i)).setPosition(i + 1);
         }
 
-        EventAnnouncements announcements = this.round != null && this.round.getEvent() != null ? this.round.getEvent().getAnnouncements() : this.plugin.getEventAnnouncements();
-        announcements.broadcastFinalStandings(this, results, this.previousState);
+        EventAnnouncements announcements =
+            this.round != null && this.round.getEvent() != null
+                ? this.round.getEvent().getAnnouncements()
+                : this.plugin.getEventAnnouncements();
+        announcements.broadcastFinalStandings(
+            this,
+            results,
+            this.previousState
+        );
 
-        for(Driver d : results) {
+        for (Driver d : results) {
             if (this.plugin != null && d.getId() > 0) {
-                this.plugin.getRaceEventManager().getDatabaseManager().updateDriverPosition(d.getId(), d.getPosition());
+                this.plugin.getRaceEventManager()
+                    .getDatabaseManager()
+                    .updateDriverPosition(d.getId(), d.getPosition());
             }
         }
-
     }
 
     public void resetHeat() {
-        this.plugin.getLonelyController().clearGhostForPlayers(this.drivers.keySet());
-        if (this.heatState != HeatState.RACING && this.heatState != HeatState.STARTING && this.heatState != HeatState.QUALIFYING) {
-            if (this.heatState != HeatState.SETUP && this.heatState != HeatState.FINISHED && this.heatState != HeatState.PRACTICE) {
-                EventAnnouncements announcements = this.round != null && this.round.getEvent() != null ? this.round.getEvent().getAnnouncements() : this.plugin.getEventAnnouncements();
+        this.plugin.getLonelyController().clearGhostForPlayers(
+            this.drivers.keySet()
+        );
+        if (
+            this.heatState != HeatState.RACING &&
+            this.heatState != HeatState.STARTING &&
+            this.heatState != HeatState.QUALIFYING
+        ) {
+            if (
+                this.heatState != HeatState.SETUP &&
+                this.heatState != HeatState.FINISHED &&
+                this.heatState != HeatState.PRACTICE
+            ) {
+                EventAnnouncements announcements =
+                    this.round != null && this.round.getEvent() != null
+                        ? this.round.getEvent().getAnnouncements()
+                        : this.plugin.getEventAnnouncements();
                 announcements.broadcastSessionCancelled(this);
 
-                for(Driver driver : this.drivers.values()) {
+                for (Driver driver : this.drivers.values()) {
                     Player player = Bukkit.getPlayer(driver.getUuid());
                     if (player != null && player.isOnline()) {
                         this.clearTimeTrialActionBar(player);
@@ -590,12 +866,21 @@ public class Heats {
         } else {
             DebugManager var10000 = this.plugin.getDebugManager();
             int var10001 = this.id;
-            var10000.logRaceSystem("Heat " + var10001 + " em andamento (" + String.valueOf(this.heatState) + ") - forçando parada antes do reset...");
+            var10000.logRaceSystem(
+                "Heat " +
+                    var10001 +
+                    " em andamento (" +
+                    String.valueOf(this.heatState) +
+                    ") - forçando parada antes do reset..."
+            );
             if (this.heatState != HeatState.PRACTICE) {
-                EventAnnouncements announcements = this.round != null && this.round.getEvent() != null ? this.round.getEvent().getAnnouncements() : this.plugin.getEventAnnouncements();
+                EventAnnouncements announcements =
+                    this.round != null && this.round.getEvent() != null
+                        ? this.round.getEvent().getAnnouncements()
+                        : this.plugin.getEventAnnouncements();
                 announcements.broadcastSessionCancelled(this);
 
-                for(Driver driver : this.drivers.values()) {
+                for (Driver driver : this.drivers.values()) {
                     Player player = Bukkit.getPlayer(driver.getUuid());
                     if (player != null && player.isOnline()) {
                         this.clearTimeTrialActionBar(player);
@@ -604,8 +889,12 @@ public class Heats {
             }
 
             this.forceFinishWithoutSave();
+            if (this.heatState != HeatState.FINISHED) {
+                this.setHeatStateForLoad(HeatState.FINISHED);
+            }
         }
 
+        this.stopSessionTimer();
         this.stopOfflineMonitoring();
         if (this.plugin.getPitStopManager() != null) {
             this.plugin.getPitStopManager().clear();
@@ -625,12 +914,18 @@ public class Heats {
             this.livePositions.clear();
         }
 
-        for(Driver driver : this.drivers.values()) {
+        for (Driver driver : this.drivers.values()) {
             driver.reset();
             Player player = Bukkit.getPlayer(driver.getUuid());
             if (player != null && player.isOnline()) {
-                boolean dbLonely = this.plugin.getDatabaseManager().getLonelyModePlayer(player.getUniqueId());
-                this.plugin.getLonelyController().setLonelyMode(player, dbLonely);
+                boolean dbLonely =
+                    this.plugin.getDatabaseManager().getLonelyModePlayer(
+                        player.getUniqueId()
+                    );
+                this.plugin.getLonelyController().setLonelyMode(
+                    player,
+                    dbLonely
+                );
             }
         }
 
@@ -640,16 +935,23 @@ public class Heats {
             }
         }
 
-        this.setHeatState(HeatState.SETUP);
-        this.plugin.getDebugManager().logRaceSystem("✓ Heat " + this.id + " resetado para estado inicial.");
+        if (this.heatState != HeatState.SETUP) {
+            this.setHeatState(HeatState.SETUP);
+        }
+        this.plugin.getDebugManager().logRaceSystem(
+            "✓ Heat " + this.id + " resetado para estado inicial."
+        );
     }
 
     public long getSessionTimeRemaining() {
         if (this.startTime == null) {
-            return this.timeLimit != null && this.timeLimit > 0 ? (long)this.timeLimit * 1000L : -1L;
+            return this.timeLimit != null && this.timeLimit > 0
+                ? (long) this.timeLimit * 1000L
+                : -1L;
         } else if (this.timeLimit != null && this.timeLimit > 0) {
-            long elapsed = System.currentTimeMillis() - this.startTime.toEpochMilli();
-            long limitMs = (long)this.timeLimit * 1000L;
+            long elapsed =
+                System.currentTimeMillis() - this.startTime.toEpochMilli();
+            long limitMs = (long) this.timeLimit * 1000L;
             return Math.max(0L, limitMs - elapsed);
         } else {
             return Long.MAX_VALUE;
@@ -664,39 +966,77 @@ public class Heats {
 
     public void startOfflineMonitoring() {
         this.stopOfflineMonitoring();
-        this.offlineMonitorTask = this.plugin.getServer().getScheduler().runTaskTimer(this.plugin, () -> {
-            if (this.heatState != HeatState.RACING) {
-                this.stopOfflineMonitoring();
-            } else {
-                for(Driver driver : this.drivers.values()) {
-                    if (!driver.isFinished() && !driver.isDnf()) {
-                        Player player = this.plugin.getServer().getPlayer(driver.getUuid());
-                        if (player == null || !player.isOnline()) {
-                            this.plugin.getDebugManager().logRaceSystem("Driver " + String.valueOf(driver.getUuid()) + " desconectou durante corrida - marcando como DNF");
-                            driver.setDnf(true);
-                            driver.setPtpActive(false);
-                            driver.setPtpEnergy((double)0.0F);
-                            EventAnnouncements announcements = this.round != null && this.round.getEvent() != null ? this.round.getEvent().getAnnouncements() : this.plugin.getEventAnnouncements();
-                            announcements.broadcastDNF(this, driver, "Disconnected");
+        this.offlineMonitorTask = this.plugin.getServer()
+            .getScheduler()
+            .runTaskTimer(
+                this.plugin,
+                () -> {
+                    if (this.heatState != HeatState.RACING) {
+                        this.stopOfflineMonitoring();
+                    } else {
+                        for (Driver driver : this.drivers.values()) {
+                            if (!driver.isFinished() && !driver.isDnf()) {
+                                Player player =
+                                    this.plugin.getServer().getPlayer(
+                                        driver.getUuid()
+                                    );
+                                if (player == null || !player.isOnline()) {
+                                    this.plugin.getDebugManager().logRaceSystem(
+                                        "Driver " +
+                                            String.valueOf(driver.getUuid()) +
+                                            " desconectou durante corrida - marcando como DNF"
+                                    );
+                                    driver.setDnf(true);
+                                    driver.setPtpActive(false);
+                                    driver.setPtpEnergy((double) 0.0F);
+                                    EventAnnouncements announcements =
+                                        this.round != null &&
+                                        this.round.getEvent() != null
+                                            ? this.round.getEvent().getAnnouncements()
+                                            : this.plugin.getEventAnnouncements();
+                                    announcements.broadcastDNF(
+                                        this,
+                                        driver,
+                                        "Disconnected"
+                                    );
+                                }
+                            }
+                        }
+
+                        boolean allFinished = this.drivers.values()
+                            .stream()
+                            .allMatch(
+                                driverx ->
+                                    driverx.isFinished() || driverx.isDnf()
+                            );
+                        if (allFinished) {
+                            this.plugin.getDebugManager().logRaceSystem(
+                                "Todos os pilotos finalizaram ou foram marcados como DNF - finalizando heat"
+                            );
+                            this.plugin.getServer()
+                                .getScheduler()
+                                .runTask(this.plugin, () -> this.finishHeat());
                         }
                     }
-                }
-
-                boolean allFinished = this.drivers.values().stream().allMatch((driverx) -> driverx.isFinished() || driverx.isDnf());
-                if (allFinished) {
-                    this.plugin.getDebugManager().logRaceSystem("Todos os pilotos finalizaram ou foram marcados como DNF - finalizando heat");
-                    this.plugin.getServer().getScheduler().runTask(this.plugin, () -> this.finishHeat());
-                }
-
-            }
-        }, 200L, 200L);
-        this.plugin.getDebugManager().logRaceSystem("Monitoramento de jogadores offline iniciado para Heat " + this.id);
+                },
+                200L,
+                200L
+            );
+        this.plugin.getDebugManager().logRaceSystem(
+            "Monitoramento de jogadores offline iniciado para Heat " + this.id
+        );
     }
 
     private void stopOfflineMonitoring() {
-        if (this.offlineMonitorTask != null && !this.offlineMonitorTask.isCancelled()) {
+        if (
+            this.offlineMonitorTask != null &&
+            !this.offlineMonitorTask.isCancelled()
+        ) {
             this.offlineMonitorTask.cancel();
-            this.plugin.getDebugManager().logRaceSystem("Monitoramento de jogadores offline cancelado para Heat " + this.id);
+            this.plugin.getDebugManager().logRaceSystem(
+                "Monitoramento de jogadores offline cancelado para Heat " +
+                    this.id
+            );
         }
 
         this.offlineMonitorTask = null;
@@ -706,50 +1046,72 @@ public class Heats {
         if (this.plugin.getTimeTrialDuelsAction() != null) {
             this.plugin.getTimeTrialDuelsAction().stopAll(player);
         }
-
     }
 
     public void stopTimeTrialTimer(Player player) {
         if (this.plugin.getTimerUtils() != null) {
             this.plugin.getTimerUtils().stopTimer(player);
-            this.plugin.getDebugManager().logRaceSystem("[RACE DEBUG] Timer de Time Trial parado para " + player.getName());
+            this.plugin.getDebugManager().logRaceSystem(
+                "[RACE DEBUG] Timer de Time Trial parado para " +
+                    player.getName()
+            );
         }
-
     }
 
     private void forceFinishWithoutSave() {
         this.gridManager.unfreezePlayers();
 
-        for(Driver driver : this.drivers.values()) {
+        for (Driver driver : this.drivers.values()) {
             Player player = Bukkit.getPlayer(driver.getUuid());
             if (player != null && player.isOnline()) {
                 this.plugin.getRaceScoreboardManager().removePlayer(player);
                 this.plugin.getRaceActionBarManager().removePlayer(player);
                 if (this.plugin.getPacketSender() != null) {
-                    this.plugin.getLonelyController().setLonelyMode(player, false);
+                    this.plugin.getLonelyController().setLonelyMode(
+                        player,
+                        false
+                    );
                 }
             }
         }
 
-        this.plugin.getDebugManager().logRaceSystem("Heat " + this.id + " forçadamente finalizado (sem salvar resultados)");
+        this.plugin.getDebugManager().logRaceSystem(
+            "Heat " +
+                this.id +
+                " forçadamente finalizado (sem salvar resultados)"
+        );
     }
 
     public boolean setDriverPosition(Driver driver, int newStartPosition) {
-        if (this.heatState != HeatState.SETUP && this.heatState != HeatState.LOADED) {
+        if (
+            this.heatState != HeatState.SETUP &&
+            this.heatState != HeatState.LOADED
+        ) {
             return false;
-        } else if (newStartPosition >= 1 && newStartPosition <= this.drivers.size()) {
+        } else if (
+            newStartPosition >= 1 && newStartPosition <= this.drivers.size()
+        ) {
             int prevPos = driver.getStartPosition();
             if (prevPos == newStartPosition) {
                 return false;
             } else {
-                for(Driver d : this.drivers.values()) {
+                for (Driver d : this.drivers.values()) {
                     int currentStart = d.getStartPosition();
                     if (newStartPosition < prevPos) {
-                        if (currentStart >= newStartPosition && currentStart < prevPos && !d.getUuid().equals(driver.getUuid())) {
+                        if (
+                            currentStart >= newStartPosition &&
+                            currentStart < prevPos &&
+                            !d.getUuid().equals(driver.getUuid())
+                        ) {
                             d.setStartPosition(currentStart + 1);
                             d.setPosition(currentStart + 1);
                         }
-                    } else if (newStartPosition > prevPos && currentStart > prevPos && currentStart <= newStartPosition && !d.getUuid().equals(driver.getUuid())) {
+                    } else if (
+                        newStartPosition > prevPos &&
+                        currentStart > prevPos &&
+                        currentStart <= newStartPosition &&
+                        !d.getUuid().equals(driver.getUuid())
+                    ) {
                         d.setStartPosition(currentStart - 1);
                         d.setPosition(currentStart - 1);
                     }
@@ -758,14 +1120,20 @@ public class Heats {
                 driver.setStartPosition(newStartPosition);
                 driver.setPosition(newStartPosition);
                 this.reorderGrid();
-                if (this.plugin != null && this.id > 0 && this.plugin.getRaceEventManager() != null) {
+                if (
+                    this.plugin != null &&
+                    this.id > 0 &&
+                    this.plugin.getRaceEventManager() != null
+                ) {
                     Map<UUID, Integer> positions = new HashMap();
 
-                    for(Driver d : this.drivers.values()) {
+                    for (Driver d : this.drivers.values()) {
                         positions.put(d.getUuid(), d.getStartPosition());
                     }
 
-                    this.plugin.getRaceEventManager().getDatabaseManager().updateHeatGridPositions(this.id, positions);
+                    this.plugin.getRaceEventManager()
+                        .getDatabaseManager()
+                        .updateHeatGridPositions(this.id, positions);
                 }
 
                 return true;
@@ -782,11 +1150,16 @@ public class Heats {
             return false;
         } else {
             if (this.round != null) {
-                for(Heats heat : this.round.getHeats().values()) {
+                for (Heats heat : this.round.getHeats().values()) {
                     if (heat != this && heat.getDrivers().containsKey(uuid)) {
                         DebugManager var10000 = this.plugin.getDebugManager();
                         String var10001 = String.valueOf(uuid);
-                        var10000.logRaceSystem("Tentativa de adicionar piloto " + var10001 + " em múltiplos heats do round " + this.round.getId());
+                        var10000.logRaceSystem(
+                            "Tentativa de adicionar piloto " +
+                                var10001 +
+                                " em múltiplos heats do round " +
+                                this.round.getId()
+                        );
                         return false;
                     }
                 }
@@ -797,8 +1170,14 @@ public class Heats {
             if (this.plugin != null && this.plugin.getDriverLookup() != null) {
                 this.plugin.getDriverLookup().register(driver, this);
             }
-            if (this.plugin != null && this.id > 0 && this.plugin.getRaceEventManager() != null) {
-                this.plugin.getRaceEventManager().getDatabaseManager().createDriver(driver);
+            if (
+                this.plugin != null &&
+                this.id > 0 &&
+                this.plugin.getRaceEventManager() != null
+            ) {
+                this.plugin.getRaceEventManager()
+                    .getDatabaseManager()
+                    .createDriver(driver);
             }
 
             return true;
@@ -832,19 +1211,41 @@ public class Heats {
         if (this.drivers.containsKey(player.getUniqueId())) {
             DebugManager var10000 = this.plugin.getDebugManager();
             String var10001 = player.getName();
-            var10000.logRaceSystem("Processando entrada tardia de " + var10001 + " no Heat " + this.id);
+            var10000.logRaceSystem(
+                "Processando entrada tardia de " +
+                    var10001 +
+                    " no Heat " +
+                    this.id
+            );
             this.plugin.getRaceScoreboardManager().addPlayer(player, this);
             this.plugin.getRaceActionBarManager().addPlayer(player, this);
             this.stopTimeTrialTimer(player);
             if (this.plugin.getPacketSender() != null) {
-                this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, this.trackNameWS);
+                this.plugin.getPacketSender().applyBoatUtilsToPlayer(
+                    player,
+                    this.trackNameWS
+                );
                 this.applyCollisionModeToPlayer(player);
             }
 
-            if (this.heatState != HeatState.IDLE && this.heatState != HeatState.SETUP && this.heatState != HeatState.LOADED && this.heatState != HeatState.FINISHED) {
-                if (this.heatState != HeatState.RACING && this.heatState != HeatState.STARTING) {
-                    if (!this.isLonely() && this.heatState != HeatState.PRACTICE && this.heatState != HeatState.QUALIFYING) {
-                        Driver driver = (Driver)this.drivers.get(player.getUniqueId());
+            if (
+                this.heatState != HeatState.IDLE &&
+                this.heatState != HeatState.SETUP &&
+                this.heatState != HeatState.LOADED &&
+                this.heatState != HeatState.FINISHED
+            ) {
+                if (
+                    this.heatState != HeatState.RACING &&
+                    this.heatState != HeatState.STARTING
+                ) {
+                    if (
+                        !this.isLonely() &&
+                        this.heatState != HeatState.PRACTICE &&
+                        this.heatState != HeatState.QUALIFYING
+                    ) {
+                        Driver driver = (Driver) this.drivers.get(
+                            player.getUniqueId()
+                        );
                         if (driver != null) {
                             if (driver.getStartPosition() <= 0) {
                                 driver.setStartPosition(this.drivers.size());
@@ -858,21 +1259,47 @@ public class Heats {
                             this.gridManager.teleportDriver(driver);
                             var10000 = this.plugin.getDebugManager();
                             var10001 = player.getName();
-                            var10000.logRaceSystem("Jogador " + var10001 + " teleportado para o GRID (P" + driver.getStartPosition() + ").");
+                            var10000.logRaceSystem(
+                                "Jogador " +
+                                    var10001 +
+                                    " teleportado para o GRID (P" +
+                                    driver.getStartPosition() +
+                                    ")."
+                            );
                         }
                     } else {
-                        Location spawnLoc = this.plugin.getDatabaseManager().getTrackSpawn(this.trackNameWS);
+                        Location spawnLoc =
+                            this.plugin.getDatabaseManager().getTrackSpawn(
+                                this.trackNameWS
+                            );
                         if (spawnLoc != null) {
                             player.teleport(spawnLoc);
-                            this.plugin.getAPI().spawnBoat(player, false, false, false);
-                            this.plugin.getLonelyController().updatePlayersVisibility(player);
-                            this.plugin.getDebugManager().logRaceSystem("Jogador " + player.getName() + " teleportado para spawn de Treino/Quali.");
+                            this.plugin.getAPI().spawnBoat(
+                                player,
+                                false,
+                                false,
+                                false
+                            );
+                            this.plugin.getLonelyController().updatePlayersVisibility(
+                                player
+                            );
+                            this.plugin.getDebugManager().logRaceSystem(
+                                "Jogador " +
+                                    player.getName() +
+                                    " teleportado para spawn de Treino/Quali."
+                            );
                         }
                     }
-
                 } else {
-                    this.plugin.getDebugManager().logRaceSystem("Jogador " + player.getName() + " tentou entrar durante RACING/STARTING. Bloqueado.");
-                    player.sendMessage(String.valueOf(ChatColor.RED) + "⚠ Você não pode entrar em uma corrida que já está em andamento!");
+                    this.plugin.getDebugManager().logRaceSystem(
+                        "Jogador " +
+                            player.getName() +
+                            " tentou entrar durante RACING/STARTING. Bloqueado."
+                    );
+                    player.sendMessage(
+                        String.valueOf(ChatColor.RED) +
+                            "⚠ Você não pode entrar em uma corrida que já está em andamento!"
+                    );
                 }
             }
         }
@@ -881,96 +1308,162 @@ public class Heats {
     public void handleLateLeave(Player player) {
         DebugManager var10000 = this.plugin.getDebugManager();
         String var10001 = player.getName();
-        var10000.logRaceSystem("Processando saída de " + var10001 + " do Heat " + this.id);
+        var10000.logRaceSystem(
+            "Processando saída de " + var10001 + " do Heat " + this.id
+        );
         this.plugin.getLonelyController().clearGhost(player.getUniqueId());
         this.plugin.getRaceScoreboardManager().removePlayer(player);
         this.plugin.getRaceActionBarManager().removePlayer(player);
         this.plugin.getAPI().recoverPlayerBoatState(player);
         if (this.plugin.getPacketSender() != null) {
-            boolean dbLonely = this.plugin.getDatabaseManager().getLonelyModePlayer(player.getUniqueId());
+            boolean dbLonely =
+                this.plugin.getDatabaseManager().getLonelyModePlayer(
+                    player.getUniqueId()
+                );
             this.plugin.getLonelyController().setLonelyMode(player, dbLonely);
         }
 
-        if (this.heatState != HeatState.IDLE && this.heatState != HeatState.SETUP && this.heatState != HeatState.FINISHED) {
-            Location spawnLoc = this.plugin.getDatabaseManager().getTrackSpawn(this.trackNameWS);
+        if (
+            this.heatState != HeatState.IDLE &&
+            this.heatState != HeatState.SETUP &&
+            this.heatState != HeatState.FINISHED
+        ) {
+            Location spawnLoc = this.plugin.getDatabaseManager().getTrackSpawn(
+                this.trackNameWS
+            );
             if (spawnLoc != null) {
                 player.teleport(spawnLoc);
             }
         }
-
     }
 
     public int getFinishedCount() {
-        return (int)this.drivers.values().stream().filter(Driver::isFinished).count();
+        return (int) this.drivers.values()
+            .stream()
+            .filter(Driver::isFinished)
+            .count();
     }
 
     public void updateLivePositions() {
-        if (this.heatState != HeatState.QUALIFYING && this.heatState != HeatState.PRACTICE) {
-            List<Driver> racingDrivers = this.drivers.values().stream().filter((d) -> !d.isFinished() && !d.isDnf()).sorted((d1, d2) -> {
-                int lapCompare = Integer.compare(d2.getLapCount(), d1.getLapCount());
-                if (lapCompare != 0) {
-                    return lapCompare;
-                } else {
-                    int cpCompare = Integer.compare(d2.getCheckpointsReached(), d1.getCheckpointsReached());
-                    if (cpCompare != 0) {
-                        return cpCompare;
+        if (
+            this.heatState != HeatState.QUALIFYING &&
+            this.heatState != HeatState.PRACTICE
+        ) {
+            List<Driver> racingDrivers = this.drivers.values()
+                .stream()
+                .filter(d -> !d.isFinished() && !d.isDnf())
+                .sorted((d1, d2) -> {
+                    int lapCompare = Integer.compare(
+                        d2.getLapCount(),
+                        d1.getLapCount()
+                    );
+                    if (lapCompare != 0) {
+                        return lapCompare;
                     } else {
-                        int latestCP1 = d1.getCheckpointsReached();
-                        int latestCP2 = d2.getCheckpointsReached();
-                        int currentLapIdx1 = d1.getLapCount();
-                        int currentLapIdx2 = d2.getLapCount();
-                        Long time1 = d1.getAbsoluteTimeAtProgress(currentLapIdx1, latestCP1);
-                        Long time2 = d2.getAbsoluteTimeAtProgress(currentLapIdx2, latestCP2);
-                        if (time1 != null && time2 != null) {
-                            int timeCompare = Long.compare(time1, time2);
-                            if (timeCompare != 0) {
-                                return timeCompare;
+                        int cpCompare = Integer.compare(
+                            d2.getCheckpointsReached(),
+                            d1.getCheckpointsReached()
+                        );
+                        if (cpCompare != 0) {
+                            return cpCompare;
+                        } else {
+                            int latestCP1 = d1.getCheckpointsReached();
+                            int latestCP2 = d2.getCheckpointsReached();
+                            int currentLapIdx1 = d1.getLapCount();
+                            int currentLapIdx2 = d2.getLapCount();
+                            Long time1 = d1.getAbsoluteTimeAtProgress(
+                                currentLapIdx1,
+                                latestCP1
+                            );
+                            Long time2 = d2.getAbsoluteTimeAtProgress(
+                                currentLapIdx2,
+                                latestCP2
+                            );
+                            if (time1 != null && time2 != null) {
+                                int timeCompare = Long.compare(time1, time2);
+                                if (timeCompare != 0) {
+                                    return timeCompare;
+                                }
                             }
-                        }
 
-                        return Long.compare(d1.getTotalTime(), d2.getTotalTime());
+                            return Long.compare(
+                                d1.getTotalTime(),
+                                d2.getTotalTime()
+                            );
+                        }
                     }
-                }
-            }).toList();
-            List<Driver> finishedDrivers = this.drivers.values().stream().filter(Driver::isFinished).filter((d) -> !d.isDnf()).sorted(Comparator.comparingInt(Driver::getPosition)).toList();
+                })
+                .toList();
+            List<Driver> finishedDrivers = this.drivers.values()
+                .stream()
+                .filter(Driver::isFinished)
+                .filter(d -> !d.isDnf())
+                .sorted(Comparator.comparingInt(Driver::getPosition))
+                .toList();
             this.livePositions = new ArrayList();
             this.livePositions.addAll(finishedDrivers);
             this.livePositions.addAll(racingDrivers);
             int nextPosition = finishedDrivers.size() + 1;
 
-            for(Driver racingDriver : racingDrivers) {
+            for (Driver racingDriver : racingDrivers) {
                 racingDriver.setPosition(nextPosition++);
             }
-
         } else {
-            List<Driver> sortedDrivers = this.drivers.values().stream().sorted((d1, d2) -> {
-                long t1 = d1.getFastestLap() != null ? d1.getFastestLap().getLapTime() : Long.MAX_VALUE;
-                long t2 = d2.getFastestLap() != null ? d2.getFastestLap().getLapTime() : Long.MAX_VALUE;
-                return t1 == Long.MAX_VALUE && t2 == Long.MAX_VALUE ? Integer.compare(d1.getStartPosition(), d2.getStartPosition()) : Long.compare(t1, t2);
-            }).toList();
+            List<Driver> sortedDrivers = this.drivers.values()
+                .stream()
+                .sorted((d1, d2) -> {
+                    long t1 =
+                        d1.getFastestLap() != null
+                            ? d1.getFastestLap().getLapTime()
+                            : Long.MAX_VALUE;
+                    long t2 =
+                        d2.getFastestLap() != null
+                            ? d2.getFastestLap().getLapTime()
+                            : Long.MAX_VALUE;
+                    return t1 == Long.MAX_VALUE && t2 == Long.MAX_VALUE
+                        ? Integer.compare(
+                              d1.getStartPosition(),
+                              d2.getStartPosition()
+                          )
+                        : Long.compare(t1, t2);
+                })
+                .toList();
             this.livePositions = new ArrayList(sortedDrivers);
 
-            for(int i = 0; i < sortedDrivers.size(); ++i) {
-                ((Driver)sortedDrivers.get(i)).setPosition(i + 1);
+            for (int i = 0; i < sortedDrivers.size(); ++i) {
+                ((Driver) sortedDrivers.get(i)).setPosition(i + 1);
             }
-
         }
     }
 
     public Driver getFastestLapDriver() {
-        return this.fastestLapUUID == null ? null : (Driver)this.drivers.get(this.fastestLapUUID);
+        return this.fastestLapUUID == null
+            ? null
+            : (Driver) this.drivers.get(this.fastestLapUUID);
     }
 
     public boolean isPlayerInActiveHeat(UUID playerUUID) {
-        return (this.heatState == HeatState.RACING || this.heatState == HeatState.STARTING || this.heatState == HeatState.LOADED || this.heatState == HeatState.PRACTICE) && this.drivers.containsKey(playerUUID);
+        return (
+            (this.heatState == HeatState.RACING ||
+                this.heatState == HeatState.STARTING ||
+                this.heatState == HeatState.LOADED ||
+                this.heatState == HeatState.PRACTICE) &&
+            this.drivers.containsKey(playerUUID)
+        );
     }
 
     public boolean isPlayerActivelyRacing(UUID playerUUID) {
-        Driver driver = (Driver)this.drivers.get(playerUUID);
+        Driver driver = (Driver) this.drivers.get(playerUUID);
         if (driver == null) {
             return false;
         } else {
-            return (this.heatState == HeatState.RACING || this.heatState == HeatState.STARTING || this.heatState == HeatState.LOADED) && !driver.isFinished() && !driver.isDnf();
+            return (
+                (this.heatState == HeatState.RACING ||
+                    this.heatState == HeatState.STARTING ||
+                    this.heatState == HeatState.LOADED) &&
+                !driver.isFinished() &&
+                !driver.isDnf()
+            );
         }
     }
 
@@ -995,7 +1488,6 @@ public class Heats {
         if (round != null) {
             this.roundId = round.getId();
         }
-
     }
 
     public int getRoundId() {
@@ -1020,7 +1512,10 @@ public class Heats {
                 case PRACTICE -> var10000 = "P";
                 case QUALIFICATION -> var10000 = "Q";
                 case FINAL -> var10000 = "F";
-                default -> throw new MatchException((String)null, (Throwable)null);
+                default -> throw new MatchException(
+                    (String) null,
+                    (Throwable) null
+                );
             }
 
             String typeCode = var10000;
@@ -1056,10 +1551,15 @@ public class Heats {
         HeatStateMachine.validateTransition(this.heatState, heatState);
         this.previousState = this.heatState;
         this.heatState = heatState;
-        if (this.plugin != null && this.id > 0 && this.plugin.getRaceEventManager() != null) {
-            this.plugin.getRaceEventManager().getDatabaseManager().updateHeatState(this.id, heatState);
+        if (
+            this.plugin != null &&
+            this.id > 0 &&
+            this.plugin.getRaceEventManager() != null
+        ) {
+            this.plugin.getRaceEventManager()
+                .getDatabaseManager()
+                .updateHeatState(this.id, heatState);
         }
-
     }
 
     public void setHeatStateForLoad(HeatState heatState) {
@@ -1069,37 +1569,70 @@ public class Heats {
     public void startSessionTimer() {
         this.stopSessionTimer();
         if (this.timeLimit != null && this.timeLimit > 0) {
-            this.sessionTask = Bukkit.getScheduler().runTaskTimer(this.plugin, () -> {
-                long remaining = this.getSessionTimeRemaining();
-                if (remaining > 0L) {
-                    long seconds = remaining / 1000L;
-                    if (seconds == 60L || seconds == 30L || seconds == 10L || seconds <= 5L && seconds > 0L) {
-                        EventAnnouncements announcements = this.round != null && this.round.getEvent() != null ? this.round.getEvent().getAnnouncements() : this.plugin.getEventAnnouncements();
-                        announcements.broadcastSessionWarning(this, seconds);
+            this.sessionTask = Bukkit.getScheduler().runTaskTimer(
+                this.plugin,
+                () -> {
+                    long remaining = this.getSessionTimeRemaining();
+                    if (remaining > 0L) {
+                        long seconds = remaining / 1000L;
+                        if (
+                            seconds == 60L ||
+                            seconds == 30L ||
+                            seconds == 10L ||
+                            (seconds <= 5L && seconds > 0L)
+                        ) {
+                            EventAnnouncements announcements =
+                                this.round != null &&
+                                this.round.getEvent() != null
+                                    ? this.round.getEvent().getAnnouncements()
+                                    : this.plugin.getEventAnnouncements();
+                            announcements.broadcastSessionWarning(
+                                this,
+                                seconds
+                            );
+                        }
                     }
-                }
 
-                if (remaining <= 0L) {
-                    this.plugin.getDebugManager().logRaceSystem("Tempo de sessão esgotado no Heat " + this.id);
-                    EventAnnouncements announcements = this.round != null && this.round.getEvent() != null ? this.round.getEvent().getAnnouncements() : this.plugin.getEventAnnouncements();
-                    if (this.heatState != HeatState.QUALIFYING && this.heatState != HeatState.PRACTICE) {
-                        this.finishHeat();
-                    } else {
-                        announcements.broadcastSessionExpired(this, true);
-                        Bukkit.getScheduler().runTaskLater(this.plugin, () -> {
-                            if (this.heatState == HeatState.QUALIFYING || this.heatState == HeatState.PRACTICE) {
-                                this.finishHeat();
-                            }
+                    if (remaining <= 0L) {
+                        this.plugin.getDebugManager().logRaceSystem(
+                            "Tempo de sessão esgotado no Heat " + this.id
+                        );
+                        EventAnnouncements announcements =
+                            this.round != null && this.round.getEvent() != null
+                                ? this.round.getEvent().getAnnouncements()
+                                : this.plugin.getEventAnnouncements();
+                        if (
+                            this.heatState != HeatState.QUALIFYING &&
+                            this.heatState != HeatState.PRACTICE
+                        ) {
+                            this.finishHeat();
+                        } else {
+                            announcements.broadcastSessionExpired(this, true);
+                            Bukkit.getScheduler().runTaskLater(
+                                this.plugin,
+                                () -> {
+                                    if (
+                                        this.heatState ==
+                                            HeatState.QUALIFYING ||
+                                        this.heatState == HeatState.PRACTICE
+                                    ) {
+                                        this.finishHeat();
+                                    }
+                                },
+                                3600L
+                            );
+                        }
 
-                        }, 3600L);
+                        this.stopSessionTimer();
                     }
-
-                    this.stopSessionTimer();
-                }
-
-            }, 20L, 20L);
+                },
+                20L,
+                20L
+            );
         } else {
-            this.plugin.getDebugManager().logRaceSystem("Heat " + this.id + " sem limite de tempo definido.");
+            this.plugin.getDebugManager().logRaceSystem(
+                "Heat " + this.id + " sem limite de tempo definido."
+            );
         }
     }
 
@@ -1108,7 +1641,6 @@ public class Heats {
             this.sessionTask.cancel();
             this.sessionTask = null;
         }
-
     }
 
     public Map<UUID, Driver> getDrivers() {
@@ -1116,7 +1648,7 @@ public class Heats {
     }
 
     public Driver getDriver(UUID uuid) {
-        return (Driver)this.drivers.get(uuid);
+        return (Driver) this.drivers.get(uuid);
     }
 
     public List<Driver> getStartPositions() {
@@ -1176,10 +1708,20 @@ public class Heats {
     }
 
     private void updateDatabaseConfig() {
-        if (this.plugin != null && this.id > 0 && this.plugin.getRaceEventManager() != null) {
-            this.plugin.getRaceEventManager().getDatabaseManager().updateHeatConfig(this.id, this.totalLaps, this.totalPits, this.maxDrivers);
+        if (
+            this.plugin != null &&
+            this.id > 0 &&
+            this.plugin.getRaceEventManager() != null
+        ) {
+            this.plugin.getRaceEventManager()
+                .getDatabaseManager()
+                .updateHeatConfig(
+                    this.id,
+                    this.totalLaps,
+                    this.totalPits,
+                    this.maxDrivers
+                );
         }
-
     }
 
     public boolean isCanReset() {
@@ -1196,39 +1738,61 @@ public class Heats {
 
     public void setLonely(boolean lonely) {
         this.lonely = lonely;
-        if (this.plugin != null && this.id > 0 && this.plugin.getRaceEventManager() != null) {
-            this.plugin.getRaceEventManager().getDatabaseManager().updateHeatLonely(this.id, lonely);
+        if (
+            this.plugin != null &&
+            this.id > 0 &&
+            this.plugin.getRaceEventManager() != null
+        ) {
+            this.plugin.getRaceEventManager()
+                .getDatabaseManager()
+                .updateHeatLonely(this.id, lonely);
         }
-
     }
 
     public void reverseGrid(int percentage) {
-        if (this.heatState == HeatState.SETUP || this.heatState == HeatState.LOADED) {
+        if (
+            this.heatState == HeatState.SETUP ||
+            this.heatState == HeatState.LOADED
+        ) {
             List<Driver> driversToReverse = new ArrayList(this.startPositions);
-            int totalToReverse = Math.min(driversToReverse.size() * percentage / 100, driversToReverse.size());
+            int totalToReverse = Math.min(
+                (driversToReverse.size() * percentage) / 100,
+                driversToReverse.size()
+            );
             if (totalToReverse > 1) {
-                List<Driver> subList = driversToReverse.subList(0, totalToReverse);
-                List<Integer> originalPositions = subList.stream().map(Driver::getStartPosition).toList();
+                List<Driver> subList = driversToReverse.subList(
+                    0,
+                    totalToReverse
+                );
+                List<Integer> originalPositions = subList
+                    .stream()
+                    .map(Driver::getStartPosition)
+                    .toList();
                 Collections.reverse(subList);
 
-                for(int i = 0; i < subList.size(); ++i) {
-                    Driver d = (Driver)subList.get(i);
-                    int newStartPos = (Integer)originalPositions.get(i);
+                for (int i = 0; i < subList.size(); ++i) {
+                    Driver d = (Driver) subList.get(i);
+                    int newStartPos = (Integer) originalPositions.get(i);
                     d.setStartPosition(newStartPos);
                     d.setPosition(newStartPos);
                 }
 
                 this.reorderGrid();
-                if (this.plugin != null && this.id > 0 && this.plugin.getRaceEventManager() != null) {
+                if (
+                    this.plugin != null &&
+                    this.id > 0 &&
+                    this.plugin.getRaceEventManager() != null
+                ) {
                     Map<UUID, Integer> positions = new HashMap();
 
-                    for(Driver d : this.drivers.values()) {
+                    for (Driver d : this.drivers.values()) {
                         positions.put(d.getUuid(), d.getStartPosition());
                     }
 
-                    this.plugin.getRaceEventManager().getDatabaseManager().updateHeatGridPositions(this.id, positions);
+                    this.plugin.getRaceEventManager()
+                        .getDatabaseManager()
+                        .updateHeatGridPositions(this.id, positions);
                 }
-
             }
         }
     }
@@ -1259,32 +1823,57 @@ public class Heats {
 
     private void validateMandatoryPits() {
         if (this.totalPits != null && this.totalPits > 0) {
-            for(Driver driver : this.drivers.values()) {
+            for (Driver driver : this.drivers.values()) {
                 if (!driver.hasCompletedMandatoryPits(this.totalPits)) {
                     int missingPits = this.totalPits - driver.getPitstops();
-                    Player player = this.plugin.getServer().getPlayer(driver.getUuid());
+                    Player player = this.plugin.getServer().getPlayer(
+                        driver.getUuid()
+                    );
                     if (player != null) {
                         player.getName();
                     } else {
                         String var10000 = "Piloto";
                     }
 
-                    EventAnnouncements announcements = this.round != null && this.round.getEvent() != null ? this.round.getEvent().getAnnouncements() : this.plugin.getEventAnnouncements();
-                    announcements.broadcastPitStopPenalty(this, driver, missingPits);
+                    EventAnnouncements announcements =
+                        this.round != null && this.round.getEvent() != null
+                            ? this.round.getEvent().getAnnouncements()
+                            : this.plugin.getEventAnnouncements();
+                    announcements.broadcastPitStopPenalty(
+                        this,
+                        driver,
+                        missingPits
+                    );
                     DebugManager var7 = this.plugin.getDebugManager();
                     String var10001 = String.valueOf(driver.getUuid());
-                    var7.logPitStopSystem("Driver " + var10001 + " penalized for missing pits: " + missingPits);
+                    var7.logPitStopSystem(
+                        "Driver " +
+                            var10001 +
+                            " penalized for missing pits: " +
+                            missingPits
+                    );
                     driver.setDnf(true);
                     driver.setPtpActive(false);
-                    driver.setPtpEnergy((double)0.0F);
+                    driver.setPtpEnergy((double) 0.0F);
                 }
             }
-
         }
     }
 
     public String toString() {
         int var10000 = this.id;
-        return "Heats{id=" + var10000 + ", heatNumber=" + this.heatNumber + ", state=" + String.valueOf(this.heatState) + ", drivers=" + this.drivers.size() + ", totalLaps=" + this.totalLaps + "}";
+        return (
+            "Heats{id=" +
+            var10000 +
+            ", heatNumber=" +
+            this.heatNumber +
+            ", state=" +
+            String.valueOf(this.heatState) +
+            ", drivers=" +
+            this.drivers.size() +
+            ", totalLaps=" +
+            this.totalLaps +
+            "}"
+        );
     }
 }
