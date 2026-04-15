@@ -96,18 +96,25 @@ Este documento descreve os procedimentos de teste in-game para validar as 9 melh
    ```
    Anotar valores exibidos.
 
-4. **REINICIAR O SERVIDOR COMPLETAMENTE:**
+4. **Carregar heat (salva configs no DB):**
+   ```
+   /heat load <heat>
+   ```
+   - As configurações são salvas automaticamente ao carregar o heat
+   - Alternativamente, `/heat start <heat>` também persiste antes de iniciar
+
+5. **REINICIAR O SERVIDOR COMPLETAMENTE:**
    ```
    stop
    (iniciar servidor novamente)
    ```
 
-5. Após reload, consultar novamente:
+6. Após reload, consultar novamente:
    ```
    /heat info <heat>
    ```
 
-6. **Comparar valores antes e depois do restart.**
+7. **Comparar valores antes e depois do restart.**
 
 ### Critério de Pass
 ```

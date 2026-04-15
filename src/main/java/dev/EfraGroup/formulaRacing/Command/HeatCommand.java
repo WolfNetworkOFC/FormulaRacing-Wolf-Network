@@ -815,10 +815,14 @@ public class HeatCommand extends BaseCommand {
         );
     }
 
-    @Subcommand("set reversegrid")
-    @CommandCompletion("@heats true|false")
+    @Subcommand("set reversegridenabled")
+    @CommandCompletion("@heat true|false")
     @CommandPermission("formularacing.admin")
-    public void onSetReverseGrid(Player player, Heats heat, boolean val) {
+    public void onSetReverseGridEnabled(
+        Player player,
+        Heats heat,
+        boolean val
+    ) {
         heat = this.resolveHeat(player, heat);
         if (heat == null) {
             player.sendMessage(
@@ -921,7 +925,7 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("set deltaghosting")
-    @CommandCompletion("@heats")
+    @CommandCompletion("@heat <seconds>")
     @CommandPermission("formularacing.admin")
     public void onSetGhosting(Player player, Heats heat, int seconds) {
         heat = this.resolveHeat(player, heat);

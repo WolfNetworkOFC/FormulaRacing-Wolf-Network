@@ -69,6 +69,7 @@ public class Heats {
     private boolean reversegrid;
     private double pushtopasspower;
     private BukkitTask sessionTask;
+    private boolean configDirty = false;
 
     public Heats(FormulaRacing plugin, int id, Rounds round, int heatNumber) {
         this.plugin = plugin;
@@ -123,32 +124,77 @@ public class Heats {
         return this.pushtopasspower;
     }
 
+    public void markConfigDirty() {
+        this.configDirty = true;
+    }
+
+    public void saveConfigIfDirty() {
+        if (!this.configDirty || !this.shouldSaveConfig()) {
+            return;
+        }
+        this.plugin.getRaceEventManager()
+            .getDatabaseManager()
+            .updateHeatFullConfig(
+                this.id,
+                this.totalLaps,
+                this.totalPits,
+                this.timeLimit,
+                this.startDelay,
+                this.maxDrivers,
+                this.lonely,
+                this.canReset,
+                true,
+                this.collisionMode,
+                this.drsEnabled,
+                this.driverswap,
+                this.drsdowntime,
+                this.drsdownpower,
+                this.reversegrid,
+                this.deltaghosting,
+                this.pushtopass,
+                this.pushtopasspower,
+                this.realistc
+            );
+        this.configDirty = false;
+    }
+
+    private boolean shouldSaveConfig() {
+        return this.id > 0
+            && this.plugin != null
+            && this.plugin.getRaceEventManager() != null;
+    }
+
     public void setrealistc(boolean realistc) {
         this.realistc = realistc;
+        this.markConfigDirty();
     }
 
     public void setreversegrid(boolean reversegrid) {
         this.reversegrid = reversegrid;
+        this.markConfigDirty();
     }
 
     public void setpushtopasspower(double pushtopasspower) {
         this.pushtopasspower = pushtopasspower;
+        this.markConfigDirty();
     }
 
     public double getDrsdowntime() {
         return this.drsdowntime;
     }
 
+    public void setDrsdowntime(double drsdowntime) {
+        this.drsdowntime = drsdowntime;
+        this.markConfigDirty();
+    }
+
     public double getDrsdownpower() {
         return this.drsdownpower;
     }
 
-    public void setDrsdowntime(double drsdowntime) {
-        this.drsdowntime = drsdowntime;
-    }
-
     public void setDrsdownpower(double drsdownpower) {
         this.drsdownpower = drsdownpower;
+        this.markConfigDirty();
     }
 
     public boolean getDriverSwap() {
@@ -157,6 +203,7 @@ public class Heats {
 
     public void setDriverSwap(boolean driverswap) {
         this.driverswap = driverswap;
+        this.markConfigDirty();
     }
 
     public boolean isDrsEnabled() {
@@ -169,6 +216,7 @@ public class Heats {
 
     public void setPushtopass(boolean pushtopass) {
         this.pushtopass = pushtopass;
+        this.markConfigDirty();
     }
 
     public int getDeltaGhosting() {
@@ -177,10 +225,12 @@ public class Heats {
 
     public void setDeltaghosting(int deltaghosting) {
         this.deltaghosting = deltaghosting;
+        this.markConfigDirty();
     }
 
     public void setDrsEnabled(boolean drsEnabled) {
         this.drsEnabled = drsEnabled;
+        this.markConfigDirty();
     }
 
     public List<Driver> getLivePositions() {
@@ -457,6 +507,7 @@ public class Heats {
             }
 
             this.setHeatState(HeatState.LOADED);
+            this.saveConfigIfDirty();
             var10000 = this.plugin.getDebugManager();
             var10001 = this.id;
             var10000.logRaceSystem(
@@ -533,6 +584,7 @@ public class Heats {
                         this.pushtopasspower,
                         this.realistc
                     );
+                this.configDirty = false;
             }
             this.setHeatState(HeatState.STARTING);
             this.gridManager.freezePlayers();

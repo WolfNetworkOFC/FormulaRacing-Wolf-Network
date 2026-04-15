@@ -728,7 +728,11 @@ public class RaceCheckpointListener implements Listener {
         Heats heat,
         Player player
     ) {
-        long finishTime = System.currentTimeMillis();
+        long finishTime =
+            driver.getCurrentLap() != null &&
+            driver.getCurrentLap().getLapEnd() > 0L
+                ? driver.getCurrentLap().getLapEnd()
+                : System.currentTimeMillis();
         HeatState sessionState = heat.getHeatState();
         if (this.plugin.getPTP() != null) {
             this.plugin.getPTP().disablePTP(player, driver);
