@@ -222,46 +222,97 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("create|new")
-    @CommandCompletion("@nothing")
+    @CommandCompletion("@round")
     @CommandPermission("formularacing.event.admin")
     @Description("Cria um novo heat no round")
     public void onCreate(
         Player player,
-        @co.aikar.commands.annotation.Optional Rounds round
+        @co.aikar.commands.annotation.Optional String roundOrHeatRef
     ) {
-        if (round == null) {
-            Events event = this.database.getPlayerSelectedEvent(
-                player.getUniqueId()
-            ).orElse(null);
-            if (event != null) {
-                round = event.getSchedule().getCurrentRound().orElse(null);
-            }
-        }
+        Rounds round = this.resolveRoundReference(player, roundOrHeatRef);
 
         if (round == null) {
             player.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum round selecionado ou ativo!"
             );
-        } else {
-            int nextNumber = round.getHeats().size() + 1;
-            this.eventManager.createHeat(round, nextNumber).thenAccept(heat -> {
-                if (heat != null) {
-                    String var10001 = String.valueOf(ChatColor.GREEN);
-                    player.sendMessage(
-                        var10001 +
-                            "✓ Heat " +
-                            nextNumber +
-                            " criado com sucesso!"
-                    );
-                } else {
-                    player.sendMessage(
-                        String.valueOf(ChatColor.RED) +
-                            "✗ Erro ao criar heat no banco de dados."
-                    );
-                }
-            });
+            player.sendMessage(
+                String.valueOf(ChatColor.GRAY) +
+                    "Use /heat create R1 ou /heat create R1Q1 (ou selecione um evento com round atual)."
+            );
+            return;
         }
+
+        int nextNumber = round.getHeats().size() + 1;
+        this.eventManager.createHeat(round, nextNumber).thenAccept(heat -> {
+            if (heat != null) {
+                String var10001 = String.valueOf(ChatColor.GREEN);
+                player.sendMessage(
+                    var10001 +
+                        "✓ Heat " +
+                        nextNumber +
+                        " criado com sucesso no " +
+                        round.getDisplayName() +
+                        "!"
+                );
+            } else {
+                player.sendMessage(
+                    String.valueOf(ChatColor.RED) +
+                        "✗ Erro ao criar heat no banco de dados."
+                );
+            }
+        });
+    }
+
+    private Rounds resolveRoundReference(Player player, String roundOrHeatRef) {
+        Events selectedEvent = this.database.getPlayerSelectedEvent(
+            player.getUniqueId()
+        ).orElse(null);
+
+        if (roundOrHeatRef == null || roundOrHeatRef.isBlank()) {
+            if (selectedEvent != null) {
+                return selectedEvent
+                    .getSchedule()
+                    .getCurrentRound()
+                    .orElse(null);
+            }
+            return null;
+        }
+
+        String ref = roundOrHeatRef.toUpperCase();
+
+        if (ref.matches("R\\d+[QFH]\\d+")) {
+            int qPos = ref.indexOf('Q');
+            int hPos = ref.indexOf('H');
+            int fPos = ref.indexOf('F');
+            int splitPos = qPos >= 0 ? qPos : (hPos >= 0 ? hPos : fPos);
+            if (splitPos > 1) {
+                ref = ref.substring(0, splitPos);
+            }
+        }
+
+        if (!ref.matches("R\\d+")) {
+            return null;
+        }
+
+        int roundIdx;
+        try {
+            roundIdx = Integer.parseInt(ref.substring(1));
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+
+        if (selectedEvent != null) {
+            return selectedEvent.getSchedule().getRound(roundIdx).orElse(null);
+        }
+
+        return this.eventManager.getAllEvents()
+            .stream()
+            .filter(Events::isActive)
+            .map(e -> e.getSchedule().getRound(roundIdx).orElse(null))
+            .filter(r -> r != null)
+            .findFirst()
+            .orElse(null);
     }
 
     @Subcommand("info|view")

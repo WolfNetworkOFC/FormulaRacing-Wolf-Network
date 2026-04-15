@@ -1159,6 +1159,7 @@ public class EventCommand extends BaseCommand {
                         Action.RUN_COMMAND
                     )
                 );
+                player.spigot().sendMessage(line);
                 if (isAdmin) {
                     for (Heats heat : round.getHeats().values()) {
                         var10002 = String.valueOf(ChatColor.GRAY);
