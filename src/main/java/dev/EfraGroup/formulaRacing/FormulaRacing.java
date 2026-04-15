@@ -325,7 +325,6 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(new JoinListener(this, this.dm, this.packetSender, this.hotbarController), this);
         Bukkit.getPluginManager().registerEvents(this, this);
         Bukkit.getPluginManager().registerEvents(this.rcl, this);
-        Bukkit.getPluginManager().registerEvents(new DuelCommand(this, dm, ttd,ttda, packetSender), this);
         Bukkit.getPluginManager().registerEvents(new CamListener(this, this.cu), this);
         Bukkit.getPluginManager().registerEvents(this.lonelyController, this);
         Bukkit.getPluginManager().registerEvents(new DuelProtectionListener(this, this.dm), this);
