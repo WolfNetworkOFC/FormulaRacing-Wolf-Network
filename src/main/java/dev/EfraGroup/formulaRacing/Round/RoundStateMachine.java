@@ -15,6 +15,9 @@ public class RoundStateMachine {
     }
 
     public static void validateTransition(RoundState from, RoundState to) {
+        if (from == to) {
+            return;
+        }
         if (!canTransition(from, to)) {
             throw new IllegalStateException(
                 "Illegal RoundState transition: " + from + " -> " + to

@@ -20,6 +20,9 @@ public class HeatStateMachine {
     }
 
     public static void validateTransition(HeatState from, HeatState to) {
+        if (from == to) {
+            return;
+        }
         if (!canTransition(from, to)) {
             throw new IllegalStateException(
                 "Illegal HeatState transition: " + from + " -> " + to
