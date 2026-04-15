@@ -28,15 +28,14 @@ import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
 import dev.EfraGroup.formulaRacing.Event.EventAnnouncements;
 import dev.EfraGroup.formulaRacing.Event.Events;
-import dev.EfraGroup.formulaRacing.Gui.ReadyCheckManager;
 import dev.EfraGroup.formulaRacing.Gui.Framework.GuiListener;
 import dev.EfraGroup.formulaRacing.Gui.Framework.GuiManager;
+import dev.EfraGroup.formulaRacing.Gui.ReadyCheckManager;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
-import dev.EfraGroup.formulaRacing.Heat.PitStopManager;
 import dev.EfraGroup.formulaRacing.Heat.Logic.DrsManager;
 import dev.EfraGroup.formulaRacing.Heat.Logic.PTPManager;
 import dev.EfraGroup.formulaRacing.Heat.Logic.RaceSession;
-import dev.EfraGroup.formulaRacing.Participant.DriverLookup;
+import dev.EfraGroup.formulaRacing.Heat.PitStopManager;
 import dev.EfraGroup.formulaRacing.Listener.CamListener;
 import dev.EfraGroup.formulaRacing.Listener.DuelProtectionListener;
 import dev.EfraGroup.formulaRacing.Listener.FormulaRacingListener;
@@ -46,6 +45,7 @@ import dev.EfraGroup.formulaRacing.Listener.PitStopListener;
 import dev.EfraGroup.formulaRacing.Listener.RaceCheckpointListener;
 import dev.EfraGroup.formulaRacing.Listener.RaceMovementListener;
 import dev.EfraGroup.formulaRacing.Listener.RegionListener;
+import dev.EfraGroup.formulaRacing.Participant.DriverLookup;
 import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.TimeTrial.TimeTrialController;
@@ -57,9 +57,9 @@ import dev.EfraGroup.formulaRacing.Utils.RaceActionBarManager;
 import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardService;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardDuelsTimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardTimeTrialUtils;
+import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeDefaults;
 import dev.EfraGroup.formulaRacing.Utils.TimeTrialDuelsAction;
 import dev.EfraGroup.formulaRacing.Utils.TimeUtils;
-import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeDefaults;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.TranslationUtil;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
@@ -80,7 +80,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
-
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -94,12 +93,14 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class FormulaRacing extends JavaPlugin implements Listener {
+
     private static FormulaRacing instance;
     private final Map<UUID, String> lastTimeTrialTrack = new HashMap();
     private final Map<UUID, String> lastDuelTrack = new HashMap();
     private final Map<String, TrackLeaderboard> leaderboards = new HashMap();
     private final Map<UUID, Boolean> lastDuelLonelyStatus = new HashMap();
-    private final Map<String, YamlConfiguration> langConfigCache = new ConcurrentHashMap();
+    private final Map<String, YamlConfiguration> langConfigCache =
+        new ConcurrentHashMap();
     private static final Map<UUID, Boolean> playersWithMod = new HashMap();
     private static final Map<UUID, Integer> playersModVersion = new HashMap();
     private ScoreboardTimeTrialUtils stt;
@@ -152,11 +153,11 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return this.commandManager;
     }
 
-    public <T> TaskChain <T> newChain() {
+    public <T> TaskChain<T> newChain() {
         return this.taskChainFactory.newChain();
     }
 
-    public <T> TaskChain <T> newSharedChain(String name) {
+    public <T> TaskChain<T> newSharedChain(String name) {
         return this.taskChainFactory.newSharedChain(name);
     }
 
@@ -215,9 +216,18 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.worldEditSelect = new WorldEditSelect();
             this.dcu = new DiscordUtils();
             this.hotbarController = new HotbarController(this, this.dm);
-            this.scoreboardOwnershipCoordinator = new ScoreboardOwnershipCoordinator();
-            this.sharedScoreboardAdapter = new MegavexAdapter(this, this.getConfig().getInt("scoreboard.max-rows", 15));
-            this.stt = new ScoreboardTimeTrialUtils(this, this.dm, this.sharedScoreboardAdapter, this.scoreboardOwnershipCoordinator);
+            this.scoreboardOwnershipCoordinator =
+                new ScoreboardOwnershipCoordinator();
+            this.sharedScoreboardAdapter = new MegavexAdapter(
+                this,
+                this.getConfig().getInt("scoreboard.max-rows", 15)
+            );
+            this.stt = new ScoreboardTimeTrialUtils(
+                this,
+                this.dm,
+                this.sharedScoreboardAdapter,
+                this.scoreboardOwnershipCoordinator
+            );
             this.packetSender = new PacketSender(this.dm, this);
             this.timerUtils = new TimerUtils(this, this.dm);
             this.cu = new CamUtils(this.dm, this);
@@ -226,30 +236,77 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.ttda = new TimeTrialDuelsAction(this, this.dm);
             this.trackIntegrationManager = new TrackIntegrationManager(this);
             this.pitStopConfigManager = new PitStopConfigManager(this);
-            this.pitStopManager = new PitStopManager(this, this.dm, this.pitStopConfigManager);
+            this.pitStopManager = new PitStopManager(
+                this,
+                this.dm,
+                this.pitStopConfigManager
+            );
             this.raceEventManager = new RaceEventManager(this);
             this.spectatorManager = new SpectatorManager(this);
             this.readyCheckManager = new ReadyCheckManager(this);
             this.raceActionBarManager = new RaceActionBarManager(this);
-            this.raceScoreboardManager = new RaceScoreboardV2Manager(this, this.sharedScoreboardAdapter, this.scoreboardOwnershipCoordinator);
-            this.getLogger().info("[FormulaRacing] Unified scoreboard enabled (Megavex).");
+            this.raceScoreboardManager = new RaceScoreboardV2Manager(
+                this,
+                this.sharedScoreboardAdapter,
+                this.scoreboardOwnershipCoordinator
+            );
+            this.getLogger().info(
+                "[FormulaRacing] Unified scoreboard enabled (Megavex)."
+            );
             this.trackVisualizer = new TrackVisualizer(this);
             this.eventAnnouncements = new EventAnnouncements(this);
-            this.quickRaceManager = new QuickRaceManager(this, this.raceEventManager, this.dm);
-            this.drsManager = new DrsManager(new RaceSession(this), this, this.packetSender);
+            this.quickRaceManager = new QuickRaceManager(
+                this,
+                this.raceEventManager,
+                this.dm
+            );
+            this.drsManager = new DrsManager(
+                new RaceSession(this),
+                this,
+                this.packetSender
+            );
             this.ptpManager = new PTPManager(this);
-            this.raceVoteManager = new RaceVoteManager(this, this.dm, this.quickRaceManager);
+            this.raceVoteManager = new RaceVoteManager(
+                this,
+                this.dm,
+                this.quickRaceManager
+            );
             this.podiumManager = new PodiumManager(this);
             this.raceEventManager.loadActiveEventsFromDatabase();
             this.dailyRaceManager = new DailyRaceManager(this);
             this.dailyRaceManager.start();
-            ScoreboardDuelsTimeUtils scoreboardDuelsUtils = new ScoreboardDuelsTimeUtils(this, this.dm, this.ttda, null, this.sharedScoreboardAdapter, this.scoreboardOwnershipCoordinator);
-            this.ttd = new TimeTrialDuels(this, this.dm, this.packetSender, this.ttda, scoreboardDuelsUtils);
+            ScoreboardDuelsTimeUtils scoreboardDuelsUtils =
+                new ScoreboardDuelsTimeUtils(
+                    this,
+                    this.dm,
+                    this.ttda,
+                    null,
+                    this.sharedScoreboardAdapter,
+                    this.scoreboardOwnershipCoordinator
+                );
+            this.ttd = new TimeTrialDuels(
+                this,
+                this.dm,
+                this.packetSender,
+                this.ttda,
+                scoreboardDuelsUtils
+            );
             this.ttda.setTimeTrialDuels(this.ttd);
             scoreboardDuelsUtils.setTimeTrialDuels(this.ttd);
-            this.rcl = new RegionListener(this, this.dm, this.timerUtils, this.packetSender, this.stt, this.ttda, this.ttd, this.timeTrialController);
+            this.rcl = new RegionListener(
+                this,
+                this.dm,
+                this.timerUtils,
+                this.packetSender,
+                this.stt,
+                this.ttda,
+                this.ttd,
+                this.timeTrialController
+            );
             this.stt.startAutoUpdate();
-            this.getServer().getMessenger().registerOutgoingPluginChannel(this, "openboatutils:settings");
+            this.getServer()
+                .getMessenger()
+                .registerOutgoingPluginChannel(this, "openboatutils:settings");
             this.registerModChannel();
             this.commandManager = new PaperCommandManager(this);
             this.taskChainFactory = BukkitTaskChainFactory.create(this);
@@ -259,22 +316,33 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.registerCommands();
             this.loadLeaderboards();
             this.startLeaderboardUpdater();
-            Bukkit.getScheduler().runTaskAsynchronously(this, () -> this.dm.cleanOrphanedCheckpoints());
+            Bukkit.getScheduler().runTaskAsynchronously(this, () ->
+                this.dm.cleanOrphanedCheckpoints()
+            );
             if (this.debugManager != null) {
-                this.getLogger().info("[FormulaRacing] Plugin ativado com sucesso!");
-                this.getLogger().info("[FormulaRacing] Banco de dados conectado com sucesso!");
+                this.getLogger().info(
+                    "[FormulaRacing] Plugin ativado com sucesso!"
+                );
+                this.getLogger().info(
+                    "[FormulaRacing] Banco de dados conectado com sucesso!"
+                );
             }
         } catch (Exception var2) {
             if (this.debugManager != null) {
-                this.debugManager.logRaceSystem("[FormulaRacing] Erro ao inicializar o plugin: " + var2.getMessage());
+                this.debugManager.logRaceSystem(
+                    "[FormulaRacing] Erro ao inicializar o plugin: " +
+                        var2.getMessage()
+                );
             } else {
-                this.getLogger().severe("[FormulaRacing] Erro crítico ao inicializar o plugin (DebugManager nulo): " + var2.getMessage());
+                this.getLogger().severe(
+                    "[FormulaRacing] Erro crítico ao inicializar o plugin (DebugManager nulo): " +
+                        var2.getMessage()
+                );
             }
 
             var2.printStackTrace();
             this.setEnabled(false);
         }
-
     }
 
     public void onDisable() {
@@ -312,26 +380,69 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             }
         } catch (SQLException var2) {
             if (this.debugManager != null) {
-                this.debugManager.logRaceSystem("Erro ao limpar dados no banco durante o desligamento.");
+                this.debugManager.logRaceSystem(
+                    "Erro ao limpar dados no banco durante o desligamento."
+                );
             }
         }
-
     }
 
     private void registerListeners() {
         Bukkit.getPluginManager().registerEvents(new GuiListener(), this);
-        Bukkit.getPluginManager().registerEvents(new HotbarListener(this, this.hotbarController), this);
-        Bukkit.getPluginManager().registerEvents(new FormulaRacingListener(this, this.timerUtils, this.api, this.dm, this.packetSender), this);
-        Bukkit.getPluginManager().registerEvents(new JoinListener(this, this.dm, this.packetSender, this.hotbarController), this);
+        Bukkit.getPluginManager().registerEvents(
+            new HotbarListener(this, this.hotbarController),
+            this
+        );
+        Bukkit.getPluginManager().registerEvents(
+            new FormulaRacingListener(
+                this,
+                this.timerUtils,
+                this.api,
+                this.dm,
+                this.packetSender
+            ),
+            this
+        );
+        Bukkit.getPluginManager().registerEvents(
+            new JoinListener(
+                this,
+                this.dm,
+                this.packetSender,
+                this.hotbarController
+            ),
+            this
+        );
         Bukkit.getPluginManager().registerEvents(this, this);
         Bukkit.getPluginManager().registerEvents(this.rcl, this);
-        Bukkit.getPluginManager().registerEvents(new CamListener(this, this.cu), this);
+        Bukkit.getPluginManager().registerEvents(
+            new CamListener(this, this.cu),
+            this
+        );
         Bukkit.getPluginManager().registerEvents(this.lonelyController, this);
-        Bukkit.getPluginManager().registerEvents(new DuelCommand(this, dm, ttd,ttda, packetSender), this);
-        Bukkit.getPluginManager().registerEvents(new DuelProtectionListener(this, this.dm), this);
-        Bukkit.getPluginManager().registerEvents(new RaceCheckpointListener(this), this);
-        Bukkit.getPluginManager().registerEvents(new RaceMovementListener(this, this.raceEventManager), this);
-        Bukkit.getPluginManager().registerEvents(new PitStopListener(this, this.raceEventManager, this.pitStopManager), this);
+        Bukkit.getPluginManager().registerEvents(
+            new DuelCommand(this, dm, ttd, ttda, packetSender),
+            this
+        );
+        Bukkit.getPluginManager().registerEvents(
+            new DuelProtectionListener(this, this.dm),
+            this
+        );
+        Bukkit.getPluginManager().registerEvents(
+            new RaceCheckpointListener(this),
+            this
+        );
+        Bukkit.getPluginManager().registerEvents(
+            new RaceMovementListener(this, this.raceEventManager),
+            this
+        );
+        Bukkit.getPluginManager().registerEvents(
+            new PitStopListener(
+                this,
+                this.raceEventManager,
+                this.pitStopManager
+            ),
+            this
+        );
     }
 
     private void registerCommands() {
@@ -339,19 +450,34 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.commandManager.registerCommand(new AdminCommand(this));
             this.commandManager.registerCommand(new BoatCommand(api));
             this.commandManager.registerCommand(new LonelyCommand(this));
-            this.commandManager.registerCommand(new CamCommand(this, getDatabaseManager(), getCamUtils()));
+            this.commandManager.registerCommand(
+                new CamCommand(this, getDatabaseManager(), getCamUtils())
+            );
             this.commandManager.registerCommand(new EventCommand(this));
             this.commandManager.registerCommand(new RoundCommand(this));
             this.commandManager.registerCommand(new HeatCommand(this));
             this.commandManager.registerCommand(new TrackCommand(this));
             this.commandManager.registerCommand(new SettingsCommand(this));
             this.commandManager.registerCommand(new LanguageCommand(this));
-            this.commandManager.registerCommand(new TimeTrialCancelCommand(this));
-            this.commandManager.registerCommand(new TimeTrialRandomCommand(this));
+            this.commandManager.registerCommand(
+                new TimeTrialCancelCommand(this)
+            );
+            this.commandManager.registerCommand(
+                new TimeTrialRandomCommand(this)
+            );
             this.commandManager.registerCommand(new TimeTrialCommand(this));
-            this.commandManager.registerCommand(new TrackEditorCommand(this, this.dm, this.packetSender, this.worldEditSelect));
+            this.commandManager.registerCommand(
+                new TrackEditorCommand(
+                    this,
+                    this.dm,
+                    this.packetSender,
+                    this.worldEditSelect
+                )
+            );
             this.commandManager.registerCommand(new PartyCommand(this));
-            this.commandManager.registerCommand(new DuelCommand(this, dm, ttd,ttda, packetSender));
+            this.commandManager.registerCommand(
+                new DuelCommand(this, dm, ttd, ttda, packetSender)
+            );
             this.commandManager.registerCommand(new RaceCommand(this));
             this.commandManager.registerCommand(new VoteRaceCommand(this));
             this.commandManager.registerCommand(new DailyRaceCommand(this));
@@ -362,16 +488,23 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.commandManager.registerCommand(new UnghostCommand(this));
         } catch (Exception e) {
             if (this.debugManager != null) {
-                this.debugManager.logRaceSystem("[FormulaRacing] Erro ao registrar comandos: " + e.getMessage());
+                this.debugManager.logRaceSystem(
+                    "[FormulaRacing] Erro ao registrar comandos: " +
+                        e.getMessage()
+                );
             }
         }
-
     }
 
     public String getDirectTranslation(String key, String langCode) {
-        YamlConfiguration config = (YamlConfiguration)this.langConfigCache.get(langCode);
+        YamlConfiguration config = (YamlConfiguration) this.langConfigCache.get(
+            langCode
+        );
         if (config == null) {
-            File langFile = new File(this.getDataFolder(), "lang/" + langCode + ".yml");
+            File langFile = new File(
+                this.getDataFolder(),
+                "lang/" + langCode + ".yml"
+            );
             if (!langFile.exists()) {
                 langFile = new File(this.getDataFolder(), "lang/en_US.yml");
                 if (!langFile.exists()) {
@@ -384,17 +517,34 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         }
 
         String message = config.getString(key);
-        return message == null ? "§c[Lang Error] Key '" + key + "' not found in " + langCode + ".yml" : ChatColor.translateAlternateColorCodes('&', message);
+        return message == null
+            ? "§c[Lang Error] Key '" +
+              key +
+              "' not found in " +
+              langCode +
+              ".yml"
+            : ChatColor.translateAlternateColorCodes('&', message);
     }
 
-    public List<String> getTranslationList(String key, String langCode, String... placeholders) {
-        YamlConfiguration config = (YamlConfiguration)this.langConfigCache.get(langCode);
+    public List<String> getTranslationList(
+        String key,
+        String langCode,
+        String... placeholders
+    ) {
+        YamlConfiguration config = (YamlConfiguration) this.langConfigCache.get(
+            langCode
+        );
         if (config == null) {
-            File langFile = new File(this.getDataFolder(), "lang/" + langCode + ".yml");
+            File langFile = new File(
+                this.getDataFolder(),
+                "lang/" + langCode + ".yml"
+            );
             if (!langFile.exists()) {
                 langFile = new File(this.getDataFolder(), "lang/en_US.yml");
                 if (!langFile.exists()) {
-                    return Collections.singletonList("§c[Lang Error] File not found: " + langCode);
+                    return Collections.singletonList(
+                        "§c[Lang Error] File not found: " + langCode
+                    );
                 }
             }
 
@@ -406,7 +556,13 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         if (list == null || list.isEmpty()) {
             String single = config.getString(key);
             if (single == null) {
-                return Collections.singletonList("§c[Lang Error] Key '" + key + "' not found in " + langCode + ".yml");
+                return Collections.singletonList(
+                    "§c[Lang Error] Key '" +
+                        key +
+                        "' not found in " +
+                        langCode +
+                        ".yml"
+                );
             }
 
             list = Collections.singletonList(single);
@@ -414,10 +570,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
         List<String> translated = new ArrayList();
 
-        for(String line : list) {
+        for (String line : list) {
             String msg = line;
             if (placeholders != null && placeholders.length > 0) {
-                for(int i = 0; i < placeholders.length - 1; i += 2) {
+                for (int i = 0; i < placeholders.length - 1; i += 2) {
                     msg = msg.replace(placeholders[i], placeholders[i + 1]);
                 }
 
@@ -434,10 +590,14 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         this.langConfigCache.clear();
     }
 
-    public String getTranslation(String key, String langCode, String... placeholders) {
+    public String getTranslation(
+        String key,
+        String langCode,
+        String... placeholders
+    ) {
         String message = this.getDirectTranslation(key, langCode);
         if (placeholders != null && placeholders.length > 0) {
-            for(int i = 0; i < placeholders.length - 1; i += 2) {
+            for (int i = 0; i < placeholders.length - 1; i += 2) {
                 String placeholder = placeholders[i];
                 String value = placeholders[i + 1];
                 if (message.contains(placeholder)) {
@@ -451,28 +611,35 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return message;
     }
 
-    private String applyLegacyStringPlaceholders(String message, String... placeholders) {
+    private String applyLegacyStringPlaceholders(
+        String message,
+        String... placeholders
+    ) {
         if (placeholders == null || placeholders.length < 2) {
             return message;
         }
 
         List<String> values = new ArrayList();
 
-        for(int i = 1; i < placeholders.length; i += 2) {
+        for (int i = 1; i < placeholders.length; i += 2) {
             values.add(placeholders[i]);
         }
 
-        for(int i = 0; i < values.size(); ++i) {
-            message = message.replace("%" + (i + 1) + "$s", (CharSequence)values.get(i));
+        for (int i = 0; i < values.size(); ++i) {
+            message = message.replace(
+                "%" + (i + 1) + "$s",
+                (CharSequence) values.get(i)
+            );
         }
 
-        for(String value : values) {
+        for (String value : values) {
             int idx = message.indexOf("%s");
             if (idx < 0) {
                 break;
             }
 
-            message = message.substring(0, idx) + value + message.substring(idx + 2);
+            message =
+                message.substring(0, idx) + value + message.substring(idx + 2);
         }
 
         return message;
@@ -484,7 +651,11 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         player.sendMessage(message);
     }
 
-    public void sendMessage(CommandSender sender, String key, String... placeholders) {
+    public void sendMessage(
+        CommandSender sender,
+        String key,
+        String... placeholders
+    ) {
         String langCode = "en_US";
         if (sender instanceof Player player) {
             langCode = this.dm.getPlayerLanguage(player.getUniqueId());
@@ -495,62 +666,100 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     }
 
     public void startLeaderboardUpdater() {
-        Bukkit.getScheduler().runTaskTimer(this, () -> {
-            if (!Bukkit.getOnlinePlayers().isEmpty()) {
-                this.leaderboards.values().forEach((leaderboard) -> leaderboard.updateLeaderboard());
-            }
-        }, 100L, 300L);
+        Bukkit.getScheduler().runTaskTimer(
+            this,
+            () -> {
+                if (!Bukkit.getOnlinePlayers().isEmpty()) {
+                    this.leaderboards.values().forEach(leaderboard ->
+                        leaderboard.updateLeaderboard()
+                    );
+                }
+            },
+            100L,
+            300L
+        );
     }
 
-    public TrackLeaderboard getOrCreateLeaderboard(String trackName, Location defaultLocation) {
-        return (TrackLeaderboard)this.leaderboards.computeIfAbsent(trackName, (tn) -> new TrackLeaderboard(this, tn, defaultLocation, this.dm));
+    public TrackLeaderboard getOrCreateLeaderboard(
+        String trackName,
+        Location defaultLocation
+    ) {
+        return (TrackLeaderboard) this.leaderboards.computeIfAbsent(
+            trackName,
+            tn -> new TrackLeaderboard(this, tn, defaultLocation, this.dm)
+        );
     }
 
     private void loadLeaderboards() {
         if (this.debugManager != null) {
-            this.debugManager.logDatabaseOperations("[FormulaRacing] Carregando leaderboards...");
+            this.debugManager.logDatabaseOperations(
+                "[FormulaRacing] Carregando leaderboards..."
+            );
         }
 
         try {
             List<String> tracks = this.dm.getAllTracks();
             if (this.debugManager != null) {
-                this.debugManager.logDatabaseOperations("[FormulaRacing] Encontradas " + tracks.size() + " pistas no banco");
+                this.debugManager.logDatabaseOperations(
+                    "[FormulaRacing] Encontradas " +
+                        tracks.size() +
+                        " pistas no banco"
+                );
             }
 
-            for(String trackName : tracks) {
+            for (String trackName : tracks) {
                 Location savedLoc = this.dm.getHologramLocation(trackName);
                 if (savedLoc != null) {
                     this.getOrCreateLeaderboard(trackName, savedLoc);
                 } else if (this.debugManager != null) {
-                    this.debugManager.logDatabaseOperations("[FormulaRacing] ⚠️ Pista '" + trackName + "' não tem localização de holograma definida (use /trackedit sethologram)");
+                    this.debugManager.logDatabaseOperations(
+                        "[FormulaRacing] ⚠️ Pista '" +
+                            trackName +
+                            "' não tem localização de holograma definida (use /trackedit sethologram)"
+                    );
                 }
             }
         } catch (Exception e) {
             if (this.debugManager != null) {
-                this.debugManager.logRaceSystem("[FormulaRacing] Erro ao carregar leaderboards: " + e.getMessage());
+                this.debugManager.logRaceSystem(
+                    "[FormulaRacing] Erro ao carregar leaderboards: " +
+                        e.getMessage()
+                );
             }
         }
-
     }
 
     private void registerModChannel() {
-        this.getServer().getMessenger().registerIncomingPluginChannel(this, "openboatutils:settings", (channel, player, message) -> {
-            if (channel.equals("openboatutils:settings")) {
-                ByteBuffer buf = ByteBuffer.wrap(message);
-                short packetId = buf.getShort();
-                int versionId = buf.getInt();
-                if (packetId == 0) {
-                    setPlayerHasMod(player.getUniqueId(), true);
-                    setPlayerModVersion(player.getUniqueId(), versionId);
-                    if (this.debugManager != null) {
-                        DebugManager var10000 = this.debugManager;
-                        String var10001 = player.getName();
-                        var10000.logPacketHandling("[FormulaRacing] Player " + var10001 + " entrou com OpenBoatUtils v" + versionId);
+        this.getServer()
+            .getMessenger()
+            .registerIncomingPluginChannel(
+                this,
+                "openboatutils:settings",
+                (channel, player, message) -> {
+                    if (channel.equals("openboatutils:settings")) {
+                        ByteBuffer buf = ByteBuffer.wrap(message);
+                        short packetId = buf.getShort();
+                        int versionId = buf.getInt();
+                        if (packetId == 0) {
+                            setPlayerHasMod(player.getUniqueId(), true);
+                            setPlayerModVersion(
+                                player.getUniqueId(),
+                                versionId
+                            );
+                            if (this.debugManager != null) {
+                                DebugManager var10000 = this.debugManager;
+                                String var10001 = player.getName();
+                                var10000.logPacketHandling(
+                                    "[FormulaRacing] Player " +
+                                        var10001 +
+                                        " entrou com OpenBoatUtils v" +
+                                        versionId
+                                );
+                            }
+                        }
                     }
                 }
-
-            }
-        });
+            );
     }
 
     public static void setPlayerHasMod(UUID uuid, boolean hasMod) {
@@ -558,11 +767,13 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         if (!hasMod) {
             playersModVersion.remove(uuid);
         }
-
     }
 
     public static boolean hasOpenBoatUtilsMod(Player player) {
-        return (Boolean)playersWithMod.getOrDefault(player.getUniqueId(), false);
+        return (Boolean) playersWithMod.getOrDefault(
+            player.getUniqueId(),
+            false
+        );
     }
 
     public static void setPlayerModVersion(UUID uuid, int version) {
@@ -570,7 +781,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     }
 
     public static int getPlayerModVersion(Player player) {
-        return (Integer)playersModVersion.getOrDefault(player.getUniqueId(), -1);
+        return (Integer) playersModVersion.getOrDefault(
+            player.getUniqueId(),
+            -1
+        );
     }
 
     public TimerUtils getTimerUtils() {
@@ -674,7 +888,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     }
 
     public String getLastTimeTrialTrack(UUID playerId) {
-        return (String)this.lastTimeTrialTrack.get(playerId);
+        return (String) this.lastTimeTrialTrack.get(playerId);
     }
 
     public void setLastDuelTrack(UUID playerId, String track) {
@@ -682,7 +896,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     }
 
     public String getLastDuelTrack(UUID playerId) {
-        return (String)this.lastDuelTrack.get(playerId);
+        return (String) this.lastDuelTrack.get(playerId);
     }
 
     public void clearLastDuelTrack(UUID playerId) {
@@ -716,242 +930,504 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     }
 
     private void registerCommandContexts() {
-        this.commandManager.getCommandContexts().registerContext(Events.class, (c) -> {
-            String arg = c.popFirstArg();
-            return (arg.equalsIgnoreCase("quickrace") || arg.equalsIgnoreCase("qr")) && this.quickRaceManager != null && this.quickRaceManager.isQuickRaceActive() ? (Events)this.quickRaceManager.getCurrentQuickRace().orElseThrow(() -> new InvalidCommandArgument("Nenhuma Quick Race ativa no momento.")) : (Events)this.raceEventManager.getEventByName(arg).orElseThrow(() -> new InvalidCommandArgument("Evento não encontrado: " + arg));
-        });
-        this.commandManager.getCommandContexts().registerContext(Rounds.class, (c) -> {
-            String arg1 = c.popFirstArg();
-            Events event = null;
-            String roundArg = null;
-            if (!c.getArgs().isEmpty()) {
-                event = (Events)this.raceEventManager.getEventByName(arg1).orElse(null);
-                if (event != null) {
-                    roundArg = c.popFirstArg();
-                }
+        this.commandManager.getCommandContexts().registerContext(
+            Events.class,
+            c -> {
+                String arg = c.popFirstArg();
+                return (arg.equalsIgnoreCase("quickrace") ||
+                        arg.equalsIgnoreCase("qr")) &&
+                    this.quickRaceManager != null &&
+                    this.quickRaceManager.isQuickRaceActive()
+                    ? (Events) this.quickRaceManager.getCurrentQuickRace().orElseThrow(
+                          () ->
+                              new InvalidCommandArgument(
+                                  "Nenhuma Quick Race ativa no momento."
+                              )
+                      )
+                    : (Events) this.raceEventManager.getEventByName(
+                          arg
+                      ).orElseThrow(() ->
+                          new InvalidCommandArgument(
+                              "Evento não encontrado: " + arg
+                          )
+                      );
             }
-
-            if (event == null) {
-                roundArg = arg1;
-                if (c.getPlayer() != null) {
-                    event = (Events)this.dm.getPlayerSelectedEvent(c.getPlayer().getUniqueId()).orElse(null);
-                }
-            }
-
-            if (event == null) {
-                throw new InvalidCommandArgument("Evento não encontrado ou não selecionado.");
-            } else if (roundArg == null) {
-                throw new InvalidCommandArgument("Round não especificado.");
-            } else {
-                String finalRoundArg = roundArg;
-
-                try {
-                    String cleanRound = finalRoundArg.toUpperCase().replace("R", "");
-                    int roundIdx = Integer.parseInt(cleanRound);
-                    return (Rounds)event.getSchedule().getRound(roundIdx).orElseThrow(() -> new InvalidCommandArgument("Round não encontrado: " + finalRoundArg));
-                } catch (NumberFormatException var8) {
-                    throw new InvalidCommandArgument("Número do round inválido: " + roundArg);
-                }
-            }
-        });
-        this.commandManager.getCommandContexts().registerContext(Heats.class, (c) -> {
-            String arg1 = c.popFirstArg();
-            Events event = null;
-            Rounds round = null;
-            String heatArg = null;
-            if (arg1.toUpperCase().matches("R\\d+[QFH]\\d+")) {
-                this.getLogger().info("[HEAT RESOLVER DEBUG] Tentando resolver código de heat: " + arg1);
-                if (c.getPlayer() != null) {
-                    event = (Events)this.dm.getPlayerSelectedEvent(c.getPlayer().getUniqueId()).orElse(null);
-                    Logger var10000 = this.getLogger();
-                    String var10001 = event != null ? event.getDisplayName() : "null";
-                    var10000.info("[HEAT RESOLVER DEBUG] Evento selecionado do jogador: " + var10001);
+        );
+        this.commandManager.getCommandContexts().registerContext(
+            Rounds.class,
+            c -> {
+                String arg1 = c.popFirstArg();
+                Events event = null;
+                String roundArg = null;
+                if (!c.getArgs().isEmpty()) {
+                    event = (Events) this.raceEventManager.getEventByName(
+                        arg1
+                    ).orElse(null);
+                    if (event != null) {
+                        roundArg = c.popFirstArg();
+                    }
                 }
 
                 if (event == null) {
-                    event = (Events)this.raceEventManager.getAllEvents().stream().filter(Events::isActive).findFirst().orElse(null);
-                    Logger var24 = this.getLogger();
-                    String var26 = event != null ? event.getDisplayName() : "null";
-                    var24.info("[HEAT RESOLVER DEBUG] Evento ativo global: " + var26);
+                    roundArg = arg1;
+                    if (c.getPlayer() != null) {
+                        event = (Events) this.dm.getPlayerSelectedEvent(
+                            c.getPlayer().getUniqueId()
+                        ).orElse(null);
+                    }
                 }
 
-                if (event != null) {
-                    this.getLogger().info("[HEAT RESOLVER DEBUG] Iterando por " + event.getSchedule().getRoundsCollection().size() + " rounds");
-
-                    for(Rounds r : event.getSchedule().getRoundsCollection()) {
-                        Logger var25 = this.getLogger();
-                        int var27 = r.getRoundIndex();
-                        var25.info("[HEAT RESOLVER DEBUG] Verificando round " + var27 + " (" + String.valueOf(r.getType()) + ") com " + r.getHeats().size() + " heats");
-
-                        for(Heats h : r.getHeats().values()) {
-                            String heatName = h.getName();
-                            this.getLogger().info("[HEAT RESOLVER DEBUG]   Heat: " + heatName + " vs " + arg1);
-                            if (heatName.equalsIgnoreCase(arg1)) {
-                                this.getLogger().info("[HEAT RESOLVER DEBUG] ✓ Match encontrado!");
-                                return h;
-                            }
-                        }
-                    }
-
-                    this.getLogger().info("[HEAT RESOLVER DEBUG] Nenhum heat encontrado com código " + arg1);
+                if (event == null) {
+                    throw new InvalidCommandArgument(
+                        "Evento não encontrado ou não selecionado."
+                    );
+                } else if (roundArg == null) {
+                    throw new InvalidCommandArgument("Round não especificado.");
                 } else {
-                    this.getLogger().info("[HEAT RESOLVER DEBUG] Nenhum evento encontrado");
-                }
-            }
+                    String finalRoundArg = roundArg;
 
-            if (!c.getArgs().isEmpty()) {
-                event = (Events)this.raceEventManager.getEventByName(arg1).orElse(null);
-                if (event != null) {
-                    String roundArg = c.popFirstArg();
-                    if (!c.getArgs().isEmpty()) {
-                        try {
-                            String cleanRound = roundArg.toUpperCase().replace("R", "");
-                            int roundIdx = Integer.parseInt(cleanRound);
-                            round = (Rounds)event.getSchedule().getRound(roundIdx).orElse(null);
-                            if (round != null) {
-                                heatArg = c.popFirstArg();
-                            }
-                        } catch (NumberFormatException var13) {
-                        }
+                    try {
+                        String cleanRound = finalRoundArg
+                            .toUpperCase()
+                            .replace("R", "");
+                        int roundIdx = Integer.parseInt(cleanRound);
+                        return (Rounds) event
+                            .getSchedule()
+                            .getRound(roundIdx)
+                            .orElseThrow(() ->
+                                new InvalidCommandArgument(
+                                    "Round não encontrado: " + finalRoundArg
+                                )
+                            );
+                    } catch (NumberFormatException var8) {
+                        throw new InvalidCommandArgument(
+                            "Número do round inválido: " + roundArg
+                        );
                     }
                 }
             }
+        );
+        this.commandManager.getCommandContexts().registerContext(
+            Heats.class,
+            c -> {
+                String arg1 = c.popFirstArg();
+                Events event = null;
+                Rounds round = null;
+                String heatArg = null;
+                if (arg1.toUpperCase().matches("R\\d+[QFH]\\d+")) {
+                    this.getLogger().info(
+                        "[HEAT RESOLVER DEBUG] Tentando resolver código de heat: " +
+                            arg1
+                    );
+                    if (c.getPlayer() != null) {
+                        event = (Events) this.dm.getPlayerSelectedEvent(
+                            c.getPlayer().getUniqueId()
+                        ).orElse(null);
+                        Logger var10000 = this.getLogger();
+                        String var10001 =
+                            event != null ? event.getDisplayName() : "null";
+                        var10000.info(
+                            "[HEAT RESOLVER DEBUG] Evento selecionado do jogador: " +
+                                var10001
+                        );
+                    }
 
-            if (round == null && c.getPlayer() != null) {
-                event = (Events)this.dm.getPlayerSelectedEvent(c.getPlayer().getUniqueId()).orElse(null);
-                if (event != null) {
-                    String roundArg = arg1;
-                    if (!c.getArgs().isEmpty()) {
-                        try {
-                            String cleanRound = roundArg.toUpperCase().replace("R", "");
-                            int roundIdx = Integer.parseInt(cleanRound);
-                            round = (Rounds)event.getSchedule().getRound(roundIdx).orElse(null);
-                            if (round != null) {
-                                heatArg = c.popFirstArg();
+                    if (event == null) {
+                        event = (Events) this.raceEventManager.getAllEvents()
+                            .stream()
+                            .filter(Events::isActive)
+                            .findFirst()
+                            .orElse(null);
+                        Logger var24 = this.getLogger();
+                        String var26 =
+                            event != null ? event.getDisplayName() : "null";
+                        var24.info(
+                            "[HEAT RESOLVER DEBUG] Evento ativo global: " +
+                                var26
+                        );
+                    }
+
+                    if (event != null) {
+                        this.getLogger().info(
+                            "[HEAT RESOLVER DEBUG] Iterando por " +
+                                event
+                                    .getSchedule()
+                                    .getRoundsCollection()
+                                    .size() +
+                                " rounds"
+                        );
+
+                        for (Rounds r : event
+                            .getSchedule()
+                            .getRoundsCollection()) {
+                            Logger var25 = this.getLogger();
+                            int var27 = r.getRoundIndex();
+                            var25.info(
+                                "[HEAT RESOLVER DEBUG] Verificando round " +
+                                    var27 +
+                                    " (" +
+                                    String.valueOf(r.getType()) +
+                                    ") com " +
+                                    r.getHeats().size() +
+                                    " heats"
+                            );
+
+                            for (Heats h : r.getHeats().values()) {
+                                String heatName = h.getName();
+                                this.getLogger().info(
+                                    "[HEAT RESOLVER DEBUG]   Heat: " +
+                                        heatName +
+                                        " vs " +
+                                        arg1
+                                );
+                                if (heatName.equalsIgnoreCase(arg1)) {
+                                    this.getLogger().info(
+                                        "[HEAT RESOLVER DEBUG] ✓ Match encontrado!"
+                                    );
+                                    return h;
+                                }
                             }
-                        } catch (NumberFormatException var12) {
                         }
+
+                        this.getLogger().info(
+                            "[HEAT RESOLVER DEBUG] Nenhum heat encontrado com código " +
+                                arg1
+                        );
                     } else {
-                        round = (Rounds)event.getSchedule().getCurrentRound().orElse(null);
-                        if (round != null) {
-                            heatArg = arg1;
+                        this.getLogger().info(
+                            "[HEAT RESOLVER DEBUG] Nenhum evento encontrado"
+                        );
+                    }
+                }
+
+                if (!c.getArgs().isEmpty()) {
+                    event = (Events) this.raceEventManager.getEventByName(
+                        arg1
+                    ).orElse(null);
+                    if (event != null) {
+                        String roundArg = c.popFirstArg();
+                        if (!c.getArgs().isEmpty()) {
+                            try {
+                                String cleanRound = roundArg
+                                    .toUpperCase()
+                                    .replace("R", "");
+                                int roundIdx = Integer.parseInt(cleanRound);
+                                round = (Rounds) event
+                                    .getSchedule()
+                                    .getRound(roundIdx)
+                                    .orElse(null);
+                                if (round != null) {
+                                    heatArg = c.popFirstArg();
+                                }
+                            } catch (NumberFormatException var13) {}
                         }
                     }
                 }
-            }
 
-            if (round == null) {
-                throw new InvalidCommandArgument("Round não encontrado ou não selecionado.");
-            } else {
-                String finalHeatArg = heatArg;
+                if (round == null && c.getPlayer() != null) {
+                    event = (Events) this.dm.getPlayerSelectedEvent(
+                        c.getPlayer().getUniqueId()
+                    ).orElse(null);
+                    if (event != null) {
+                        String roundArg = arg1;
+                        if (!c.getArgs().isEmpty()) {
+                            try {
+                                String cleanRound = roundArg
+                                    .toUpperCase()
+                                    .replace("R", "");
+                                int roundIdx = Integer.parseInt(cleanRound);
+                                round = (Rounds) event
+                                    .getSchedule()
+                                    .getRound(roundIdx)
+                                    .orElse(null);
+                                if (round != null) {
+                                    heatArg = c.popFirstArg();
+                                }
+                            } catch (NumberFormatException var12) {}
+                        } else {
+                            round = (Rounds) event
+                                .getSchedule()
+                                .getCurrentRound()
+                                .orElse(null);
+                            if (round != null) {
+                                heatArg = arg1;
+                            }
+                        }
+                    }
+                }
 
-                try {
-                    int heatIdx = Integer.parseInt(finalHeatArg);
-                    return (Heats)round.getHeat(heatIdx).orElseThrow(() -> new InvalidCommandArgument("Heat não encontrado: " + finalHeatArg));
-                } catch (NumberFormatException var11) {
-                    throw new InvalidCommandArgument("Número do heat inválido: " + heatArg);
+                if (round == null) {
+                    throw new InvalidCommandArgument(
+                        "Round não encontrado ou não selecionado."
+                    );
+                } else {
+                    String finalHeatArg = heatArg;
+
+                    try {
+                        int heatIdx = Integer.parseInt(finalHeatArg);
+                        return (Heats) round
+                            .getHeat(heatIdx)
+                            .orElseThrow(() ->
+                                new InvalidCommandArgument(
+                                    "Heat não encontrado: " + finalHeatArg
+                                )
+                            );
+                    } catch (NumberFormatException var11) {
+                        throw new InvalidCommandArgument(
+                            "Número do heat inválido: " + heatArg
+                        );
+                    }
                 }
             }
-        });
+        );
     }
 
     private void registerCommandCompletions() {
-        this.commandManager.getCommandCompletions().registerCompletion("tracks", (c) -> this.dm.getAllTracks().stream().filter((trackName) -> this.dm.isTrackOpen(trackName)).map((t) -> t.replace(" ", "")).toList());
-        this.commandManager.getCommandCompletions().registerCompletion("boatutils_settings", (c) -> Arrays.asList("defaultslipperiness", "jumpforce", "yawacceleration", "forwardacceleration", "backwardacceleration", "turningforwardacceleration", "swimforce", "stepheight", "gravity", "falldamage", "waterelevation", "aircontrol", "allowaccelerationstacking", "underwatercontrol", "surfacewatercontrol", "waterjumping", "airstepping", "tenstepinterpolation", "collisionmode", "collisionresolution", "coyotetime"));
-        this.commandManager.getCommandCompletions().registerCompletion("boatutils_group_modes", (c) -> Arrays.stream(BoatUtilsGroupMode.values()).map(Enum::name).toList());
-        this.commandManager.getCommandCompletions().registerCompletion("materials", (c) -> Arrays.stream(Material.values()).filter(Material::isBlock).map((m) -> m.getKey().getKey()).toList());
-        this.commandManager.getCommandCompletions().registerCompletion("languages", (c) -> {
-            File langFolder = new File(this.getDataFolder(), "lang");
-            if (!langFolder.exists()) {
-                return Collections.emptyList();
-            } else {
-                File[] files = langFolder.listFiles((dir, name) -> name.endsWith(".yml"));
-                return files == null ? Collections.emptyList() : Arrays.stream(files).map((f) -> f.getName().replace(".yml", "")).toList();
-            }
-        });
-        this.commandManager.getCommandCompletions().registerCompletion("boats", (c) -> List.of("oak_boat", "birch_boat", "spruce_boat", "jungle_boat", "acacia_boat", "dark_oak_boat", "mangrove_boat", "cherry_boat", "bamboo_raft", "oak_chest_boat", "birch_chest_boat", "spruce_chest_boat", "jungle_chest_boat", "acacia_chest_boat", "dark_oak_chest_boat", "mangrove_chest_boat", "cherry_chest_boat", "bamboo_chest_raft"));
-        this.commandManager.getCommandCompletions().registerCompletion("event", (c) -> {
-            List<String> events = new ArrayList(this.raceEventManager.getAllEvents().stream().map(Events::getDisplayName).toList());
-            if (this.quickRaceManager != null && this.quickRaceManager.isQuickRaceActive()) {
-                events.add("quickrace");
-            }
-
-            return events;
-        });
-        this.commandManager.getCommandCompletions().registerCompletion("round", (c) -> {
-            Events event = null;
-
-            try {
-                event = (Events)c.getContextValue(Events.class);
-            } catch (Exception var6) {
-            }
-
-            if (event == null) {
-                String input = c.getInput();
-                String[] configs = c.getConfig().split(" ");
-                if (configs.length > 2) {
-                    String eventName = configs[2];
-                    event = (Events)this.raceEventManager.getEventByName(eventName).orElse(null);
+        this.commandManager.getCommandCompletions().registerCompletion(
+            "tracks",
+            c ->
+                this.dm.getAllTracks()
+                    .stream()
+                    .filter(trackName -> this.dm.isTrackOpen(trackName))
+                    .map(t -> t.replace(" ", ""))
+                    .toList()
+        );
+        this.commandManager.getCommandCompletions().registerCompletion(
+            "boatutils_settings",
+            c ->
+                Arrays.asList(
+                    "defaultslipperiness",
+                    "jumpforce",
+                    "yawacceleration",
+                    "forwardacceleration",
+                    "backwardacceleration",
+                    "turningforwardacceleration",
+                    "swimforce",
+                    "stepheight",
+                    "gravity",
+                    "falldamage",
+                    "waterelevation",
+                    "aircontrol",
+                    "allowaccelerationstacking",
+                    "underwatercontrol",
+                    "surfacewatercontrol",
+                    "waterjumping",
+                    "airstepping",
+                    "tenstepinterpolation",
+                    "collisionmode",
+                    "collisionresolution",
+                    "coyotetime"
+                )
+        );
+        this.commandManager.getCommandCompletions().registerCompletion(
+            "boatutils_group_modes",
+            c ->
+                Arrays.stream(BoatUtilsGroupMode.values())
+                    .map(Enum::name)
+                    .toList()
+        );
+        this.commandManager.getCommandCompletions().registerCompletion(
+            "materials",
+            c ->
+                Arrays.stream(Material.values())
+                    .filter(Material::isBlock)
+                    .map(m -> m.getKey().getKey())
+                    .toList()
+        );
+        this.commandManager.getCommandCompletions().registerCompletion(
+            "languages",
+            c -> {
+                File langFolder = new File(this.getDataFolder(), "lang");
+                if (!langFolder.exists()) {
+                    return Collections.emptyList();
+                } else {
+                    File[] files = langFolder.listFiles((dir, name) ->
+                        name.endsWith(".yml")
+                    );
+                    return files == null
+                        ? Collections.emptyList()
+                        : Arrays.stream(files)
+                              .map(f -> f.getName().replace(".yml", ""))
+                              .toList();
                 }
             }
+        );
+        this.commandManager.getCommandCompletions().registerCompletion(
+            "boats",
+            c ->
+                List.of(
+                    "oak_boat",
+                    "birch_boat",
+                    "spruce_boat",
+                    "jungle_boat",
+                    "acacia_boat",
+                    "dark_oak_boat",
+                    "mangrove_boat",
+                    "cherry_boat",
+                    "bamboo_raft",
+                    "oak_chest_boat",
+                    "birch_chest_boat",
+                    "spruce_chest_boat",
+                    "jungle_chest_boat",
+                    "acacia_chest_boat",
+                    "dark_oak_chest_boat",
+                    "mangrove_chest_boat",
+                    "cherry_chest_boat",
+                    "bamboo_chest_raft"
+                )
+        );
+        this.commandManager.getCommandCompletions().registerCompletion(
+            "event",
+            c -> {
+                List<String> events = new ArrayList(
+                    this.raceEventManager.getAllEvents()
+                        .stream()
+                        .map(Events::getDisplayName)
+                        .toList()
+                );
+                if (
+                    this.quickRaceManager != null &&
+                    this.quickRaceManager.isQuickRaceActive()
+                ) {
+                    events.add("quickrace");
+                }
 
-            if (event == null && c.getPlayer() != null) {
-                event = (Events)this.dm.getPlayerSelectedEvent(c.getPlayer().getUniqueId()).orElse(null);
+                return events;
             }
+        );
+        this.commandManager.getCommandCompletions().registerCompletion(
+            "round",
+            c -> {
+                Events event = null;
 
-            return event == null ? Collections.emptyList() : event.getSchedule().getRoundsCollection().stream().map((r) -> "R" + r.getRoundNumber()).toList();
-        });
-        this.commandManager.getCommandCompletions().registerCompletion("heat", (c) -> {
-            Rounds round = null;
+                try {
+                    event = (Events) c.getContextValue(Events.class);
+                } catch (Exception var6) {}
 
-            try {
-                round = (Rounds) c.getContextValue(Rounds.class);
-            } catch (Exception var10) {
-            }
-
-            if (round == null && c.getConfig() != null) {
-                String[] configs = c.getConfig().split(" ");
-                if (configs.length > 3) {
-                    String eventName = configs[2];
-                    String roundName = configs[3];
-                    Events event = (Events) this.raceEventManager.getEventByName(eventName).orElse(null);
-                    if (event != null) {
-                        String cleanRound = roundName.toUpperCase().replace("R", "");
-
-                        try {
-                            int roundIdx = Integer.parseInt(cleanRound);
-                            round = (Rounds) event.getSchedule().getRound(roundIdx).orElse(null);
-                        } catch (NumberFormatException var9) {
+                if (event == null) {
+                    String input = c.getInput();
+                    String config = c.getConfig();
+                    if (config != null && !config.isBlank()) {
+                        String[] configs = config.split(" ");
+                        if (configs.length > 2) {
+                            String eventName = configs[2];
+                            event =
+                                (Events) this.raceEventManager.getEventByName(
+                                    eventName
+                                ).orElse(null);
                         }
                     }
                 }
-            }
 
-            // Criamos uma cópia final da variável para a Lambda
-            final Rounds finalRound = round;
-
-            if (finalRound == null && c.getPlayer() != null) {
-                Events selected = (Events) this.dm.getPlayerSelectedEvent(c.getPlayer().getUniqueId()).orElse(null);
-                if (selected != null) {
-                    return selected.getSchedule().getRoundsCollection().stream()
-                            .flatMap((r) -> {
-                                // 'r' já é final por ser parâmetro da lambda, mas o prefixo depende dele
-                                String typePrefix = r.getType() == RoundType.QUALIFICATION ? "Q" : "F";
-                                return r.getHeats().values().stream().map((h) ->
-                                        "R" + r.getRoundIndex() + typePrefix + h.getHeatNumber()
-                                );
-                            }).toList();
+                if (event == null && c.getPlayer() != null) {
+                    event = (Events) this.dm.getPlayerSelectedEvent(
+                        c.getPlayer().getUniqueId()
+                    ).orElse(null);
                 }
+
+                return event == null
+                    ? Collections.emptyList()
+                    : event
+                          .getSchedule()
+                          .getRoundsCollection()
+                          .stream()
+                          .map(r -> "R" + r.getRoundNumber())
+                          .toList();
             }
+        );
+        this.commandManager.getCommandCompletions().registerCompletion(
+            "heat",
+            c -> {
+                Rounds round = null;
 
+                try {
+                    round = (Rounds) c.getContextValue(Rounds.class);
+                } catch (Exception var10) {}
 
-// Usamos a cópia final aqui também
-            return finalRound == null ? Collections.emptyList() : finalRound.getHeats().values().stream().map((h) -> {
-                String typePrefix = finalRound.getType() == RoundType.QUALIFICATION ? "Q" : "F";
-                return "R" + finalRound.getRoundIndex() + typePrefix + h.getHeatNumber();
-            }).toList();
-        });
+                if (round == null && c.getConfig() != null) {
+                    String[] configs = c.getConfig().split(" ");
+                    if (configs.length > 3) {
+                        String eventName = configs[2];
+                        String roundName = configs[3];
+                        Events event =
+                            (Events) this.raceEventManager.getEventByName(
+                                eventName
+                            ).orElse(null);
+                        if (event != null) {
+                            String cleanRound = roundName
+                                .toUpperCase()
+                                .replace("R", "");
+
+                            try {
+                                int roundIdx = Integer.parseInt(cleanRound);
+                                round = (Rounds) event
+                                    .getSchedule()
+                                    .getRound(roundIdx)
+                                    .orElse(null);
+                            } catch (NumberFormatException var9) {}
+                        }
+                    }
+                }
+
+                // Criamos uma cópia final da variável para a Lambda
+                final Rounds finalRound = round;
+
+                if (finalRound == null && c.getPlayer() != null) {
+                    Events selected = (Events) this.dm.getPlayerSelectedEvent(
+                        c.getPlayer().getUniqueId()
+                    ).orElse(null);
+                    if (selected != null) {
+                        return selected
+                            .getSchedule()
+                            .getRoundsCollection()
+                            .stream()
+                            .flatMap(r -> {
+                                // 'r' já é final por ser parâmetro da lambda, mas o prefixo depende dele
+                                String typePrefix =
+                                    r.getType() == RoundType.QUALIFICATION
+                                        ? "Q"
+                                        : "F";
+                                return r
+                                    .getHeats()
+                                    .values()
+                                    .stream()
+                                    .map(
+                                        h ->
+                                            "R" +
+                                            r.getRoundIndex() +
+                                            typePrefix +
+                                            h.getHeatNumber()
+                                    );
+                            })
+                            .toList();
+                    }
+                }
+
+                // Usamos a cópia final aqui também
+                return finalRound == null
+                    ? Collections.emptyList()
+                    : finalRound
+                          .getHeats()
+                          .values()
+                          .stream()
+                          .map(h -> {
+                              String typePrefix =
+                                  finalRound.getType() ==
+                                  RoundType.QUALIFICATION
+                                      ? "Q"
+                                      : "F";
+                              return (
+                                  "R" +
+                                  finalRound.getRoundIndex() +
+                                  typePrefix +
+                                  h.getHeatNumber()
+                              );
+                          })
+                          .toList();
+            }
+        );
     }
+
     public DrsManager getDRS() {
         return this.drsManager;
     }
@@ -967,24 +1443,38 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             if (data != null && !data.isEmpty()) {
                 boolean requiresOBU = false;
                 Object stepHeightObj = data.get("stepHeight");
-                if (stepHeightObj instanceof Number && ((Number)stepHeightObj).floatValue() > 0.6F) {
+                if (
+                    stepHeightObj instanceof Number &&
+                    ((Number) stepHeightObj).floatValue() > 0.6F
+                ) {
                     requiresOBU = true;
                 }
 
                 if (!requiresOBU) {
-                    requiresOBU = (Boolean)data.getOrDefault("waterElevation", false);
+                    requiresOBU = (Boolean) data.getOrDefault(
+                        "waterElevation",
+                        false
+                    );
                 }
 
                 if (requiresOBU && !hasOpenBoatUtilsMod(player)) {
                     Bukkit.getScheduler().runTask(this, () -> {
                         player.sendMessage(" ");
-                        player.sendMessage("§c§l⚠ ATENÇÃO: §fEsta pista requer que seu barco suba blocos!");
-                        player.sendMessage("§fVocê está sem o §b§lOpenBoatUtils§f, então não conseguirá subir as elevações.");
-                        ClickableMessageUtil.sendClickableUrl(player, "§b[CLIQUE AQUI PARA BAIXAR O MOD]", "https://modrinth.com/mod/openboatutils", "Clique para abrir a página de download");
+                        player.sendMessage(
+                            "§c§l⚠ ATENÇÃO: §fEsta pista requer que seu barco suba blocos!"
+                        );
+                        player.sendMessage(
+                            "§fVocê está sem o §b§lOpenBoatUtils§f, então não conseguirá subir as elevações."
+                        );
+                        ClickableMessageUtil.sendClickableUrl(
+                            player,
+                            "§b[CLIQUE AQUI PARA BAIXAR O MOD]",
+                            "https://modrinth.com/mod/openboatutils",
+                            "Clique para abrir a página de download"
+                        );
                         player.sendMessage(" ");
                     });
                 }
-
             }
         });
     }

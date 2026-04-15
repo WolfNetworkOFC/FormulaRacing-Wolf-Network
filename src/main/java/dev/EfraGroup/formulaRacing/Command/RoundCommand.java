@@ -130,21 +130,6 @@ public class RoundCommand extends BaseCommand {
                                 String.valueOf(type) +
                                 ") criado com sucesso!"
                         );
-                        if (
-                            type == RoundType.PRACTICE ||
-                            type == RoundType.QUALIFICATION
-                        ) {
-                            this.eventManager.createHeat(r, 1).thenAccept(
-                                heat -> {
-                                    if (heat != null) {
-                                        player.sendMessage(
-                                            String.valueOf(ChatColor.GRAY) +
-                                                "  ➜ Heat 1 criado automaticamente."
-                                        );
-                                    }
-                                }
-                            );
-                        }
                     } else {
                         player.sendMessage(
                             String.valueOf(ChatColor.RED) +
