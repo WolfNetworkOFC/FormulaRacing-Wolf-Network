@@ -5,9 +5,9 @@
 
 package dev.EfraGroup.formulaRacing.Database;
 
-import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Event.EventState;
 import dev.EfraGroup.formulaRacing.Event.Events;
+import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.CollisionMode;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
@@ -38,15 +38,23 @@ import org.bukkit.Location;
 import org.bukkit.World;
 
 public class EventsDatabaseManager {
+
     private final DatabaseManager databaseManager;
     private final FormulaRacing plugin;
 
-    public EventsDatabaseManager(DatabaseManager databaseManager, FormulaRacing plugin) {
+    public EventsDatabaseManager(
+        DatabaseManager databaseManager,
+        FormulaRacing plugin
+    ) {
         this.databaseManager = databaseManager;
         this.plugin = plugin;
     }
 
-    private void executeAsync(String sql, String operationName, Consumer<PreparedStatement> binder) {
+    private void executeAsync(
+        String sql,
+        String operationName,
+        Consumer<PreparedStatement> binder
+    ) {
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
@@ -59,22 +67,32 @@ public class EventsDatabaseManager {
                     stmt.executeUpdate();
                 }
             } catch (SQLException e) {
-                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro assíncrono em " + operationName + ": " + e.getMessage());
+                this.plugin.getDebugManager().logDatabaseOperation(
+                    "[EventsDB] Erro assíncrono em " +
+                        operationName +
+                        ": " +
+                        e.getMessage()
+                );
             }
-
         });
     }
 
-    public CompletableFuture<Integer> createEvent(UUID creatorUUID, String name, String trackNameWS) {
+    public CompletableFuture<Integer> createEvent(
+        UUID creatorUUID,
+        String name,
+        String trackNameWS
+    ) {
         CompletableFuture<Integer> future = new CompletableFuture();
-        String sql = "INSERT INTO fr_events (creatorUUID, name, trackNameWS, creationTime, state, openSign) VALUES (?, ?, ?, ?, ?, ?)";
+        String sql =
+            "INSERT INTO fr_events (creatorUUID, name, trackNameWS, creationTime, state, openSign) VALUES (?, ?, ?, ?, ?, ?)";
+        String sanitizedName = this.sanitizeEventName(name, trackNameWS);
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
 
                 try (PreparedStatement stmt = conn.prepareStatement(sql, 1)) {
                     stmt.setString(1, creatorUUID.toString());
-                    stmt.setString(2, name);
+                    stmt.setString(2, sanitizedName);
                     stmt.setString(3, trackNameWS);
                     stmt.setLong(4, Instant.now().getEpochSecond());
                     stmt.setString(5, EventState.SETUP.name());
@@ -84,7 +102,12 @@ public class EventsDatabaseManager {
                     try (ResultSet rs = stmt.getGeneratedKeys()) {
                         if (rs.next()) {
                             int eventId = rs.getInt(1);
-                            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Evento criado (Assíncrono): ID=" + eventId + ", Nome=" + name);
+                            this.plugin.getDebugManager().logDatabaseOperation(
+                                "[EventsDB] Evento criado (Assíncrono): ID=" +
+                                    eventId +
+                                    ", Nome=" +
+                                    sanitizedName
+                            );
                             future.complete(eventId);
                         } else {
                             future.complete(-1);
@@ -92,17 +115,64 @@ public class EventsDatabaseManager {
                     }
                 }
             } catch (SQLException e) {
-                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao criar evento (Assíncrono): " + e.getMessage());
+                this.plugin.getDebugManager().logDatabaseOperation(
+                    "[EventsDB] Erro ao criar evento (Assíncrono): " +
+                        e.getMessage()
+                );
                 future.complete(-1);
             }
-
         });
         return future;
     }
 
-    public CompletableFuture<Integer> createRound(int eventId, int roundIndex, RoundType type) {
+    private String sanitizeEventName(String name, String trackNameWS) {
+        if (name == null) {
+            return null;
+        }
+
+        String trimmed = name.trim();
+        if (
+            trimmed.isEmpty() ||
+            trackNameWS == null ||
+            trackNameWS.trim().isEmpty()
+        ) {
+            return trimmed;
+        }
+
+        String normalizedTrack = trackNameWS
+            .replaceAll("\\s+", "")
+            .toLowerCase();
+        String[] parts = trimmed.split("\\s+");
+        if (parts.length < 2) {
+            return trimmed;
+        }
+
+        String last = parts[parts.length - 1].replaceAll(
+            "\\s+",
+            ""
+        ).toLowerCase();
+        String secondLast = parts[parts.length - 2].replaceAll(
+            "\\s+",
+            ""
+        ).toLowerCase();
+
+        if (
+            last.equals(normalizedTrack) && secondLast.equals(normalizedTrack)
+        ) {
+            return trimmed.substring(0, trimmed.lastIndexOf(' ')).trim();
+        }
+
+        return trimmed;
+    }
+
+    public CompletableFuture<Integer> createRound(
+        int eventId,
+        int roundIndex,
+        RoundType type
+    ) {
         CompletableFuture<Integer> future = new CompletableFuture();
-        String sql = "INSERT INTO fr_rounds (eventId, roundIndex, type, state) VALUES (?, ?, ?, ?)";
+        String sql =
+            "INSERT INTO fr_rounds (eventId, roundIndex, type, state) VALUES (?, ?, ?, ?)";
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
@@ -117,7 +187,12 @@ public class EventsDatabaseManager {
                     try (ResultSet rs = stmt.getGeneratedKeys()) {
                         if (rs.next()) {
                             int roundId = rs.getInt(1);
-                            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Round criado (Assíncrono): ID=" + roundId + ", EventID=" + eventId);
+                            this.plugin.getDebugManager().logDatabaseOperation(
+                                "[EventsDB] Round criado (Assíncrono): ID=" +
+                                    roundId +
+                                    ", EventID=" +
+                                    eventId
+                            );
                             future.complete(roundId);
                         } else {
                             future.complete(-1);
@@ -125,17 +200,41 @@ public class EventsDatabaseManager {
                     }
                 }
             } catch (SQLException e) {
-                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao criar round (Assíncrono): " + e.getMessage());
+                this.plugin.getDebugManager().logDatabaseOperation(
+                    "[EventsDB] Erro ao criar round (Assíncrono): " +
+                        e.getMessage()
+                );
                 future.complete(-1);
             }
-
         });
         return future;
     }
 
-    public CompletableFuture<Integer> createHeat(int roundId, int heatNumber, int totalLaps, int totalPitstops, int timeLimit, int startDelay, int maxDrivers, boolean lonely, boolean canReset, boolean lapReset, boolean drs, boolean driverswap, String colisao, double drsdowntime, double drsdownpower, boolean reversegrid, double ghostingdelta, boolean pushtopass, double pushtopasspower, boolean realistc) {
+    public CompletableFuture<Integer> createHeat(
+        int roundId,
+        int heatNumber,
+        int totalLaps,
+        int totalPitstops,
+        int timeLimit,
+        int startDelay,
+        int maxDrivers,
+        boolean lonely,
+        boolean canReset,
+        boolean lapReset,
+        boolean drs,
+        boolean driverswap,
+        String colisao,
+        double drsdowntime,
+        double drsdownpower,
+        boolean reversegrid,
+        double ghostingdelta,
+        boolean pushtopass,
+        double pushtopasspower,
+        boolean realistc
+    ) {
         CompletableFuture<Integer> future = new CompletableFuture();
-        String sql = "INSERT INTO fr_heats (roundId, heatNumber, state, totalLaps, totalPitstops, timeLimit, startDelay, maxDrivers, lonely, canReset, lapReset, drs, driverswap, colisao, drsdowntime, drsdownpower, reversegrid, ghostingdelta, pushtopass, pushtopasspower, realistc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql =
+            "INSERT INTO fr_heats (roundId, heatNumber, state, totalLaps, totalPitstops, timeLimit, startDelay, maxDrivers, lonely, canReset, lapReset, drs, driverswap, colisao, drsdowntime, drsdownpower, reversegrid, ghostingdelta, pushtopass, pushtopasspower, realistc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
@@ -167,7 +266,12 @@ public class EventsDatabaseManager {
                     try (ResultSet rs = stmt.getGeneratedKeys()) {
                         if (rs.next()) {
                             int heatId = rs.getInt(1);
-                            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Heat criado (Assíncrono): ID=" + heatId + ", RoundID=" + roundId);
+                            this.plugin.getDebugManager().logDatabaseOperation(
+                                "[EventsDB] Heat criado (Assíncrono): ID=" +
+                                    heatId +
+                                    ", RoundID=" +
+                                    roundId
+                            );
                             future.complete(heatId);
                         } else {
                             future.complete(-1);
@@ -175,17 +279,19 @@ public class EventsDatabaseManager {
                     }
                 }
             } catch (SQLException e) {
-                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao criar heat (Assíncrono): " + e.getMessage());
+                this.plugin.getDebugManager().logDatabaseOperation(
+                    "[EventsDB] Erro ao criar heat (Assíncrono): " +
+                        e.getMessage()
+                );
                 future.complete(-1);
             }
-
         });
         return future;
     }
 
     public void updateEventState(int eventId, EventState state) {
         String sql = "UPDATE fr_events SET state = ? WHERE id = ?";
-        this.executeAsync(sql, "updateEventState", (stmt) -> {
+        this.executeAsync(sql, "updateEventState", stmt -> {
             try {
                 stmt.setString(1, state.name());
                 stmt.setInt(2, eventId);
@@ -196,8 +302,9 @@ public class EventsDatabaseManager {
     }
 
     public void addSignup(int eventId, UUID playerUUID, String type) {
-        String sql = "INSERT INTO fr_event_signups (eventId, uuid, type, subscriptionTime, confirmed) VALUES (?, ?, ?, ?, 0)";
-        this.executeAsync(sql, "addSignup", (stmt) -> {
+        String sql =
+            "INSERT INTO fr_event_signups (eventId, uuid, type, subscriptionTime, confirmed) VALUES (?, ?, ?, ?, 0)";
+        this.executeAsync(sql, "addSignup", stmt -> {
             try {
                 stmt.setInt(1, eventId);
                 stmt.setString(2, playerUUID.toString());
@@ -210,8 +317,9 @@ public class EventsDatabaseManager {
     }
 
     public void removeSignup(int eventId, UUID playerUUID) {
-        String sql = "DELETE FROM fr_event_signups WHERE eventId = ? AND uuid = ?";
-        this.executeAsync(sql, "removeSignup", (stmt) -> {
+        String sql =
+            "DELETE FROM fr_event_signups WHERE eventId = ? AND uuid = ?";
+        this.executeAsync(sql, "removeSignup", stmt -> {
             try {
                 stmt.setInt(1, eventId);
                 stmt.setString(2, playerUUID.toString());
@@ -222,8 +330,9 @@ public class EventsDatabaseManager {
     }
 
     public void updateSignupType(int eventId, UUID playerUUID, String newType) {
-        String sql = "UPDATE fr_event_signups SET type = ? WHERE eventId = ? AND uuid = ?";
-        this.executeAsync(sql, "updateSignupType", (stmt) -> {
+        String sql =
+            "UPDATE fr_event_signups SET type = ? WHERE eventId = ? AND uuid = ?";
+        this.executeAsync(sql, "updateSignupType", stmt -> {
             try {
                 stmt.setString(1, newType);
                 stmt.setInt(2, eventId);
@@ -235,7 +344,8 @@ public class EventsDatabaseManager {
     }
 
     public List<Map<String, Object>> loadSignupsForEvent(int eventId) {
-        String sql = "SELECT uuid, type, subscriptionTime, confirmed FROM fr_event_signups WHERE eventId = ?";
+        String sql =
+            "SELECT uuid, type, subscriptionTime, confirmed FROM fr_event_signups WHERE eventId = ?";
         List<Map<String, Object>> signups = new ArrayList<>();
         try {
             Connection conn = this.databaseManager.getOrConnect();
@@ -246,21 +356,26 @@ public class EventsDatabaseManager {
                         Map<String, Object> data = new HashMap<>();
                         data.put("uuid", UUID.fromString(rs.getString("uuid")));
                         data.put("type", rs.getString("type"));
-                        data.put("subscriptionTime", rs.getLong("subscriptionTime"));
+                        data.put(
+                            "subscriptionTime",
+                            rs.getLong("subscriptionTime")
+                        );
                         data.put("confirmed", rs.getInt("confirmed") == 1);
                         signups.add(data);
                     }
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao carregar signups: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[EventsDB] Erro ao carregar signups: " + e.getMessage()
+            );
         }
         return signups;
     }
 
     public void updateEventOpenSign(int eventId, boolean openSign) {
         String sql = "UPDATE fr_events SET openSign = ? WHERE id = ?";
-        this.executeAsync(sql, "updateEventOpenSign", (stmt) -> {
+        this.executeAsync(sql, "updateEventOpenSign", stmt -> {
             try {
                 stmt.setInt(1, openSign ? 1 : 0);
                 stmt.setInt(2, eventId);
@@ -272,7 +387,7 @@ public class EventsDatabaseManager {
 
     public void updateEventTrack(int eventId, String trackNameWS) {
         String sql = "UPDATE fr_events SET trackNameWS = ? WHERE id = ?";
-        this.executeAsync(sql, "updateEventTrack", (stmt) -> {
+        this.executeAsync(sql, "updateEventTrack", stmt -> {
             try {
                 stmt.setString(1, trackNameWS);
                 stmt.setInt(2, eventId);
@@ -283,18 +398,29 @@ public class EventsDatabaseManager {
     }
 
     public void heatSet(int heatId, String column, String value) {
-        if (!column.matches("timeLimit|collisionMode|startDelay|totalLaps|totalPitstops|maxDrivers|lonely")) {
-            this.plugin.getDebugManager().logDatabaseOperation("Tentativa de update em coluna inválida ou não permitida em heatSet: " + column);
+        if (
+            !column.matches(
+                "timeLimit|collisionMode|startDelay|totalLaps|totalPitstops|maxDrivers|lonely"
+            )
+        ) {
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "Tentativa de update em coluna inválida ou não permitida em heatSet: " +
+                    column
+            );
         } else {
             String sql = "UPDATE fr_heats SET " + column + " = ? WHERE id = ?";
-            this.executeAsync(sql, "heatSet_" + column, (stmt) -> {
+            this.executeAsync(sql, "heatSet_" + column, stmt -> {
                 try {
                     stmt.setString(1, value);
                     stmt.setInt(2, heatId);
                 } catch (SQLException e) {
-                    this.plugin.getDebugManager().logDatabaseOperation("Erro ao atualizar heat (" + column + "): " + e.getMessage());
+                    this.plugin.getDebugManager().logDatabaseOperation(
+                        "Erro ao atualizar heat (" +
+                            column +
+                            "): " +
+                            e.getMessage()
+                    );
                 }
-
             });
         }
     }
@@ -314,13 +440,14 @@ public class EventsDatabaseManager {
                 try (ResultSet rs = stmt.executeQuery()) {
                     if (!rs.next()) {
                         Object event = null;
-                        return (Events)event;
+                        return (Events) event;
                     }
 
                     Events event = this.buildEventFromResultSetSimple(rs);
                     eventMap.put(event.getId(), event);
 
-                    List<Map<String, Object>> signups = this.loadSignupsForEvent(eventId);
+                    List<Map<String, Object>> signups =
+                        this.loadSignupsForEvent(eventId);
                     for (Map<String, Object> signup : signups) {
                         UUID playerUUID = (UUID) signup.get("uuid");
                         String type = (String) signup.get("type");
@@ -335,14 +462,15 @@ public class EventsDatabaseManager {
                 }
             }
 
-            Events event = (Events)eventMap.get(eventId);
-            String roundSql = "SELECT * FROM fr_rounds WHERE eventId = ? AND (isRemoved = 0 OR isRemoved IS NULL) ORDER BY roundIndex";
+            Events event = (Events) eventMap.get(eventId);
+            String roundSql =
+                "SELECT * FROM fr_rounds WHERE eventId = ? AND (isRemoved = 0 OR isRemoved IS NULL) ORDER BY roundIndex";
 
             try (PreparedStatement stmt = conn.prepareStatement(roundSql)) {
                 stmt.setInt(1, eventId);
 
                 try (ResultSet rs = stmt.executeQuery()) {
-                    while(rs.next()) {
+                    while (rs.next()) {
                         Map<String, Object> data = new HashMap<>();
                         data.put("id", rs.getInt("id"));
                         data.put("eventId", rs.getInt("eventId"));
@@ -354,13 +482,21 @@ public class EventsDatabaseManager {
                 }
             }
 
-            for(Map<String, Object> data : roundsData) {
-                int roundId = (Integer)data.get("id");
-                int roundIndex = (Integer)data.get("roundIndex");
-                RoundType roundType = RoundType.valueOf((String)data.get("type"));
-                Rounds round = this.instantiateRound(this.plugin, roundId, (Events)null, roundIndex, roundType);
-                round.setEventId((Integer)data.get("eventId"));
-                round.setState(RoundState.valueOf((String)data.get("state")));
+            for (Map<String, Object> data : roundsData) {
+                int roundId = (Integer) data.get("id");
+                int roundIndex = (Integer) data.get("roundIndex");
+                RoundType roundType = RoundType.valueOf(
+                    (String) data.get("type")
+                );
+                Rounds round = this.instantiateRound(
+                    this.plugin,
+                    roundId,
+                    (Events) null,
+                    roundIndex,
+                    roundType
+                );
+                round.setEventId((Integer) data.get("eventId"));
+                round.setState(RoundState.valueOf((String) data.get("state")));
                 round.setEvent(event);
                 roundMap.put(roundId, round);
                 event.getEventSchedule().getRounds().put(roundIndex, round);
@@ -368,34 +504,52 @@ public class EventsDatabaseManager {
 
             if (!roundMap.isEmpty()) {
                 int var10001 = roundMap.size();
-                String heatSql = "SELECT * FROM fr_heats WHERE roundId IN (" + String.join(",", Collections.nCopies(var10001, "?")) + ") AND (isRemoved = 0 OR isRemoved IS NULL) ORDER BY heatNumber";
+                String heatSql =
+                    "SELECT * FROM fr_heats WHERE roundId IN (" +
+                    String.join(",", Collections.nCopies(var10001, "?")) +
+                    ") AND (isRemoved = 0 OR isRemoved IS NULL) ORDER BY heatNumber";
 
                 try (PreparedStatement stmt = conn.prepareStatement(heatSql)) {
                     int idx = 1;
 
-                    for(Integer roundId : roundMap.keySet()) {
+                    for (Integer roundId : roundMap.keySet()) {
                         stmt.setInt(idx++, roundId);
                     }
 
                     try (ResultSet rs = stmt.executeQuery()) {
-                        while(rs.next()) {
+                        while (rs.next()) {
                             int heatId = rs.getInt("id");
                             int hroundId = rs.getInt("roundId");
                             int heatNumber = rs.getInt("heatNumber");
-                            Heats heat = new Heats(this.plugin, heatId, (Rounds)null, heatNumber);
+                            Heats heat = new Heats(
+                                this.plugin,
+                                heatId,
+                                (Rounds) null,
+                                heatNumber
+                            );
                             heat.setRoundId(hroundId);
-                            heat.setHeatStateForLoad(HeatState.valueOf(rs.getString("state")));
+                            heat.setHeatStateForLoad(
+                                HeatState.valueOf(rs.getString("state"))
+                            );
                             long startTimeValue = rs.getLong("startTime");
                             long endTimeValue = rs.getLong("endTime");
                             if (startTimeValue > 0L) {
-                                heat.setStartTime(Instant.ofEpochSecond(startTimeValue));
+                                heat.setStartTime(
+                                    Instant.ofEpochSecond(startTimeValue)
+                                );
                             }
                             if (endTimeValue > 0L) {
-                                heat.setEndTime(Instant.ofEpochSecond(endTimeValue));
+                                heat.setEndTime(
+                                    Instant.ofEpochSecond(endTimeValue)
+                                );
                             }
-                            String fastestLapUUID = rs.getString("fastestLapUUID");
+                            String fastestLapUUID = rs.getString(
+                                "fastestLapUUID"
+                            );
                             if (fastestLapUUID != null) {
-                                heat.setFastestLapUUID(UUID.fromString(fastestLapUUID));
+                                heat.setFastestLapUUID(
+                                    UUID.fromString(fastestLapUUID)
+                                );
                             }
                             int totalLaps = rs.getInt("totalLaps");
                             heat.setTotalLaps(rs.wasNull() ? null : totalLaps);
@@ -405,22 +559,64 @@ public class EventsDatabaseManager {
                             heat.setTimeLimit(rs.wasNull() ? null : timeLimit);
                             heat.setStartDelay(rs.getInt("startDelay"));
                             int maxDrivers = rs.getInt("maxDrivers");
-                            heat.setMaxDrivers(rs.wasNull() ? null : maxDrivers);
+                            heat.setMaxDrivers(
+                                rs.wasNull() ? null : maxDrivers
+                            );
                             heat.setLonely(rs.getInt("lonely") == 1);
                             heat.setCanReset(rs.getInt("canReset") == 1);
 
-                            try { heat.setCollisionMode(CollisionMode.valueOf(rs.getString("colisao"))); } catch (SQLException ignored) { heat.setCollisionMode(CollisionMode.DISABLED); }
-                            try { heat.setDrsEnabled(rs.getInt("drs") == 1); } catch (SQLException ignored) {}
-                            try { heat.setDriverSwap(rs.getInt("driverswap") == 1); } catch (SQLException ignored) {}
-                            try { heat.setDrsdowntime(rs.getDouble("drsdowntime")); } catch (SQLException ignored) {}
-                            try { heat.setDrsdownpower(rs.getDouble("drsdownpower")); } catch (SQLException ignored) {}
-                            try { heat.setreversegrid(rs.getInt("reversegrid") == 1); } catch (SQLException ignored) {}
-                            try { heat.setDeltaghosting((int) rs.getDouble("ghostingdelta")); } catch (SQLException ignored) {}
-                            try { heat.setPushtopass(rs.getInt("pushtopass") == 1); } catch (SQLException ignored) {}
-                            try { heat.setpushtopasspower(rs.getDouble("pushtopasspower")); } catch (SQLException ignored) {}
-                            try { heat.setrealistc(rs.getInt("realistc") == 1); } catch (SQLException ignored) {}
+                            try {
+                                heat.setCollisionMode(
+                                    CollisionMode.valueOf(
+                                        rs.getString("colisao")
+                                    )
+                                );
+                            } catch (SQLException ignored) {
+                                heat.setCollisionMode(CollisionMode.DISABLED);
+                            }
+                            try {
+                                heat.setDrsEnabled(rs.getInt("drs") == 1);
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setDriverSwap(
+                                    rs.getInt("driverswap") == 1
+                                );
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setDrsdowntime(
+                                    rs.getDouble("drsdowntime")
+                                );
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setDrsdownpower(
+                                    rs.getDouble("drsdownpower")
+                                );
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setreversegrid(
+                                    rs.getInt("reversegrid") == 1
+                                );
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setDeltaghosting(
+                                    (int) rs.getDouble("ghostingdelta")
+                                );
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setPushtopass(
+                                    rs.getInt("pushtopass") == 1
+                                );
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setpushtopasspower(
+                                    rs.getDouble("pushtopasspower")
+                                );
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setrealistc(rs.getInt("realistc") == 1);
+                            } catch (SQLException ignored) {}
 
-                            Rounds round = (Rounds)roundMap.get(hroundId);
+                            Rounds round = (Rounds) roundMap.get(hroundId);
                             if (round != null) {
                                 heat.setRound(round);
                                 heat.setTrackNameWS(event.getTrackNameWS());
@@ -434,7 +630,9 @@ public class EventsDatabaseManager {
 
             return event;
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao carregar evento: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[EventsDB] Erro ao carregar evento: " + e.getMessage()
+            );
             return null;
         }
     }
@@ -461,7 +659,9 @@ public class EventsDatabaseManager {
 
             return var7;
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao carregar evento por nome: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[EventsDB] Erro ao carregar evento por nome: " + e.getMessage()
+            );
             return null;
         }
     }
@@ -474,7 +674,8 @@ public class EventsDatabaseManager {
         List<Map<String, Object>> roundData = new ArrayList();
 
         try {
-            String eventSql = "SELECT * FROM fr_events WHERE state IN (?, ?) AND (isRemoved = 0 OR isRemoved IS NULL)";
+            String eventSql =
+                "SELECT * FROM fr_events WHERE state IN (?, ?) AND (isRemoved = 0 OR isRemoved IS NULL)";
             Connection conn = this.databaseManager.getOrConnect();
 
             try (PreparedStatement stmt = conn.prepareStatement(eventSql)) {
@@ -482,7 +683,7 @@ public class EventsDatabaseManager {
                 stmt.setString(2, EventState.RUNNING.name());
 
                 try (ResultSet rs = stmt.executeQuery()) {
-                    while(rs.next()) {
+                    while (rs.next()) {
                         Map<String, Object> data = new HashMap<>();
                         data.put("id", rs.getInt("id"));
                         data.put("creatorUUID", rs.getString("creatorUUID"));
@@ -500,16 +701,24 @@ public class EventsDatabaseManager {
                 return events;
             }
 
-            for(Map<String, Object> data : eventData) {
-                int eventId = (Integer)data.get("id");
-                UUID creatorUUID = UUID.fromString((String)data.get("creatorUUID"));
-                String displayName = (String)data.get("name");
-                Events event = new Events(this.plugin, this.plugin.getRaceEventManager(), eventId, creatorUUID, displayName);
+            for (Map<String, Object> data : eventData) {
+                int eventId = (Integer) data.get("id");
+                UUID creatorUUID = UUID.fromString(
+                    (String) data.get("creatorUUID")
+                );
+                String displayName = (String) data.get("name");
+                Events event = new Events(
+                    this.plugin,
+                    this.plugin.getRaceEventManager(),
+                    eventId,
+                    creatorUUID,
+                    displayName
+                );
                 event.setUuid(UUID.randomUUID());
-                event.setTrackNameWS((String)data.get("trackNameWS"));
-                event.setState(EventState.valueOf((String)data.get("state")));
-                event.setOpenSign((Integer)data.get("openSign") == 1);
-                long creationTimeSec = (Long)data.get("creationTime");
+                event.setTrackNameWS((String) data.get("trackNameWS"));
+                event.setState(EventState.valueOf((String) data.get("state")));
+                event.setOpenSign((Integer) data.get("openSign") == 1);
+                long creationTimeSec = (Long) data.get("creationTime");
                 if (creationTimeSec > 0L) {
                     event.setCreationTime(creationTimeSec * 1000L);
                 }
@@ -517,7 +726,9 @@ public class EventsDatabaseManager {
                 events.add(event);
                 eventMap.put(eventId, event);
 
-                List<Map<String, Object>> signups = this.loadSignupsForEvent(eventId);
+                List<Map<String, Object>> signups = this.loadSignupsForEvent(
+                    eventId
+                );
                 for (Map<String, Object> signup : signups) {
                     UUID playerUUID = (UUID) signup.get("uuid");
                     String type = (String) signup.get("type");
@@ -532,17 +743,20 @@ public class EventsDatabaseManager {
             }
 
             int var10001 = events.size();
-            String roundSql = "SELECT * FROM fr_rounds WHERE eventId IN (" + String.join(",", Collections.nCopies(var10001, "?")) + ") AND (isRemoved = 0 OR isRemoved IS NULL) ORDER BY roundIndex";
+            String roundSql =
+                "SELECT * FROM fr_rounds WHERE eventId IN (" +
+                String.join(",", Collections.nCopies(var10001, "?")) +
+                ") AND (isRemoved = 0 OR isRemoved IS NULL) ORDER BY roundIndex";
 
             try (PreparedStatement stmt = conn.prepareStatement(roundSql)) {
                 int idx = 1;
 
-                for(Events event : events) {
+                for (Events event : events) {
                     stmt.setInt(idx++, event.getId());
                 }
 
                 try (ResultSet rs = stmt.executeQuery()) {
-                    while(rs.next()) {
+                    while (rs.next()) {
                         Map<String, Object> data = new HashMap<>();
                         data.put("id", rs.getInt("id"));
                         data.put("eventId", rs.getInt("eventId"));
@@ -554,16 +768,24 @@ public class EventsDatabaseManager {
                 }
             }
 
-            for(Map<String, Object> data : roundData) {
-                int roundId = (Integer)data.get("id");
-                int eventId = (Integer)data.get("eventId");
-                int roundIndex = (Integer)data.get("roundIndex");
-                RoundType roundType = RoundType.valueOf((String)data.get("type"));
-                Rounds round = this.instantiateRound(this.plugin, roundId, (Events)null, roundIndex, roundType);
+            for (Map<String, Object> data : roundData) {
+                int roundId = (Integer) data.get("id");
+                int eventId = (Integer) data.get("eventId");
+                int roundIndex = (Integer) data.get("roundIndex");
+                RoundType roundType = RoundType.valueOf(
+                    (String) data.get("type")
+                );
+                Rounds round = this.instantiateRound(
+                    this.plugin,
+                    roundId,
+                    (Events) null,
+                    roundIndex,
+                    roundType
+                );
                 round.setEventId(eventId);
-                round.setState(RoundState.valueOf((String)data.get("state")));
+                round.setState(RoundState.valueOf((String) data.get("state")));
                 roundMap.put(roundId, round);
-                Events event = (Events)eventMap.get(eventId);
+                Events event = (Events) eventMap.get(eventId);
                 if (event != null) {
                     round.setEvent(event);
                     event.getEventSchedule().getRounds().put(roundIndex, round);
@@ -572,34 +794,52 @@ public class EventsDatabaseManager {
 
             if (!roundMap.isEmpty()) {
                 var10001 = roundMap.size();
-                String heatSql = "SELECT * FROM fr_heats WHERE roundId IN (" + String.join(",", Collections.nCopies(var10001, "?")) + ") AND (isRemoved = 0 OR isRemoved IS NULL) ORDER BY heatNumber";
+                String heatSql =
+                    "SELECT * FROM fr_heats WHERE roundId IN (" +
+                    String.join(",", Collections.nCopies(var10001, "?")) +
+                    ") AND (isRemoved = 0 OR isRemoved IS NULL) ORDER BY heatNumber";
 
                 try (PreparedStatement stmt = conn.prepareStatement(heatSql)) {
                     int idx = 1;
 
-                    for(Integer roundId : roundMap.keySet()) {
+                    for (Integer roundId : roundMap.keySet()) {
                         stmt.setInt(idx++, roundId);
                     }
 
                     try (ResultSet rs = stmt.executeQuery()) {
-                        while(rs.next()) {
+                        while (rs.next()) {
                             int heatId = rs.getInt("id");
                             int hroundId = rs.getInt("roundId");
                             int heatNumber = rs.getInt("heatNumber");
-                            Heats heat = new Heats(this.plugin, heatId, (Rounds)null, heatNumber);
+                            Heats heat = new Heats(
+                                this.plugin,
+                                heatId,
+                                (Rounds) null,
+                                heatNumber
+                            );
                             heat.setRoundId(hroundId);
-                            heat.setHeatStateForLoad(HeatState.valueOf(rs.getString("state")));
+                            heat.setHeatStateForLoad(
+                                HeatState.valueOf(rs.getString("state"))
+                            );
                             long startTimeValue = rs.getLong("startTime");
                             long endTimeValue = rs.getLong("endTime");
                             if (startTimeValue > 0L) {
-                                heat.setStartTime(Instant.ofEpochSecond(startTimeValue));
+                                heat.setStartTime(
+                                    Instant.ofEpochSecond(startTimeValue)
+                                );
                             }
                             if (endTimeValue > 0L) {
-                                heat.setEndTime(Instant.ofEpochSecond(endTimeValue));
+                                heat.setEndTime(
+                                    Instant.ofEpochSecond(endTimeValue)
+                                );
                             }
-                            String fastestLapUUID = rs.getString("fastestLapUUID");
+                            String fastestLapUUID = rs.getString(
+                                "fastestLapUUID"
+                            );
                             if (fastestLapUUID != null) {
-                                heat.setFastestLapUUID(UUID.fromString(fastestLapUUID));
+                                heat.setFastestLapUUID(
+                                    UUID.fromString(fastestLapUUID)
+                                );
                             }
                             int totalLaps = rs.getInt("totalLaps");
                             heat.setTotalLaps(rs.wasNull() ? null : totalLaps);
@@ -609,25 +849,69 @@ public class EventsDatabaseManager {
                             heat.setTimeLimit(rs.wasNull() ? null : timeLimit);
                             heat.setStartDelay(rs.getInt("startDelay"));
                             int maxDrivers = rs.getInt("maxDrivers");
-                            heat.setMaxDrivers(rs.wasNull() ? null : maxDrivers);
+                            heat.setMaxDrivers(
+                                rs.wasNull() ? null : maxDrivers
+                            );
                             heat.setLonely(rs.getInt("lonely") == 1);
                             heat.setCanReset(rs.getInt("canReset") == 1);
 
-                            try { heat.setCollisionMode(CollisionMode.valueOf(rs.getString("colisao"))); } catch (SQLException ignored) { heat.setCollisionMode(CollisionMode.DISABLED); }
-                            try { heat.setDrsEnabled(rs.getInt("drs") == 1); } catch (SQLException ignored) {}
-                            try { heat.setDriverSwap(rs.getInt("driverswap") == 1); } catch (SQLException ignored) {}
-                            try { heat.setDrsdowntime(rs.getDouble("drsdowntime")); } catch (SQLException ignored) {}
-                            try { heat.setDrsdownpower(rs.getDouble("drsdownpower")); } catch (SQLException ignored) {}
-                            try { heat.setreversegrid(rs.getInt("reversegrid") == 1); } catch (SQLException ignored) {}
-                            try { heat.setDeltaghosting((int) rs.getDouble("ghostingdelta")); } catch (SQLException ignored) {}
-                            try { heat.setPushtopass(rs.getInt("pushtopass") == 1); } catch (SQLException ignored) {}
-                            try { heat.setpushtopasspower(rs.getDouble("pushtopasspower")); } catch (SQLException ignored) {}
-                            try { heat.setrealistc(rs.getInt("realistc") == 1); } catch (SQLException ignored) {}
+                            try {
+                                heat.setCollisionMode(
+                                    CollisionMode.valueOf(
+                                        rs.getString("colisao")
+                                    )
+                                );
+                            } catch (SQLException ignored) {
+                                heat.setCollisionMode(CollisionMode.DISABLED);
+                            }
+                            try {
+                                heat.setDrsEnabled(rs.getInt("drs") == 1);
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setDriverSwap(
+                                    rs.getInt("driverswap") == 1
+                                );
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setDrsdowntime(
+                                    rs.getDouble("drsdowntime")
+                                );
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setDrsdownpower(
+                                    rs.getDouble("drsdownpower")
+                                );
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setreversegrid(
+                                    rs.getInt("reversegrid") == 1
+                                );
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setDeltaghosting(
+                                    (int) rs.getDouble("ghostingdelta")
+                                );
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setPushtopass(
+                                    rs.getInt("pushtopass") == 1
+                                );
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setpushtopasspower(
+                                    rs.getDouble("pushtopasspower")
+                                );
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setrealistc(rs.getInt("realistc") == 1);
+                            } catch (SQLException ignored) {}
 
-                            Rounds round = (Rounds)roundMap.get(hroundId);
+                            Rounds round = (Rounds) roundMap.get(hroundId);
                             if (round != null) {
                                 heat.setRound(round);
-                                heat.setTrackNameWS(round.getEvent().getTrackNameWS());
+                                heat.setTrackNameWS(
+                                    round.getEvent().getTrackNameWS()
+                                );
                                 round.getHeats().put(heatNumber, heat);
                                 this.loadDriversForHeat(heat);
                             }
@@ -636,17 +920,20 @@ public class EventsDatabaseManager {
                 }
             }
 
-            for(Events event : events) {
+            for (Events event : events) {
                 event.getEventSchedule().setCurrentRoundAutomatically();
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao carregar eventos ativos: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[EventsDB] Erro ao carregar eventos ativos: " + e.getMessage()
+            );
         }
 
         return events;
     }
 
-    private Events buildEventFromResultSetSimple(ResultSet rs) throws SQLException {
+    private Events buildEventFromResultSetSimple(ResultSet rs)
+        throws SQLException {
         int eventId = rs.getInt("id");
         String creatorUUIDStr = rs.getString("creatorUUID");
         String displayName = rs.getString("name");
@@ -654,7 +941,13 @@ public class EventsDatabaseManager {
         String stateStr = rs.getString("state");
         int openSignInt = rs.getInt("openSign");
         UUID creatorUUID = UUID.fromString(creatorUUIDStr);
-        Events event = new Events(this.plugin, this.plugin.getRaceEventManager(), eventId, creatorUUID, displayName);
+        Events event = new Events(
+            this.plugin,
+            this.plugin.getRaceEventManager(),
+            eventId,
+            creatorUUID,
+            displayName
+        );
         event.setUuid(UUID.randomUUID());
         event.setTrackNameWS(trackNameWS);
         event.setState(EventState.valueOf(stateStr));
@@ -668,24 +961,28 @@ public class EventsDatabaseManager {
     }
 
     private void loadDriversForHeat(Heats heat) throws SQLException {
-        String sql = "SELECT * FROM fr_drivers WHERE heatId = ? ORDER BY startPosition";
+        String sql =
+            "SELECT * FROM fr_drivers WHERE heatId = ? ORDER BY startPosition";
         Connection conn = this.databaseManager.getOrConnect();
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, heat.getId());
 
             try (ResultSet rs = stmt.executeQuery()) {
-                while(rs.next()) {
+                while (rs.next()) {
                     int driverId = rs.getInt("id");
                     UUID playerUUID = UUID.fromString(rs.getString("uuid"));
                     int startPosition = rs.getInt("startPosition");
-                    Driver driver = new Driver(playerUUID, heat.getId(), startPosition);
+                    Driver driver = new Driver(
+                        playerUUID,
+                        heat.getId(),
+                        startPosition
+                    );
                     driver.setId(driverId);
                     heat.addDriverDirect(driver);
                 }
             }
         }
-
     }
 
     public void deleteEvent(int eventId) {
@@ -695,7 +992,9 @@ public class EventsDatabaseManager {
                 conn.setAutoCommit(false);
 
                 try {
-                    PreparedStatement stmt = conn.prepareStatement("DELETE FROM fr_laps WHERE heatId IN (SELECT id FROM fr_heats WHERE roundId IN (SELECT id FROM fr_rounds WHERE eventId = ?))");
+                    PreparedStatement stmt = conn.prepareStatement(
+                        "DELETE FROM fr_laps WHERE heatId IN (SELECT id FROM fr_heats WHERE roundId IN (SELECT id FROM fr_rounds WHERE eventId = ?))"
+                    );
 
                     try {
                         stmt.setInt(1, eventId);
@@ -716,7 +1015,9 @@ public class EventsDatabaseManager {
                         stmt.close();
                     }
 
-                    stmt = conn.prepareStatement("DELETE FROM fr_drivers WHERE heatId IN (SELECT id FROM fr_heats WHERE roundId IN (SELECT id FROM fr_rounds WHERE eventId = ?))");
+                    stmt = conn.prepareStatement(
+                        "DELETE FROM fr_drivers WHERE heatId IN (SELECT id FROM fr_heats WHERE roundId IN (SELECT id FROM fr_rounds WHERE eventId = ?))"
+                    );
 
                     try {
                         stmt.setInt(1, eventId);
@@ -737,7 +1038,9 @@ public class EventsDatabaseManager {
                         stmt.close();
                     }
 
-                    stmt = conn.prepareStatement("DELETE FROM fr_heats WHERE roundId IN (SELECT id FROM fr_rounds WHERE eventId = ?)");
+                    stmt = conn.prepareStatement(
+                        "DELETE FROM fr_heats WHERE roundId IN (SELECT id FROM fr_rounds WHERE eventId = ?)"
+                    );
 
                     try {
                         stmt.setInt(1, eventId);
@@ -758,7 +1061,9 @@ public class EventsDatabaseManager {
                         stmt.close();
                     }
 
-                    stmt = conn.prepareStatement("DELETE FROM fr_rounds WHERE eventId = ?");
+                    stmt = conn.prepareStatement(
+                        "DELETE FROM fr_rounds WHERE eventId = ?"
+                    );
 
                     try {
                         stmt.setInt(1, eventId);
@@ -779,7 +1084,9 @@ public class EventsDatabaseManager {
                         stmt.close();
                     }
 
-                    stmt = conn.prepareStatement("DELETE FROM fr_events WHERE id = ?");
+                    stmt = conn.prepareStatement(
+                        "DELETE FROM fr_events WHERE id = ?"
+                    );
 
                     try {
                         stmt.setInt(1, eventId);
@@ -801,7 +1108,9 @@ public class EventsDatabaseManager {
                     }
 
                     conn.commit();
-                    this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Evento deletado (Assíncrono): ID=" + eventId);
+                    this.plugin.getDebugManager().logDatabaseOperation(
+                        "[EventsDB] Evento deletado (Assíncrono): ID=" + eventId
+                    );
                 } catch (SQLException e) {
                     conn.rollback();
                     throw e;
@@ -809,9 +1118,11 @@ public class EventsDatabaseManager {
                     conn.setAutoCommit(true);
                 }
             } catch (SQLException e) {
-                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro assíncrono ao deletar evento: " + e.getMessage());
+                this.plugin.getDebugManager().logDatabaseOperation(
+                    "[EventsDB] Erro assíncrono ao deletar evento: " +
+                        e.getMessage()
+                );
             }
-
         });
     }
 
@@ -822,7 +1133,9 @@ public class EventsDatabaseManager {
                 conn.setAutoCommit(false);
 
                 try {
-                    PreparedStatement stmt = conn.prepareStatement("DELETE FROM fr_laps WHERE heatId IN (SELECT id FROM fr_heats WHERE roundId = ?)");
+                    PreparedStatement stmt = conn.prepareStatement(
+                        "DELETE FROM fr_laps WHERE heatId IN (SELECT id FROM fr_heats WHERE roundId = ?)"
+                    );
 
                     try {
                         stmt.setInt(1, roundId);
@@ -843,7 +1156,9 @@ public class EventsDatabaseManager {
                         stmt.close();
                     }
 
-                    stmt = conn.prepareStatement("DELETE FROM fr_drivers WHERE heatId IN (SELECT id FROM fr_heats WHERE roundId = ?)");
+                    stmt = conn.prepareStatement(
+                        "DELETE FROM fr_drivers WHERE heatId IN (SELECT id FROM fr_heats WHERE roundId = ?)"
+                    );
 
                     try {
                         stmt.setInt(1, roundId);
@@ -864,7 +1179,9 @@ public class EventsDatabaseManager {
                         stmt.close();
                     }
 
-                    stmt = conn.prepareStatement("DELETE FROM fr_heats WHERE roundId = ?");
+                    stmt = conn.prepareStatement(
+                        "DELETE FROM fr_heats WHERE roundId = ?"
+                    );
 
                     try {
                         stmt.setInt(1, roundId);
@@ -885,7 +1202,9 @@ public class EventsDatabaseManager {
                         stmt.close();
                     }
 
-                    stmt = conn.prepareStatement("DELETE FROM fr_rounds WHERE id = ?");
+                    stmt = conn.prepareStatement(
+                        "DELETE FROM fr_rounds WHERE id = ?"
+                    );
 
                     try {
                         stmt.setInt(1, roundId);
@@ -907,7 +1226,9 @@ public class EventsDatabaseManager {
                     }
 
                     conn.commit();
-                    this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Round deletado (Assíncrono): ID=" + roundId);
+                    this.plugin.getDebugManager().logDatabaseOperation(
+                        "[EventsDB] Round deletado (Assíncrono): ID=" + roundId
+                    );
                 } catch (SQLException e) {
                     conn.rollback();
                     throw e;
@@ -915,9 +1236,11 @@ public class EventsDatabaseManager {
                     conn.setAutoCommit(true);
                 }
             } catch (SQLException e) {
-                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro assíncrono ao deletar round: " + e.getMessage());
+                this.plugin.getDebugManager().logDatabaseOperation(
+                    "[EventsDB] Erro assíncrono ao deletar round: " +
+                        e.getMessage()
+                );
             }
-
         });
     }
 
@@ -928,7 +1251,9 @@ public class EventsDatabaseManager {
                 conn.setAutoCommit(false);
 
                 try {
-                    PreparedStatement stmt = conn.prepareStatement("DELETE FROM fr_laps WHERE heatId = ?");
+                    PreparedStatement stmt = conn.prepareStatement(
+                        "DELETE FROM fr_laps WHERE heatId = ?"
+                    );
 
                     try {
                         stmt.setInt(1, heatId);
@@ -949,7 +1274,9 @@ public class EventsDatabaseManager {
                         stmt.close();
                     }
 
-                    stmt = conn.prepareStatement("DELETE FROM fr_drivers WHERE heatId = ?");
+                    stmt = conn.prepareStatement(
+                        "DELETE FROM fr_drivers WHERE heatId = ?"
+                    );
 
                     try {
                         stmt.setInt(1, heatId);
@@ -970,7 +1297,9 @@ public class EventsDatabaseManager {
                         stmt.close();
                     }
 
-                    stmt = conn.prepareStatement("DELETE FROM fr_heats WHERE id = ?");
+                    stmt = conn.prepareStatement(
+                        "DELETE FROM fr_heats WHERE id = ?"
+                    );
 
                     try {
                         stmt.setInt(1, heatId);
@@ -992,7 +1321,9 @@ public class EventsDatabaseManager {
                     }
 
                     conn.commit();
-                    this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Heat deletado (Assíncrono): ID=" + heatId);
+                    this.plugin.getDebugManager().logDatabaseOperation(
+                        "[EventsDB] Heat deletado (Assíncrono): ID=" + heatId
+                    );
                 } catch (SQLException e) {
                     conn.rollback();
                     throw e;
@@ -1000,13 +1331,21 @@ public class EventsDatabaseManager {
                     conn.setAutoCommit(true);
                 }
             } catch (SQLException e) {
-                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro assíncrono ao deletar heat: " + e.getMessage());
+                this.plugin.getDebugManager().logDatabaseOperation(
+                    "[EventsDB] Erro assíncrono ao deletar heat: " +
+                        e.getMessage()
+                );
             }
-
         });
     }
 
-    private Rounds instantiateRound(FormulaRacing plugin, int id, Events event, int index, RoundType type) {
+    private Rounds instantiateRound(
+        FormulaRacing plugin,
+        int id,
+        Events event,
+        int index,
+        RoundType type
+    ) {
         switch (type) {
             case PRACTICE -> {
                 return new PracticeRound(plugin, id, event, index, type);
@@ -1017,13 +1356,15 @@ public class EventsDatabaseManager {
             case FINAL -> {
                 return new RaceRound(plugin, id, event, index, type);
             }
-            default -> throw new IllegalArgumentException("Unknown RoundType: " + String.valueOf(type));
+            default -> throw new IllegalArgumentException(
+                "Unknown RoundType: " + String.valueOf(type)
+            );
         }
     }
 
     public void updateRoundState(int roundId, RoundState state) {
         String sql = "UPDATE fr_rounds SET state = ? WHERE id = ?";
-        this.executeAsync(sql, "updateRoundState", (stmt) -> {
+        this.executeAsync(sql, "updateRoundState", stmt -> {
             try {
                 stmt.setString(1, state.name());
                 stmt.setInt(2, roundId);
@@ -1034,23 +1375,26 @@ public class EventsDatabaseManager {
     }
 
     public List<Rounds> loadRoundsByEventId(int eventId) {
-        String sql = "SELECT * FROM fr_rounds WHERE eventId = ? ORDER BY roundIndex";
+        String sql =
+            "SELECT * FROM fr_rounds WHERE eventId = ? ORDER BY roundIndex";
         List<Rounds> rounds = new ArrayList();
 
         try (
-                Connection conn = this.databaseManager.getOrConnect();
-                PreparedStatement stmt = conn.prepareStatement(sql);
+            Connection conn = this.databaseManager.getOrConnect();
+            PreparedStatement stmt = conn.prepareStatement(sql);
         ) {
             stmt.setInt(1, eventId);
 
             try (ResultSet rs = stmt.executeQuery()) {
-                while(rs.next()) {
+                while (rs.next()) {
                     Rounds round = this.buildRoundFromResultSet(rs);
                     rounds.add(round);
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao carregar rounds: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[EventsDB] Erro ao carregar rounds: " + e.getMessage()
+            );
         }
 
         return rounds;
@@ -1061,11 +1405,17 @@ public class EventsDatabaseManager {
         int eventId = rs.getInt("eventId");
         int roundIndex = rs.getInt("roundIndex");
         RoundType roundType = RoundType.valueOf(rs.getString("type"));
-        Rounds round = this.instantiateRound(this.plugin, roundId, (Events)null, roundIndex, roundType);
+        Rounds round = this.instantiateRound(
+            this.plugin,
+            roundId,
+            (Events) null,
+            roundIndex,
+            roundType
+        );
         round.setEventId(eventId);
         round.setState(RoundState.valueOf(rs.getString("state")));
 
-        for(Heats heat : this.loadHeatsByRoundId(round.getId())) {
+        for (Heats heat : this.loadHeatsByRoundId(round.getId())) {
             heat.setRound(round);
             round.getHeats().put(heat.getHeatNumber(), heat);
         }
@@ -1075,7 +1425,7 @@ public class EventsDatabaseManager {
 
     public void updateHeatState(int heatId, HeatState state) {
         String sql = "UPDATE fr_heats SET state = ? WHERE id = ?";
-        this.executeAsync(sql, "updateHeatState", (stmt) -> {
+        this.executeAsync(sql, "updateHeatState", stmt -> {
             try {
                 stmt.setString(1, state.name());
                 stmt.setInt(2, heatId);
@@ -1085,12 +1435,23 @@ public class EventsDatabaseManager {
         });
     }
 
-    public void updateHeatTimes(int heatId, Instant startTime, Instant endTime) {
-        String sql = "UPDATE fr_heats SET startTime = ?, endTime = ? WHERE id = ?";
-        this.executeAsync(sql, "updateHeatTimes", (stmt) -> {
+    public void updateHeatTimes(
+        int heatId,
+        Instant startTime,
+        Instant endTime
+    ) {
+        String sql =
+            "UPDATE fr_heats SET startTime = ?, endTime = ? WHERE id = ?";
+        this.executeAsync(sql, "updateHeatTimes", stmt -> {
             try {
-                stmt.setLong(1, startTime != null ? startTime.getEpochSecond() : 0L);
-                stmt.setLong(2, endTime != null ? endTime.getEpochSecond() : 0L);
+                stmt.setLong(
+                    1,
+                    startTime != null ? startTime.getEpochSecond() : 0L
+                );
+                stmt.setLong(
+                    2,
+                    endTime != null ? endTime.getEpochSecond() : 0L
+                );
                 stmt.setInt(3, heatId);
             } catch (SQLException e) {
                 throw new RuntimeException(e);
@@ -1100,7 +1461,7 @@ public class EventsDatabaseManager {
 
     public void updateHeatFastestLap(int heatId, UUID driverUUID) {
         String sql = "UPDATE fr_heats SET fastestLapUUID = ? WHERE id = ?";
-        this.executeAsync(sql, "updateHeatFastestLap", (stmt) -> {
+        this.executeAsync(sql, "updateHeatFastestLap", stmt -> {
             try {
                 stmt.setString(1, driverUUID.toString());
                 stmt.setInt(2, heatId);
@@ -1112,7 +1473,7 @@ public class EventsDatabaseManager {
 
     public void clearHeatDrivers(int heatId) {
         String sql = "DELETE FROM fr_drivers WHERE heatId = ?";
-        this.executeAsync(sql, "clearHeatDrivers", (stmt) -> {
+        this.executeAsync(sql, "clearHeatDrivers", stmt -> {
             try {
                 stmt.setInt(1, heatId);
             } catch (SQLException e) {
@@ -1136,14 +1497,19 @@ public class EventsDatabaseManager {
                 return true;
             }
         } catch (SQLException exception) {
-            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Falha sync ao limpar pilotos do heat " + heatId + ": " + exception.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[EventsDB] Falha sync ao limpar pilotos do heat " +
+                    heatId +
+                    ": " +
+                    exception.getMessage()
+            );
             return false;
         }
     }
 
     public void updateHeatLonely(int heatId, boolean lonely) {
         String sql = "UPDATE fr_heats SET lonely = ? WHERE id = ?";
-        this.executeAsync(sql, "updateHeatLonely", (stmt) -> {
+        this.executeAsync(sql, "updateHeatLonely", stmt -> {
             try {
                 stmt.setInt(1, lonely ? 1 : 0);
                 stmt.setInt(2, heatId);
@@ -1153,9 +1519,15 @@ public class EventsDatabaseManager {
         });
     }
 
-    public void updateHeatConfig(int heatId, int totalLaps, int totalPits, int maxDrivers) {
-        String sql = "UPDATE fr_heats SET totalLaps = ?, totalPitstops = ?, maxDrivers = ? WHERE id = ?";
-        this.executeAsync(sql, "updateHeatConfig", (stmt) -> {
+    public void updateHeatConfig(
+        int heatId,
+        int totalLaps,
+        int totalPits,
+        int maxDrivers
+    ) {
+        String sql =
+            "UPDATE fr_heats SET totalLaps = ?, totalPitstops = ?, maxDrivers = ? WHERE id = ?";
+        this.executeAsync(sql, "updateHeatConfig", stmt -> {
             try {
                 stmt.setInt(1, totalLaps);
                 stmt.setInt(2, totalPits);
@@ -1167,23 +1539,59 @@ public class EventsDatabaseManager {
         });
     }
 
-    public void updateHeatFullConfig(int heatId, Integer totalLaps, Integer totalPits, Integer timeLimit,
-                                      Integer startDelay, Integer maxDrivers, boolean lonely, boolean canReset,
-                                      boolean lapReset, CollisionMode collisionMode, boolean drsEnabled,
-                                      boolean driverSwap, double drsDowntime, double drsDownPower,
-                                      boolean reverseGrid, int deltaGhosting, boolean pushToPass,
-                                      double pushToPassPower, boolean realistic) {
-        String sql = "UPDATE fr_heats SET totalLaps = ?, totalPitstops = ?, timeLimit = ?, startDelay = ?, " +
-                "maxDrivers = ?, lonely = ?, canReset = ?, lapReset = ?, colisao = ?, drs = ?, " +
-                "driverswap = ?, drsdowntime = ?, drsdownpower = ?, reversegrid = ?, ghostingdelta = ?, " +
-                "pushtopass = ?, pushtopasspower = ?, realistc = ? WHERE id = ?";
-        this.executeAsync(sql, "updateHeatFullConfig", (stmt) -> {
+    public void updateHeatFullConfig(
+        int heatId,
+        Integer totalLaps,
+        Integer totalPits,
+        Integer timeLimit,
+        Integer startDelay,
+        Integer maxDrivers,
+        boolean lonely,
+        boolean canReset,
+        boolean lapReset,
+        CollisionMode collisionMode,
+        boolean drsEnabled,
+        boolean driverSwap,
+        double drsDowntime,
+        double drsDownPower,
+        boolean reverseGrid,
+        int deltaGhosting,
+        boolean pushToPass,
+        double pushToPassPower,
+        boolean realistic
+    ) {
+        String sql =
+            "UPDATE fr_heats SET totalLaps = ?, totalPitstops = ?, timeLimit = ?, startDelay = ?, " +
+            "maxDrivers = ?, lonely = ?, canReset = ?, lapReset = ?, colisao = ?, drs = ?, " +
+            "driverswap = ?, drsdowntime = ?, drsdownpower = ?, reversegrid = ?, ghostingdelta = ?, " +
+            "pushtopass = ?, pushtopasspower = ?, realistc = ? WHERE id = ?";
+        this.executeAsync(sql, "updateHeatFullConfig", stmt -> {
             try {
-                if (totalLaps != null) { stmt.setInt(1, totalLaps); } else { stmt.setNull(1, java.sql.Types.INTEGER); }
-                if (totalPits != null) { stmt.setInt(2, totalPits); } else { stmt.setNull(2, java.sql.Types.INTEGER); }
-                if (timeLimit != null) { stmt.setInt(3, timeLimit); } else { stmt.setNull(3, java.sql.Types.INTEGER); }
-                if (startDelay != null) { stmt.setInt(4, startDelay); } else { stmt.setNull(4, java.sql.Types.INTEGER); }
-                if (maxDrivers != null) { stmt.setInt(5, maxDrivers); } else { stmt.setNull(5, java.sql.Types.INTEGER); }
+                if (totalLaps != null) {
+                    stmt.setInt(1, totalLaps);
+                } else {
+                    stmt.setNull(1, java.sql.Types.INTEGER);
+                }
+                if (totalPits != null) {
+                    stmt.setInt(2, totalPits);
+                } else {
+                    stmt.setNull(2, java.sql.Types.INTEGER);
+                }
+                if (timeLimit != null) {
+                    stmt.setInt(3, timeLimit);
+                } else {
+                    stmt.setNull(3, java.sql.Types.INTEGER);
+                }
+                if (startDelay != null) {
+                    stmt.setInt(4, startDelay);
+                } else {
+                    stmt.setNull(4, java.sql.Types.INTEGER);
+                }
+                if (maxDrivers != null) {
+                    stmt.setInt(5, maxDrivers);
+                } else {
+                    stmt.setNull(5, java.sql.Types.INTEGER);
+                }
                 stmt.setInt(6, lonely ? 1 : 0);
                 stmt.setInt(7, canReset ? 1 : 0);
                 stmt.setInt(8, lapReset ? 1 : 0);
@@ -1205,23 +1613,26 @@ public class EventsDatabaseManager {
     }
 
     public List<Heats> loadHeatsByRoundId(int roundId) {
-        String sql = "SELECT * FROM fr_heats WHERE roundId = ? ORDER BY heatNumber";
+        String sql =
+            "SELECT * FROM fr_heats WHERE roundId = ? ORDER BY heatNumber";
         List<Heats> heats = new ArrayList();
 
         try (
-                Connection conn = this.databaseManager.getOrConnect();
-                PreparedStatement stmt = conn.prepareStatement(sql);
+            Connection conn = this.databaseManager.getOrConnect();
+            PreparedStatement stmt = conn.prepareStatement(sql);
         ) {
             stmt.setInt(1, roundId);
 
             try (ResultSet rs = stmt.executeQuery()) {
-                while(rs.next()) {
+                while (rs.next()) {
                     Heats heat = this.buildHeatFromResultSet(rs);
                     heats.add(heat);
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao carregar heats: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[EventsDB] Erro ao carregar heats: " + e.getMessage()
+            );
         }
 
         return heats;
@@ -1231,7 +1642,7 @@ public class EventsDatabaseManager {
         int heatId = rs.getInt("id");
         int roundId = rs.getInt("roundId");
         int heatNumber = rs.getInt("heatNumber");
-        Heats heat = new Heats(this.plugin, heatId, (Rounds)null, heatNumber);
+        Heats heat = new Heats(this.plugin, heatId, (Rounds) null, heatNumber);
         heat.setRoundId(roundId);
         heat.setHeatStateForLoad(HeatState.valueOf(rs.getString("state")));
         long startTimestamp = rs.getLong("startTime");
@@ -1258,16 +1669,40 @@ public class EventsDatabaseManager {
         heat.setLonely(rs.getInt("lonely") == 1);
         heat.setCanReset(rs.getInt("canReset") == 1);
 
-        try { heat.setCollisionMode(CollisionMode.valueOf(rs.getString("colisao"))); } catch (SQLException ignored) { heat.setCollisionMode(CollisionMode.DISABLED); }
-        try { heat.setDrsEnabled(rs.getInt("drs") == 1); } catch (SQLException ignored) {}
-        try { heat.setDriverSwap(rs.getInt("driverswap") == 1); } catch (SQLException ignored) {}
-        try { heat.setDrsdowntime(rs.getDouble("drsdowntime")); } catch (SQLException ignored) {}
-        try { heat.setDrsdownpower(rs.getDouble("drsdownpower")); } catch (SQLException ignored) {}
-        try { heat.setreversegrid(rs.getInt("reversegrid") == 1); } catch (SQLException ignored) {}
-        try { heat.setDeltaghosting((int) rs.getDouble("ghostingdelta")); } catch (SQLException ignored) {}
-        try { heat.setPushtopass(rs.getInt("pushtopass") == 1); } catch (SQLException ignored) {}
-        try { heat.setpushtopasspower(rs.getDouble("pushtopasspower")); } catch (SQLException ignored) {}
-        try { heat.setrealistc(rs.getInt("realistc") == 1); } catch (SQLException ignored) {}
+        try {
+            heat.setCollisionMode(
+                CollisionMode.valueOf(rs.getString("colisao"))
+            );
+        } catch (SQLException ignored) {
+            heat.setCollisionMode(CollisionMode.DISABLED);
+        }
+        try {
+            heat.setDrsEnabled(rs.getInt("drs") == 1);
+        } catch (SQLException ignored) {}
+        try {
+            heat.setDriverSwap(rs.getInt("driverswap") == 1);
+        } catch (SQLException ignored) {}
+        try {
+            heat.setDrsdowntime(rs.getDouble("drsdowntime"));
+        } catch (SQLException ignored) {}
+        try {
+            heat.setDrsdownpower(rs.getDouble("drsdownpower"));
+        } catch (SQLException ignored) {}
+        try {
+            heat.setreversegrid(rs.getInt("reversegrid") == 1);
+        } catch (SQLException ignored) {}
+        try {
+            heat.setDeltaghosting((int) rs.getDouble("ghostingdelta"));
+        } catch (SQLException ignored) {}
+        try {
+            heat.setPushtopass(rs.getInt("pushtopass") == 1);
+        } catch (SQLException ignored) {}
+        try {
+            heat.setpushtopasspower(rs.getDouble("pushtopasspower"));
+        } catch (SQLException ignored) {}
+        try {
+            heat.setrealistc(rs.getInt("realistc") == 1);
+        } catch (SQLException ignored) {}
 
         for (Driver driver : this.loadDriversByHeatId(heat.getId())) {
             heat.addDriverDirect(driver);
@@ -1276,8 +1711,10 @@ public class EventsDatabaseManager {
     }
 
     public void addDriverToHeatWithShift(UUID uuid, int heatId, int position) {
-        String shiftSql = "UPDATE fr_drivers SET position = position + 1, startPosition = startPosition + 1 WHERE heatId = ? AND position >= ?";
-        String insertSql = "INSERT INTO fr_drivers (uuid, heatId, position, startPosition, pitstops) VALUES (?, ?, ?, ?, ?)";
+        String shiftSql =
+            "UPDATE fr_drivers SET position = position + 1, startPosition = startPosition + 1 WHERE heatId = ? AND position >= ?";
+        String insertSql =
+            "INSERT INTO fr_drivers (uuid, heatId, position, startPosition, pitstops) VALUES (?, ?, ?, ?, ?)";
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
@@ -1337,7 +1774,14 @@ public class EventsDatabaseManager {
                     }
 
                     conn.commit();
-                    this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Player " + String.valueOf(uuid) + " adicionado ao heat " + heatId + " na posição " + position);
+                    this.plugin.getDebugManager().logDatabaseOperation(
+                        "[EventsDB] Player " +
+                            String.valueOf(uuid) +
+                            " adicionado ao heat " +
+                            heatId +
+                            " na posição " +
+                            position
+                    );
                 } catch (SQLException e) {
                     conn.rollback();
                     throw e;
@@ -1345,15 +1789,23 @@ public class EventsDatabaseManager {
                     conn.setAutoCommit(initialAutoCommit);
                 }
             } catch (SQLException e) {
-                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao adicionar player ao heat com shift: " + e.getMessage());
+                this.plugin.getDebugManager().logDatabaseOperation(
+                    "[EventsDB] Erro ao adicionar player ao heat com shift: " +
+                        e.getMessage()
+                );
             }
-
         });
     }
 
-    public boolean addDriverToHeatWithShiftSync(UUID uuid, int heatId, int position) {
-        String shiftSql = "UPDATE fr_drivers SET position = position + 1, startPosition = startPosition + 1 WHERE heatId = ? AND position >= ?";
-        String insertSql = "INSERT INTO fr_drivers (uuid, heatId, position, startPosition, pitstops) VALUES (?, ?, ?, ?, ?)";
+    public boolean addDriverToHeatWithShiftSync(
+        UUID uuid,
+        int heatId,
+        int position
+    ) {
+        String shiftSql =
+            "UPDATE fr_drivers SET position = position + 1, startPosition = startPosition + 1 WHERE heatId = ? AND position >= ?";
+        String insertSql =
+            "INSERT INTO fr_drivers (uuid, heatId, position, startPosition, pitstops) VALUES (?, ?, ?, ?, ?)";
 
         try {
             Connection conn = this.databaseManager.getOrConnect();
@@ -1365,13 +1817,21 @@ public class EventsDatabaseManager {
             conn.setAutoCommit(false);
 
             try {
-                try (PreparedStatement shiftStmt = conn.prepareStatement(shiftSql)) {
+                try (
+                    PreparedStatement shiftStmt = conn.prepareStatement(
+                        shiftSql
+                    )
+                ) {
                     shiftStmt.setInt(1, heatId);
                     shiftStmt.setInt(2, position);
                     shiftStmt.executeUpdate();
                 }
 
-                try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+                try (
+                    PreparedStatement insertStmt = conn.prepareStatement(
+                        insertSql
+                    )
+                ) {
                     insertStmt.setString(1, uuid.toString());
                     insertStmt.setInt(2, heatId);
                     insertStmt.setInt(3, position);
@@ -1384,13 +1844,19 @@ public class EventsDatabaseManager {
                 return true;
             } catch (SQLException exception) {
                 conn.rollback();
-                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro sync ao adicionar piloto com shift: " + exception.getMessage());
+                this.plugin.getDebugManager().logDatabaseOperation(
+                    "[EventsDB] Erro sync ao adicionar piloto com shift: " +
+                        exception.getMessage()
+                );
                 return false;
             } finally {
                 conn.setAutoCommit(initialAutoCommit);
             }
         } catch (SQLException exception) {
-            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Falha sync ao adicionar piloto com shift: " + exception.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[EventsDB] Falha sync ao adicionar piloto com shift: " +
+                    exception.getMessage()
+            );
             return false;
         }
     }
@@ -1405,7 +1871,9 @@ public class EventsDatabaseManager {
 
                     try {
                         int removedPosition = -1;
-                        PreparedStatement ps = conn.prepareStatement("SELECT position FROM fr_drivers WHERE uuid=? AND heatId=?");
+                        PreparedStatement ps = conn.prepareStatement(
+                            "SELECT position FROM fr_drivers WHERE uuid=? AND heatId=?"
+                        );
 
                         try {
                             ps.setString(1, uuid.toString());
@@ -1448,7 +1916,9 @@ public class EventsDatabaseManager {
                         }
 
                         if (removedPosition != -1) {
-                            ps = conn.prepareStatement("DELETE FROM fr_drivers WHERE uuid=? AND heatId=?");
+                            ps = conn.prepareStatement(
+                                "DELETE FROM fr_drivers WHERE uuid=? AND heatId=?"
+                            );
 
                             try {
                                 ps.setString(1, uuid.toString());
@@ -1470,7 +1940,9 @@ public class EventsDatabaseManager {
                                 ps.close();
                             }
 
-                            ps = conn.prepareStatement("UPDATE fr_drivers SET position = position - 1, startPosition = startPosition - 1 WHERE heatId=? AND position > ?");
+                            ps = conn.prepareStatement(
+                                "UPDATE fr_drivers SET position = position - 1, startPosition = startPosition - 1 WHERE heatId=? AND position > ?"
+                            );
 
                             try {
                                 ps.setInt(1, heatId);
@@ -1493,9 +1965,15 @@ public class EventsDatabaseManager {
                             }
 
                             conn.commit();
-                            DebugManager var10000 = this.plugin.getDebugManager();
+                            DebugManager var10000 =
+                                this.plugin.getDebugManager();
                             String var10001 = String.valueOf(uuid);
-                            var10000.logDatabaseOperation("[EventsDB] Player " + var10001 + " removido e posições reajustadas no heat " + heatId);
+                            var10000.logDatabaseOperation(
+                                "[EventsDB] Player " +
+                                    var10001 +
+                                    " removido e posições reajustadas no heat " +
+                                    heatId
+                            );
                             return;
                         }
 
@@ -1506,18 +1984,22 @@ public class EventsDatabaseManager {
                     } finally {
                         conn.setAutoCommit(initialAutoCommit);
                     }
-
                 }
             } catch (SQLException e) {
-                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao remover player do heat com shift: " + e.getMessage());
+                this.plugin.getDebugManager().logDatabaseOperation(
+                    "[EventsDB] Erro ao remover player do heat com shift: " +
+                        e.getMessage()
+                );
             }
         });
     }
 
     public boolean removeDriverFromHeatWithShiftSync(UUID uuid, int heatId) {
-        String fetchSql = "SELECT position FROM fr_drivers WHERE uuid=? AND heatId=?";
+        String fetchSql =
+            "SELECT position FROM fr_drivers WHERE uuid=? AND heatId=?";
         String deleteSql = "DELETE FROM fr_drivers WHERE uuid=? AND heatId=?";
-        String shiftSql = "UPDATE fr_drivers SET position = position - 1, startPosition = startPosition - 1 WHERE heatId=? AND position > ?";
+        String shiftSql =
+            "UPDATE fr_drivers SET position = position - 1, startPosition = startPosition - 1 WHERE heatId=? AND position > ?";
 
         try {
             Connection conn = this.databaseManager.getOrConnect();
@@ -1530,7 +2012,11 @@ public class EventsDatabaseManager {
 
             try {
                 int removedPosition = -1;
-                try (PreparedStatement fetchStmt = conn.prepareStatement(fetchSql)) {
+                try (
+                    PreparedStatement fetchStmt = conn.prepareStatement(
+                        fetchSql
+                    )
+                ) {
                     fetchStmt.setString(1, uuid.toString());
                     fetchStmt.setInt(2, heatId);
                     try (ResultSet rs = fetchStmt.executeQuery()) {
@@ -1545,13 +2031,21 @@ public class EventsDatabaseManager {
                     return false;
                 }
 
-                try (PreparedStatement deleteStmt = conn.prepareStatement(deleteSql)) {
+                try (
+                    PreparedStatement deleteStmt = conn.prepareStatement(
+                        deleteSql
+                    )
+                ) {
                     deleteStmt.setString(1, uuid.toString());
                     deleteStmt.setInt(2, heatId);
                     deleteStmt.executeUpdate();
                 }
 
-                try (PreparedStatement shiftStmt = conn.prepareStatement(shiftSql)) {
+                try (
+                    PreparedStatement shiftStmt = conn.prepareStatement(
+                        shiftSql
+                    )
+                ) {
                     shiftStmt.setInt(1, heatId);
                     shiftStmt.setInt(2, removedPosition);
                     shiftStmt.executeUpdate();
@@ -1561,19 +2055,29 @@ public class EventsDatabaseManager {
                 return true;
             } catch (SQLException exception) {
                 conn.rollback();
-                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro sync ao remover piloto com shift: " + exception.getMessage());
+                this.plugin.getDebugManager().logDatabaseOperation(
+                    "[EventsDB] Erro sync ao remover piloto com shift: " +
+                        exception.getMessage()
+                );
                 return false;
             } finally {
                 conn.setAutoCommit(initialAutoCommit);
             }
         } catch (SQLException exception) {
-            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Falha sync ao remover piloto com shift: " + exception.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[EventsDB] Falha sync ao remover piloto com shift: " +
+                    exception.getMessage()
+            );
             return false;
         }
     }
 
-    public void updateHeatGridPositions(int heatId, Map<UUID, Integer> positions) {
-        String sql = "UPDATE fr_drivers SET position = ?, startPosition = ? WHERE heatId = ? AND uuid = ?";
+    public void updateHeatGridPositions(
+        int heatId,
+        Map<UUID, Integer> positions
+    ) {
+        String sql =
+            "UPDATE fr_drivers SET position = ?, startPosition = ? WHERE heatId = ? AND uuid = ?";
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
@@ -1588,17 +2092,25 @@ public class EventsDatabaseManager {
                     PreparedStatement stmt = conn.prepareStatement(sql);
 
                     try {
-                        for(Map.Entry<UUID, Integer> entry : positions.entrySet()) {
-                            stmt.setInt(1, (Integer)entry.getValue());
-                            stmt.setInt(2, (Integer)entry.getValue());
+                        for (Map.Entry<
+                            UUID,
+                            Integer
+                        > entry : positions.entrySet()) {
+                            stmt.setInt(1, (Integer) entry.getValue());
+                            stmt.setInt(2, (Integer) entry.getValue());
                             stmt.setInt(3, heatId);
-                            stmt.setString(4, ((UUID)entry.getKey()).toString());
+                            stmt.setString(
+                                4,
+                                ((UUID) entry.getKey()).toString()
+                            );
                             stmt.addBatch();
                         }
 
                         stmt.executeBatch();
                         conn.commit();
-                        this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Grid do heat " + heatId + " atualizado.");
+                        this.plugin.getDebugManager().logDatabaseOperation(
+                            "[EventsDB] Grid do heat " + heatId + " atualizado."
+                        );
                     } catch (Throwable var16) {
                         if (stmt != null) {
                             try {
@@ -1621,14 +2133,17 @@ public class EventsDatabaseManager {
                     conn.setAutoCommit(initialAutoCommit);
                 }
             } catch (SQLException e) {
-                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao atualizar grid do heat: " + e.getMessage());
+                this.plugin.getDebugManager().logDatabaseOperation(
+                    "[EventsDB] Erro ao atualizar grid do heat: " +
+                        e.getMessage()
+                );
             }
-
         });
     }
 
     public void createDriver(Driver driver) {
-        String sql = "INSERT INTO fr_drivers (uuid, heatId, position, startPosition, pitstops) VALUES (?, ?, ?, ?, ?)";
+        String sql =
+            "INSERT INTO fr_drivers (uuid, heatId, position, startPosition, pitstops) VALUES (?, ?, ?, ?, ?)";
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
@@ -1648,20 +2163,27 @@ public class EventsDatabaseManager {
                         if (rs.next()) {
                             int driverId = rs.getInt(1);
                             driver.setId(driverId);
-                            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Driver criado (Assíncrono): ID=" + driverId + ", UUID=" + String.valueOf(driver.getUuid()));
+                            this.plugin.getDebugManager().logDatabaseOperation(
+                                "[EventsDB] Driver criado (Assíncrono): ID=" +
+                                    driverId +
+                                    ", UUID=" +
+                                    String.valueOf(driver.getUuid())
+                            );
                         }
                     }
                 }
             } catch (SQLException e) {
-                this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro assíncrono ao criar driver: " + e.getMessage());
+                this.plugin.getDebugManager().logDatabaseOperation(
+                    "[EventsDB] Erro assíncrono ao criar driver: " +
+                        e.getMessage()
+                );
             }
-
         });
     }
 
     public void updateDriverPosition(int driverId, int position) {
         String sql = "UPDATE fr_drivers SET position = ? WHERE id = ?";
-        this.executeAsync(sql, "updateDriverPosition", (stmt) -> {
+        this.executeAsync(sql, "updateDriverPosition", stmt -> {
             try {
                 stmt.setInt(1, position);
                 stmt.setInt(2, driverId);
@@ -1671,12 +2193,23 @@ public class EventsDatabaseManager {
         });
     }
 
-    public void updateDriverTimes(int driverId, Instant startTime, Instant endTime) {
-        String sql = "UPDATE fr_drivers SET startTime = ?, endTime = ? WHERE id = ?";
-        this.executeAsync(sql, "updateDriverTimes", (stmt) -> {
+    public void updateDriverTimes(
+        int driverId,
+        Instant startTime,
+        Instant endTime
+    ) {
+        String sql =
+            "UPDATE fr_drivers SET startTime = ?, endTime = ? WHERE id = ?";
+        this.executeAsync(sql, "updateDriverTimes", stmt -> {
             try {
-                stmt.setLong(1, startTime != null ? startTime.getEpochSecond() : 0L);
-                stmt.setLong(2, endTime != null ? endTime.getEpochSecond() : 0L);
+                stmt.setLong(
+                    1,
+                    startTime != null ? startTime.getEpochSecond() : 0L
+                );
+                stmt.setLong(
+                    2,
+                    endTime != null ? endTime.getEpochSecond() : 0L
+                );
                 stmt.setInt(3, driverId);
             } catch (SQLException e) {
                 throw new RuntimeException(e);
@@ -1685,8 +2218,9 @@ public class EventsDatabaseManager {
     }
 
     public void incrementDriverPitstops(int driverId) {
-        String sql = "UPDATE fr_drivers SET pitstops = pitstops + 1 WHERE id = ?";
-        this.executeAsync(sql, "incrementDriverPitstops", (stmt) -> {
+        String sql =
+            "UPDATE fr_drivers SET pitstops = pitstops + 1 WHERE id = ?";
+        this.executeAsync(sql, "incrementDriverPitstops", stmt -> {
             try {
                 stmt.setInt(1, driverId);
             } catch (SQLException e) {
@@ -1697,7 +2231,7 @@ public class EventsDatabaseManager {
 
     public void deleteDriver(UUID playerUUID, int heatId) {
         String sql = "DELETE FROM fr_drivers WHERE uuid = ? AND heatId = ?";
-        this.executeAsync(sql, "deleteDriver", (stmt) -> {
+        this.executeAsync(sql, "deleteDriver", stmt -> {
             try {
                 stmt.setString(1, playerUUID.toString());
                 stmt.setInt(2, heatId);
@@ -1708,23 +2242,26 @@ public class EventsDatabaseManager {
     }
 
     public List<Driver> loadDriversByHeatId(int heatId) {
-        String sql = "SELECT * FROM fr_drivers WHERE heatId = ? ORDER BY position";
+        String sql =
+            "SELECT * FROM fr_drivers WHERE heatId = ? ORDER BY position";
         List<Driver> drivers = new ArrayList();
 
         try (
-                Connection conn = this.databaseManager.getOrConnect();
-                PreparedStatement stmt = conn.prepareStatement(sql);
+            Connection conn = this.databaseManager.getOrConnect();
+            PreparedStatement stmt = conn.prepareStatement(sql);
         ) {
             stmt.setInt(1, heatId);
 
             try (ResultSet rs = stmt.executeQuery()) {
-                while(rs.next()) {
+                while (rs.next()) {
                     Driver driver = this.buildDriverFromResultSet(rs);
                     drivers.add(driver);
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao carregar drivers: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[EventsDB] Erro ao carregar drivers: " + e.getMessage()
+            );
         }
 
         return drivers;
@@ -1751,9 +2288,17 @@ public class EventsDatabaseManager {
         return driver;
     }
 
-    public void createLap(UUID playerUUID, int heatId, String trackNameWS, long lapStart, long lapEnd, boolean pitted) {
-        String sql = "INSERT INTO fr_laps (uuid, heatId, tracknameWS, lapStart, lapEnd, pitted) VALUES (?, ?, ?, ?, ?, ?)";
-        this.executeAsync(sql, "createLap", (stmt) -> {
+    public void createLap(
+        UUID playerUUID,
+        int heatId,
+        String trackNameWS,
+        long lapStart,
+        long lapEnd,
+        boolean pitted
+    ) {
+        String sql =
+            "INSERT INTO fr_laps (uuid, heatId, tracknameWS, lapStart, lapEnd, pitted) VALUES (?, ?, ?, ?, ?, ?)";
+        this.executeAsync(sql, "createLap", stmt -> {
             try {
                 stmt.setString(1, playerUUID.toString());
                 stmt.setInt(2, heatId);
@@ -1769,7 +2314,7 @@ public class EventsDatabaseManager {
 
     public void finishLap(int lapId, long lapEnd) {
         String sql = "UPDATE fr_laps SET lapEnd = ? WHERE id = ?";
-        this.executeAsync(sql, "finishLap", (stmt) -> {
+        this.executeAsync(sql, "finishLap", stmt -> {
             try {
                 stmt.setLong(1, lapEnd);
                 stmt.setInt(2, lapId);
@@ -1779,19 +2324,23 @@ public class EventsDatabaseManager {
         });
     }
 
-    public List<Map<String, Object>> loadLapsByDriverAndHeat(UUID playerUUID, int heatId) {
-        String sql = "SELECT * FROM fr_laps WHERE uuid = ? AND heatId = ? ORDER BY lapStart";
+    public List<Map<String, Object>> loadLapsByDriverAndHeat(
+        UUID playerUUID,
+        int heatId
+    ) {
+        String sql =
+            "SELECT * FROM fr_laps WHERE uuid = ? AND heatId = ? ORDER BY lapStart";
         List<Map<String, Object>> laps = new ArrayList();
 
         try (
-                Connection conn = this.databaseManager.getOrConnect();
-                PreparedStatement stmt = conn.prepareStatement(sql);
+            Connection conn = this.databaseManager.getOrConnect();
+            PreparedStatement stmt = conn.prepareStatement(sql);
         ) {
             stmt.setString(1, playerUUID.toString());
             stmt.setInt(2, heatId);
 
             try (ResultSet rs = stmt.executeQuery()) {
-                while(rs.next()) {
+                while (rs.next()) {
                     Map<String, Object> lap = new HashMap<>();
                     lap.put("id", rs.getInt("id"));
                     lap.put("lapStart", rs.getLong("lapStart"));
@@ -1801,13 +2350,17 @@ public class EventsDatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao carregar laps: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[EventsDB] Erro ao carregar laps: " + e.getMessage()
+            );
         }
 
         return laps;
     }
 
-    public synchronized Map<String, Location> getDrsRegions(String trackNameWS) {
+    public synchronized Map<String, Location> getDrsRegions(
+        String trackNameWS
+    ) {
         Map<String, Location> regions = new HashMap<>();
         trackNameWS = trackNameWS.replace(" ", "").toLowerCase();
         String sql = "SELECT * FROM fr_drs WHERE trackNameWS = ?";
@@ -1826,18 +2379,66 @@ public class EventsDatabaseManager {
                     World world = Bukkit.getWorld(worldName);
                     if (world != null) {
                         if (rs.getObject("detectMinMinX") != null) {
-                            regions.put("detectMin", new Location(world, rs.getDouble("detectMinMinX"), rs.getDouble("detectMinMinY"), rs.getDouble("detectMinMinZ")));
-                            regions.put("detectMax", new Location(world, rs.getDouble("detectMinMaxX"), rs.getDouble("detectMinMaxY"), rs.getDouble("detectMinMaxZ")));
+                            regions.put(
+                                "detectMin",
+                                new Location(
+                                    world,
+                                    rs.getDouble("detectMinMinX"),
+                                    rs.getDouble("detectMinMinY"),
+                                    rs.getDouble("detectMinMinZ")
+                                )
+                            );
+                            regions.put(
+                                "detectMax",
+                                new Location(
+                                    world,
+                                    rs.getDouble("detectMinMaxX"),
+                                    rs.getDouble("detectMinMaxY"),
+                                    rs.getDouble("detectMinMaxZ")
+                                )
+                            );
                         }
 
                         if (rs.getObject("drsMinX") != null) {
-                            regions.put("startMin", new Location(world, rs.getDouble("drsMinX"), rs.getDouble("drsMinY"), rs.getDouble("drsMinZ")));
-                            regions.put("startMax", new Location(world, rs.getDouble("drsMaxX"), rs.getDouble("drsMaxY"), rs.getDouble("drsMaxZ")));
+                            regions.put(
+                                "startMin",
+                                new Location(
+                                    world,
+                                    rs.getDouble("drsMinX"),
+                                    rs.getDouble("drsMinY"),
+                                    rs.getDouble("drsMinZ")
+                                )
+                            );
+                            regions.put(
+                                "startMax",
+                                new Location(
+                                    world,
+                                    rs.getDouble("drsMaxX"),
+                                    rs.getDouble("drsMaxY"),
+                                    rs.getDouble("drsMaxZ")
+                                )
+                            );
                         }
 
                         if (rs.getObject("endDrsMinX") != null) {
-                            regions.put("finishMin", new Location(world, rs.getDouble("endDrsMinX"), rs.getDouble("endDrsMinY"), rs.getDouble("endDrsMinZ")));
-                            regions.put("finishMax", new Location(world, rs.getDouble("endDrsMaxX"), rs.getDouble("endDrsMaxY"), rs.getDouble("endDrsMaxZ")));
+                            regions.put(
+                                "finishMin",
+                                new Location(
+                                    world,
+                                    rs.getDouble("endDrsMinX"),
+                                    rs.getDouble("endDrsMinY"),
+                                    rs.getDouble("endDrsMinZ")
+                                )
+                            );
+                            regions.put(
+                                "finishMax",
+                                new Location(
+                                    world,
+                                    rs.getDouble("endDrsMaxX"),
+                                    rs.getDouble("endDrsMaxY"),
+                                    rs.getDouble("endDrsMaxZ")
+                                )
+                            );
                         }
 
                         return regions;
@@ -1847,7 +2448,7 @@ public class EventsDatabaseManager {
                 }
             }
 
-            return (Map<String, Location>)var9;
+            return (Map<String, Location>) var9;
         } catch (SQLException e) {
             e.printStackTrace();
             return regions;
@@ -1855,29 +2456,35 @@ public class EventsDatabaseManager {
     }
 
     public Map<String, Object> getFastestLapInHeat(int heatId) {
-        String sql = "SELECT uuid, MIN(lapEnd - lapStart) as fastestTime FROM fr_laps WHERE heatId = ? AND lapEnd IS NOT NULL GROUP BY uuid ORDER BY fastestTime LIMIT 1";
+        String sql =
+            "SELECT uuid, MIN(lapEnd - lapStart) as fastestTime FROM fr_laps WHERE heatId = ? AND lapEnd IS NOT NULL GROUP BY uuid ORDER BY fastestTime LIMIT 1";
 
         try {
             try (
-                    Connection conn = this.databaseManager.getOrConnect();
-                    PreparedStatement stmt = conn.prepareStatement(sql);
+                Connection conn = this.databaseManager.getOrConnect();
+                PreparedStatement stmt = conn.prepareStatement(sql);
             ) {
                 stmt.setInt(1, heatId);
 
                 try (ResultSet rs = stmt.executeQuery()) {
                     if (rs.next()) {
                         Map<String, Object> result = new HashMap<>();
-                        result.put("uuid", UUID.fromString(rs.getString("uuid")));
+                        result.put(
+                            "uuid",
+                            UUID.fromString(rs.getString("uuid"))
+                        );
                         result.put("time", rs.getLong("fastestTime"));
                         Object var7 = result;
-                        return (Map<String, Object>)var7;
+                        return (Map<String, Object>) var7;
                     } else {
                         return null;
                     }
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[EventsDB] Erro ao buscar fastest lap: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[EventsDB] Erro ao buscar fastest lap: " + e.getMessage()
+            );
             return null;
         }
     }

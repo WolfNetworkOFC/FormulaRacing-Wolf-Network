@@ -2,13 +2,12 @@ package dev.EfraGroup.formulaRacing.Command;
 
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.CommandAlias;
-import co.aikar.commands.annotation.CommandPermission;
 import co.aikar.commands.annotation.Default;
 import co.aikar.commands.annotation.Description;
 import dev.EfraGroup.formulaRacing.APIFormulaRacing;
 import org.bukkit.entity.Player;
 
-@CommandAlias("boat") // Define o comando e um alias opcional
+@CommandAlias("boat|b") // Define o comando e aliases
 @Description("Spawna um barco de corrida na sua posição")
 public class BoatCommand extends BaseCommand {
 

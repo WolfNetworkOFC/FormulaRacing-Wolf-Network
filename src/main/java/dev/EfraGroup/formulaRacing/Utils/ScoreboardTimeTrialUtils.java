@@ -3,8 +3,8 @@ package dev.EfraGroup.formulaRacing.Utils;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.ScoreboardOwnershipCoordinator;
-import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.ScoreboardAdapter;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.style.TimingScoreboardStyle;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.ScoreboardAdapter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -14,24 +14,32 @@ import java.util.concurrent.ConcurrentHashMap;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
 public class ScoreboardTimeTrialUtils {
+
     private static final int MAX_LINES = 15;
     private final Map<UUID, String> playerTracks = new ConcurrentHashMap<>();
-    private final Map<UUID, String> playerTrackOwners = new ConcurrentHashMap<>();
+    private final Map<UUID, String> playerTrackOwners =
+        new ConcurrentHashMap<>();
     private final DatabaseManager mysql;
     private final ScoreboardAdapter adapter;
     private final ScoreboardOwnershipCoordinator ownershipCoordinator;
     private boolean running = false;
-    private final Map<String, CachedLeaderboard> leaderboardCache = new ConcurrentHashMap<>();
-    private final Map<String, String> trackOwnerCache = new ConcurrentHashMap<>();
+    private final Map<String, CachedLeaderboard> leaderboardCache =
+        new ConcurrentHashMap<>();
+    private final Map<String, String> trackOwnerCache =
+        new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> enabledCache = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastEnabledCheck = new ConcurrentHashMap<>();
     private static final long SETTINGS_TTL = 5000L;
 
-    public ScoreboardTimeTrialUtils(FormulaRacing plugin, DatabaseManager mysql, ScoreboardAdapter adapter, ScoreboardOwnershipCoordinator ownershipCoordinator) {
+    public ScoreboardTimeTrialUtils(
+        FormulaRacing plugin,
+        DatabaseManager mysql,
+        ScoreboardAdapter adapter,
+        ScoreboardOwnershipCoordinator ownershipCoordinator
+    ) {
         this.mysql = mysql;
         this.adapter = adapter;
         this.ownershipCoordinator = ownershipCoordinator;
@@ -46,17 +54,25 @@ public class ScoreboardTimeTrialUtils {
             @Override
             public void run() {
                 for (Player player : Bukkit.getOnlinePlayers()) {
-                    String trackName = ScoreboardTimeTrialUtils.this.playerTracks.get(player.getUniqueId());
+                    String trackName =
+                        ScoreboardTimeTrialUtils.this.playerTracks.get(
+                            player.getUniqueId()
+                        );
                     if (trackName == null) {
                         continue;
                     }
                     ScoreboardTimeTrialUtils.this.show(player, trackName);
                 }
             }
-        }.runTaskTimer( FormulaRacing.getInstance(), 0L, 20L);
+        }
+            .runTaskTimer(FormulaRacing.getInstance(), 0L, 20L);
     }
 
-    public void setPlayerTrack(Player player, String trackName, String ownerName) {
+    public void setPlayerTrack(
+        Player player,
+        String trackName,
+        String ownerName
+    ) {
         this.playerTracks.put(player.getUniqueId(), trackName);
         if (ownerName != null) {
             this.playerTrackOwners.put(player.getUniqueId(), ownerName);
@@ -67,7 +83,10 @@ public class ScoreboardTimeTrialUtils {
     public void clearPlayerTrack(Player player) {
         this.playerTracks.remove(player.getUniqueId());
         this.playerTrackOwners.remove(player.getUniqueId());
-        this.ownershipCoordinator.release(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.TIME_TRIAL);
+        this.ownershipCoordinator.release(
+            player.getUniqueId(),
+            ScoreboardOwnershipCoordinator.Mode.TIME_TRIAL
+        );
         this.adapter.delete(player);
     }
 
@@ -75,14 +94,22 @@ public class ScoreboardTimeTrialUtils {
         if (player == null || !player.isOnline()) {
             return false;
         }
-        if (FormulaRacing.getInstance().getTimeTrialDuels() != null
-                && FormulaRacing.getInstance().getTimeTrialDuels().isPlayerInActiveDuelCached(player.getUniqueId())) {
+        if (
+            FormulaRacing.getInstance().getTimeTrialDuels() != null &&
+            FormulaRacing.getInstance()
+                .getTimeTrialDuels()
+                .isPlayerInActiveDuelCached(player.getUniqueId())
+        ) {
             return false;
         }
 
         long now = System.currentTimeMillis();
         boolean enabled;
-        if (this.enabledCache.containsKey(player.getUniqueId()) && now - this.lastEnabledCheck.getOrDefault(player.getUniqueId(), 0L) < SETTINGS_TTL) {
+        if (
+            this.enabledCache.containsKey(player.getUniqueId()) &&
+            now - this.lastEnabledCheck.getOrDefault(player.getUniqueId(), 0L) <
+            SETTINGS_TTL
+        ) {
             enabled = this.enabledCache.get(player.getUniqueId());
         } else {
             enabled = this.mysql.getTimeTrialScoreboard(player.getUniqueId());
@@ -91,15 +118,28 @@ public class ScoreboardTimeTrialUtils {
         }
 
         if (!enabled) {
-            this.ownershipCoordinator.release(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.TIME_TRIAL);
+            this.ownershipCoordinator.release(
+                player.getUniqueId(),
+                ScoreboardOwnershipCoordinator.Mode.TIME_TRIAL
+            );
             this.adapter.delete(player);
             return false;
         }
 
-        if (!this.ownershipCoordinator.acquire(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.TIME_TRIAL)) {
+        if (
+            !this.ownershipCoordinator.acquire(
+                player.getUniqueId(),
+                ScoreboardOwnershipCoordinator.Mode.TIME_TRIAL
+            )
+        ) {
             return false;
         }
-        if (!this.ownershipCoordinator.isOwner(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.TIME_TRIAL)) {
+        if (
+            !this.ownershipCoordinator.isOwner(
+                player.getUniqueId(),
+                ScoreboardOwnershipCoordinator.Mode.TIME_TRIAL
+            )
+        ) {
             return false;
         }
 
@@ -122,11 +162,21 @@ public class ScoreboardTimeTrialUtils {
             if (allRecords == null) {
                 allRecords = new ArrayList<>();
             }
-            allRecords.sort(Comparator
-                    .comparingInt((DatabaseManager.TrackRecord tr) -> tr.isFinished() ? 0 : 1)
-                    .thenComparing(Comparator.comparingInt(DatabaseManager.TrackRecord::getCheckpointsReached).reversed())
-                    .thenComparingDouble(DatabaseManager.TrackRecord::getTime));
-            this.leaderboardCache.put(trackName, new CachedLeaderboard(allRecords));
+            allRecords.sort(
+                Comparator.comparingInt((DatabaseManager.TrackRecord tr) ->
+                    tr.isFinished() ? 0 : 1
+                )
+                    .thenComparing(
+                        Comparator.comparingInt(
+                            DatabaseManager.TrackRecord::getCheckpointsReached
+                        ).reversed()
+                    )
+                    .thenComparingDouble(DatabaseManager.TrackRecord::getTime)
+            );
+            this.leaderboardCache.put(
+                trackName,
+                new CachedLeaderboard(allRecords)
+            );
         } else {
             allRecords = cached.records;
         }
@@ -140,15 +190,30 @@ public class ScoreboardTimeTrialUtils {
         }
 
         TranslationUtil tu = FormulaRacing.getInstance().getTranslationUtil();
-        this.adapter.updateTitle(player, this.boldTitle(tu.getTranslated(player, "scoreboard_tt_title")));
-        String separator = "§l" + tu.getTranslated(player, "scoreboard_common_separator");
+        this.adapter.updateTitle(
+            player,
+            this.boldTitle(tu.getTranslated(player, "scoreboard_tt_title"))
+        );
+        String separator =
+            "§l" + tu.getTranslated(player, "scoreboard_common_separator");
         String footer = "§ewolfnetwork.com.br";
 
         List<String> lines = new ArrayList<>();
         lines.add(separator);
-        lines.add("§f§l" + tu.getTranslated(player, "scoreboard_tt_track", "{track}", trackName));
+        lines.add(
+            "§f§l" +
+                tu.getTranslated(
+                    player,
+                    "scoreboard_tt_track",
+                    "{track}",
+                    trackName
+                )
+        );
 
-        String creator = this.playerTrackOwners.getOrDefault(player.getUniqueId(), this.trackOwnerCache.get(trackName));
+        String creator = this.playerTrackOwners.getOrDefault(
+            player.getUniqueId(),
+            this.trackOwnerCache.get(trackName)
+        );
         if (creator == null) {
             creator = this.mysql.getTrackOwner(trackName);
             if (creator != null) {
@@ -157,18 +222,31 @@ public class ScoreboardTimeTrialUtils {
         }
 
         if (creator != null) {
-            lines.add("§f§l" + tu.getTranslated(player, "scoreboard_tt_by", "{creator}", creator));
+            lines.add(
+                "§f§l" +
+                    tu.getTranslated(
+                        player,
+                        "scoreboard_tt_by",
+                        "{creator}",
+                        creator
+                    )
+            );
         }
 
         lines.add(separator);
         lines.add("");
-        lines.add("§e§l" + tu.getTranslated(player, "scoreboard_tt_leaderboard"));
+        lines.add(
+            "§e§l" + tu.getTranslated(player, "scoreboard_tt_leaderboard")
+        );
 
         List<DatabaseManager.TrackRecord> neighbors = new ArrayList<>();
         DatabaseManager.TrackRecord firstPlace = null;
         boolean includeSeparator = false;
         int footerLines = 3;
-        int availableForEntries = Math.max(3, MAX_LINES - lines.size() - footerLines);
+        int availableForEntries = Math.max(
+            3,
+            MAX_LINES - lines.size() - footerLines
+        );
 
         if (myPos == -1 || myPos < 5) {
             int limit = Math.min(allRecords.size(), availableForEntries);
@@ -186,7 +264,10 @@ public class ScoreboardTimeTrialUtils {
                 minIndex = 1;
             }
             int start = Math.max(minIndex, myPos - neighborsLimit / 2);
-            int end = Math.min(allRecords.size() - 1, start + neighborsLimit - 1);
+            int end = Math.min(
+                allRecords.size() - 1,
+                start + neighborsLimit - 1
+            );
             start = Math.max(minIndex, end - neighborsLimit + 1);
             for (int i = start; i <= end; i++) {
                 if (canShowLeaderAndStillCenter && i == 0) {
@@ -197,14 +278,18 @@ public class ScoreboardTimeTrialUtils {
         }
 
         if (firstPlace != null) {
-            lines.add(formatRecordLine(firstPlace, 1, player.getName(), player));
+            lines.add(
+                formatRecordLine(firstPlace, 1, player.getName(), player)
+            );
         }
         if (includeSeparator) {
             lines.add(separator);
         }
         for (DatabaseManager.TrackRecord tr : neighbors) {
             int actualPos = allRecords.indexOf(tr) + 1;
-            lines.add(formatRecordLine(tr, actualPos, player.getName(), player));
+            lines.add(
+                formatRecordLine(tr, actualPos, player.getName(), player)
+            );
         }
 
         lines.add("");
@@ -213,7 +298,12 @@ public class ScoreboardTimeTrialUtils {
         this.adapter.updateLines(player, lines);
     }
 
-    private String formatRecordLine(DatabaseManager.TrackRecord tr, int pos, String observerName, Player viewer) {
+    private String formatRecordLine(
+        DatabaseManager.TrackRecord tr,
+        int pos,
+        String observerName,
+        Player viewer
+    ) {
         boolean isMe = tr.getPlayerName().equals(observerName);
         String color;
         if (isMe) {
@@ -228,17 +318,27 @@ public class ScoreboardTimeTrialUtils {
         }
 
         String timeRaw = tr.isFinished()
-                ? this.formatTime(tr.getTime())
-                : tr.getCheckpointsReached() + "CP (" + this.formatTime(tr.getTime()) + ")";
+            ? this.formatTime(tr.getTime())
+            : tr.getCheckpointsReached() +
+              "CP (" +
+              this.formatTime(tr.getTime()) +
+              ")";
         String timeDisplay = "§b" + TimingScoreboardStyle.padRight(timeRaw, 12);
-        String configured = FormulaRacing.getInstance().getConfig().getString("scoreboard.style.accent-marker", "┃");
+        String configured = FormulaRacing.getInstance()
+            .getConfig()
+            .getString("scoreboard.style.accent-marker", "┃");
         String accent = TimingScoreboardStyle.normalizeAccentMarker(configured);
         String marker = color + "§l" + accent + accent + "§r";
         String nameBase = isMe
-                ? ChatColor.stripColor(FormulaRacing.getInstance().getTranslationUtil().getTranslated(viewer, "scoreboard_tt_you"))
-                : tr.getPlayerName();
-        String nameColor = isMe ? "§e§l" : "§f";
-        String nameDisplay = nameColor + TimingScoreboardStyle.padRight(nameBase, 14) + "§r";
+            ? ChatColor.stripColor(
+                  FormulaRacing.getInstance()
+                      .getTranslationUtil()
+                      .getTranslated(viewer, "scoreboard_tt_you")
+              )
+            : tr.getPlayerName();
+        String nameColor = isMe ? "§e§l" : "§f§r";
+        String nameDisplay =
+            nameColor + TimingScoreboardStyle.padRight(nameBase, 14) + "§r";
         String rank = color + pos + ". ";
         return rank + "§7| " + timeDisplay + " " + marker + " " + nameDisplay;
     }
@@ -246,7 +346,8 @@ public class ScoreboardTimeTrialUtils {
     public String formatTime(double timeInSeconds) {
         long minutes = (long) (timeInSeconds / 60.0);
         long seconds = (long) (timeInSeconds % 60.0);
-        long millis = (long) ((timeInSeconds - Math.floor(timeInSeconds)) * 1000.0);
+        long millis = (long) ((timeInSeconds - Math.floor(timeInSeconds)) *
+            1000.0);
         if (minutes > 0L) {
             return String.format("%d:%02d.%03d", minutes, seconds, millis);
         }
@@ -265,7 +366,10 @@ public class ScoreboardTimeTrialUtils {
 
     public void clearAll() {
         for (UUID uuid : this.playerTracks.keySet()) {
-            this.ownershipCoordinator.release(uuid, ScoreboardOwnershipCoordinator.Mode.TIME_TRIAL);
+            this.ownershipCoordinator.release(
+                uuid,
+                ScoreboardOwnershipCoordinator.Mode.TIME_TRIAL
+            );
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
                 this.adapter.delete(player);
@@ -276,6 +380,7 @@ public class ScoreboardTimeTrialUtils {
     }
 
     private static class CachedLeaderboard {
+
         final List<DatabaseManager.TrackRecord> records;
         final long timestamp;
 
