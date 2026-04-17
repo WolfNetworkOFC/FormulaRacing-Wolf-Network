@@ -49,21 +49,36 @@ public class JoinListener implements Listener {
     private String getPlayerRank(UUID uuid) {
         if (!this.hasLuckPerms) {
             return "";
-        } else {
-            LuckPerms api = LuckPermsProvider.get();
-            User user = api.getUserManager().getUser(uuid);
-            if (user == null) {
-                return "";
+        }
+
+        LuckPerms api = LuckPermsProvider.get();
+        User user = api.getUserManager().getUser(uuid);
+
+        if (user == null) {
+            return "";
+        }
+
+        // 1. Pegamos o grupo primário primeiro para checar se é default
+        String primaryGroup = user.getPrimaryGroup();
+
+        if (primaryGroup != null && primaryGroup.equalsIgnoreCase("default")) {
+            // 2. Se for default, verificamos se é Bedrock ou Java usando a API do Geyser
+            // Nota: Certifique-se de que a instância do jogador está online para essa checagem
+            if (org.geysermc.geyser.api.GeyserApi.api().isBedrockPlayer(uuid)) {
+                return "bedrock";
             } else {
-                CachedMetaData metaData = user.getCachedData().getMetaData();
-                String prefix = metaData != null ? metaData.getPrefix() : null;
-                if (prefix != null && !prefix.isEmpty()) {
-                    return ChatColor.translateAlternateColorCodes('&', prefix);
-                } else {
-                    String primaryGroup = user.getPrimaryGroup();
-                    return primaryGroup != null ? primaryGroup : "";
-                }
+                return "java";
             }
+        }
+
+        // 3. Se NÃO for default, segue a lógica normal de pegar o prefixo do LuckPerms
+        CachedMetaData metaData = user.getCachedData().getMetaData();
+        String prefix = metaData != null ? metaData.getPrefix() : null;
+
+        if (prefix != null && !prefix.isEmpty()) {
+            return ChatColor.translateAlternateColorCodes('&', prefix);
+        } else {
+            return primaryGroup != null ? primaryGroup : "";
         }
     }
 
@@ -75,7 +90,8 @@ public class JoinListener implements Listener {
         UUID uuid = player.getUniqueId();
         String playerName = player.getName();
         String rank = this.getPlayerRank(uuid);
-        event.setJoinMessage((String)null);
+        event.setJoinMessage(null);
+        this.updatePlayerPrefix(player);
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
             try {
                 boolean isFirstJoin = false;
@@ -84,7 +100,7 @@ public class JoinListener implements Listener {
                     isFirstJoin = true;
                 }
 
-                this.mysql.setSelectedEvent(uuid, (String)null);
+                this.mysql.setSelectedEvent(uuid, null);
                 if (this.plugin.getConfig().getBoolean("message-settings.join.enabled", true)) {
                     String msg;
                     if (isFirstJoin) {
