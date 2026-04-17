@@ -9,7 +9,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.geysermc.geyser.api.GeyserApi;
 
 import java.util.Arrays;
 import java.util.List;
@@ -41,13 +40,7 @@ public class AdminCommand extends BaseCommand {
         String randomMsg = debugMessages.get(random.nextInt(debugMessages.size()));
         int count = 0;
 
-        // Itera sobre jogadores online verificando Bedrock via Geyser
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (GeyserApi.api().isBedrockPlayer(player.getUniqueId())) {
-                player.sendMessage(randomMsg);
-                count++;
-            }
-        }
+
 
         // Logs no console
         Bukkit.getLogger().info("[FormulaRacing] Debug enviado para " + count + " jogadores Bedrock.");

@@ -91,7 +91,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.geysermc.geyser.api.GeyserApi;
 
 public final class FormulaRacing extends JavaPlugin implements Listener {
 
@@ -1480,9 +1479,12 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         });
     }
     public boolean isBedrockPlayer(Player player) {
-        // A GeyserApi.get() retorna a instância da API
-        // O método isBedrockPlayer verifica se o UUID está na sessão do Geyser
-        return GeyserApi.api().isBedrockPlayer(player.getUniqueId());
+        // 1. Verifica se o plugin Floodgate está ativo no servidor para evitar crash
+        if (org.bukkit.Bukkit.getPluginManager().getPlugin("floodgate") != null) {
+            // 2. Usa a instância do FloodgateApi para checar o UUID
+            return org.geysermc.floodgate.api.FloodgateApi.getInstance().isFloodgatePlayer(player.getUniqueId());
+        }
+        // Se o Floodgate não estiver instalado, tecnicamente ninguém é Bedrock
+        return false;
     }
-
 }

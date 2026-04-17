@@ -47,31 +47,26 @@ public class JoinListener implements Listener {
     }
 
     private String getPlayerRank(UUID uuid) {
-        if (!this.hasLuckPerms) {
-            return "";
-        }
+        if (!this.hasLuckPerms) return "";
 
         LuckPerms api = LuckPermsProvider.get();
         User user = api.getUserManager().getUser(uuid);
+        if (user == null) return "";
 
-        if (user == null) {
-            return "";
-        }
-
-        // 1. Pegamos o grupo primário primeiro para checar se é default
         String primaryGroup = user.getPrimaryGroup();
 
+        // Checagem para o rank Default
         if (primaryGroup != null && primaryGroup.equalsIgnoreCase("default")) {
-            // 2. Se for default, verificamos se é Bedrock ou Java usando a API do Geyser
-            // Nota: Certifique-se de que a instância do jogador está online para essa checagem
-            if (org.geysermc.geyser.api.GeyserApi.api().isBedrockPlayer(uuid)) {
-                return "bedrock";
-            } else {
-                return "java";
+            // Verifica se o Floodgate está no servidor e se o jogador é Bedrock
+            if (Bukkit.getPluginManager().getPlugin("floodgate") != null) {
+                if (org.geysermc.floodgate.api.FloodgateApi.getInstance().isFloodgatePlayer(uuid)) {
+                    return "bedrock";
+                }
             }
+            return "java";
         }
 
-        // 3. Se NÃO for default, segue a lógica normal de pegar o prefixo do LuckPerms
+        // Lógica normal para outros cargos (VIP, Staff, etc)
         CachedMetaData metaData = user.getCachedData().getMetaData();
         String prefix = metaData != null ? metaData.getPrefix() : null;
 
@@ -81,7 +76,6 @@ public class JoinListener implements Listener {
             return primaryGroup != null ? primaryGroup : "";
         }
     }
-
     @EventHandler(
             priority = EventPriority.MONITOR
     )
