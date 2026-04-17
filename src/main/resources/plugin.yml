@@ -4,7 +4,9 @@ main: dev.EfraGroup.formulaRacing.FormulaRacing
 api-version: 1.21
 author: EfraGroup
 description: Plugin de corrida de formula 1
-depend: [WorldEdit]
+depend:
+  - WorldEdit
+  - TAB
 softdepend:
   - DecentHolograms
   - PlayerPoints

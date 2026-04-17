@@ -11,6 +11,9 @@ import dev.EfraGroup.formulaRacing.Controllers.HotbarController;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import java.sql.SQLException;
 import java.util.UUID;
+
+import me.neznamy.tab.api.TabAPI;
+import me.neznamy.tab.api.TabPlayer;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.cacheddata.CachedMetaData;
@@ -128,6 +131,30 @@ public class JoinListener implements Listener {
 
         });
         this.plugin.getLonelyController().updatePlayersVisibility(player);
+    }
+
+    public void updatePlayerPrefix(Player player) {
+        // 1. Obter a instância do LuckPerms
+        LuckPerms luckPerms = LuckPermsProvider.get();
+        User user = luckPerms.getUserManager().getUser(player.getUniqueId());
+
+        if (user == null) return;
+
+        // 2. Obter o jogador na API do TAB
+        TabPlayer tabPlayer = TabAPI.getInstance().getPlayer(player.getUniqueId());
+        if (tabPlayer == null) return;
+
+        // 3. Verificar se o grupo primário é "default"
+        String primaryGroup = user.getPrimaryGroup();
+
+        if (primaryGroup.equalsIgnoreCase("default")) {
+            if (plugin.isBedrockPlayer(player)){
+                TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, ":bedrock: §r");
+
+            } else{
+                TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, ":java: §r");
+            }
+        }
     }
 
     @EventHandler(

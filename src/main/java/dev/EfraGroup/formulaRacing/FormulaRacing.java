@@ -91,6 +91,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.geysermc.geyser.api.GeyserApi;
 
 public final class FormulaRacing extends JavaPlugin implements Listener {
 
@@ -1478,4 +1479,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             }
         });
     }
+    public boolean isBedrockPlayer(Player player) {
+        // A GeyserApi.get() retorna a instância da API
+        // O método isBedrockPlayer verifica se o UUID está na sessão do Geyser
+        return GeyserApi.api().isBedrockPlayer(player.getUniqueId());
+    }
+
 }
