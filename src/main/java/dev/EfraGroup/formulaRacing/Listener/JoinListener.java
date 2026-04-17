@@ -57,13 +57,12 @@ public class JoinListener implements Listener {
 
         // Checagem para o rank Default
         if (primaryGroup != null && primaryGroup.equalsIgnoreCase("default")) {
-            // Verifica se o Floodgate está no servidor e se o jogador é Bedrock
-            if (Bukkit.getPluginManager().getPlugin("floodgate") != null) {
                 if (org.geysermc.floodgate.api.FloodgateApi.getInstance().isFloodgatePlayer(uuid)) {
-                    return "bedrock";
+                    return ":bedrock:";
+                } else {
+                    return ":java:";
                 }
-            }
-            return "java";
+
         }
 
         // Lógica normal para outros cargos (VIP, Staff, etc)
@@ -159,10 +158,10 @@ public class JoinListener implements Listener {
 
         if (primaryGroup.equalsIgnoreCase("default")) {
             if (plugin.isBedrockPlayer(player)){
-                TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, ":bedrock: §r");
+                TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, "%img_bedrock% §r");
 
             } else{
-                TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, ":java: §r");
+                TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, "%img_java% §r");
             }
         }
     }
