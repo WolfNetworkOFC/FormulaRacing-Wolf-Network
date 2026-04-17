@@ -57,7 +57,7 @@ public class JoinListener implements Listener {
 
         // Checagem para o rank Default
         if (primaryGroup != null && primaryGroup.equalsIgnoreCase("default")) {
-                if (org.geysermc.floodgate.api.FloodgateApi.getInstance().isFloodgatePlayer(uuid)) {
+                if (isFloodgatePlayer(uuid)) {
                     return ":bedrock:";
                 } else {
                     return ":java:";
@@ -142,6 +142,31 @@ public class JoinListener implements Listener {
         this.plugin.getLonelyController().updatePlayersVisibility(player);
     }
 
+    public boolean isFloodgatePlayer(UUID uuid) {
+        // 1. Tenta pegar o jogador online primeiro (mais rápido)
+        Player player = org.bukkit.Bukkit.getPlayer(uuid);
+        String playerName;
+
+        if (player != null) {
+            playerName = player.getName();
+        } else {
+            // 2. Se o jogador não estiver online, busca nos registros do servidor
+            playerName = org.bukkit.Bukkit.getOfflinePlayer(uuid).getName();
+        }
+
+        // 3. Verifica se o nome não é nulo e se começa com o ponto
+        if (playerName != null && playerName.startsWith(".")) {
+            return true;
+        }
+
+        // 4. Fallback: Se não começar com ponto, verificamos via API do Floodgate para garantir
+        if (org.bukkit.Bukkit.getPluginManager().getPlugin("floodgate") != null) {
+            return org.geysermc.floodgate.api.FloodgateApi.getInstance().isFloodgatePlayer(uuid);
+        }
+
+        return false;
+    }
+
     public void updatePlayerPrefix(Player player) {
         // 1. Obter a instância do LuckPerms
         LuckPerms luckPerms = LuckPermsProvider.get();
@@ -157,7 +182,7 @@ public class JoinListener implements Listener {
         String primaryGroup = user.getPrimaryGroup();
 
         if (primaryGroup.equalsIgnoreCase("default")) {
-            if (plugin.isBedrockPlayer(player)){
+            if (isFloodgatePlayer(player.getUniqueId())){
                 TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, "%img_bedrock% §r");
 
             } else{
