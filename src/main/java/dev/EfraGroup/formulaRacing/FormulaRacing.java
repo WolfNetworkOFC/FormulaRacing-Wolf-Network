@@ -99,8 +99,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private final Map<UUID, String> lastDuelTrack = new HashMap();
     private final Map<String, TrackLeaderboard> leaderboards = new HashMap();
     private final Map<UUID, Boolean> lastDuelLonelyStatus = new HashMap();
-    private final Map<String, YamlConfiguration> langConfigCache =
-        new ConcurrentHashMap();
+    private final Map<String, YamlConfiguration> langConfigCache = new ConcurrentHashMap();
     private static final Map<UUID, Boolean> playersWithMod = new HashMap();
     private static final Map<UUID, Integer> playersModVersion = new HashMap();
     private ScoreboardTimeTrialUtils stt;

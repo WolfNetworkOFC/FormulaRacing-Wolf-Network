@@ -401,6 +401,14 @@ public class EventCommand extends BaseCommand {
             return;
         }
 
+        if (!event.isOpenSign()) {
+            this.plugin.sendMessage(
+                    player,
+                    "event_is_closed"
+            );
+            return;
+        }
+
         EventSignupService.SignupResult result = this.signupService.signPlayer(
             player,
             event,
