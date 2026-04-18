@@ -195,11 +195,10 @@ public class ScoreboardTimeTrialUtils {
             this.boldTitle(tu.getTranslated(player, "scoreboard_tt_title"))
         );
         String separator =
-            "§l" + tu.getTranslated(player, "scoreboard_common_separator");
+            "§l" + "§7-------------------------" ;
         String footer = "§ewolfnetwork.com.br";
 
         List<String> lines = new ArrayList<>();
-        lines.add(separator);
         lines.add(
             "§f§l" +
                 tu.getTranslated(
@@ -293,7 +292,6 @@ public class ScoreboardTimeTrialUtils {
         }
 
         lines.add("");
-        lines.add(separator);
         lines.add(footer);
         this.adapter.updateLines(player, lines);
     }

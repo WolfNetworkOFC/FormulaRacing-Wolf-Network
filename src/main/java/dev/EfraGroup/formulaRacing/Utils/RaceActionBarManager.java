@@ -113,7 +113,7 @@ public class RaceActionBarManager {
                     RaceActionBarManager.this.updateActionBarForDriver(spectator, target.heat, driver);
                 }
             }
-        }.runTaskTimer((Plugin)this.plugin, 0L, this.dynamicUpdateIntervalTicks);
+        }.runTaskTimer(this.plugin, 0L, this.dynamicUpdateIntervalTicks);
     }
 
     private boolean shouldSkipUpdate(UUID playerId, HeatState state, long now) {
@@ -383,9 +383,9 @@ public class RaceActionBarManager {
             long lapElapsed = System.currentTimeMillis() - driver.getCurrentLap().getStartTime();
             sb.append(" &t| &w⏱ ").append(this.formatLapTime(lapElapsed));
             String delta = driver.getCachedDelta();
-            if (delta != null && !delta.isEmpty()) {
-                sb.append(delta);
-            }
+                if (delta != null && !delta.isEmpty()) {
+                    sb.append(delta);
+                }
         }
 
         if (heat.getTotalPits() > 0) {

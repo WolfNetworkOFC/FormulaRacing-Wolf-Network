@@ -760,7 +760,7 @@ public class RegionListener implements Listener {
     private void handleRaceLapCrossing(Player player, Driver driver, Heats heat, Location from, Location to, DatabaseManager.RegionData regionData) {
         UUID uuid = player.getUniqueId();
         long now = System.currentTimeMillis();
-        Long lastCross = (Long)this.lastStartEndCross.get(uuid);
+        Long lastCross = this.lastStartEndCross.get(uuid);
         if (lastCross == null || now - lastCross >= 2000L) {
             this.lastStartEndCross.put(uuid, now);
             if (!driver.isFinished() && !driver.isDnf()) {
