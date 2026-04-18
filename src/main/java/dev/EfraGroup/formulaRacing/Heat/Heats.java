@@ -93,9 +93,9 @@ public class Heats {
         this.drsEnabled = false;
         this.pushtopass = true;
         this.driverswap = false;
-        this.drsdowntime = (double) 3.0F;
+        this.drsdowntime =  3.0F;
         this.drsdownpower = 0.052;
-        this.realistc = true;
+        this.realistc = false;
         this.pushtopasspower = 0.05;
         this.reversegrid = false;
         this.deltaghosting = 0;

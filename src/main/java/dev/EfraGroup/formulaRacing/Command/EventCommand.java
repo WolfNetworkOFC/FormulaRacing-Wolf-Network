@@ -309,7 +309,7 @@ public class EventCommand extends BaseCommand {
         }
     }
 
-    @Subcommand("start|begin")
+    @Subcommand("start")
     @CommandCompletion("@event")
     @CommandPermission("formularacing.event.admin")
     @Description("Inicia um evento")
