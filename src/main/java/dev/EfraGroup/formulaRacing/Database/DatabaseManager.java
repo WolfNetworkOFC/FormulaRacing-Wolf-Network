@@ -2,6 +2,7 @@ package dev.EfraGroup.formulaRacing.Database;
 
 import dev.EfraGroup.formulaRacing.FileManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
@@ -241,65 +242,32 @@ public class DatabaseManager {
             return false;
         }
     }
-
-    public boolean saveOrUpdateDrsZone(
+    public boolean saveDrsZone(
             String trackName,
             String type, // "detect", "drs", "end"
             Location min,
             Location max
     ) {
-        // 1. Verifica se já existe uma zona desse TIPO para essa PISTA
-        // Com a nova estrutura, buscamos pela combinação track + type
-        boolean exists = false;
-        String checkSql = "SELECT 1 FROM fr_drs WHERE trackNameWS = ? AND type = ?;";
-        try (PreparedStatement ps = connection.prepareStatement(checkSql)) {
-            ps.setString(1, trackName);
-            ps.setString(2, type.toLowerCase());
-            exists = ps.executeQuery().next();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        String sql;
-        if (!exists) {
-            // INSERT: Cria uma nova linha para este tipo de zona
-            sql = "INSERT INTO fr_drs (trackNameWS, world, type, " +
-                    "regionMinX, regionMinY, regionMinZ, " +
-                    "regionMaxX, regionMaxY, regionMaxZ) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
-        } else {
-            // UPDATE: Atualiza as coordenadas da zona existente
-            sql = "UPDATE fr_drs SET world = ?, " +
-                    "regionMinX = ?, regionMinY = ?, regionMinZ = ?, " +
-                    "regionMaxX = ?, regionMaxY = ?, regionMaxZ = ? " +
-                    "WHERE trackNameWS = ? AND type = ?;";
-        }
+        // Agora sempre usamos INSERT. O 'id' (AUTOINCREMENT) cuidará de diferenciar as zonas.
+        String sql = "INSERT INTO fr_drs (trackNameWS, world, type, " +
+                "regionMinX, regionMinY, regionMinZ, " +
+                "regionMaxX, regionMaxY, regionMaxZ) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            if (!exists) {
-                ps.setString(1, trackName);
-                ps.setString(2, min.getWorld().getName());
-                ps.setString(3, type.toLowerCase());
-                ps.setDouble(4, min.getX());
-                ps.setDouble(5, min.getY());
-                ps.setDouble(6, min.getZ());
-                ps.setDouble(7, max.getX());
-                ps.setDouble(8, max.getY());
-                ps.setDouble(9, max.getZ());
-            } else {
-                ps.setString(1, min.getWorld().getName());
-                ps.setDouble(2, min.getX());
-                ps.setDouble(3, min.getY());
-                ps.setDouble(4, min.getZ());
-                ps.setDouble(5, max.getX());
-                ps.setDouble(6, max.getY());
-                ps.setDouble(7, max.getZ());
-                ps.setString(8, trackName);
-                ps.setString(9, type.toLowerCase());
-            }
+            ps.setString(1, trackName.toLowerCase());
+            ps.setString(2, min.getWorld().getName());
+            ps.setString(3, type.toLowerCase());
+            ps.setDouble(4, min.getX());
+            ps.setDouble(5, min.getY());
+            ps.setDouble(6, min.getZ());
+            ps.setDouble(7, max.getX());
+            ps.setDouble(8, max.getY());
+            ps.setDouble(9, max.getZ());
+
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
-            Bukkit.getLogger().severe("[FormulaRacing] Erro ao salvar DRS (" + type + "): " + e.getMessage());
+            Bukkit.getLogger().severe("[FormulaRacing] Erro ao adicionar nova zona de DRS (" + type + "): " + e.getMessage());
             return false;
         }
     }
@@ -7767,6 +7735,7 @@ public class DatabaseManager {
             return false;
         }
     }
+
 
     /**
      * Remove pit stop region de uma pista

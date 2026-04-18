@@ -19,13 +19,6 @@ public class PitCommand extends BaseCommand {
 
     @Default
     public void onPit(Player player) {
-        // O ACF já valida se o sender é um Player automaticamente pelo tipo do parâmetro
-        player.sendMessage("§a[FormulaRacing] §fVocê solicitou uma parada nos boxes!");
-
-        handlePitStop(player);
-    }
-
-    private void handlePitStop(Player player) {
         plugin.getPitStopManager().startTestMinigame(player);
     }
 }

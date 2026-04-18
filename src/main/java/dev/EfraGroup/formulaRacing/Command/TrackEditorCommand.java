@@ -1324,7 +1324,7 @@ public class TrackEditorCommand extends BaseCommand {
 
         // Agora enviamos para o MySQL os dados para a nova tabela fr_drs
         // Note que passamos o 'type' para o banco saber qual parte da linha atualizar/inserir
-        if (this.mysql.saveOrUpdateDrsZone(trackName, type, min, max)) {
+        if (this.mysql.saveDrsZone(trackName, type, min, max)) {
             player.sendMessage("§a[DRS] Parte §f" + type.toUpperCase() + " §adefinida para a pista: §e" + trackName);
             player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.0F);
         } else {

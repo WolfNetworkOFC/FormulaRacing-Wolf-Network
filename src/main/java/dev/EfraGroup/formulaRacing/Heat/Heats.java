@@ -59,7 +59,7 @@ public class Heats {
     private GridManager gridManager;
     private boolean drsEnabled;
     private BukkitTask offlineMonitorTask;
-    private Map<String, Location> drsRegions;
+    private List<DrsRegion> drsRegions = new ArrayList<>();
     private boolean pushtopass;
     private int deltaghosting;
     private boolean driverswap;
@@ -291,16 +291,18 @@ public class Heats {
 
     public void setupDrs() {
         if (this.drsEnabled) {
+            // Agora o método getDrsRegionsList deve retornar uma List<DrsRegion>
             this.drsRegions = this.plugin.getRaceEventManager()
-                .getDatabaseManager()
-                .getDrsRegions(this.trackNameWS);
+                    .getDatabaseManager()
+                    .getDrsRegionsList(this.trackNameWS);
+
+            this.plugin.getLogger().info("§a[DRS] Carregadas " + drsRegions.size() + " zonas para " + this.trackNameWS);
         }
     }
 
-    public Map<String, Location> getDrsRegions() {
+    public List<DrsRegion> getDrsRegions() {
         return this.drsRegions;
     }
-
     public void reorderGrid() {
         this.startPositions = new ArrayList(this.drivers.values());
         this.startPositions.sort(
@@ -1939,4 +1941,21 @@ public class Heats {
             "}"
         );
     }
+
+    public static class DrsRegion {
+        private final String type;
+        private final Location min;
+        private final Location max;
+
+        public DrsRegion(String type, Location min, Location max) {
+            this.type = type;
+            this.min = min;
+            this.max = max;
+        }
+
+        public String getType() { return type; }
+        public Location getMin() { return min; }
+        public Location getMax() { return max; }
+    }
+
 }

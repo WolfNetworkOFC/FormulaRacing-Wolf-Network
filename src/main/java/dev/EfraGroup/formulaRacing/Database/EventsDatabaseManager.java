@@ -2422,6 +2422,32 @@ public class EventsDatabaseManager {
         return regions;
     }
 
+
+    public List<Heats.DrsRegion> getDrsRegionsList(String trackNameWS) {
+        List<Heats.DrsRegion> list = new ArrayList<>();
+        String sql = "SELECT * FROM fr_drs WHERE trackNameWS = ?";
+
+        try (Connection conn = this.databaseManager.getOrConnect();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, trackNameWS.toLowerCase());
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                World world = Bukkit.getWorld(rs.getString("world"));
+                if (world == null) continue;
+
+                Location min = new Location(world, rs.getDouble("regionMinX"), rs.getDouble("regionMinY"), rs.getDouble("regionMinZ"));
+                Location max = new Location(world, rs.getDouble("regionMaxX"), rs.getDouble("regionMaxY"), rs.getDouble("regionMaxZ"));
+
+                list.add(new Heats.DrsRegion(rs.getString("type").toLowerCase(), min, max));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
     public Map<String, Object> getFastestLapInHeat(int heatId) {
         String sql =
             "SELECT uuid, MIN(lapEnd - lapStart) as fastestTime FROM fr_laps WHERE heatId = ? AND lapEnd IS NOT NULL GROUP BY uuid ORDER BY fastestTime LIMIT 1";
