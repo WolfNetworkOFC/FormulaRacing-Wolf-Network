@@ -72,6 +72,8 @@ private double ersenergy;
         this.checkpointsReached = 0;
         this.state = DriverState.SETUP;
         this.ersenergy = 50;
+        this.ersmode = "Disabled";
+
     }
 
     public void setErsEnergy(double value) {
