@@ -200,4 +200,34 @@
           double ub = ((x2 - x1) * (z1 - z3) - (z2 - z1) * (x1 - x3)) / denom;
           return ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1;
       }
+
+      public static boolean isInsideRegion(Location loc, DatabaseManager.RegionData r) {
+          double minX = Math.min(r.getMinX(), r.getMaxX());
+          double maxX = Math.max(r.getMinX(), r.getMaxX());
+          double minY = Math.min(r.getMinY(), r.getMaxY());
+          double maxY = Math.max(r.getMinY(), r.getMaxY());
+          double minZ = Math.min(r.getMinZ(), r.getMaxZ());
+          double maxZ = Math.max(r.getMinZ(), r.getMaxZ());
+          double x = loc.getX();
+          double y = loc.getY();
+          double z = loc.getZ();
+
+          if (x < minX || x > maxX || y < minY || y > maxY || z < minZ || z > maxZ) {
+              return false;
+          }
+
+          if (r.isPoly()) {
+              double[][] polygon = r.getPolyPoints();
+              if (polygon == null || polygon.length < 3) {
+                  return true;
+              }
+              return pointInPolygon(x, z, polygon);
+          }
+
+          return true;
+      }
+
+      public static boolean isEnteringRegion(Location from, Location to, DatabaseManager.RegionData r) {
+          return !isInsideRegion(from, r) && intersectsRegion(from, to, r);
+      }
   }

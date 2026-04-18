@@ -199,7 +199,7 @@ public class RaceCheckpointListener implements Listener {
 
                                 for (DatabaseManager.RegionData expectedRegion : expectedRegions) {
                                     if (
-                                        RegionMathUtils.intersectsRegion(
+                                        RegionMathUtils.isEnteringRegion(
                                             from,
                                             to,
                                             expectedRegion
@@ -240,7 +240,7 @@ public class RaceCheckpointListener implements Listener {
 
                                     for (DatabaseManager.RegionData skipRegion : skipRegions) {
                                         if (
-                                            RegionMathUtils.intersectsRegion(
+                                            RegionMathUtils.isEnteringRegion(
                                                 from,
                                                 to,
                                                 skipRegion
