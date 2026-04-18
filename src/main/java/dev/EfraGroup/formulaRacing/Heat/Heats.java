@@ -74,6 +74,7 @@ public class Heats {
     private BukkitTask sessionTask;
     private boolean configDirty = false;
     private boolean onlyBedrock = false;
+    private boolean ErsEnabled = false;
 
     public Heats(FormulaRacing plugin, int id, Rounds round, int heatNumber) {
         this.plugin = plugin;
@@ -102,6 +103,7 @@ public class Heats {
         this.pushtopasspower = 0.05;
         this.reversegrid = false;
         this.deltaghosting = 0;
+        this.ErsEnabled = false;
         this.gridManager = new GridManager(plugin, this);
     }
 
@@ -1747,6 +1749,15 @@ public class Heats {
 
     public void setFastestLapUUID(UUID fastestLapUUID) {
         this.fastestLapUUID = fastestLapUUID;
+    }
+
+
+    public boolean isErsEnabled() {
+        return this.ErsEnabled;
+    }
+
+    public void setErsEnabled(boolean a) {
+        this.ErsEnabled = a;
     }
 
     public Integer getTimeLimit() {

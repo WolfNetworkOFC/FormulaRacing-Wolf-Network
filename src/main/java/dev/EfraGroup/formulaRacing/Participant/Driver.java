@@ -46,6 +46,8 @@ public class Driver {
     private int resetCount;
     private boolean lagStartPassed;
     private boolean lagEndPassed;
+    private String ersmode;
+private double ersenergy;
 
     public Driver(UUID uuid, int heatId, int startPosition) {
         this.state = DriverState.SETUP;
@@ -69,10 +71,27 @@ public class Driver {
         this.laps = new ArrayList();
         this.checkpointsReached = 0;
         this.state = DriverState.SETUP;
+        this.ersenergy = 50;
     }
+
+    public void setErsEnergy(double value) {
+        this.ersenergy = value;
+    }
+    public double getErsEnergy() {
+        return this.ersenergy;
+    }
+
 
     public int getId() {
         return this.id;
+    }
+
+    public void setErsMode(String id) {
+        this.ersmode = ersmode;
+    }
+
+    public String getErsMode() {
+        return this.ersmode;
     }
 
     public void setId(int id) {

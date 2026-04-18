@@ -33,6 +33,7 @@ import dev.EfraGroup.formulaRacing.Gui.Framework.GuiManager;
 import dev.EfraGroup.formulaRacing.Gui.ReadyCheckManager;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Heat.Logic.DrsManager;
+import dev.EfraGroup.formulaRacing.Heat.Logic.ERSManager;
 import dev.EfraGroup.formulaRacing.Heat.Logic.PTPManager;
 import dev.EfraGroup.formulaRacing.Heat.Logic.RaceSession;
 import dev.EfraGroup.formulaRacing.Heat.PitStopManager;
@@ -464,6 +465,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             );
             this.commandManager.registerCommand(
                 new TimeTrialRandomCommand(this)
+            );
+            this.commandManager.registerCommand(
+                    new AnnounceCommand()
             );
             this.commandManager.registerCommand(new TimeTrialCommand(this));
             this.commandManager.registerCommand(
@@ -1434,6 +1438,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     public PTPManager getPTP() {
         return this.ptpManager;
+    }
+    public ERSManager getERS() {
+        return new ERSManager(this);
     }
 
     public void checkAndWarnOBU(Player player, String trackName) {

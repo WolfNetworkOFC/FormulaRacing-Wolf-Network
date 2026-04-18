@@ -79,27 +79,31 @@ public class FormulaRacingListener implements Listener {
     )
     public void onPlayerSneakBoost(PlayerToggleSneakEvent event) {
         Player player = event.getPlayer();
+
         if (event.isSneaking() && player.isInsideVehicle()) {
             if (this.plugin.getRaceEventManager() != null) {
-                for(Events eventObj : this.plugin.getRaceEventManager().getAllEvents()) {
-                    for(Rounds round : eventObj.getEventSchedule().getRounds().values()) {
-                        for(Heats heat : round.getHeats().values()) {
+                for (Events eventObj : this.plugin.getRaceEventManager().getAllEvents()) {
+                    for (Rounds round : eventObj.getEventSchedule().getRounds().values()) {
+                        for (Heats heat : round.getHeats().values()) {
                             Driver d = heat.getDriver(player.getUniqueId());
-                            if (d != null && heat.getHeatState() == HeatState.RACING && heat.isPushtopass()) {
-                                event.setCancelled(true);
-                                if (this.plugin.getPTP() != null) {
-                                    this.plugin.getPTP().togglePTP(player, d, heat);
-                                }
 
+                            if (d != null && heat.getHeatState() == HeatState.RACING) {
+
+                                // --- Lógica do PTP ---
+                                if (heat.isPushtopass()) {
+                                    event.setCancelled(true);
+                                    if (this.plugin.getPTP() != null) {
+                                        this.plugin.getPTP().togglePTP(player, d, heat);
+                                    }
+                                    return; // Se o PTP foi processado, encerra aqui
+                                }
+                                this.plugin.getERS().cycleERSMode(player, d, heat);
                                 return;
+                                }
                             }
                         }
                     }
                 }
-            }
-
-            if (this.plugin.getQuickRaceManager().isPlayerActivelyRacing(player.getUniqueId())) {
-            }
 
         }
     }

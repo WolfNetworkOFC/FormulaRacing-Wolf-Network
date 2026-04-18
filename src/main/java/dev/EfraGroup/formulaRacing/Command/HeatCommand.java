@@ -924,6 +924,27 @@ public class HeatCommand extends BaseCommand {
         );
     }
 
+    @Subcommand("set ers")
+    @CommandCompletion("@heats")
+    @CommandPermission("formularacing.admin")
+    public void onSetErs(Player player, Heats heat, boolean seconds) {
+        heat = this.resolveHeat(player, heat);
+        if (heat == null) {
+            player.sendMessage(
+                    ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
+            );
+            return;
+        }
+
+        heat.setErsEnabled(seconds);
+        player.sendMessage(
+                "§a[Config] Ers definido como §f" +
+                        seconds +
+                        "s §ano heat §f" +
+                        heat.getId()
+        );
+    }
+
     @Subcommand("set deltaghosting")
     @CommandCompletion("@heat <seconds>")
     @CommandPermission("formularacing.admin")

@@ -37,6 +37,10 @@ public class RaceSession implements SessionLogic {
             heat.getPlugin().getPTP().startPTPTask(heat);
         }
 
+        if (heat.isErsEnabled()) {
+            heat.getPlugin().getERS().startERSTask(heat);
+        }
+
         if (heat.getHeatState() == HeatState.STARTING || heat.getHeatState() == HeatState.LOADED || heat.getHeatState() == HeatState.PRACTICE) {
             heat.setHeatState(HeatState.RACING);
             heat.setStartTime(Instant.now());

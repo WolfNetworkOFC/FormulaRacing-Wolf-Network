@@ -1,33 +1,23 @@
 package dev.EfraGroup.formulaRacing.Command;
 
+import co.aikar.commands.annotation.*;
+import co.aikar.commands.BaseCommand;
 import org.bukkit.Bukkit;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.jetbrains.annotations.NotNull;
 
-public class AnnounceCommand implements CommandExecutor {
+@CommandAlias("announce|anuncio") // Define o comando e um alias opcional
+public class AnnounceCommand extends BaseCommand {
 
-    @Override
-    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+    @Default // Define que este método será executado ao usar /announce diretamente
+    @CommandPermission("formularacing.admin") // ACF cuida da permissão automaticamente
+    @Description("Envia um anúncio global para todo o servidor.")
+    @Syntax("<mensagem>") // Mensagem de erro automática se o argumento estiver faltando
+    public void onAnnounce(CommandSender sender, String mensagem) {
 
-        if (!sender.hasPermission("formularacing.admin")) {
-            sender.sendMessage("§cVocê não tem permissão!");
-            return true;
-        }
+        // O ACF já faz o "String.join" automaticamente se o último parâmetro for String
 
-        if (args.length == 0) {
-            sender.sendMessage("§eUso correto: /announce <mensagem>");
-            return true;
-        }
-
-        String mensagem = String.join(" ", args);
-
-        // Envia as Strings puras para todo o servidor
         Bukkit.broadcastMessage("§6=============== §c§lAnuncio §6===============");
-        Bukkit.broadcastMessage("§f" + mensagem);
+        Bukkit.broadcastMessage("§f" + mensagem.replace("&", "§")); // Permite cores no anúncio
         Bukkit.broadcastMessage("§6=======================================");
-
-        return true;
     }
 }
