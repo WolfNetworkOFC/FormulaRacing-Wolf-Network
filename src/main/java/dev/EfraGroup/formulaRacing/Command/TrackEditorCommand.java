@@ -1283,18 +1283,31 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("drs delete detect")
-    public void onDeleteDetect(Player player, @Optional String trackNameArg) {
-        this.deleteDrsPart(player, "DETECT", trackNameArg);
+    @Description("Remove uma região de detecção pelo ID")
+    public void onDeleteDetect(Player player, Integer id) {
+        this.deleteDrsById(player, id, "DETECT");
     }
 
     @Subcommand("drs delete startdrs")
-    public void onDeleteStart(Player player, @Optional String trackNameArg) {
-        this.deleteDrsPart(player, "START", trackNameArg);
+    @Description("Remove uma região de ativação pelo ID")
+    public void onDeleteStart(Player player, Integer id) {
+        this.deleteDrsById(player, id, "START");
     }
 
     @Subcommand("drs delete finishdrs")
-    public void onDeleteFinish(Player player, @Optional String trackNameArg) {
-        this.deleteDrsPart(player, "FINISH", trackNameArg);
+    @Description("Remove uma região de desativação pelo ID")
+    public void onDeleteFinish(Player player, Integer id) {
+        this.deleteDrsById(player, id, "FINISH");
+    }
+
+    private void deleteDrsById(Player player, int id, String type) {
+        // Chamamos o MySQL passando o ID único da linha
+        if (this.mysql.deleteDRSRegionById(id)) {
+            player.sendMessage("§a[DRS] Região ID §f#" + id + " (§e" + type + "§a) removida com sucesso!");
+            player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 1.0F, 2.0F);
+        } else {
+            player.sendMessage("§c[DRS] Não foi possível encontrar uma região com o ID §f#" + id);
+        }
     }
 
     private void saveDrsPart(Player player, String type, String trackArg) {
@@ -1316,18 +1329,6 @@ public class TrackEditorCommand extends BaseCommand {
             player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.0F);
         } else {
             player.sendMessage("§cErro ao salvar a região de DRS no banco de dados.");
-        }
-    }
-
-    private void deleteDrsPart(Player player, String type, String trackArg) {
-        String trackName = this.getTargetTrack(player, trackArg);
-        if (trackName != null) {
-            if (this.mysql.clearAllDrsRegions(trackName)) {
-                player.sendMessage("§aRegião §f" + type + " §ado DRS removida da pista: §e" + trackName);
-            } else {
-                player.sendMessage("§cErro ao remover ou região já estava vazia.");
-            }
-
         }
     }
 

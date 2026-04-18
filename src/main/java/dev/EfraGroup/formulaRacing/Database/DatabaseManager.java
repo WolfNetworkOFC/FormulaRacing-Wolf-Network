@@ -243,32 +243,18 @@ public class DatabaseManager {
     }
 
     public boolean saveOrUpdateDrsZone(
-        String trackName,
-        String type,
-        Location min,
-        Location max
+            String trackName,
+            String type, // "detect", "drs", "end"
+            Location min,
+            Location max
     ) {
-        // 1. Define o prefixo das colunas com base no tipo passado pelo comando
-        String prefix;
-        switch (type.toLowerCase()) {
-            case "detect":
-                prefix = "detectMin"; // Vai afetar detectMinMinX e detectMinMaxX
-                break;
-            case "drs":
-                prefix = "drs"; // Vai afetar drsMinX e drsMaxX
-                break;
-            case "end":
-                prefix = "endDrs"; // Vai afetar endDrsMinX e endDrsMaxX
-                break;
-            default:
-                return false;
-        }
-
-        // 2. Verifica se já existe uma linha para esta pista na tabela fr_drs
+        // 1. Verifica se já existe uma zona desse TIPO para essa PISTA
+        // Com a nova estrutura, buscamos pela combinação track + type
         boolean exists = false;
-        String checkSql = "SELECT 1 FROM fr_drs WHERE trackNameWS = ?;";
+        String checkSql = "SELECT 1 FROM fr_drs WHERE trackNameWS = ? AND type = ?;";
         try (PreparedStatement ps = connection.prepareStatement(checkSql)) {
             ps.setString(1, trackName);
+            ps.setString(2, type.toLowerCase());
             exists = ps.executeQuery().next();
         } catch (SQLException e) {
             e.printStackTrace();
@@ -276,51 +262,30 @@ public class DatabaseManager {
 
         String sql;
         if (!exists) {
-            // INSERT: Cria o registro do zero
-            sql =
-                "INSERT INTO fr_drs (trackNameWS, world, " +
-                prefix +
-                "MinX, " +
-                prefix +
-                "MinY, " +
-                prefix +
-                "MinZ, " +
-                prefix +
-                "MaxX, " +
-                prefix +
-                "MaxY, " +
-                prefix +
-                "MaxZ) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
+            // INSERT: Cria uma nova linha para este tipo de zona
+            sql = "INSERT INTO fr_drs (trackNameWS, world, type, " +
+                    "regionMinX, regionMinY, regionMinZ, " +
+                    "regionMaxX, regionMaxY, regionMaxZ) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
         } else {
-            // UPDATE: Atualiza apenas as colunas daquela parte específica
-            sql =
-                "UPDATE fr_drs SET world = ?, " +
-                prefix +
-                "MinX = ?, " +
-                prefix +
-                "MinY = ?, " +
-                prefix +
-                "MinZ = ?, " +
-                prefix +
-                "MaxX = ?, " +
-                prefix +
-                "MaxY = ?, " +
-                prefix +
-                "MaxZ = ? " +
-                "WHERE trackNameWS = ?;";
+            // UPDATE: Atualiza as coordenadas da zona existente
+            sql = "UPDATE fr_drs SET world = ?, " +
+                    "regionMinX = ?, regionMinY = ?, regionMinZ = ?, " +
+                    "regionMaxX = ?, regionMaxY = ?, regionMaxZ = ? " +
+                    "WHERE trackNameWS = ? AND type = ?;";
         }
 
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             if (!exists) {
                 ps.setString(1, trackName);
                 ps.setString(2, min.getWorld().getName());
-                ps.setDouble(3, min.getX());
-                ps.setDouble(4, min.getY());
-                ps.setDouble(5, min.getZ());
-                ps.setDouble(6, max.getX());
-                ps.setDouble(7, max.getY());
-                ps.setDouble(8, max.getZ());
+                ps.setString(3, type.toLowerCase());
+                ps.setDouble(4, min.getX());
+                ps.setDouble(5, min.getY());
+                ps.setDouble(6, min.getZ());
+                ps.setDouble(7, max.getX());
+                ps.setDouble(8, max.getY());
+                ps.setDouble(9, max.getZ());
             } else {
                 ps.setString(1, min.getWorld().getName());
                 ps.setDouble(2, min.getX());
@@ -330,45 +295,40 @@ public class DatabaseManager {
                 ps.setDouble(6, max.getY());
                 ps.setDouble(7, max.getZ());
                 ps.setString(8, trackName);
+                ps.setString(9, type.toLowerCase());
             }
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
-            Bukkit.getLogger().severe(
-                "[FormulaRacing] Erro ao salvar DRS: " + e.getMessage()
-            );
+            Bukkit.getLogger().severe("[FormulaRacing] Erro ao salvar DRS (" + type + "): " + e.getMessage());
             return false;
         }
     }
-
     /**
      * Remove todas as zonas de DRS vinculadas a uma pista específica.
      */
     public boolean clearAllDrsRegions(String trackName) {
-        // Agora usamos DELETE pois cada zona é um registro na tabela fr_drs
+        // Usamos DELETE para remover todas as linhas que compartilham o nome da pista
         String sql = "DELETE FROM fr_drs WHERE trackNameWS = ?;";
 
         try (
-            Connection conn = getOrConnect();
-            PreparedStatement ps = conn.prepareStatement(sql)
+                Connection conn = getOrConnect();
+                PreparedStatement ps = conn.prepareStatement(sql)
         ) {
             ps.setString(1, trackName);
-            int deletedRows = ps.executeUpdate();
 
-            if (deletedRows > 0) {
-                return true;
-            }
-            return false;
+            // Em vez de verificar apenas > 0, executamos a ação.
+            // Se não houver nada para deletar, não é necessariamente um "erro".
+            ps.executeUpdate();
+            return true;
+
         } catch (SQLException e) {
             Bukkit.getLogger().severe(
-                "[FormulaRacing] Erro ao deletar regiões de DRS da pista " +
-                    trackName +
-                    ": " +
-                    e.getMessage()
+                    "[FormulaRacing] Erro ao deletar regiões de DRS da pista " +
+                            trackName + ": " + e.getMessage()
             );
             return false;
         }
     }
-
     /**
      * Método auxiliar para transformar Location em String (Mundo,X,Y,Z)
      */
@@ -724,17 +684,14 @@ public class DatabaseManager {
             );
 
             stmt.executeUpdate(
-                "CREATE TABLE IF NOT EXISTS fr_drs (" +
-                    "id INTEGER PRIMARY KEY AUTOINCREMENT, " + // Novo ID único
-                    "trackNameWS TEXT NOT NULL, " +
-                    "detectMinMinX REAL, detectMinMinY REAL, detectMinMinZ REAL, " +
-                    "detectMinMaxX REAL, detectMinMaxY REAL, detectMinMaxZ REAL, " +
-                    "drsMinX REAL, drsMinY REAL, drsMinZ REAL, " +
-                    "drsMaxX REAL, drsMaxY REAL, drsMaxZ REAL, " +
-                    "endDrsMinX REAL, endDrsMinY REAL, endDrsMinZ REAL, " +
-                    "endDrsMaxX REAL, endDrsMaxY REAL, endDrsMaxZ REAL, " +
-                    "world TEXT NOT NULL" +
-                    ");"
+                    "CREATE TABLE IF NOT EXISTS fr_drs (" +
+                            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                            "trackNameWS TEXT NOT NULL, " +
+                            "regionMinX REAL, regionMinY REAL, regionMinZ REAL, " +
+                            "regionMaxX REAL, regionMaxY REAL, regionMaxZ REAL, " +
+                            "world TEXT NOT NULL, " + // <-- Adicionada a vírgula aqui
+                            "type TEXT NOT NULL" +     // <-- Agora o tipo fica em uma coluna separada
+                            ");"
             );
 
             stmt.executeUpdate(
@@ -878,6 +835,21 @@ public class DatabaseManager {
                     "[FormulaRacing] Erro crítico ao criar tabelas: " +
                         e.getMessage()
                 );
+        }
+    }
+
+    public boolean deleteDRSRegionById(int id) {
+        String sql = "DELETE FROM fr_drs WHERE id = ?;";
+
+        try (Connection conn = getOrConnect();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, id);
+            return ps.executeUpdate() > 0; // Retorna true se deletou uma linha
+
+        } catch (SQLException e) {
+            Bukkit.getLogger().severe("[FormulaRacing] Erro ao deletar região por ID: " + e.getMessage());
+            return false;
         }
     }
 

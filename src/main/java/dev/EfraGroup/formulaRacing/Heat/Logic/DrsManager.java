@@ -39,61 +39,84 @@ public class DrsManager {
     }
 
     public void startDrsTask(final Heats heat) {
+        // Carrega as regiões do banco (já filtradas por trackName)
         final Map<String, Location> regions = heat.getDrsRegions();
-        final boolean hasFinishRegion = regions.containsKey("finishMin") && regions.get("finishMin") != null;
-        this.plugin.getLogger().info("§e[DRS-Debug] Iniciando Task. Regioes carregadas: " + String.valueOf(regions.keySet()));
-        (new BukkitRunnable() {
-            public void run() {
-                if (heat.getHeatState() != HeatState.RACING) {
-                    heat.getDrivers().values().forEach((d) -> {
-                        if (d.getDrsBossBar() != null) {
-                            d.getDrsBossBar().removeAll();
-                        }
 
+        // Verifica se as regiões essenciais existem para evitar erros de Null no Loop
+        final boolean hasDetect = regions.containsKey("detectMin") && regions.containsKey("detectMax");
+        final boolean hasStart = regions.containsKey("startMin") && regions.containsKey("startMax");
+        final boolean hasFinish = regions.containsKey("finishMin") && regions.containsKey("finishMax");
+
+        this.plugin.getLogger().info("§e[DRS-Debug] Task iniciada para a pista: §f" + heat.getTrackNameWS());
+
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                // Se a corrida acabou ou não está em estado de RACING, limpa as barras e cancela
+                if (heat.getHeatState() != HeatState.RACING) {
+                    heat.getDrivers().values().forEach(d -> {
+                        if (d.getDrsBossBar() != null) d.getDrsBossBar().removeAll();
                     });
                     this.cancel();
-                } else {
-                    for(Driver driver : heat.getDrivers().values()) {
-                        Player player = Bukkit.getPlayer(driver.getUuid());
-                        if (player != null && player.isOnline()) {
-                            Location loc = player.getLocation();
-                            if (DrsManager.this.rs.isInside(loc, (Location)regions.get("detectMin"), (Location)regions.get("detectMax")) && !driver.hasDrsPermission() && !driver.isDrsActive()) {
-                                Driver target = DrsManager.this.rs.getDriverAhead(driver, heat);
-                                if (target == null) {
-                                    if (player.getTicksLived() % 20 == 0) {
-                                        FRTheme theme = FRThemeResolver.resolveTheme(player);
-                                        String rawMsg = "&2[DRS] Na zona de deteccao, mas sem piloto a frente.";
-                                        String themed = LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawMsg, theme));
-                                        player.spigot().sendMessage(ChatMessageType.CHAT, new TextComponent(themed));
-                                    }
-                                } else {
-                                    double gapValue = DrsManager.this.rs.calculateGap(driver, target, heat);
-                                    if (gapValue >= 0.1 && gapValue <= 1.3) {
-                                        driver.setDrsPermission(true);
-                                        DrsManager.this.showDrsAvailableBar(player, driver);
-                                        Object[] var10002 = new Object[]{gapValue};
-                                        FRTheme theme = FRThemeResolver.resolveTheme(player);
-                                        String rawMsg = "&s[DRS] Permissao concedida! Gap: " + String.format("%.3f", var10002);
-                                        String themed = LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawMsg, theme));
-                                        player.spigot().sendMessage(ChatMessageType.CHAT, new TextComponent(themed));
-                                    }
+                    return;
+                }
+
+                for (Driver driver : heat.getDrivers().values()) {
+                    Player player = Bukkit.getPlayer(driver.getUuid());
+                    if (player == null || !player.isOnline()) continue;
+
+                    Location loc = player.getLocation();
+                    FRTheme theme = FRThemeResolver.resolveTheme(player);
+
+                    // 1. LÓGICA DE DETECÇÃO (Trigger de Permissão)
+                    if (hasDetect && DrsManager.this.rs.isInside(loc, regions.get("detectMin"), regions.get("detectMax"))) {
+                        // Só checa se ele já não tiver permissão ou DRS ativo para não spammar cálculo
+                        if (!driver.hasDrsPermission() && !driver.isDrsActive()) {
+                            Driver target = DrsManager.this.rs.getDriverAhead(driver, heat);
+
+                            if (target != null) {
+                                double gapValue = DrsManager.this.rs.calculateGap(driver, target, heat);
+
+                                // Regra clássica: gap entre 0.1 e 1.0 (ajustado para 1.3 por latência)
+                                if (gapValue >= 0.01 && gapValue <= 1.3) {
+                                    driver.setDrsPermission(true);
+                                    DrsManager.this.showDrsAvailableBar(player, driver);
+
+                                    String msg = "&a[DRS] Permissão concedida! Gap: &f" + String.format("%.3f", gapValue) + "s";
+                                    sendThemedMessage(player, theme, msg);
                                 }
-                            }
-
-                            if (DrsManager.this.rs.isInside(loc, (Location)regions.get("startMin"), (Location)regions.get("startMax")) && !driver.isDrsActive() && driver.hasDrsPermission()) {
-                                driver.setDrsPermission(false);
-                                DrsManager.this.applyDrsBoost(player, heat, driver, hasFinishRegion);
-                            }
-
-                            if (driver.isDrsActive() && hasFinishRegion && DrsManager.this.rs.isInside(loc, (Location)regions.get("finishMin"), (Location)regions.get("finishMax"))) {
-                                DrsManager.this.stopDrsBoost(player, driver, heat);
+                            } else if (player.getTicksLived() % 40 == 0) { // Mensagem de aviso a cada 2 segundos
+                                sendThemedMessage(player, theme, "&2[DRS] Na zona de detecção, mas sem alvo à frente.");
                             }
                         }
                     }
 
+                    // 2. LÓGICA DE ATIVAÇÃO (Início do Boost)
+                    if (hasStart && driver.hasDrsPermission() && !driver.isDrsActive()) {
+                        if (DrsManager.this.rs.isInside(loc, regions.get("startMin"), regions.get("startMax"))) {
+                            driver.setDrsPermission(false); // Consome a permissão
+                            DrsManager.this.applyDrsBoost(player, heat, driver, hasFinish);
+                            sendThemedMessage(player, theme, "&a[DRS] Asa Aberta! Ativando ERS/Boost...");
+                        }
+                    }
+
+                    // 3. LÓGICA DE DESATIVAÇÃO (Fim da Reta)
+                    if (hasFinish && driver.isDrsActive()) {
+                        if (DrsManager.this.rs.isInside(loc, regions.get("finishMin"), regions.get("finishMax"))) {
+                            DrsManager.this.stopDrsBoost(player, driver, heat);
+                            sendThemedMessage(player, theme, "&c[DRS] Asa Fechada.");
+                        }
+                    }
                 }
             }
-        }).runTaskTimer(heat.getPlugin(), 0L, 2L);
+        }.runTaskTimer(heat.getPlugin(), 0L, 2L);
+    }
+
+    // Método auxiliar para limpar o código de mensagens repetitivas
+    private void sendThemedMessage(Player player, FRTheme theme, String rawMsg) {
+        String themed = LegacyComponentSerializer.legacySection()
+                .serialize(FRThemeParser.parseWithLegacy(rawMsg, theme));
+        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(themed));
     }
 
     private void showDrsAvailableBar(Player player, Driver driver) {

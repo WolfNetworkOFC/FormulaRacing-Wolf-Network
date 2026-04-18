@@ -2358,101 +2358,68 @@ public class EventsDatabaseManager {
         return laps;
     }
 
-    public synchronized Map<String, Location> getDrsRegions(
-        String trackNameWS
-    ) {
+    public synchronized Map<String, Location> getDrsRegions(String trackNameWS) {
         Map<String, Location> regions = new HashMap<>();
         trackNameWS = trackNameWS.replace(" ", "").toLowerCase();
+
+        // SQL busca todas as linhas daquela pista específica
         String sql = "SELECT * FROM fr_drs WHERE trackNameWS = ?";
 
-        try {
-            Object var9;
-            try (Connection conn = this.databaseManager.getOrConnect()) {
-                try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-                    stmt.setString(1, trackNameWS);
-                    ResultSet rs = stmt.executeQuery();
-                    if (!rs.next()) {
-                        return regions;
-                    }
+        try (Connection conn = this.databaseManager.getOrConnect();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-                    String worldName = rs.getString("world");
-                    World world = Bukkit.getWorld(worldName);
-                    if (world != null) {
-                        if (rs.getObject("detectMinMinX") != null) {
-                            regions.put(
-                                "detectMin",
-                                new Location(
-                                    world,
-                                    rs.getDouble("detectMinMinX"),
-                                    rs.getDouble("detectMinMinY"),
-                                    rs.getDouble("detectMinMinZ")
-                                )
-                            );
-                            regions.put(
-                                "detectMax",
-                                new Location(
-                                    world,
-                                    rs.getDouble("detectMinMaxX"),
-                                    rs.getDouble("detectMinMaxY"),
-                                    rs.getDouble("detectMinMaxZ")
-                                )
-                            );
-                        }
+            stmt.setString(1, trackNameWS);
+            ResultSet rs = stmt.executeQuery();
 
-                        if (rs.getObject("drsMinX") != null) {
-                            regions.put(
-                                "startMin",
-                                new Location(
-                                    world,
-                                    rs.getDouble("drsMinX"),
-                                    rs.getDouble("drsMinY"),
-                                    rs.getDouble("drsMinZ")
-                                )
-                            );
-                            regions.put(
-                                "startMax",
-                                new Location(
-                                    world,
-                                    rs.getDouble("drsMaxX"),
-                                    rs.getDouble("drsMaxY"),
-                                    rs.getDouble("drsMaxZ")
-                                )
-                            );
-                        }
+            // Usamos WHILE em vez de IF para percorrer todas as zonas (detect, drs, end)
+            while (rs.next()) {
+                String worldName = rs.getString("world");
+                World world = Bukkit.getWorld(worldName);
 
-                        if (rs.getObject("endDrsMinX") != null) {
-                            regions.put(
-                                "finishMin",
-                                new Location(
-                                    world,
-                                    rs.getDouble("endDrsMinX"),
-                                    rs.getDouble("endDrsMinY"),
-                                    rs.getDouble("endDrsMinZ")
-                                )
-                            );
-                            regions.put(
-                                "finishMax",
-                                new Location(
-                                    world,
-                                    rs.getDouble("endDrsMaxX"),
-                                    rs.getDouble("endDrsMaxY"),
-                                    rs.getDouble("endDrsMaxZ")
-                                )
-                            );
-                        }
+                if (world == null) continue;
 
-                        return regions;
-                    }
+                String type = rs.getString("type").toLowerCase();
 
-                    var9 = regions;
+                // Mapeamos o "type" da tabela para as chaves que seu plugin espera
+                String minKey, maxKey;
+                switch (type) {
+                    case "detect":
+                        minKey = "detectMin";
+                        maxKey = "detectMax";
+                        break;
+                    case "drs":
+                        minKey = "startMin";
+                        maxKey = "startMax";
+                        break;
+                    case "end":
+                        minKey = "finishMin";
+                        maxKey = "finishMax";
+                        break;
+                    default:
+                        continue; // Pula tipos desconhecidos
                 }
-            }
 
-            return (Map<String, Location>) var9;
+                // Adiciona a localização mínima
+                regions.put(minKey, new Location(
+                        world,
+                        rs.getDouble("regionMinX"),
+                        rs.getDouble("regionMinY"),
+                        rs.getDouble("regionMinZ")
+                ));
+
+                // Adiciona a localização máxima
+                regions.put(maxKey, new Location(
+                        world,
+                        rs.getDouble("regionMaxX"),
+                        rs.getDouble("regionMaxY"),
+                        rs.getDouble("regionMaxZ")
+                ));
+            }
         } catch (SQLException e) {
             e.printStackTrace();
-            return regions;
         }
+
+        return regions;
     }
 
     public Map<String, Object> getFastestLapInHeat(int heatId) {

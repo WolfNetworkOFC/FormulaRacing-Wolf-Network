@@ -70,6 +70,7 @@ public class Heats {
     private double pushtopasspower;
     private BukkitTask sessionTask;
     private boolean configDirty = false;
+    private boolean onlyBedrock = false;
 
     public Heats(FormulaRacing plugin, int id, Rounds round, int heatNumber) {
         this.plugin = plugin;
@@ -111,6 +112,16 @@ public class Heats {
         this.startPositions = new ArrayList();
         this.livePositions = new ArrayList();
     }
+
+    public void setOnlyBedrock(boolean onlyBedrock) {
+        this.onlyBedrock = onlyBedrock;
+        this.markConfigDirty();
+    }
+
+    public boolean getOnlyBedrock() {
+        return this.onlyBedrock;
+    }
+
 
     public boolean getrealistc() {
         return this.realistc;
