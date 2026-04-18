@@ -240,14 +240,11 @@ final class BuilderSupport {
 
     /**
      * Compute live race gap between current driver and reference driver.
-     * Uses TimingSystem algorithm with live interpolation for smoother updates.
+     * Follows TimingSystem algorithm: compares both drivers at the most recent common checkpoint.
      *
-     * Algorithm:
-     * 1. Determine which driver is behind (slower) based on position
-     * 2. Find the most recent common progress point (lap, checkpoint) where both have data
-     * 3. For the slower driver, use "live" elapsed time (System.currentTimeMillis() - startTime)
-     *    instead of the static checkpoint timestamp, creating a continuously updating gap
-     * 4. For finished drivers, use finish times like TimingSystem
+     * For drivers at different lap counts, compares at the last checkpoint of the trailing driver.
+     * When a driver is stationary, the gap "grows" because the leading driver continues advancing
+     * while the trailing driver's timestamp at that checkpoint remains fixed.
      */
     private static Long computeRaceGap(Driver current, Driver reference, ScoreboardContext context) {
         // Same driver - no gap
@@ -255,98 +252,107 @@ final class BuilderSupport {
             return 0L;
         }
 
-        // Check if live gap is enabled in config
-        boolean liveGapEnabled = context.plugin().getConfig().getBoolean("scoreboard.v2.live-gap", true);
-        if (!liveGapEnabled) {
-            return fallbackGapCalculation(current, reference);
-        }
-
         // Handle finished drivers using finish times (TimingSystem pattern)
-        if (current.isFinished()) {
+        if (current.isFinished() && reference.isFinished()) {
             if (reference.getEndTime() == null || current.getEndTime() == null) {
                 return null;
             }
-            // Time difference between finish times
             return current.getEndTime() - reference.getEndTime();
         }
+        if (current.isFinished()) {
+            // Current finished, reference still racing
+            // Gap = current's total time - reference's time at current's finish point
+            Long currentTotal = current.getTotalTime();
+            Long referenceAtCurrentFinish = findElapsedAtDriversFinishPoint(reference, current);
+            if (referenceAtCurrentFinish == null) {
+                return null;
+            }
+            return currentTotal - referenceAtCurrentFinish;
+        }
         if (reference.isFinished()) {
-            if (reference.getEndTime() == null) {
+            // Reference finished, current still racing
+            // Gap = current's time at reference's finish point - reference's total time
+            Long currentAtRefFinish = findElapsedAtDriversFinishPoint(current, reference);
+            if (currentAtRefFinish == null) {
                 return null;
             }
-            // Current is still racing, reference finished - use "live" time for current
-            // at reference's progress point
-            Long referenceElapsedAtLastCp = getElapsedAtLastCheckpoint(reference);
-            if (referenceElapsedAtLastCp == null) {
-                return null;
-            }
-            Long currentElapsedLive = getLiveElapsedTime(current);
-            if (currentElapsedLive == null) {
-                return null;
-            }
-            // Gap = how much longer current took to reach reference's position
-            return currentElapsedLive - referenceElapsedAtLastCp;
+            Long refTotal = reference.getTotalTime();
+            return currentAtRefFinish - refTotal;
         }
 
-        // Both racing: use "live" gap calculation
-        // Determine who is behind (slower) - we evaluate at the slower driver's progress
-        Driver slower, faster;
-        boolean currentIsSlower = current.getPosition() > reference.getPosition();
-
-        if (currentIsSlower) {
-            slower = current;
-            faster = reference;
-        } else {
-            slower = reference;
-            faster = current;
-        }
-
-        // Get the most recent common progress point (lap, checkpoint)
-        int[] slowerProgress = slower.getCurrentProgress();
-        int slowerLap = slowerProgress[0];
-        int slowerCp = slowerProgress[1];
-
-        // Get faster driver's elapsed time at slower's progress point
-        Long fasterElapsedAtSlowerProgress = faster.getElapsedAtProgress(slowerLap, slowerCp);
-
-        if (fasterElapsedAtSlowerProgress == null) {
-            // Faster hasn't reached this point yet, use fallback
-            return fallbackGapCalculation(current, reference);
-        }
-
-        // Get slower driver's "live" elapsed time (continuously updating)
-        Long slowerElapsedLive = getLiveElapsedTime(slower);
-        if (slowerElapsedLive == null) {
-            return fallbackGapCalculation(current, reference);
-        }
-
-        // Calculate gap: difference in elapsed times
-        long rawGap = slowerElapsedLive - fasterElapsedAtSlowerProgress;
-
-        // Return with sign based on who is slower
-        return currentIsSlower ? rawGap : -rawGap;
+        // Both racing: find the most recent common progress point and compare
+        return computeGapAtCommonPoint(current, reference);
     }
 
     /**
-     * Get live elapsed time for a driver (continuously updating even when stationary).
-     * Returns time from heat start to now, or to finish time if finished.
+     * Find the elapsed time for 'driver' at the finish point of 'targetDriver'.
+     * Returns null if driver hasn't reached that point yet.
      */
-    private static Long getLiveElapsedTime(Driver driver) {
-        Long startTime = driver.getStartTime();
-        if (startTime == null) {
-            return null;
+    private static Long findElapsedAtDriversFinishPoint(Driver driver, Driver targetDriver) {
+        // Target's finish: (laps completed, last checkpoint of final lap)
+        int targetLap = targetDriver.getLapCount();
+        int targetCp = 0;
+
+        // If target has no laps, they're at start
+        if (targetLap == 0) {
+            return 0L;
         }
-        if (driver.isFinished() && driver.getEndTime() != null) {
-            return driver.getEndTime() - startTime;
+
+        // Get target's last checkpoint on their final lap
+        Lap targetFinalLap = targetDriver.getLaps().isEmpty() ? null :
+                targetDriver.getLaps().get(targetDriver.getLaps().size() - 1);
+        if (targetFinalLap != null) {
+            Map<Integer, Long> cpTimes = targetFinalLap.getCheckpointTimes();
+            if (!cpTimes.isEmpty()) {
+                targetCp = cpTimes.keySet().stream().mapToInt(Integer::intValue).max().orElse(0);
+            }
         }
-        return System.currentTimeMillis() - startTime;
+
+        return driver.getElapsedAtProgress(targetLap, targetCp);
     }
 
     /**
-     * Get elapsed time at the driver's last crossed checkpoint.
+     * Compute gap by comparing both drivers at the most recent common progress point.
+     * Uses TimingSystem logic: evaluate at the trailing driver's current progress.
      */
-    private static Long getElapsedAtLastCheckpoint(Driver driver) {
-        int[] progress = driver.getCurrentProgress();
-        return driver.getElapsedAtProgress(progress[0], progress[1]);
+    private static Long computeGapAtCommonPoint(Driver current, Driver reference) {
+        // Determine positions
+        boolean currentIsBehind = current.getPosition() > reference.getPosition();
+        Driver behind = currentIsBehind ? current : reference;
+        Driver ahead = currentIsBehind ? reference : current;
+
+        // Get behind driver's current progress
+        int behindLap = behind.getLapCount();
+        int behindCp = behind.getCurrentLap() != null ? behind.getCheckpointsReached() : 0;
+
+        // Try to get times at behind's current position
+        Long behindElapsed = behind.getElapsedAtProgress(behindLap, behindCp);
+        Long aheadElapsedAtBehindPos = ahead.getElapsedAtProgress(behindLap, behindCp);
+
+        // If ahead hasn't reached this point, try previous checkpoint
+        if (aheadElapsedAtBehindPos == null && behindCp > 0) {
+            behindCp--;
+            behindElapsed = behind.getElapsedAtProgress(behindLap, behindCp);
+            aheadElapsedAtBehindPos = ahead.getElapsedAtProgress(behindLap, behindCp);
+        }
+
+        // If still no common point, try previous lap
+        if (aheadElapsedAtBehindPos == null && behindLap > 0) {
+            behindLap--;
+            Lap prevLap = behind.getLaps().get(behindLap);
+            behindCp = prevLap.getCheckpointTimes().keySet().stream().mapToInt(Integer::intValue).max().orElse(0);
+
+            behindElapsed = behind.getElapsedAtProgress(behindLap, behindCp);
+            aheadElapsedAtBehindPos = ahead.getElapsedAtProgress(behindLap, behindCp);
+        }
+
+        if (behindElapsed == null || aheadElapsedAtBehindPos == null) {
+            return fallbackGapCalculation(current, reference);
+        }
+
+        // Gap is how much longer the behind driver took to reach this point
+        long gap = behindElapsed - aheadElapsedAtBehindPos;
+        return currentIsBehind ? gap : -gap;
     }
 
     /**
