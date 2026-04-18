@@ -82,6 +82,26 @@ public class Events {
         }
     }
 
+    public boolean ensureRunning(Rounds triggeringRound) {
+        if (this.state == EventState.RUNNING) {
+            return true;
+        }
+        if (this.state == EventState.FINISHED) {
+            return false;
+        }
+        if (this.trackNameWS == null || this.trackNameWS.isEmpty()) {
+            this.plugin.getDebugManager().logRaceSystem("Evento " + this.id + " sem pista; auto-start abortado");
+            return false;
+        }
+        if (triggeringRound != null) {
+            this.eventSchedule.setCurrentRoundIndex(triggeringRound.getRoundIndex());
+        }
+        this.setState(EventState.RUNNING);
+        this.announcements.broadcastEventStart(this);
+        this.plugin.getDebugManager().logRaceSystem("Evento " + this.displayName + " auto-iniciado via heat");
+        return true;
+    }
+
     public boolean finish() {
         if (this.state != EventState.FINISHED && this.state != EventState.SETUP) {
             if (this.eventSchedule.isLastRound()) {

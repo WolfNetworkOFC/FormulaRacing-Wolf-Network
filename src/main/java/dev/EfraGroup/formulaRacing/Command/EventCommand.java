@@ -309,39 +309,6 @@ public class EventCommand extends BaseCommand {
         }
     }
 
-    @Subcommand("start")
-    @CommandCompletion("@event")
-    @CommandPermission("formularacing.event.admin")
-    @Description("Inicia um evento")
-    public void onStart(
-        Player player,
-        @co.aikar.commands.annotation.Optional Events event
-    ) {
-        if (event == null) {
-            event = database
-                .getPlayerSelectedEvent(player.getUniqueId())
-                .orElse(null);
-        }
-
-        if (event == null) {
-            this.plugin.sendMessage(
-                player,
-                "event_none_selected",
-                new String[0]
-            );
-        } else {
-            if (event.start()) {
-                this.plugin.sendMessage(player, "event_started", new String[0]);
-            } else {
-                this.plugin.sendMessage(
-                    player,
-                    "event_start_error",
-                    new String[0]
-                );
-            }
-        }
-    }
-
     @Subcommand("finish|end|stop")
     @CommandCompletion("@event")
     @CommandPermission("formularacing.event.admin")

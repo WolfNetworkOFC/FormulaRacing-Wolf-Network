@@ -1,4 +1,4 @@
-# ==========================================
+﻿# ==========================================
 # FormulaRacing - English (US) Language File
 # ==========================================
 
@@ -225,7 +225,7 @@ ready_check_player_ready: "&a✔ You are ready!"
 
 # Spectator Quick Race
 spectator_qr_title: "&wSPECTATOR"
-spectator_qr_subtitle: "&2Watching the race..."
+spectator_qr_subtitle: "&xWatching the race..."
 
 # DRS Messages
 drs_available: "&i&lDRS AVAILABLE"
@@ -722,7 +722,7 @@ quickrace_broadcast_track: 'Track: '
 quickrace_broadcast_laps_pits: 'Laps: {laps} | Pits: {pits}'
 quickrace_broadcast_drivers: 'Drivers: {current}/{max}'
 quickrace_broadcast_click: '[  CLICK TO JOIN ]'
-quickrace_broadcast_click_hover: '&aClick to join the Quick Race!&n&7Command: &f/race join'
+quickrace_broadcast_click_hover: '&aClick to join the Quick Race!&u&7Command: &f/race join'
 quickrace_leave_hint: '&eTo leave at any time, type &f/race leave'
 
 scoreboard_title_practice: '&d&l FREE PRACTICE'
@@ -952,22 +952,40 @@ pit_lane_start: "&eYou entered the pit lane."
 scoreboard_common_separator: "&7----------------------------------------"
 scoreboard_common_footer: "&ewolfnetwork.com.br"
 scoreboard_v2_no_active_drivers: "&7No active drivers"
-scoreboard_v2_best_lap: "&1Best lap: &2{time}"
+scoreboard_v2_best_lap: "&pBest lap: &x{time}"
 scoreboard_v2_offline: "&7Offline"
-scoreboard_v2_drivers: "&1Drivers: &2{count}"
-scoreboard_v2_track: "&1Track: &2{track}"
-scoreboard_v2_laps: "&1Laps: &2{laps}"
-scoreboard_v2_position: "&1Position: &2{position}"
-scoreboard_v2_time: "&1Time: &2{time}"
+scoreboard_v2_drivers: "&pDrivers: &x{count}"
+scoreboard_v2_track: "&pTrack: &x{track}"
+scoreboard_v2_laps: "&pLaps: &x{laps}"
+scoreboard_v2_position: "&pPosition: &x{position}"
+scoreboard_v2_time: "&pTime: &x{time}"
 
 # Color Settings
-gui_settings_color_name: "&1Color"
-gui_settings_color_lore: "&2Click to choose your theme color"
-gui_color_title: "&1Choose Your Color"
+gui_settings_color_name: "&pColor"
+gui_settings_color_lore: "&xClick to choose your theme color"
+gui_color_title: "&pColor Settings"
 gui_color_lore: "&aClick to select"
 gui_color_current: "&aCurrent color! &7({color})"
 gui_color_back_name: "&7← Back"
 gui_color_back_lore: "&8Return to settings"
+gui_color_header_primary: "Primary Color"
+gui_color_header_accent: "Accent Color"
+gui_color_lore_select: "Click to select"
+gui_color_lore_current: "✔ Current color"
+gui_color_changed_primary: "&aPrimary color changed to {color}&a!"
+gui_color_changed_accent: "&aAccent color changed to {color}&a!"
+gui_color_name_crimson: "Crimson"
+gui_color_name_orange: "Orange"
+gui_color_name_amber: "Amber"
+gui_color_name_lime: "Lime"
+gui_color_name_emerald: "Emerald"
+gui_color_name_teal: "Teal"
+gui_color_name_sky: "Sky"
+gui_color_name_azure: "Azure"
+gui_color_name_violet: "Violet"
+gui_color_name_magenta: "Magenta"
+gui_color_name_pink: "Pink"
+gui_color_name_snow: "Snow"
 
 # Scoreboard State Labels
 scoreboard_state_setup: "Setting up"

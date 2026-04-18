@@ -289,11 +289,11 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
 
     private void renderSimplified(Player player, Heats heat) {
         FRTheme theme = FRThemeResolver.resolveTheme(player);
-        String rawName = "&n" + heat.getName();
-        String rawState = "&2" + heat.getHeatState().name();
-        String rawDrivers = "&2Pilotos: &1" + heat.getDriverCount();
-        String rawLaps = "&2Voltas: &1" + heat.getTotalLaps();
-        String rawSponsor = "&nwolfnetwork.com.br";
+        String rawName = "&a" + heat.getName();
+        String rawState = "&x" + heat.getHeatState().name();
+        String rawDrivers = "&xPilotos: &p" + heat.getDriverCount();
+        String rawLaps = "&xVoltas: &p" + heat.getTotalLaps();
+        String rawSponsor = "&mwolfnetwork.com.br";
         List<String> lines = new ArrayList<>();
         lines.add(LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawName, theme)));
         lines.add(LegacyComponentSerializer.legacySection().serialize(FRThemeParser.parseWithLegacy(rawState, theme)));

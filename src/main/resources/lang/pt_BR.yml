@@ -1,4 +1,4 @@
-# ==========================================
+﻿# ==========================================
 # FormulaRacing - Português (Brasil) Language File
 # ==========================================
 
@@ -94,7 +94,7 @@ duel_separator_line: "&8§m                                                     
 
 # Duelo Finish & Lap Titles
 duel_finish_title: "&s&lTERMINOU!"
-duel_finish_waiting: "&2Aguardando resultado..."
+duel_finish_waiting: "&xAguardando resultado..."
 duel_lap_prefix: "&w&lVOLTA "
 duel_victory_title: "&w&l🏆 VITÓRIA!"
 duel_defeat_title: "&e&lDERROTA"
@@ -109,7 +109,7 @@ ready_check_player_ready: "&a✔ Você está pronto!"
 
 # Espectador Quick Race
 spectator_qr_title: "&wESPECTADOR"
-spectator_qr_subtitle: "&2Acompanhando a corrida..."
+spectator_qr_subtitle: "&xAcompanhando a corrida..."
 
 # Mensagens DRS
 drs_available: "&i&lDRS DISPONIVEL"
@@ -719,7 +719,7 @@ quickrace_broadcast_track: 'Pista: '
 quickrace_broadcast_laps_pits: 'Voltas: {laps} | Pits: {pits}'
 quickrace_broadcast_drivers: 'Pilotos: {current}/{max}'
 quickrace_broadcast_click: '[  CLIQUE PARA ENTRAR ]'
-quickrace_broadcast_click_hover: '&aClique para entrar na Quick Race!&n&7Comando: &f/race join'
+quickrace_broadcast_click_hover: '&aClique para entrar na Quick Race!&u&7Comando: &f/race join'
 quickrace_leave_hint: '&ePara sair a qualquer momento, digite &f/race leave'
 
 scoreboard_title_practice: '&d&l TREINO LIVRE'
@@ -948,22 +948,40 @@ pit_lane_start: "&eVoce entrou no pit lane."
 scoreboard_common_separator: "&7----------------------------------------"
 scoreboard_common_footer: "&ewolfnetwork.com.br"
 scoreboard_v2_no_active_drivers: "&7Nenhum piloto ativo"
-scoreboard_v2_best_lap: "&1Melhor volta: &2{time}"
+scoreboard_v2_best_lap: "&pMelhor volta: &x{time}"
 scoreboard_v2_offline: "&7Offline"
-scoreboard_v2_drivers: "&1Pilotos: &2{count}"
-scoreboard_v2_track: "&1Pista: &2{track}"
-scoreboard_v2_laps: "&1Voltas: &2{laps}"
-scoreboard_v2_position: "&1Posição: &2{position}"
-scoreboard_v2_time: "&1Tempo: &2{time}"
+scoreboard_v2_drivers: "&pPilotos: &x{count}"
+scoreboard_v2_track: "&pPista: &x{track}"
+scoreboard_v2_laps: "&pVoltas: &x{laps}"
+scoreboard_v2_position: "&pPosição: &x{position}"
+scoreboard_v2_time: "&pTempo: &x{time}"
 
 # Color Settings
-gui_settings_color_name: "&1Cor"
-gui_settings_color_lore: "&2Clique para escolher a cor do seu tema"
-gui_color_title: "&1Escolha Sua Cor"
+gui_settings_color_name: "&pCor"
+gui_settings_color_lore: "&xClique para escolher a cor do seu tema"
+gui_color_title: "&pConfigurações de Cor"
 gui_color_lore: "&aClique para selecionar"
 gui_color_current: "&aCor atual! &7({color})"
 gui_color_back_name: "&7← Voltar"
 gui_color_back_lore: "&8Voltar às configurações"
+gui_color_header_primary: "Cor Primária"
+gui_color_header_accent: "Cor de Destaque"
+gui_color_lore_select: "Clique para selecionar"
+gui_color_lore_current: "✔ Cor atual"
+gui_color_changed_primary: "&aCor primária alterada para {color}&a!"
+gui_color_changed_accent: "&aCor de destaque alterada para {color}&a!"
+gui_color_name_crimson: "Carmízim"
+gui_color_name_orange: "Laranja"
+gui_color_name_amber: "Âmbar"
+gui_color_name_lime: "Lima"
+gui_color_name_emerald: "Esmeralda"
+gui_color_name_teal: "Teal"
+gui_color_name_sky: "Céu"
+gui_color_name_azure: "Azure"
+gui_color_name_violet: "Violeta"
+gui_color_name_magenta: "Magenta"
+gui_color_name_pink: "Rosa"
+gui_color_name_snow: "Neve"
 
 # Scoreboard State Labels
 scoreboard_state_setup: "A configurar"

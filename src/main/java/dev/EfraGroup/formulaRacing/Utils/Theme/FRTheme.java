@@ -1,225 +1,216 @@
 package dev.EfraGroup.formulaRacing.Utils.Theme;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 
 public class FRTheme {
-    private final TextColor primary;
-    private final TextColor secondary;
-    private final TextColor success;
-    private final TextColor warning;
-    private final TextColor error;
-    private final TextColor broadcast;
-    private final TextColor award;
-    private final TextColor title;
-    private final TextColor info;
-    private final TextColor accent;
 
-    public FRTheme(TextColor primary, TextColor secondary, TextColor success,
-                   TextColor warning, TextColor error, TextColor broadcast,
-                   TextColor award, TextColor title, TextColor info, TextColor accent) {
-        this.primary = primary;
-        this.secondary = secondary;
-        this.success = success;
-        this.warning = warning;
-        this.error = error;
+    // ── Tokens derivados da cor do jogador ──────────────────────────────────
+    private final TextColor primary;   // &p  destaque principal (color1 do jogador)
+    private final TextColor accent;    // &a  destaque secundário (color2 do jogador)
+
+    // ── Tokens fixos — corpo legível, independentes do jogador ──────────────
+    private final TextColor headline;  // &h  títulos / scoreboard header
+    private final TextColor text;      // &x  corpo de texto principal
+    private final TextColor muted;     // &m  labels, separadores, unidades
+    private final TextColor success;   // &s  OK / positivo
+    private final TextColor warning;   // &w  atenção
+    private final TextColor error;     // &e  erro / negativo
+    private final TextColor info;      // &i  informativo neutro
+    private final TextColor award;     // &v  pódio / prêmios
+    private final TextColor broadcast; // &b  anúncios globais
+
+    // ── Aliases de compatibilidade (tokens antigos) ─────────────────────────
+    /** @deprecated use {@link #getPrimary()} via &amp;p */
+    @Deprecated public TextColor getSecondary()  { return accent; }
+    /** @deprecated use {@link #getMuted()} via &amp;m */
+    @Deprecated public TextColor getTitle()      { return muted; }
+
+    public FRTheme(TextColor primary, TextColor accent,
+                   TextColor headline, TextColor text, TextColor muted,
+                   TextColor success, TextColor warning, TextColor error,
+                   TextColor info, TextColor award, TextColor broadcast) {
+        this.primary   = primary;
+        this.accent    = accent;
+        this.headline  = headline;
+        this.text      = text;
+        this.muted     = muted;
+        this.success   = success;
+        this.warning   = warning;
+        this.error     = error;
+        this.info      = info;
+        this.award     = award;
         this.broadcast = broadcast;
-        this.award = award;
-        this.title = title;
-        this.info = info;
-        this.accent = accent;
     }
 
-    public TextColor getPrimary() { return primary; }
-    public TextColor getSecondary() { return secondary; }
-    public TextColor getSuccess() { return success; }
-    public TextColor getWarning() { return warning; }
-    public TextColor getError() { return error; }
+    public TextColor getPrimary()   { return primary; }
+    public TextColor getAccent()    { return accent; }
+    public TextColor getHeadline()  { return headline; }
+    public TextColor getText()      { return text; }
+    public TextColor getMuted()     { return muted; }
+    public TextColor getSuccess()   { return success; }
+    public TextColor getWarning()   { return warning; }
+    public TextColor getError()     { return error; }
+    public TextColor getInfo()      { return info; }
+    public TextColor getAward()     { return award; }
     public TextColor getBroadcast() { return broadcast; }
-    public TextColor getAward() { return award; }
-    public TextColor getTitle() { return title; }
-    public TextColor getInfo() { return info; }
-    public TextColor getAccent() { return accent; }
+
+    // ── Fixed tokens (shared between all instances) ─────────────────────────
+    private static final TextColor FIXED_HEADLINE  = TextColor.color(0xf0f0f0);
+    private static final TextColor FIXED_TEXT      = TextColor.color(0xe6e6e6);
+    private static final TextColor FIXED_MUTED     = TextColor.color(0x9aa0a6);
+    private static final TextColor FIXED_SUCCESS   = TextColor.color(0x7bf200);
+    private static final TextColor FIXED_WARNING   = TextColor.color(0xffc93a);
+    private static final TextColor FIXED_ERROR     = TextColor.color(0xff5757);
+    private static final TextColor FIXED_INFO      = TextColor.color(0x6cc3ff);
+    private static final TextColor FIXED_AWARD     = TextColor.color(0xffd700);
+    private static final TextColor FIXED_BROADCAST = TextColor.color(0x00e5ff);
+
+    private static final TextColor DEFAULT_PRIMARY = TextColor.color(0x7bf200);
+    private static final TextColor DEFAULT_ACCENT  = TextColor.color(0x00cc99);
+
+    // ── Luminance clamping ───────────────────────────────────────────────────
+    /** Minimum perceived luminance (0–1, ITU-R BT.709) for a readable accent on dark BG. */
+    private static final float MIN_LUMINANCE = 0.12f;
+    /** Maximum perceived luminance — avoids blinding white-ish colours. */
+    private static final float MAX_LUMINANCE = 0.90f;
 
     public static FRTheme defaultTheme() {
         return new FRTheme(
-                TextColor.color(0x7bf200),
-                TextColor.color(NamedTextColor.WHITE),
-                TextColor.color(0x7bf200),
-                TextColor.color(NamedTextColor.YELLOW),
-                TextColor.color(0xff7a75),
-                TextColor.color(NamedTextColor.AQUA),
-                TextColor.color(NamedTextColor.GOLD),
-                TextColor.color(NamedTextColor.DARK_GRAY),
-                TextColor.color(0xcc99ff),
-                TextColor.color(0x00cc99)
+                DEFAULT_PRIMARY, DEFAULT_ACCENT,
+                FIXED_HEADLINE, FIXED_TEXT, FIXED_MUTED,
+                FIXED_SUCCESS, FIXED_WARNING, FIXED_ERROR,
+                FIXED_INFO, FIXED_AWARD, FIXED_BROADCAST
         );
     }
 
-    public static FRTheme fromPlayerColors(String primaryHex, String secondaryHex) {
-        TextColor primary = parseHex(primaryHex);
-        TextColor secondary = parseHex(secondaryHex);
-
-        TextColor success = shiftHue(primary, 0.33f);
-        TextColor warning = shiftHue(primary, 0.15f);
-        TextColor error = shiftHue(primary, 0.0f, 0.85f);
-        TextColor broadcast = shiftHue(primary, 0.5f);
-        TextColor award = shiftSaturation(primary, 1.0f);
-        TextColor title = adjustLightness(primary, -0.25f);
-        TextColor info = shiftHue(primary, 0.75f);
-        TextColor accent = shiftHue(primary, 0.58f);
-
-        return new FRTheme(primary, secondary, success, warning, error, broadcast, award, title, info, accent);
+    /**
+     * Build a theme from the player's chosen colours.
+     * primary/accent are clamped to a safe luminance range so they always
+     * stay visible against a dark scoreboard / action-bar background.
+     */
+    public static FRTheme forPlayer(String primaryHex, String accentHex) {
+        TextColor primary = clampLuminance(parseHex(primaryHex, DEFAULT_PRIMARY));
+        TextColor accent  = resolveAccent(primaryHex, accentHex, primary);
+        return new FRTheme(
+                primary, accent,
+                FIXED_HEADLINE, FIXED_TEXT, FIXED_MUTED,
+                FIXED_SUCCESS, FIXED_WARNING, FIXED_ERROR,
+                FIXED_INFO, FIXED_AWARD, FIXED_BROADCAST
+        );
     }
 
-    private static TextColor parseHex(String hex) {
-        if (hex == null || hex.isEmpty()) {
-            return TextColor.color(0x7bf200);
-        }
+    /** Legacy compatibility — maps old (color1, color2) call to forPlayer(). */
+    public static FRTheme fromPlayerColors(String primaryHex, String secondaryHex) {
+        return forPlayer(primaryHex, secondaryHex);
+    }
+
+    // ── Parsing & luminance helpers ──────────────────────────────────────────
+
+    private static TextColor parseHex(String hex, TextColor fallback) {
+        if (hex == null || hex.isBlank()) return fallback;
         String clean = hex.startsWith("#") ? hex.substring(1) : hex;
         try {
             return TextColor.fromHexString("#" + clean);
         } catch (IllegalArgumentException e) {
-            return TextColor.color(0x7bf200);
+            return fallback;
         }
     }
 
-    private static TextColor shiftHue(TextColor base, float hueShift) {
-        return shiftHue(base, hueShift, -1f);
+    /**
+     * Clamp a colour's perceived luminance (ITU-R BT.709) to [MIN_LUMINANCE, MAX_LUMINANCE]
+     * by scaling the linear RGB values uniformly, so it stays visible on a dark background
+     * without being blinding-white.
+     */
+    private static TextColor clampLuminance(TextColor color) {
+        float lum = relativeLuminance(color);
+        if (lum >= MIN_LUMINANCE && lum <= MAX_LUMINANCE) return color;
+
+        float target = lum < MIN_LUMINANCE ? MIN_LUMINANCE : MAX_LUMINANCE;
+        float scale  = (target + 0.05f) / (lum + 0.05f);
+
+        float r = linearize(color.red())   * scale;
+        float g = linearize(color.green()) * scale;
+        float b = linearize(color.blue())  * scale;
+
+        r = Math.max(0f, Math.min(1f, r));
+        g = Math.max(0f, Math.min(1f, g));
+        b = Math.max(0f, Math.min(1f, b));
+
+        return TextColor.color(delinearize(r), delinearize(g), delinearize(b));
     }
 
-    private static TextColor shiftHue(TextColor base, float hueShift, float saturationOverride) {
-        int r = (base.red() * 255);
-        int g = (base.green() * 255);
-        int b = (base.blue() * 255);
-
-        float[] hsv = rgbToHsv(r, g, b);
-        hsv[0] = (hsv[0] + hueShift) % 1.0f;
-        if (hsv[0] < 0) hsv[0] += 1.0f;
-        if (saturationOverride >= 0) hsv[1] = saturationOverride;
-
-        int[] rgb = hsvToRgb(hsv[0], hsv[1], hsv[2]);
-        return TextColor.color(rgb[0], rgb[1], rgb[2]);
-    }
-
-    private static TextColor shiftSaturation(TextColor base, float saturation) {
-        int r = (base.red() * 255);
-        int g = (base.green() * 255);
-        int b = (base.blue() * 255);
-
-        float[] hsv = rgbToHsv(r, g, b);
-        hsv[1] = Math.min(1.0f, saturation);
-
-        int[] rgb = hsvToRgb(hsv[0], hsv[1], hsv[2]);
-        return TextColor.color(rgb[0], rgb[1], rgb[2]);
-    }
-
-    private static TextColor adjustLightness(TextColor base, float delta) {
-        int r = (base.red() * 255);
-        int g = (base.green() * 255);
-        int b = (base.blue() * 255);
-
-        float[] hsv = rgbToHsv(r, g, b);
-        hsv[2] = Math.max(0f, Math.min(1f, hsv[2] + delta));
-
-        int[] rgb = hsvToRgb(hsv[0], hsv[1], hsv[2]);
-        return TextColor.color(rgb[0], rgb[1], rgb[2]);
-    }
-
-    private static float[] rgbToHsv(int r, int g, int b) {
-        float rf = r / 255f;
-        float gf = g / 255f;
-        float bf = b / 255f;
-
-        float max = Math.max(rf, Math.max(gf, bf));
-        float min = Math.min(rf, Math.min(gf, bf));
-        float delta = max - min;
-
-        float h = 0f;
-        float s = max == 0 ? 0f : delta / max;
-        float v = max;
-
-        if (delta != 0) {
-            if (max == rf) {
-                h = ((gf - bf) / delta) % 6f;
-            } else if (max == gf) {
-                h = (bf - rf) / delta + 2f;
-            } else {
-                h = (rf - gf) / delta + 4f;
-            }
-            h /= 6f;
-            if (h < 0) h += 1f;
+    private static TextColor resolveAccent(String accentHex, String color2Hex, TextColor primary) {
+        TextColor parsed = parseHex(color2Hex, null);
+        if (parsed == null || parsed.equals(primary)) {
+            parsed = parseHex(accentHex, null);
         }
-
-        return new float[]{h, s, v};
+        if (parsed == null) return DEFAULT_ACCENT;
+        return clampLuminance(parsed);
     }
 
-    private static int[] hsvToRgb(float h, float s, float v) {
-        int r, g, b;
-
-        int i = (int) Math.floor(h * 6);
-        float f = h * 6 - i;
-        float p = v * (1 - s);
-        float q = v * (1 - f * s);
-        float t = v * (1 - (1 - f) * s);
-
-        switch (i % 6) {
-            case 0 -> { r = Math.round(v * 255); g = Math.round(t * 255); b = Math.round(p * 255); }
-            case 1 -> { r = Math.round(q * 255); g = Math.round(v * 255); b = Math.round(p * 255); }
-            case 2 -> { r = Math.round(p * 255); g = Math.round(v * 255); b = Math.round(t * 255); }
-            case 3 -> { r = Math.round(p * 255); g = Math.round(q * 255); b = Math.round(v * 255); }
-            case 4 -> { r = Math.round(t * 255); g = Math.round(p * 255); b = Math.round(v * 255); }
-            default -> { r = Math.round(v * 255); g = Math.round(p * 255); b = Math.round(q * 255); }
-        }
-
-        r = Math.max(0, Math.min(255, r));
-        g = Math.max(0, Math.min(255, g));
-        b = Math.max(0, Math.min(255, b));
-
-        return new int[]{r, g, b};
+    /** ITU-R BT.709 relative luminance of an sRGB colour, in [0, 1]. */
+    private static float relativeLuminance(TextColor c) {
+        return 0.2126f * linearize(c.red())
+             + 0.7152f * linearize(c.green())
+             + 0.0722f * linearize(c.blue());
     }
 
-    public Component label(String text) {
-        return Component.text(text).color(primary);
+    /** sRGB channel (0–255) → linear [0, 1]. */
+    private static float linearize(int channel) {
+        float v = channel / 255f;
+        return v <= 0.04045f ? v / 12.92f : (float) Math.pow((v + 0.055) / 1.055, 2.4);
     }
 
-    public Component value(String text) {
-        return Component.text(text).color(secondary);
+    /** Linear [0, 1] → sRGB channel (0–255). */
+    private static int delinearize(float linear) {
+        float v = linear <= 0.0031308f
+                ? linear * 12.92f
+                : (float) (1.055 * Math.pow(linear, 1.0 / 2.4) - 0.055);
+        return Math.round(v * 255f);
     }
 
-    public Component highlight(String text) {
-        return Component.text(text).color(success);
+    // ── Component builder helpers ────────────────────────────────────────────
+
+    public Component label(String textStr) {
+        return Component.text(textStr).color(primary);
     }
 
-    public Component warn(String text) {
-        return Component.text(text).color(warning);
+    public Component value(String textStr) {
+        return Component.text(textStr).color(accent);
     }
 
-    public Component err(String text) {
-        return Component.text(text).color(error);
+    public Component highlight(String textStr) {
+        return Component.text(textStr).color(success);
     }
 
-    public Component bracket(String text) {
+    public Component warn(String textStr) {
+        return Component.text(textStr).color(warning);
+    }
+
+    public Component err(String textStr) {
+        return Component.text(textStr).color(error);
+    }
+
+    public Component bracket(String textStr) {
         return Component.text("[").color(primary)
-                .append(Component.text(text).color(secondary))
+                .append(Component.text(textStr).color(accent))
                 .append(Component.text("]").color(primary));
     }
 
     public Component bracket(Component content) {
         return Component.text("[").color(primary)
-                .append(content.color(secondary))
+                .append(content.color(accent))
                 .append(Component.text("]").color(primary));
     }
 
     public Component getViewButton() {
-        return Component.text("[»]").color(title);
+        return Component.text("[»]").color(muted);
     }
 
-    public Component getEditButton(String value) {
+    public Component getEditButton(String val) {
         return Component.text("[").color(primary)
-                .append(Component.text(value).color(secondary))
+                .append(Component.text(val).color(accent))
                 .append(Component.text("]").color(primary));
     }
 
@@ -232,19 +223,19 @@ public class FRTheme {
     }
 
     public Component getRefreshButton() {
-        return Component.text("↻").color(title);
+        return Component.text("↻").color(muted);
     }
 
     public Component getSeparator() {
-        return Component.text("------------------------").color(title);
+        return Component.text("------------------------").color(muted);
     }
 
     public Component getSpacersStart() {
-        return Component.text("--- ").color(title);
+        return Component.text("--- ").color(muted);
     }
 
     public Component getSpacersEnd() {
-        return Component.text(" ---").color(title);
+        return Component.text(" ---").color(muted);
     }
 
     public Component getTitleLine(String titleText) {
@@ -255,10 +246,10 @@ public class FRTheme {
 
     public Component getPageSelector(int page, int total) {
         return Component.text("--- <<<  page ")
-                .color(title)
+                .color(muted)
                 .append(Component.text(String.valueOf(page)).color(primary))
-                .append(Component.text(" of ").color(title))
+                .append(Component.text(" of ").color(muted))
                 .append(Component.text(String.valueOf(total)).color(primary))
-                .append(Component.text(" >>> ---").color(title));
+                .append(Component.text(" >>> ---").color(muted));
     }
 }

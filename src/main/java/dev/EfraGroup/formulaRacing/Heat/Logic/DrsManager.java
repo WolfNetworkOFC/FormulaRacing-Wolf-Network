@@ -86,7 +86,7 @@ public class DrsManager {
                                                 sendThemedMessage(player, theme, "&a[DRS] Permissão concedida! Gap: &f" + String.format("%.3f", gapValue) + "s");
                                             }
                                         } else if (player.getTicksLived() % 40 == 0) {
-                                            sendThemedMessage(player, theme, "&2[DRS] Na zona de detecção, mas sem alvo à frente.");
+                                            sendThemedMessage(player, theme, "&x[DRS] Na zona de detecção, mas sem alvo à frente.");
                                         }
                                     }
                                 }

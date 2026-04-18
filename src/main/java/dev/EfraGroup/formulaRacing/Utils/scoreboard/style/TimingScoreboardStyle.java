@@ -9,9 +9,9 @@ public final class TimingScoreboardStyle {
     public static String positionColor(int pos) {
         return switch (pos) {
             case 1 -> "&v";
-            case 2 -> "&2";
-            case 3 -> "&e";
-            default -> "&2";
+            case 2 -> "&x";
+            case 3 -> "&w";
+            default -> "&m";
         };
     }
 
@@ -68,5 +68,24 @@ public final class TimingScoreboardStyle {
             currentLength++;
         }
         return builder.toString();
+    }
+
+    /**
+     * Pad a string to a target pixel width using Minecraft font metrics.
+     * @param value the original string
+     * @param targetPixelWidth target width in pixels (default char is ~6px)
+     * @return padded string
+     */
+    public static String padRightPixels(String value, int targetPixelWidth) {
+        return MinecraftFontMetrics.padToPixels(value, targetPixelWidth);
+    }
+
+    /**
+     * Get the pixel width of a string in the Minecraft default font.
+     * @param text the string (may contain color codes)
+     * @return width in pixels
+     */
+    public static int pixelWidth(String text) {
+        return MinecraftFontMetrics.stringWidth(text);
     }
 }

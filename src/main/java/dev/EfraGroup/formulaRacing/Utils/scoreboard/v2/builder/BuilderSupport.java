@@ -7,6 +7,7 @@ import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeDefaults;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeResolver;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.style.MinecraftFontMetrics;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.style.TimingScoreboardStyle;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.model.ScoreboardContext;
 import java.util.HashMap;
@@ -22,9 +23,11 @@ final class BuilderSupport {
             "§0", "§1", "§2", "§3", "§4", "§5", "§6", "§7",
             "§8", "§9", "§a", "§b", "§c", "§d", "§e", "§f"
     };
-    private static final int MIDDLE_CONTENT_WIDTH = 11;
-    private static final int NAME_CONTENT_WIDTH = 13;
-    private static final int NAME_CONTENT_WIDTH_WITH_PITS = 11;
+    // Pixel-based widths for precise alignment (~6px per char default)
+    private static final int MIDDLE_PIXEL_WIDTH = 66;  // ~11 chars
+    private static final int NAME_PIXEL_WIDTH = 78;    // ~13 chars
+    private static final int NAME_PIXEL_WIDTH_WITH_PITS = 66;  // ~11 chars
+    private static final int COMPACT_NAME_PIXEL_WIDTH = 24;    // ~4 chars
 
     private BuilderSupport() {
     }
@@ -112,23 +115,23 @@ final class BuilderSupport {
 
     static String stateLabel(ScoreboardContext context, HeatState state) {
         return switch (state) {
-            case SETUP -> "&2" + tr(context, "scoreboard_state_setup");
-            case IDLE -> "&2" + tr(context, "scoreboard_state_idle");
-            case PRACTICE -> "&2" + tr(context, "scoreboard_state_practice");
-            case QUALIFYING -> "&2" + tr(context, "scoreboard_state_qualifying");
-            case LOADED -> "&2" + tr(context, "scoreboard_state_loaded");
-            case STARTING -> "&2" + tr(context, "scoreboard_state_starting");
-            case RACING -> "&2" + tr(context, "scoreboard_state_racing");
-            case FINISHED -> "&2" + tr(context, "scoreboard_state_finished");
+            case SETUP -> "&x" + tr(context, "scoreboard_state_setup");
+            case IDLE -> "&x" + tr(context, "scoreboard_state_idle");
+            case PRACTICE -> "&x" + tr(context, "scoreboard_state_practice");
+            case QUALIFYING -> "&x" + tr(context, "scoreboard_state_qualifying");
+            case LOADED -> "&x" + tr(context, "scoreboard_state_loaded");
+            case STARTING -> "&x" + tr(context, "scoreboard_state_starting");
+            case RACING -> "&x" + tr(context, "scoreboard_state_racing");
+            case FINISHED -> "&x" + tr(context, "scoreboard_state_finished");
         };
     }
 
     static String formatBestLap(ScoreboardContext context, Driver driver) {
         Lap bestLap = driver == null ? null : driver.getFastestLap();
         if (bestLap == null) {
-            return tr(context, "scoreboard_v2_best_lap", "{time}", "&2--.---");
+            return tr(context, "scoreboard_v2_best_lap", "{time}", "&m--.---");
         }
-        return tr(context, "scoreboard_v2_best_lap", "{time}", "&i" + formatTime(bestLap.getLapTime()));
+        return tr(context, "scoreboard_v2_best_lap", "{time}", "&i" + formatTime(bestLap.getLapTime()));  // &i = info colour
     }
 
     static String heatContext(ScoreboardContext context) {
@@ -140,7 +143,7 @@ final class BuilderSupport {
             eventName = eventName.substring(0, 22);
         }
         String heatName = context.heat().getName();
-        return "&w" + heatName + (eventName.isEmpty() ? "" : " &2/ &2" + eventName);
+        return "&x" + heatName + (eventName.isEmpty() ? "" : " &m/ &x" + eventName);
     }
 
     static String formatTime(long timeMs) {
@@ -170,16 +173,18 @@ final class BuilderSupport {
         String marker = teamMarker(accentMarker, pos);
         boolean showPits = hasRequiredPits(context);
         boolean compact = context.compact();
-        int nameWidth = compact ? 4 : (showPits ? NAME_CONTENT_WIDTH_WITH_PITS : NAME_CONTENT_WIDTH);
-        String pilotName = formatPilotName(name, nameWidth);
+        int namePixelWidth = compact ? COMPACT_NAME_PIXEL_WIDTH : (showPits ? NAME_PIXEL_WIDTH_WITH_PITS : NAME_PIXEL_WIDTH);
+        String pilotName = formatPilotName(name, namePixelWidth);
         String pits = formatPits(context, current);
-        String divider = compact ? " " : " &2| ";
+        String divider = compact ? " " : " &m| ";
 
         return rank + divider + middle + " " + marker + " " + pilotName + pits;
     }
 
-    private static String formatPilotName(String name, int width) {
-        return "&2" + padRight(name, width);
+    private static String formatPilotName(String name, int pixelWidth) {
+        // Truncate name if too long for the allocated space
+        String truncated = MinecraftFontMetrics.truncateToPixels(name, pixelWidth, false);
+        return "&x" + TimingScoreboardStyle.padRightPixels(truncated, pixelWidth);
     }
 
     private static boolean hasRequiredPits(ScoreboardContext context) {
@@ -196,7 +201,7 @@ final class BuilderSupport {
         if (qualifyingMode) {
             if (reference == null || reference.getUuid().equals(current.getUuid())) {
                 Lap best = current.getFastestLap();
-                return best == null ? middleCell("&t", "--.---") : middleCell("&2", formatTime(best.getLapTime()));
+                return best == null ? middleCell("&m", "--.---") : middleCell("&x", formatTime(best.getLapTime()));
             }
             return gapBlock(context, current, reference, true);
         }
@@ -206,9 +211,9 @@ final class BuilderSupport {
                 return middleCell("&s", "DRS");
             }
             if (current.hasDrsPermission()) {
-                return middleCell("&2", "DRS");
+                return middleCell("&x", "DRS");
             }
-            return middleCell("&t", "");
+            return middleCell("&m", "");
         }
 
         return gapBlock(context, current, reference, false);
@@ -219,21 +224,137 @@ final class BuilderSupport {
             Lap currentBest = current.getFastestLap();
             Lap referenceBest = reference.getFastestLap();
             if (currentBest == null || referenceBest == null) {
-                return middleCell("&t", "--");
+                return middleCell("&m", "--");
             }
             long diff = currentBest.getLapTime() - referenceBest.getLapTime();
             return formatSignedGap(diff);
         }
 
-        Long raceDiff = computeRaceGap(current, reference);
+        Long raceDiff = computeRaceGap(current, reference, context);
         if (raceDiff != null) {
             return formatSignedGap(raceDiff);
         }
 
-        return middleCell("&t", "--");
+        return middleCell("&m", "--");
     }
 
-    private static Long computeRaceGap(Driver current, Driver reference) {
+    /**
+     * Compute live race gap between current driver and reference driver.
+     * Uses TimingSystem algorithm with live interpolation for smoother updates.
+     *
+     * Algorithm:
+     * 1. Determine which driver is behind (slower) based on position
+     * 2. Find the most recent common progress point (lap, checkpoint) where both have data
+     * 3. For the slower driver, use "live" elapsed time (System.currentTimeMillis() - startTime)
+     *    instead of the static checkpoint timestamp, creating a continuously updating gap
+     * 4. For finished drivers, use finish times like TimingSystem
+     */
+    private static Long computeRaceGap(Driver current, Driver reference, ScoreboardContext context) {
+        // Same driver - no gap
+        if (current.getUuid().equals(reference.getUuid())) {
+            return 0L;
+        }
+
+        // Check if live gap is enabled in config
+        boolean liveGapEnabled = context.plugin().getConfig().getBoolean("scoreboard.v2.live-gap", true);
+        if (!liveGapEnabled) {
+            return fallbackGapCalculation(current, reference);
+        }
+
+        // Handle finished drivers using finish times (TimingSystem pattern)
+        if (current.isFinished()) {
+            if (reference.getEndTime() == null || current.getEndTime() == null) {
+                return null;
+            }
+            // Time difference between finish times
+            return current.getEndTime() - reference.getEndTime();
+        }
+        if (reference.isFinished()) {
+            if (reference.getEndTime() == null) {
+                return null;
+            }
+            // Current is still racing, reference finished - use "live" time for current
+            // at reference's progress point
+            Long referenceElapsedAtLastCp = getElapsedAtLastCheckpoint(reference);
+            if (referenceElapsedAtLastCp == null) {
+                return null;
+            }
+            Long currentElapsedLive = getLiveElapsedTime(current);
+            if (currentElapsedLive == null) {
+                return null;
+            }
+            // Gap = how much longer current took to reach reference's position
+            return currentElapsedLive - referenceElapsedAtLastCp;
+        }
+
+        // Both racing: use "live" gap calculation
+        // Determine who is behind (slower) - we evaluate at the slower driver's progress
+        Driver slower, faster;
+        boolean currentIsSlower = current.getPosition() > reference.getPosition();
+
+        if (currentIsSlower) {
+            slower = current;
+            faster = reference;
+        } else {
+            slower = reference;
+            faster = current;
+        }
+
+        // Get the most recent common progress point (lap, checkpoint)
+        int[] slowerProgress = slower.getCurrentProgress();
+        int slowerLap = slowerProgress[0];
+        int slowerCp = slowerProgress[1];
+
+        // Get faster driver's elapsed time at slower's progress point
+        Long fasterElapsedAtSlowerProgress = faster.getElapsedAtProgress(slowerLap, slowerCp);
+
+        if (fasterElapsedAtSlowerProgress == null) {
+            // Faster hasn't reached this point yet, use fallback
+            return fallbackGapCalculation(current, reference);
+        }
+
+        // Get slower driver's "live" elapsed time (continuously updating)
+        Long slowerElapsedLive = getLiveElapsedTime(slower);
+        if (slowerElapsedLive == null) {
+            return fallbackGapCalculation(current, reference);
+        }
+
+        // Calculate gap: difference in elapsed times
+        long rawGap = slowerElapsedLive - fasterElapsedAtSlowerProgress;
+
+        // Return with sign based on who is slower
+        return currentIsSlower ? rawGap : -rawGap;
+    }
+
+    /**
+     * Get live elapsed time for a driver (continuously updating even when stationary).
+     * Returns time from heat start to now, or to finish time if finished.
+     */
+    private static Long getLiveElapsedTime(Driver driver) {
+        Long startTime = driver.getStartTime();
+        if (startTime == null) {
+            return null;
+        }
+        if (driver.isFinished() && driver.getEndTime() != null) {
+            return driver.getEndTime() - startTime;
+        }
+        return System.currentTimeMillis() - startTime;
+    }
+
+    /**
+     * Get elapsed time at the driver's last crossed checkpoint.
+     */
+    private static Long getElapsedAtLastCheckpoint(Driver driver) {
+        int[] progress = driver.getCurrentProgress();
+        return driver.getElapsedAtProgress(progress[0], progress[1]);
+    }
+
+    /**
+     * Fallback gap calculation when live method doesn't have enough data.
+     * Uses the old checkpoint-based approach as a safety net.
+     */
+    private static Long fallbackGapCalculation(Driver current, Driver reference) {
+        // Try to find any common checkpoint
         int maxComparableLap = Math.min(latestComparableLap(current), latestComparableLap(reference));
         if (maxComparableLap < 0) {
             return null;
@@ -245,14 +366,15 @@ final class BuilderSupport {
             int maxCommonCp = Math.min(maxCpCurrent, maxCpReference);
 
             for (int cp = maxCommonCp; cp >= 0; cp--) {
-                Long currentAt = current.getAbsoluteTimeAtProgress(lap, cp);
-                Long referenceAt = reference.getAbsoluteTimeAtProgress(lap, cp);
+                Long currentAt = current.getElapsedAtProgress(lap, cp);
+                Long referenceAt = reference.getElapsedAtProgress(lap, cp);
                 if (currentAt != null && referenceAt != null) {
                     return currentAt - referenceAt;
                 }
             }
         }
 
+        // Final fallback: use time at last checkpoint
         long currentProgressMs = current.getTimeAtLastCheckpoint();
         long referenceProgressMs = reference.getTimeAtLastCheckpoint();
         if (currentProgressMs > 0L && referenceProgressMs > 0L) {
@@ -273,7 +395,9 @@ final class BuilderSupport {
     }
 
     private static String middleCell(String color, String content) {
-        return " " + color + padRight(content, MIDDLE_CONTENT_WIDTH);
+        // Pad to pixel width for consistent alignment
+        String padded = TimingScoreboardStyle.padRightPixels(content, MIDDLE_PIXEL_WIDTH);
+        return " " + color + padded;
     }
 
     private static int latestComparableLap(Driver driver) {
@@ -306,13 +430,13 @@ final class BuilderSupport {
 
     private static String statusBlock(ScoreboardContext context, Driver driver, Player player) {
         if (driver.isDnf()) {
-            return middleCell("&2", tr(context, "scoreboard_status_dnf_short"));
+            return middleCell("&m", tr(context, "scoreboard_status_dnf_short"));
         }
         if (player == null || !player.isOnline()) {
-            return middleCell("&2", tr(context, "scoreboard_status_offline"));
+            return middleCell("&m", tr(context, "scoreboard_status_offline"));
         }
         if (context.plugin().getPitStopManager() != null && context.plugin().getPitStopManager().isPlayerInPitRegion(driver.getUuid())) {
-            return middleCell("&2", tr(context, "scoreboard_status_in_pit"));
+            return middleCell("&m", tr(context, "scoreboard_status_in_pit"));
         }
         return "";
     }
@@ -341,7 +465,7 @@ final class BuilderSupport {
         }
         int pits = driver.getPitstops();
 
-        String pitsColor = "&2";
+        String pitsColor = "&x";
         if (pits >= requiredPits) {
             pitsColor = "&s";
         } else if (pits > 0) {
@@ -350,7 +474,7 @@ final class BuilderSupport {
             pitsColor = "&e";
         }
 
-        return " &tP: " + pitsColor + pits;
+        return " &mP: " + pitsColor + pits;
     }
 
     static String scoreboardTitle(ScoreboardContext context, String baseKey) {
@@ -368,9 +492,9 @@ final class BuilderSupport {
         }
 
         if (eventName.isEmpty()) {
-            return base + " &t| &2" + heatName;
+            return base + " &m| &x" + heatName;
         }
-        return base + " &t| &2" + heatName + " &t| &2" + eventName;
+        return base + " &m| &x" + heatName + " &m| &x" + eventName;
     }
 
     private static String normalizeEventName(String rawName) {

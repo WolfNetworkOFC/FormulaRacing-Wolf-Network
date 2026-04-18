@@ -301,7 +301,6 @@ public class Driver {
     public void setBestLapCheckpointTimes(Map<Integer, Long> bestLapCheckpointTimes) {
         this.bestLapCheckpointTimes = bestLapCheckpointTimes;
     }
-
     public int getLapCount() {
         return this.laps.size();
     }
@@ -320,6 +319,36 @@ public class Driver {
         } else {
             return lapIndex == this.laps.size() && this.currentLap != null ? this.currentLap.getCheckpointTime(cpId) : null;
         }
+    }
+
+    /**
+     * Get elapsed time (from heat start) at a specific progress point (lap, checkpoint).
+     * Used for live gap calculation where the "slower" driver's time can be substituted
+     * with System.currentTimeMillis() - heatStartTime to create a "live" gap.
+     *
+     * @param lapIndex the lap index (0-based for completed laps, laps.size() for current lap)
+     * @param cpId checkpoint ID (0 = start of lap)
+     * @return elapsed time in ms, or null if not available
+     */
+    public Long getElapsedAtProgress(int lapIndex, int cpId) {
+        Long absoluteTime = getAbsoluteTimeAtProgress(lapIndex, cpId);
+        if (absoluteTime == null || this.startTime == null) {
+            return null;
+        }
+        return absoluteTime - this.startTime;
+    }
+
+    /**
+     * Get the driver's current progress as (lap, checkpoint) tuple.
+     * @return int array where [0] = lap index, [1] = checkpoint ID
+     */
+    public int[] getCurrentProgress() {
+        int lapIndex = this.laps.size();
+        int checkpoint = 0;
+        if (this.currentLap != null) {
+            checkpoint = this.checkpointsReached;
+        }
+        return new int[]{lapIndex, checkpoint};
     }
 
     public long getTimeAtLastCheckpoint() {

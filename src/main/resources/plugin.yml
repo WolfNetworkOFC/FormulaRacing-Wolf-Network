@@ -78,7 +78,7 @@ commands:
     usage: /duel
   event:
     description: Gerenciamento de Eventos de Corrida (Event)
-    usage: /event <list|info|create|delete|start|finish|sign|reserve|spectate|quit|settrack>
+    usage: /event <list|info|create|delete|finish|sign|reserve|spectate|quit|settrack>
   round:
     description: Gerenciamento de Rodadas (Round)
     usage: /round <list|create|delete|info>

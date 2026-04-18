@@ -47,6 +47,9 @@ scoreboard:
     interval: 500ms
     dynamic-interval: 200ms
     static-interval: 500ms
+    # Live gap continuously updates even when a driver is stationary (F1 TV style)
+    # When false, uses static checkpoint-based gaps only
+    live-gap: true
     metrics-log-enabled: false
     metrics-log-interval-seconds: 30
 
@@ -230,33 +233,11 @@ podium:
 # =========================================================#
 #                         THEME                            #
 # =========================================================#
-# Default theme colors for new players and config fallbacks.
-# Per-player colors are stored in the database and override these defaults.
+# Default server-wide accent colours (used for players who have not set a
+# personal colour, and for console/non-player senders).
+# Only 'primary' and 'accent' are applied — all body text / success / warning /
+# error / info / award / broadcast colours are fixed semantic constants in code
+# and are not overridable here (they are always legible on a dark background).
 theme:
-  primary: "#7bf200"
-  secondary: "#FFFFFF"
-  success: "#55FF55"
-  warning: "#FFFF55"
-  error: "#FF7A75"
-  broadcast: "#55FFFF"
-  award: "#FFD700"
-  title: "#555555"
-  info: "#CC99FF"
-  accent: "#00CC99"
-
-# =========================================================#
-#                         THEME                            #
-# =========================================================#
-# Default theme colors for new players and config fallbacks.
-# Per-player colors are stored in the database and override these defaults.
-theme:
-  primary: "#7bf200"
-  secondary: "#FFFFFF"
-  success: "#55FF55"
-  warning: "#FFFF55"
-  error: "#FF7A75"
-  broadcast: "#55FFFF"
-  award: "#FFD700"
-  title: "#555555"
-  info: "#CC99FF"
-  accent: "#00CC99"
+  primary: "#7bf200"   # server default colour-1 (player brand / highlight)
+  accent:  "#00CC99"   # server default colour-2 (secondary highlight)

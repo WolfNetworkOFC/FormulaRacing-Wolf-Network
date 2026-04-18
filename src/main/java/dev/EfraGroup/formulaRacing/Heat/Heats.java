@@ -6,6 +6,9 @@
 package dev.EfraGroup.formulaRacing.Heat;
 
 import dev.EfraGroup.formulaRacing.Event.EventAnnouncements;
+import dev.EfraGroup.formulaRacing.Event.EventState;
+import dev.EfraGroup.formulaRacing.Event.Events;
+import dev.EfraGroup.formulaRacing.Round.RoundState;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.Logic.PracticeSession;
 import dev.EfraGroup.formulaRacing.Heat.Logic.QualifyingSession;
@@ -541,6 +544,15 @@ public class Heats {
     }
 
     public boolean startCountdown(int seconds) {
+        if (this.round != null) {
+            if (this.round.getRoundState() == RoundState.SETUP) {
+                this.round.setRoundState(RoundState.RUNNING);
+            }
+            Events ev = this.round.getEvent();
+            if (ev != null && ev.getState() == EventState.SETUP) {
+                ev.ensureRunning(this.round);
+            }
+        }
         DebugManager var10000 = this.plugin.getDebugManager();
         int var10001 = this.id;
         var10000.logRaceSystem(
@@ -618,6 +630,15 @@ public class Heats {
     }
 
     public void startPractice() {
+        if (this.round != null) {
+            if (this.round.getRoundState() == RoundState.SETUP) {
+                this.round.setRoundState(RoundState.RUNNING);
+            }
+            Events ev = this.round.getEvent();
+            if (ev != null && ev.getState() == EventState.SETUP) {
+                ev.ensureRunning(this.round);
+            }
+        }
         (new PracticeSession()).start(this);
     }
 

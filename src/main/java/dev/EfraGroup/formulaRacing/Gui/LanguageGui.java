@@ -27,6 +27,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
 
 public class LanguageGui extends BaseGui {
+    private final FormulaRacing plugin;
     private final DatabaseManager db;
     private final Player player;
     private static final Map<UUID, Long> clickCooldown = new HashMap();
@@ -58,6 +59,7 @@ public class LanguageGui extends BaseGui {
 
     public LanguageGui(FormulaRacing plugin, Player player) {
         super(plugin.getTranslation("lang_menu_title", plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId()), new String[0]), 3);
+        this.plugin = plugin;
         this.db = plugin.getDatabaseManager();
         this.player = player;
         this.setupContent();

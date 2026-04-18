@@ -256,8 +256,9 @@ public class RaceActionBarManager {
         if (message.equals(previous)) {
             return;
         }
-        String themedString = buildThemedActionBar(player, message);
-        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(themedString));
+        String themedLegacy = buildThemedActionBar(player, message);
+        player.spigot().sendMessage(ChatMessageType.ACTION_BAR,
+                TextComponent.fromLegacyText(themedLegacy));
         this.lastActionBarMessage.put(player.getUniqueId(), message);
     }
 
@@ -294,13 +295,13 @@ public class RaceActionBarManager {
 
         int currentLap = driver.getLapCount() + 1;
         if (sb.length() > 0) {
-            sb.append(" &t| ");
+            sb.append(" &m| ");
         }
         sb.append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_practice_lap", "{lap}", String.valueOf(currentLap)));
 
         if (driver.getCurrentLap() != null) {
             long lapElapsed = System.currentTimeMillis() - driver.getCurrentLap().getStartTime();
-            sb.append(" &t| &w⏱ ").append(this.formatLapTime(lapElapsed));
+            sb.append(" &m| &w⏱ ").append(this.formatLapTime(lapElapsed));
             String delta = driver.getCachedDelta();
             if (delta != null && !delta.isEmpty()) {
                 sb.append(delta);
@@ -318,15 +319,15 @@ public class RaceActionBarManager {
             sb.append("&e⏱ ").append(this.formatTimeShort(remaining));
         }
         if (sb.length() > 0) {
-            sb.append(" &t| ");
+            sb.append(" &m| ");
         }
         sb.append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_qualifying_pos", "{pos}", String.valueOf(driver.getPosition())));
         int currentLap = driver.getLapCount() + 1;
-        sb.append(" &t| ").append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_practice_lap", "{lap}", String.valueOf(currentLap)));
+        sb.append(" &m| ").append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_practice_lap", "{lap}", String.valueOf(currentLap)));
 
         if (driver.getCurrentLap() != null) {
             long lapElapsed = System.currentTimeMillis() - driver.getCurrentLap().getStartTime();
-            sb.append(" &t| &w⏱ ").append(this.formatLapTime(lapElapsed));
+            sb.append(" &m| &w⏱ ").append(this.formatLapTime(lapElapsed));
             String delta = driver.getCachedDelta();
             if (delta != null && !delta.isEmpty()) {
                 sb.append(delta);
@@ -361,7 +362,7 @@ public class RaceActionBarManager {
 
         int totalLaps = heat.getTotalLaps();
         int currentLap = driver.getCurrentLap() == null ? 0 : Math.min(totalLaps, driver.getLapCount() + 1);
-        sb.append(" &t| ").append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_practice_lap", "{lap}", currentLap + "&2&2/" + "&2" + totalLaps));
+        sb.append(" &m| ").append(this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_practice_lap", "{lap}", currentLap + "&m/" + "&x" + totalLaps));
 
         int totalCheckpoints = this.getTrackCheckpointCount(heat.getTrackNameWS());
         double lapsCompleted = driver.getLapCount();
@@ -381,7 +382,7 @@ public class RaceActionBarManager {
 
         if (driver.getCurrentLap() != null) {
             long lapElapsed = System.currentTimeMillis() - driver.getCurrentLap().getStartTime();
-            sb.append(" &t| &w⏱ ").append(this.formatLapTime(lapElapsed));
+            sb.append(" &m| &w⏱ ").append(this.formatLapTime(lapElapsed));
             String delta = driver.getCachedDelta();
                 if (delta != null && !delta.isEmpty()) {
                     sb.append(delta);
@@ -401,7 +402,7 @@ public class RaceActionBarManager {
         if (heat.getStartTime() != null) {
             elapsed = System.currentTimeMillis() - heat.getStartTime().toEpochMilli();
         }
-        sb.append(" &t| &2").append(this.formatRaceElapsed(elapsed));
+        sb.append(" &m| &x").append(this.formatRaceElapsed(elapsed));
         return sb.toString();
     }
 
@@ -409,7 +410,7 @@ public class RaceActionBarManager {
         if (driver.isFinished()) {
             String posColor = this.getPositionColor(driver.getPosition());
             return String.format(
-                    this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_finished_title", new String[0]) + "%sP%d &t| &2%s",
+                    this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_finished_title", new String[0]) + "%sP%d &m| &x%s",
                     posColor,
                     driver.getPosition(),
                     this.formatTimeShort(driver.getTotalTime())
@@ -424,9 +425,9 @@ public class RaceActionBarManager {
     private String getPositionColor(int position) {
         return switch (position) {
             case 1 -> "&v";
-            case 2 -> "&2";
-            case 3 -> "&e";
-            default -> "&2";
+            case 2 -> "&x";
+            case 3 -> "&w";
+            default -> "&m";
         };
     }
 

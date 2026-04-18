@@ -54,29 +54,32 @@ public class FRThemeParser {
                 continue;
             }
 
-            String option = part.substring(0, 1);
+            char code = part.charAt(0);
             String content = part.length() > 1 ? part.substring(1) : "";
 
-            switch (option) {
-                case "1" -> color = theme.getPrimary();
-                case "2" -> color = theme.getSecondary();
-                case "s" -> color = theme.getSuccess();
-                case "w" -> color = theme.getWarning();
-                case "e" -> color = theme.getError();
-                case "b" -> color = theme.getBroadcast();
-                case "v" -> color = theme.getAward();
-                case "t" -> color = theme.getTitle();
-                case "i" -> color = theme.getInfo();
-                case "n" -> color = theme.getAccent();
-                case "l" -> decorations.add(TextDecoration.BOLD);
-                case "o" -> decorations.add(TextDecoration.ITALIC);
-                case "r" -> {
-                    decorations.clear();
-                    color = NamedTextColor.WHITE;
-                }
-                default -> {
-                    color = NamedTextColor.WHITE;
-                    content = "&" + part;
+            TextColor themeColor = getThemeColor(Character.toLowerCase(code), theme);
+            if (themeColor != null) {
+                color = themeColor;
+                decorations.clear();
+            } else {
+                switch (Character.toLowerCase(code)) {
+                    case 'l' -> decorations.add(TextDecoration.BOLD);
+                    case 'o' -> decorations.add(TextDecoration.ITALIC);
+                    case 'u' -> decorations.add(TextDecoration.UNDERLINED);
+                    case 'r' -> {
+                        decorations.clear();
+                        color = NamedTextColor.WHITE;
+                    }
+                    default -> {
+                        NamedTextColor mc = LEGACY_COLORS.get(Character.toLowerCase(code));
+                        if (mc != null) {
+                            color = mc;
+                            decorations.clear();
+                        } else {
+                            color = NamedTextColor.WHITE;
+                            content = "&" + part;
+                        }
+                    }
                 }
             }
 
@@ -207,16 +210,23 @@ public class FRThemeParser {
 
     private static TextColor getThemeColor(char code, FRTheme theme) {
         return switch (code) {
-            case '1' -> theme.getPrimary();
-            case '2' -> theme.getSecondary();
-            case 's' -> theme.getSuccess();
-            case 'w' -> theme.getWarning();
-            case 'e' -> theme.getError();
-            case 'b' -> theme.getBroadcast();
-            case 'v' -> theme.getAward();
-            case 't' -> theme.getTitle();
-            case 'i' -> theme.getInfo();
-            case 'n' -> theme.getAccent();
+            // ── New semantic tokens ─────────────────────────────────────────
+            case 'p' -> theme.getPrimary();    // &p  primary / brand (player colour 1)
+            case 'a' -> theme.getAccent();     // &a  accent (player colour 2)
+            case 'h' -> theme.getHeadline();   // &h  headline / scoreboard title
+            case 'x' -> theme.getText();       // &x  body text
+            case 'm' -> theme.getMuted();      // &m  muted / labels / separators
+            case 's' -> theme.getSuccess();    // &s  success / positive
+            case 'w' -> theme.getWarning();    // &w  warning / attention
+            case 'e' -> theme.getError();      // &e  error / negative  (NOT legacy §e=yellow)
+            case 'i' -> theme.getInfo();       // &i  info / neutral
+            case 'v' -> theme.getAward();      // &v  award / podium / gold
+            case 'b' -> theme.getBroadcast();  // &b  broadcast announcement  (NOT legacy §b=aqua)
+            // ── Legacy aliases (kept for backwards compat) ──────────────────
+            case '1' -> theme.getPrimary();    // &1  was "primary"
+            case '2' -> theme.getText();       // &2  was "secondary/white" → now body text
+            case 'n' -> theme.getAccent();     // &n  was "accent"
+            case 't' -> theme.getMuted();      // &t  was "title/dark-gray" → now muted
             default -> null;
         };
     }
