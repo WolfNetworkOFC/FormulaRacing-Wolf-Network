@@ -66,7 +66,6 @@ public class TrackLeaderboard { // Removido o 'abstract'
             });
         });
     }
-
     private void processAndShow(List<DatabaseManager.PlayerTime> leaderboard, String type) {
         int totalCheckpoints = this.mySQLManager.getCheckpointCount(this.trackName);
 
@@ -80,13 +79,10 @@ public class TrackLeaderboard { // Removido o 'abstract'
         String configPath = "leaderboards.fastesttime-" + type + ".lines";
         List<String> configLines = this.plugin.getConfig().getStringList(configPath);
 
-        // --- INÍCIO DO DEBUG ---
-        this.plugin.getLogger().info("[LB-DEBUG] Montando placar tipo: " + type + " para a pista: " + this.trackName);
-        this.plugin.getLogger().info("[LB-DEBUG] Lendo path da config: " + configPath);
-        this.plugin.getLogger().info("[LB-DEBUG] Linhas encontradas na config: " + configLines.size());
+        // --- DEBUG ---
+        this.plugin.getLogger().info("[LB-DEBUG] Atualizando: " + type + " | Pista: " + this.trackName);
 
         if (configLines.isEmpty()) {
-            this.plugin.getLogger().warning("[LB-DEBUG] AVISO: A config retornou 0 linhas! Usando fallback gerado no código.");
             configLines = new ArrayList<>();
             configLines.add("&6&lLeaderboard &e" + this.trackName);
             configLines.add("&7Nenhum tempo registrado");
@@ -95,52 +91,59 @@ public class TrackLeaderboard { // Removido o 'abstract'
         List<String> finalLines = new ArrayList<>();
 
         for (String configLine : configLines) {
-            // Substitui o mapname e traduz as cores do Bukkit de forma segura
-            String line = ChatColor.translateAlternateColorCodes('&', configLine.replace("{mapname}", this.trackName));
+            // 1. Substitui o nome do mapa
+            String processedLine = configLine.replace("{mapname}", this.trackName);
 
-            for (int j = 1; j <= 10; ++j) {
-                String nameKey = "{name" + j + "}";
-                String timeKey = "{time" + j + "}";
+            // 2. CONVERSÃO DE ÍCONES: Troca $java$ por :java: e $bedrock$ por :bedrock:
+            // Isso permite que o DH entenda os itens/emojis
+            processedLine = processedLine.replace("$java$", ":java:").replace("$bedrock$", ":bedrock:");
 
-                if (top10.size() >= j) {
-                    DatabaseManager.PlayerTime p = top10.get(j - 1);
-                    boolean hasFinished = (totalCheckpoints > 0 && p.getCheckpointsReached() >= totalCheckpoints) || p.isFinished();
+            // 3. Traduz cores do Bukkit (& para §)
+            String line = ChatColor.translateAlternateColorCodes('&', processedLine);
 
-                    String displayTime = hasFinished
-                            ? "§e" + this.formatTime(p.getTime())
-                            : "§7" + p.getCheckpointsReached() + "CP §e(" + this.formatTime(p.getTime()) + ")";
+            // 4. TRAVA DE SEGURANÇA: Só processa jogadores em linhas que contém placeholders de nome
+            if (line.contains("{name")) {
+                for (int j = 1; j <= 10; ++j) {
+                    String nameKey = "{name" + j + "}";
+                    String timeKey = "{time" + j + "}";
 
-                    line = line.replace(nameKey, p.getPlayerName()).replace(timeKey, displayTime);
-                } else {
-                    line = line.replace(nameKey, "----").replace(timeKey, "----");
+                    if (top10.size() >= j) {
+                        DatabaseManager.PlayerTime p = top10.get(j - 1);
+                        boolean hasFinished = (totalCheckpoints > 0 && p.getCheckpointsReached() >= totalCheckpoints) || p.isFinished();
+
+                        String displayTime = hasFinished
+                                ? "§e" + this.formatTime(p.getTime())
+                                : "§7" + p.getCheckpointsReached() + "CP §e(" + this.formatTime(p.getTime()) + ")";
+
+                        line = line.replace(nameKey, p.getPlayerName()).replace(timeKey, displayTime);
+                    } else {
+                        line = line.replace(nameKey, "----").replace(timeKey, "----");
+                    }
                 }
             }
             finalLines.add(line);
         }
 
-        // Verifica a primeira linha processada no console
-        this.plugin.getLogger().info("[LB-DEBUG] Linha 1 processada (Título): " + finalLines.get(0));
+        // Debug para ver se o título converteu o $ corretamente
+        this.plugin.getLogger().info("[LB-DEBUG] Linha 1 Final: " + finalLines.get(0));
 
         Bukkit.getScheduler().runTask(this.plugin, () -> {
             try {
-                // Remove qualquer caractere que o DecentHolograms não aceite no nome
                 String safeTrackName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
                 String holoName = "lb_" + type + "_" + safeTrackName;
 
-                double xOffset = type.equals("bedrock") ? 3.0 : 0.0;
+                double xOffset = type.equals("bedrock") ? 4.0 : 0.0;
                 Location holoLoc = this.location.clone().add(xOffset, 0.5, 0.0);
 
                 Hologram holo = holograms.get(type);
                 if (holo == null) {
-                    this.plugin.getLogger().info("[LB-DEBUG] Criando novo holograma: " + holoName);
                     holo = DHAPI.createHologram(holoName, holoLoc, false, finalLines);
                     holograms.put(type, holo);
                 } else {
                     DHAPI.setHologramLines(holo, finalLines);
                 }
             } catch (Exception e) {
-                this.plugin.getLogger().severe("[LB-DEBUG] ERRO ao criar/atualizar holograma no DHAPI!");
-                e.printStackTrace();
+                this.plugin.getLogger().severe("[LB-DEBUG] Erro no DHAPI: " + e.getMessage());
             }
         });
     }
