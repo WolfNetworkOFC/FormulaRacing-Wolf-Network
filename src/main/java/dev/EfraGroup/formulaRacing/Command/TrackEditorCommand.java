@@ -1401,38 +1401,35 @@ public class TrackEditorCommand extends BaseCommand {
     @Description("Teleporta o holograma do leaderboard Java")
     @CommandCompletion("@tracks @nothing")
     public void onLocationLeaderboardJava(Player player, String trackName, @Optional Double x, @Optional Double y, @Optional Double z) {
-        Location targetLocation;
-        if (x != null && y != null && z != null) {
-            targetLocation = new Location(player.getWorld(), x, y + 3.0, z);
-        } else {
-            targetLocation = player.getLocation();
-        }
+        Location targetLocation = (x != null && y != null && z != null)
+                ? new Location(player.getWorld(), x, y + 1.5, z)
+                : player.getLocation();
 
-        TrackLeaderboard leaderboard = this.plugin.getOrCreateJavaLeaderboard(trackName, targetLocation);
+        // Usa o método unificado que retorna a instância única da pista
+        TrackLeaderboard leaderboard = this.plugin.getOrCreateLeaderboard(trackName, targetLocation);
+
         leaderboard.setLocation(targetLocation);
-        leaderboard.updateJavaLeaderboard();
-        player.sendMessage("§aHolograma JAVA da pista §e" + trackName + " §ateleportado para " +
-                String.format("X: %.2f Y: %.2f Z: %.2f", targetLocation.getX(), targetLocation.getY(), targetLocation.getZ()));
+        leaderboard.updateJavaLeaderboard(); // Atualiza especificamente o lado Java
+
+        player.sendMessage("§aHolograma JAVA da pista §e" + trackName + " §ateleportado!");
     }
 
     @Subcommand("location leaderboard bedrock")
     @Description("Teleporta o holograma do leaderboard Bedrock")
     @CommandCompletion("@tracks @nothing")
     public void onLocationLeaderboardBedrock(Player player, String trackName, @Optional Double x, @Optional Double y, @Optional Double z) {
-        Location targetLocation;
-        if (x != null && y != null && z != null) {
-            targetLocation = new Location(player.getWorld(), x, y + 3.0, z);
-        } else {
-            targetLocation = player.getLocation();
-        }
+        Location targetLocation = (x != null && y != null && z != null)
+                ? new Location(player.getWorld(), x, y + 1.5, z)
+                : player.getLocation();
 
-        TrackLeaderboard leaderboard = this.plugin.getOrCreateBedrockLeaderboard(trackName, targetLocation);
+        // Usa a MESMA instância que o Java usaria
+        TrackLeaderboard leaderboard = this.plugin.getOrCreateLeaderboard(trackName, targetLocation);
+
         leaderboard.setLocation(targetLocation);
-        leaderboard.updateBedrockLeaderboard();
-        player.sendMessage("§aHolograma BEDROCK da pista §e" + trackName + " §ateleportado para " +
-                String.format("X: %.2f Y: %.2f Z: %.2f", targetLocation.getX(), targetLocation.getY(), targetLocation.getZ()));
-    }
+        leaderboard.updateBedrockLeaderboard(); // Atualiza especificamente o lado Bedrock
 
+        player.sendMessage("§aHolograma BEDROCK da pista §e" + trackName + " §ateleportado!");
+    }
     @Subcommand("location startline")
     @Description("Define a linha de largada")
     public void onLocationStartLine(Player player) {

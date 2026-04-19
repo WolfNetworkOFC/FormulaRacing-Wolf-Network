@@ -690,73 +690,56 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         );
     }
 
-    // Dentro da sua classe principal FormulaRacing (ou a classe que extende JavaPlugin)
-    private final Map<String, TrackLeaderboard> javaLeaderboards = new HashMap<>();
-    private final Map<String, TrackLeaderboard> bedrockLeaderboards = new HashMap<>();
+    // Agora você só precisa de UM mapa, pois a classe gerencia ambos (Java e Bedrock)
+    private final Map<String, TrackLeaderboard> trackLeaderboards = new HashMap<>();
 
-    public TrackLeaderboard getOrCreateJavaLeaderboard(String trackName, Location defaultLocation) {
-        return javaLeaderboards.computeIfAbsent(trackName, name ->
-                new TrackLeaderboard(this, name, defaultLocation, this.getDatabaseManager()) {
-                    @Override
-                    public void updateLeaderboard() {
-                        this.updateJavaLeaderboard(); // chama o método específico
-                    }
-                }
-        );
-    }
-
-    public TrackLeaderboard getOrCreateBedrockLeaderboard(String trackName, Location defaultLocation) {
-        return bedrockLeaderboards.computeIfAbsent(trackName, name ->
-                new TrackLeaderboard(this, name, defaultLocation, this.getDatabaseManager()) {
-                    @Override
-                    public void updateLeaderboard() {
-                        this.updateBedrockLeaderboard(); // chama o método específico
-                    }
-                }
-        );
+    public TrackLeaderboard getOrCreateLeaderboard(String trackName, Location defaultLocation) {
+        return trackLeaderboards.computeIfAbsent(trackName, name -> {
+            TrackLeaderboard lb = new TrackLeaderboard(this, name, defaultLocation, this.getDatabaseManager());
+            // Inicia o updater automático assim que a pista é carregada
+            lb.startAutoUpdate();
+            return lb;
+        });
     }
 
     private void loadLeaderboards() {
         if (this.debugManager != null) {
-            this.debugManager.logDatabaseOperations(
-                    "[FormulaRacing] Carregando leaderboards..."
-            );
+            this.debugManager.logDatabaseOperations("[FormulaRacing] Carregando leaderboards...");
         }
 
         try {
             List<String> tracks = this.dm.getAllTracks();
-            if (this.debugManager != null) {
-                this.debugManager.logDatabaseOperations(
-                        "[FormulaRacing] Encontradas " + tracks.size() + " pistas no banco"
-                );
-            }
 
             for (String trackName : tracks) {
                 Location savedLoc = this.dm.getHologramLocation(trackName);
-                if (savedLoc != null) {
-                    // Cria/atualiza holograma Java
-                    TrackLeaderboard javaLeaderboard = this.getOrCreateJavaLeaderboard(trackName, savedLoc);
-                    javaLeaderboard.setLocation(savedLoc);
-                    javaLeaderboard.updateJavaLeaderboard();
 
-                    // Cria/atualiza holograma Bedrock
-                    TrackLeaderboard bedrockLeaderboard = this.getOrCreateBedrockLeaderboard(trackName, savedLoc);
-                    bedrockLeaderboard.setLocation(savedLoc);
-                    bedrockLeaderboard.updateBedrockLeaderboard();
+                if (savedLoc != null) {
+                    // USAR APENAS UMA INSTÂNCIA:
+                    // O método getOrCreateLeaderboard (singular) deve retornar a instância única
+                    TrackLeaderboard leaderboard = this.getOrCreateLeaderboard(trackName, savedLoc);
+
+                    // Seta a localização uma única vez para a pista
+                    leaderboard.setLocation(savedLoc);
+
+                    // Chama os updates específicos dentro da mesma instância
+                    leaderboard.updateJavaLeaderboard();
+                    leaderboard.updateBedrockLeaderboard();
+
+                    if (this.debugManager != null) {
+                        this.debugManager.logDatabaseOperations("[FormulaRacing] Leaderboards (Java/Bedrock) carregados para: " + trackName);
+                    }
 
                 } else if (this.debugManager != null) {
                     this.debugManager.logDatabaseOperations(
-                            "[FormulaRacing] ⚠️ Pista '" + trackName +
-                                    "' não tem localização de holograma definida (use /trackedit sethologram)"
+                            "[FormulaRacing] ⚠️ Pista '" + trackName + "' sem localização definida."
                     );
                 }
             }
         } catch (Exception e) {
             if (this.debugManager != null) {
-                this.debugManager.logRaceSystem(
-                        "[FormulaRacing] Erro ao carregar leaderboards: " + e.getMessage()
-                );
+                this.debugManager.logRaceSystem("[FormulaRacing] Erro ao carregar leaderboards: " + e.getMessage());
             }
+            e.printStackTrace();
         }
     }
 

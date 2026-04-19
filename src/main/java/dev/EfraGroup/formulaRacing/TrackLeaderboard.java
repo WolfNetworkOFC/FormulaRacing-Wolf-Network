@@ -9,17 +9,17 @@ import java.util.List;
 import java.util.Map;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public abstract class TrackLeaderboard {
+public class TrackLeaderboard { // Removido o 'abstract'
     private final String trackName;
     private Location location;
     private final DatabaseManager mySQLManager;
     private final JavaPlugin plugin;
     private int taskId = -1;
 
-    // Armazena os hologramas separadamente para Java e Bedrock
     private final Map<String, Hologram> holograms = new HashMap<>();
 
     public TrackLeaderboard(JavaPlugin plugin, String trackName, Location defaultLocation, DatabaseManager mySQLManager) {
@@ -56,14 +56,10 @@ public abstract class TrackLeaderboard {
 
     public void setLocation(Location newLocation) {
         this.location = newLocation;
-
-        // Salva a nova localização no Banco de Dados
         this.mySQLManager.saveHologramLocation(this.trackName, newLocation);
 
-        // Atualiza a posição de todos os hologramas ativos (Java e Bedrock)
         Bukkit.getScheduler().runTask(this.plugin, () -> {
             holograms.forEach((type, holo) -> {
-                // Mantém o offset de 3 blocos para o Bedrock se for o caso
                 double xOffset = type.equals("bedrock") ? 3.0 : 0.0;
                 Location holoLoc = newLocation.clone().add(xOffset, 0.5, 0.0);
                 holo.setLocation(holoLoc);
@@ -81,23 +77,27 @@ public abstract class TrackLeaderboard {
                 .limit(10)
                 .toList();
 
-        // Puxa as linhas da config
-        List<String> configLines = this.plugin.getConfig().getStringList("leaderboards.fastesttime-" + type + ".lines");
+        String configPath = "leaderboards.fastesttime-" + type + ".lines";
+        List<String> configLines = this.plugin.getConfig().getStringList(configPath);
 
-        // Se a config falhar, tenta um fallback básico para não ficar vazio
+        // --- INÍCIO DO DEBUG ---
+        this.plugin.getLogger().info("[LB-DEBUG] Montando placar tipo: " + type + " para a pista: " + this.trackName);
+        this.plugin.getLogger().info("[LB-DEBUG] Lendo path da config: " + configPath);
+        this.plugin.getLogger().info("[LB-DEBUG] Linhas encontradas na config: " + configLines.size());
+
         if (configLines.isEmpty()) {
+            this.plugin.getLogger().warning("[LB-DEBUG] AVISO: A config retornou 0 linhas! Usando fallback gerado no código.");
             configLines = new ArrayList<>();
-            configLines.add("§6§lLeaderboard §e" + this.trackName);
-            configLines.add("§7Nenhum tempo registrado");
+            configLines.add("&6&lLeaderboard &e" + this.trackName);
+            configLines.add("&7Nenhum tempo registrado");
         }
 
         List<String> finalLines = new ArrayList<>();
 
         for (String configLine : configLines) {
-            // CORREÇÃO: Traduz as cores primeiro e aplica o nome do mapa
-            String line = configLine.replace("&", "§").replace("{mapname}", this.trackName);
+            // Substitui o mapname e traduz as cores do Bukkit de forma segura
+            String line = ChatColor.translateAlternateColorCodes('&', configLine.replace("{mapname}", this.trackName));
 
-            // Substitui os placeholders de 1 a 10
             for (int j = 1; j <= 10; ++j) {
                 String nameKey = "{name" + j + "}";
                 String timeKey = "{time" + j + "}";
@@ -112,28 +112,35 @@ public abstract class TrackLeaderboard {
 
                     line = line.replace(nameKey, p.getPlayerName()).replace(timeKey, displayTime);
                 } else {
-                    // Se não tiver jogador, limpa as chaves
                     line = line.replace(nameKey, "----").replace(timeKey, "----");
                 }
             }
             finalLines.add(line);
         }
 
-        // Task Síncrona para o DecentHolograms
+        // Verifica a primeira linha processada no console
+        this.plugin.getLogger().info("[LB-DEBUG] Linha 1 processada (Título): " + finalLines.get(0));
+
         Bukkit.getScheduler().runTask(this.plugin, () -> {
-            String holoName = "lb_" + type + "_" + this.trackName.toLowerCase().replace(" ", "_");
+            try {
+                // Remove qualquer caractere que o DecentHolograms não aceite no nome
+                String safeTrackName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
+                String holoName = "lb_" + type + "_" + safeTrackName;
 
-            double xOffset = type.equals("bedrock") ? 3.0 : 0.0;
-            Location holoLoc = this.location.clone().add(xOffset, 0.5, 0.0);
+                double xOffset = type.equals("bedrock") ? 3.0 : 0.0;
+                Location holoLoc = this.location.clone().add(xOffset, 0.5, 0.0);
 
-            Hologram holo = holograms.get(type);
-            if (holo == null) {
-                // Cria o holograma e força a exibição
-                holo = DHAPI.createHologram(holoName, holoLoc, false, finalLines);
-                holograms.put(type, holo);
-            } else {
-                // REFRESH TOTAL: Remove as linhas e coloca as novas para forçar o título
-                DHAPI.setHologramLines(holo, finalLines);
+                Hologram holo = holograms.get(type);
+                if (holo == null) {
+                    this.plugin.getLogger().info("[LB-DEBUG] Criando novo holograma: " + holoName);
+                    holo = DHAPI.createHologram(holoName, holoLoc, false, finalLines);
+                    holograms.put(type, holo);
+                } else {
+                    DHAPI.setHologramLines(holo, finalLines);
+                }
+            } catch (Exception e) {
+                this.plugin.getLogger().severe("[LB-DEBUG] ERRO ao criar/atualizar holograma no DHAPI!");
+                e.printStackTrace();
             }
         });
     }
@@ -159,6 +166,4 @@ public abstract class TrackLeaderboard {
         long millis = (long)((timeInSeconds - Math.floor(timeInSeconds)) * 1000.0);
         return minutes > 0 ? String.format("%d:%02d.%03d", minutes, seconds, millis) : String.format("%d.%03d", seconds, millis);
     }
-
-    public abstract void updateLeaderboard();
 }
