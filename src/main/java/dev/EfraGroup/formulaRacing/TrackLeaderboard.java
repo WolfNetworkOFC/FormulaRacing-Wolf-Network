@@ -54,7 +54,9 @@ public class TrackLeaderboard {
                 .limit(10)
                 .collect(Collectors.toList());
 
-        List<String> configLines = this.plugin.getConfig().getStringList("leaderboards.fastesttime.lines");
+        // Escolhe a chave certa no config.yml
+        String configPath = "leaderboards.fastesttime-" + type + ".lines";
+        List<String> configLines = this.plugin.getConfig().getStringList(configPath);
         List<String> lines = new ArrayList<>();
 
         for (String configLine : configLines) {
@@ -88,6 +90,7 @@ public class TrackLeaderboard {
             }
         });
     }
+
 
 
     public synchronized void removeHologram() {
