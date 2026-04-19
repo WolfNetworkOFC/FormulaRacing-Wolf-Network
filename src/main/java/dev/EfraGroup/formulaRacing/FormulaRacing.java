@@ -670,17 +670,23 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     }
 
     public void startLeaderboardUpdater() {
+        // Puxa o intervalo do config (ex: 18000 ticks) ou usa 300 como fallback
+        long ticks = this.getConfig().getLong("leaderboards.updateticks", 300L);
+
         Bukkit.getScheduler().runTaskTimer(
-            this,
-            () -> {
-                if (!Bukkit.getOnlinePlayers().isEmpty()) {
-                    this.leaderboards.values().forEach(leaderboard ->
-                        leaderboard.updateLeaderboard()
-                    );
-                }
-            },
-            100L,
-            300L
+                this,
+                () -> {
+                    // Só processa se houver jogadores online para economizar recursos do banco
+                    if (!Bukkit.getOnlinePlayers().isEmpty()) {
+                        this.leaderboards.values().forEach(leaderboard -> {
+                            // Atualiza ambos os hologramas para cada pista registrada
+                            leaderboard.updateJavaLeaderboard();
+                            leaderboard.updateBedrockLeaderboard();
+                        });
+                    }
+                },
+                100L, // Delay inicial
+                ticks  // Intervalo de repetição
         );
     }
 
@@ -695,7 +701,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                     public void updateLeaderboard() {
                         this.updateJavaLeaderboard(); // chama o método específico
                     }
-                }
+                }t
         );
     }
 
