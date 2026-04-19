@@ -54,9 +54,18 @@ public class TrackLeaderboard {
                 .limit(10)
                 .collect(Collectors.toList());
 
-        // Escolhe a chave certa no config.yml
+        // monta o caminho dinâmico no config (ex: leaderboards.fastesttime-java.lines)
         String configPath = "leaderboards.fastesttime-" + type + ".lines";
         List<String> configLines = this.plugin.getConfig().getStringList(configPath);
+
+        // fallback: se não existir, tenta a chave genérica antiga ou a chave java
+        if (configLines == null || configLines.isEmpty()) {
+            configLines = this.plugin.getConfig().getStringList("leaderboards.fastesttime.lines");
+        }
+        if (configLines == null || configLines.isEmpty()) {
+            configLines = this.plugin.getConfig().getStringList("leaderboards.fastesttime-java.lines");
+        }
+
         List<String> lines = new ArrayList<>();
 
         for (String configLine : configLines) {
@@ -67,7 +76,7 @@ public class TrackLeaderboard {
                 String timeKey = "{time" + j + "}";
                 if (top10.size() >= j) {
                     DatabaseManager.PlayerTime p = top10.get(j - 1);
-                    boolean hasFinished = totalCheckpoints > 0 && p.getCheckpointsReached() >= totalCheckpoints || p.isFinished();
+                    boolean hasFinished = (totalCheckpoints > 0 && p.getCheckpointsReached() >= totalCheckpoints) || p.isFinished();
                     String displayTime = hasFinished
                             ? "§e" + this.formatTime(p.getTime())
                             : "§7" + p.getCheckpointsReached() + "CP§e(" + this.formatTime(p.getTime()) + ")";
@@ -81,6 +90,7 @@ public class TrackLeaderboard {
         }
 
         Bukkit.getScheduler().runTask(this.plugin, () -> {
+            // usa um nome distinto por tipo para evitar sobrescrever hologramas
             String holoName = "leaderboard-" + type + "-" + this.trackName.replaceAll("[^a-zA-Z0-9_\\-]", "");
             Location holoLoc = this.location.clone().add(0.0, 0.5, 0.0);
             if (this.hologram == null) {
@@ -126,28 +136,36 @@ public class TrackLeaderboard {
         Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
             List<DatabaseManager.PlayerTime> leaderboard = this.mySQLManager.getLeaderboard(this.trackName);
             int totalCheckpoints = this.mySQLManager.getCheckpointCount(this.trackName);
-            List<DatabaseManager.PlayerTime> top10 = (List)leaderboard.stream().sorted((p1, p2) -> p1.getCheckpointsReached() != p2.getCheckpointsReached() ? Integer.compare(p2.getCheckpointsReached(), p1.getCheckpointsReached()) : Double.compare(p1.getTime(), p2.getTime())).limit(10L).collect(Collectors.toList());
-            List<String> configLines = this.plugin.getConfig().getStringList("leaderboards.fastesttime.lines");
-            List<String> lines = new ArrayList();
+            List<DatabaseManager.PlayerTime> top10 = leaderboard.stream()
+                    .sorted((p1, p2) -> p1.getCheckpointsReached() != p2.getCheckpointsReached()
+                            ? Integer.compare(p2.getCheckpointsReached(), p1.getCheckpointsReached())
+                            : Double.compare(p1.getTime(), p2.getTime()))
+                    .limit(10)
+                    .collect(Collectors.toList());
 
-            for(String configLine : configLines) {
+            // tenta a chave antiga, se existir; senão usa fastesttime-java como fallback
+            List<String> configLines = this.plugin.getConfig().getStringList("leaderboards.fastesttime.lines");
+            if (configLines == null || configLines.isEmpty()) {
+                configLines = this.plugin.getConfig().getStringList("leaderboards.fastesttime-java.lines");
+            }
+            if (configLines == null || configLines.isEmpty()) {
+                configLines = this.plugin.getConfig().getStringList("leaderboards.fastesttime-bedrock.lines");
+            }
+
+            List<String> lines = new ArrayList<>();
+
+            for (String configLine : configLines) {
                 String line = configLine.replace("{mapname}", this.trackName);
 
-                for(int j = 1; j <= 10; ++j) {
+                for (int j = 1; j <= 10; ++j) {
                     String nameKey = "{name" + j + "}";
                     String timeKey = "{time" + j + "}";
                     if (top10.size() >= j) {
-                        DatabaseManager.PlayerTime p = (DatabaseManager.PlayerTime)top10.get(j - 1);
-                        boolean hasFinished = totalCheckpoints > 0 && p.getCheckpointsReached() >= totalCheckpoints || p.isFinished();
-                        String displayTime;
-                        if (!hasFinished) {
-                            int var10000 = p.getCheckpointsReached();
-                            displayTime = "§7" + var10000 + "CP§e(" + this.formatTime(p.getTime()) + ")";
-                        } else {
-                            String var16 = this.formatTime(p.getTime());
-                            displayTime = "§e" + var16;
-                        }
-
+                        DatabaseManager.PlayerTime p = top10.get(j - 1);
+                        boolean hasFinished = (totalCheckpoints > 0 && p.getCheckpointsReached() >= totalCheckpoints) || p.isFinished();
+                        String displayTime = hasFinished
+                                ? "§e" + this.formatTime(p.getTime())
+                                : "§7" + p.getCheckpointsReached() + "CP§e(" + this.formatTime(p.getTime()) + ")";
                         line = line.replace(nameKey, p.getPlayerName());
                         line = line.replace(timeKey, displayTime);
                     } else {
@@ -158,9 +176,20 @@ public class TrackLeaderboard {
                 lines.add(line);
             }
 
-            Bukkit.getScheduler().runTask(this.plugin, () -> this.updateHologramLines(lines));
+            Bukkit.getScheduler().runTask(this.plugin, () -> {
+                // nome distinto para o holograma genérico
+                String var10000 = this.trackName.replace(" ", "");
+                String holoName = "leaderboard-generic-" + var10000.replaceAll("[^a-zA-Z0-9_\\-]", "");
+                Location holoLoc = this.location.clone().add(0.0F, 0.5F, 0.0F);
+                if (this.hologram == null) {
+                    this.hologram = DHAPI.createHologram(holoName, holoLoc, false, lines);
+                } else {
+                    DHAPI.setHologramLines(this.hologram, lines);
+                }
+            });
         });
     }
+
 
     private void updateHologramLines(List<String> lines) {
         if (this.hologram == null) {
