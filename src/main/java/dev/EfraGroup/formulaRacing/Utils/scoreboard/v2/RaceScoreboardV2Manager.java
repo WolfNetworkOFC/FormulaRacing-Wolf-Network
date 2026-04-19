@@ -318,8 +318,18 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
     private List<Driver> getSortedDriversForHeat(Heats heat) {
         if (heat.getHeatState() == HeatState.QUALIFYING || heat.getHeatState() == HeatState.PRACTICE || heat.getHeatState() == HeatState.IDLE) {
             return heat.getDrivers().values().stream()
-                    .filter(driver -> driver.getFastestLap() != null)
-                    .sorted(Comparator.comparingLong(driver -> driver.getFastestLap().getLapTime()))
+                    .sorted((d1, d2) -> {
+                        // Drivers with a lap come first (sorted by lap time)
+                        boolean d1HasLap = d1.getFastestLap() != null;
+                        boolean d2HasLap = d2.getFastestLap() != null;
+                        if (d1HasLap && d2HasLap) {
+                            return Long.compare(d1.getFastestLap().getLapTime(), d2.getFastestLap().getLapTime());
+                        }
+                        if (d1HasLap) return -1;
+                        if (d2HasLap) return 1;
+                        // Neither has a lap - keep original order by grid position if available
+                        return Integer.compare(d1.getStartPosition(), d2.getStartPosition());
+                    })
                     .collect(Collectors.toList());
         }
 

@@ -170,14 +170,31 @@ public class EventAnnouncements {
             delta = "(-)";
         }
 
+        String message = String.format("&w%s &7[Volta %d] &f%s %s%s", name, driver.getLapCount(), formattedTime, deltaToken, delta);
+
         for(Driver d : heat.getDrivers().values()) {
             Player p = Bukkit.getPlayer(d.getUuid());
             if (p != null && p.isOnline()) {
                 FRTheme theme = FRThemeResolver.resolveTheme(p);
-                String message = String.format("&w%s &7[Volta %d] &f%s %s%s", name, driver.getLapCount(), formattedTime, deltaToken, delta);
                 Component comp = FRThemeParser.parseWithLegacy(message, theme);
                 String legacy = LegacyComponentSerializer.legacySection().serialize(comp);
                 p.sendMessage(legacy);
+            }
+        }
+
+        // Also send to spectators watching this event
+        if (this.plugin.getSpectatorManager() != null) {
+            Events event = heat.getRound() != null ? heat.getRound().getEvent() : null;
+            if (event != null) {
+                for(UUID specId : this.plugin.getSpectatorManager().getSpectatorsInEvent(event.getId())) {
+                    Player p = Bukkit.getPlayer(specId);
+                    if (p != null && p.isOnline()) {
+                        FRTheme theme = FRThemeResolver.resolveTheme(p);
+                        Component comp = FRThemeParser.parseWithLegacy(message, theme);
+                        String legacy = LegacyComponentSerializer.legacySection().serialize(comp);
+                        p.sendMessage(legacy);
+                    }
+                }
             }
         }
 

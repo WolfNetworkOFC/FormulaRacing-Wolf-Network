@@ -81,6 +81,9 @@ public class SpectatorManager {
             event.addSpectator(playerId);
             this.setupSpectatorMode(player, spectator, event);
             this.syncBindingFor(playerId, player, event);
+            if (this.plugin.getLonelyController() != null) {
+                this.plugin.getLonelyController().reconcilePlayer(player);
+            }
             this.plugin.sendMessage(player, "spectator_watching", new String[0]);
             this.plugin.sendMessage(player, "spectator_help_follow", new String[0]);
             this.plugin.sendMessage(player, "spectator_help_leave", new String[0]);
@@ -118,6 +121,9 @@ public class SpectatorManager {
             }
 
             this.restorePlayer(player, previousMode);
+            if (this.plugin.getLonelyController() != null) {
+                this.plugin.getLonelyController().reconcilePlayer(player);
+            }
             long watchTime = spectator.getWatchTime() / 1000L;
             this.plugin.sendMessage(player, "spectator_time_watched", new String[]{"{time}", this.formatTime(watchTime)});
             this.debug.logSpectatorSystem(String.format("%s saiu do modo espectador", player.getName()));
@@ -328,6 +334,9 @@ public class SpectatorManager {
             this.spectatorBoundHeat.remove(spectatorId);
         }
 
+        if (this.plugin.getLonelyController() != null) {
+            this.plugin.getLonelyController().reconcilePlayer(player);
+        }
     }
 
     private Heats resolveActiveHeat(Events event) {
@@ -438,6 +447,10 @@ public class SpectatorManager {
 
     public Events getWatchingEvent(UUID spectatorId) {
         return (Events)this.spectatorToEvent.get(spectatorId);
+    }
+
+    public Heats getSpectatorBoundHeat(UUID spectatorId) {
+        return (Heats)this.spectatorBoundHeat.get(spectatorId);
     }
 
     public List<Spectator> getEventSpectators(Events event) {

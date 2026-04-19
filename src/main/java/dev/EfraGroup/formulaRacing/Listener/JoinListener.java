@@ -111,14 +111,6 @@ public class JoinListener implements Listener {
                     Bukkit.getScheduler().runTask(this.plugin, () -> Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', msg)));
                 }
 
-                boolean lonelyActive = this.mysql.getLonelyModePlayer(uuid);
-                if (lonelyActive) {
-                    Bukkit.getScheduler().runTask(this.plugin, () -> {
-                        this.plugin.getLonelyController().setLonelyMode(player, true);
-                        this.plugin.getDebugManager().logRaceSystem("Modo lonely (DB) aplicado ao jogador " + playerName + " ao entrar.");
-                    });
-                }
-
                 Bukkit.getScheduler().runTaskLater(this.plugin, () -> {
                     if (player.isOnline()) {
                         this.plugin.getDailyRaceManager().notifyPlayerOfAllActiveEvents(player);
