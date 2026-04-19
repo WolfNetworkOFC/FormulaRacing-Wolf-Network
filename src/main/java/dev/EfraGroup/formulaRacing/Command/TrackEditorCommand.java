@@ -1302,7 +1302,7 @@ public class TrackEditorCommand extends BaseCommand {
 
     private void deleteDrsById(Player player, int id, String type) {
         // Chamamos o MySQL passando o ID único da linha
-        if (this.mysql.deleteDRSRegionById(id)) {
+        if (this.mysql.deleteDRSRegionByID(id)) {
             player.sendMessage("§a[DRS] Região ID §f#" + id + " (§e" + type + "§a) removida com sucesso!");
             player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 1.0F, 2.0F);
         } else {
@@ -1397,21 +1397,40 @@ public class TrackEditorCommand extends BaseCommand {
 
     }
 
-    @Subcommand("location leaderboard")
-    @Description("Teleporta o holograma do leaderboard")
+    @Subcommand("location leaderboard java")
+    @Description("Teleporta o holograma do leaderboard Java")
     @CommandCompletion("@tracks @nothing")
-    public void onLocationLeaderboard(Player player, String trackName, @Optional Double x, @Optional Double y, @Optional Double z) {
+    public void onLocationLeaderboardJava(Player player, String trackName, @Optional Double x, @Optional Double y, @Optional Double z) {
         Location targetLocation;
         if (x != null && y != null && z != null) {
-            targetLocation = new Location(player.getWorld(), x, y + (double)3.0F, z);
+            targetLocation = new Location(player.getWorld(), x, y + 3.0, z);
         } else {
             targetLocation = player.getLocation();
         }
 
-        TrackLeaderboard leaderboard = this.plugin.getOrCreateLeaderboard(trackName, targetLocation);
+        TrackLeaderboard leaderboard = this.plugin.getOrCreateJavaLeaderboard(trackName, targetLocation);
         leaderboard.setLocation(targetLocation);
-        leaderboard.updateLeaderboard();
-        player.sendMessage("§aHolograma da pista §e" + trackName + " §ateleportado para " + String.format("X: %.2f Y: %.2f Z: %.2f", targetLocation.getX(), targetLocation.getY(), targetLocation.getZ()));
+        leaderboard.updateJavaLeaderboard();
+        player.sendMessage("§aHolograma JAVA da pista §e" + trackName + " §ateleportado para " +
+                String.format("X: %.2f Y: %.2f Z: %.2f", targetLocation.getX(), targetLocation.getY(), targetLocation.getZ()));
+    }
+
+    @Subcommand("location leaderboard bedrock")
+    @Description("Teleporta o holograma do leaderboard Bedrock")
+    @CommandCompletion("@tracks @nothing")
+    public void onLocationLeaderboardBedrock(Player player, String trackName, @Optional Double x, @Optional Double y, @Optional Double z) {
+        Location targetLocation;
+        if (x != null && y != null && z != null) {
+            targetLocation = new Location(player.getWorld(), x, y + 3.0, z);
+        } else {
+            targetLocation = player.getLocation();
+        }
+
+        TrackLeaderboard leaderboard = this.plugin.getOrCreateBedrockLeaderboard(trackName, targetLocation);
+        leaderboard.setLocation(targetLocation);
+        leaderboard.updateBedrockLeaderboard();
+        player.sendMessage("§aHolograma BEDROCK da pista §e" + trackName + " §ateleportado para " +
+                String.format("X: %.2f Y: %.2f Z: %.2f", targetLocation.getX(), targetLocation.getY(), targetLocation.getZ()));
     }
 
     @Subcommand("location startline")

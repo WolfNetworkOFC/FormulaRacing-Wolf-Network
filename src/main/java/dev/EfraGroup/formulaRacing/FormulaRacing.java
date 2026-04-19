@@ -684,20 +684,36 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         );
     }
 
-    public TrackLeaderboard getOrCreateLeaderboard(
-        String trackName,
-        Location defaultLocation
-    ) {
-        return (TrackLeaderboard) this.leaderboards.computeIfAbsent(
-            trackName,
-            tn -> new TrackLeaderboard(this, tn, defaultLocation, this.dm)
+    // Dentro da sua classe principal FormulaRacing (ou a classe que extende JavaPlugin)
+    private final Map<String, TrackLeaderboard> javaLeaderboards = new HashMap<>();
+    private final Map<String, TrackLeaderboard> bedrockLeaderboards = new HashMap<>();
+
+    public TrackLeaderboard getOrCreateJavaLeaderboard(String trackName, Location defaultLocation) {
+        return javaLeaderboards.computeIfAbsent(trackName, name ->
+                new TrackLeaderboard(this, name, defaultLocation, this.getDatabaseManager()) {
+                    @Override
+                    public void updateLeaderboard() {
+                        this.updateJavaLeaderboard(); // chama o método específico
+                    }
+                }
+        );
+    }
+
+    public TrackLeaderboard getOrCreateBedrockLeaderboard(String trackName, Location defaultLocation) {
+        return bedrockLeaderboards.computeIfAbsent(trackName, name ->
+                new TrackLeaderboard(this, name, defaultLocation, this.getDatabaseManager()) {
+                    @Override
+                    public void updateLeaderboard() {
+                        this.updateBedrockLeaderboard(); // chama o método específico
+                    }
+                }
         );
     }
 
     private void loadLeaderboards() {
         if (this.debugManager != null) {
             this.debugManager.logDatabaseOperations(
-                "[FormulaRacing] Carregando leaderboards..."
+                    "[FormulaRacing] Carregando leaderboards..."
             );
         }
 
@@ -705,29 +721,34 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             List<String> tracks = this.dm.getAllTracks();
             if (this.debugManager != null) {
                 this.debugManager.logDatabaseOperations(
-                    "[FormulaRacing] Encontradas " +
-                        tracks.size() +
-                        " pistas no banco"
+                        "[FormulaRacing] Encontradas " + tracks.size() + " pistas no banco"
                 );
             }
 
             for (String trackName : tracks) {
                 Location savedLoc = this.dm.getHologramLocation(trackName);
                 if (savedLoc != null) {
-                    this.getOrCreateLeaderboard(trackName, savedLoc);
+                    // Cria/atualiza holograma Java
+                    TrackLeaderboard javaLeaderboard = this.getOrCreateJavaLeaderboard(trackName, savedLoc);
+                    javaLeaderboard.setLocation(savedLoc);
+                    javaLeaderboard.updateJavaLeaderboard();
+
+                    // Cria/atualiza holograma Bedrock
+                    TrackLeaderboard bedrockLeaderboard = this.getOrCreateBedrockLeaderboard(trackName, savedLoc);
+                    bedrockLeaderboard.setLocation(savedLoc);
+                    bedrockLeaderboard.updateBedrockLeaderboard();
+
                 } else if (this.debugManager != null) {
                     this.debugManager.logDatabaseOperations(
-                        "[FormulaRacing] ⚠️ Pista '" +
-                            trackName +
-                            "' não tem localização de holograma definida (use /trackedit sethologram)"
+                            "[FormulaRacing] ⚠️ Pista '" + trackName +
+                                    "' não tem localização de holograma definida (use /trackedit sethologram)"
                     );
                 }
             }
         } catch (Exception e) {
             if (this.debugManager != null) {
                 this.debugManager.logRaceSystem(
-                    "[FormulaRacing] Erro ao carregar leaderboards: " +
-                        e.getMessage()
+                        "[FormulaRacing] Erro ao carregar leaderboards: " + e.getMessage()
                 );
             }
         }

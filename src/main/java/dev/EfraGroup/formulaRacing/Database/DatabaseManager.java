@@ -2,7 +2,6 @@ package dev.EfraGroup.formulaRacing.Database;
 
 import dev.EfraGroup.formulaRacing.FileManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
-import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
@@ -148,100 +147,6 @@ public class DatabaseManager {
             : new SQLException("Não foi possível obter conexão SQLite");
     }
 
-    public CompletableFuture<Boolean> savePitStopStartRegion(
-        String trackName,
-        double minX,
-        double minY,
-        double minZ,
-        double maxX,
-        double maxY,
-        double maxZ
-    ) {
-        return CompletableFuture.supplyAsync(() -> {
-            // Usamos UPDATE para preencher apenas as colunas de START onde a pista coincide
-            String sql =
-                "UPDATE fr_pit_stops SET startMinX = ?, startMinY = ?, startMinZ = ?, " +
-                "startMaxX = ?, startMaxY = ?, startMaxZ = ? WHERE trackNameWS = ?";
-
-            try (
-                Connection conn = this.getOrConnect();
-                PreparedStatement ps = conn.prepareStatement(sql)
-            ) {
-                ps.setDouble(1, minX);
-                ps.setDouble(2, minY);
-                ps.setDouble(3, minZ);
-                ps.setDouble(4, maxX);
-                ps.setDouble(5, maxY);
-                ps.setDouble(6, maxZ);
-                ps.setString(7, trackName);
-
-                int affectedRows = ps.executeUpdate();
-
-                // Se nenhuma linha foi afetada, significa que a pista ainda não tem registro de Pit
-                if (affectedRows == 0) {
-                    this.plugin.getDebugManager().logDatabaseOperation(
-                        "Aviso: Nenhuma pista encontrada com o nome " +
-                            trackName +
-                            " para salvar o Start."
-                    );
-                    return false;
-                }
-
-                return true;
-            } catch (SQLException e) {
-                this.plugin.getDebugManager().logDatabaseOperation(
-                    "Erro ao salvar região Start no banco: " + e.getMessage()
-                );
-                e.printStackTrace();
-                return false;
-            }
-        });
-    }
-
-    /**
-     * Atualiza as coordenadas de uma região de DRS no banco de dados.
-     * @param trackName Nome da pista.
-     * @param type Tipo da região (ex: "detection" ou "activation").
-     * @param min Localização mínima (ponto 1).
-     * @param max Localização máxima (ponto 2).
-     * @return true se a operação foi bem sucedida.
-     */
-    public boolean updateDrsRegion(
-        String trackName,
-        String type,
-        Location min,
-        Location max
-    ) {
-        // Definimos as colunas dinamicamente com base no 'type'
-        String columnMin = "drs_" + type.toLowerCase() + "_min";
-        String columnMax = "drs_" + type.toLowerCase() + "_max";
-
-        String sql =
-            "UPDATE fr_tracks SET " +
-            columnMin +
-            " = ?, " +
-            columnMax +
-            " = ? WHERE track_name = ?;";
-
-        try (
-            Connection conn = getOrConnect();
-            PreparedStatement ps = conn.prepareStatement(sql)
-        ) {
-            ps.setString(1, serializeLocation(min));
-            ps.setString(2, serializeLocation(max));
-            ps.setString(3, trackName);
-
-            return ps.executeUpdate() > 0;
-        } catch (SQLException e) {
-            Bukkit.getLogger().severe(
-                "[FormulaRacing] Erro ao atualizar DRS (" +
-                    type +
-                    "): " +
-                    e.getMessage()
-            );
-            return false;
-        }
-    }
     public boolean saveDrsZone(
             String trackName,
             String type, // "detect", "drs", "end"
@@ -297,21 +202,7 @@ public class DatabaseManager {
             return false;
         }
     }
-    /**
-     * Método auxiliar para transformar Location em String (Mundo,X,Y,Z)
-     */
-    private String serializeLocation(Location loc) {
-        if (loc == null || loc.getWorld() == null) return null;
-        return (
-            loc.getWorld().getName() +
-            "," +
-            loc.getBlockX() +
-            "," +
-            loc.getBlockY() +
-            "," +
-            loc.getBlockZ()
-        );
-    }
+
 
     /**
      * Salva as coordenadas da região de START (onde o carro para) no banco de dados.
@@ -806,20 +697,138 @@ public class DatabaseManager {
         }
     }
 
-    public boolean deleteDRSRegionById(int id) {
-        String sql = "DELETE FROM fr_drs WHERE id = ?;";
-
-        try (Connection conn = getOrConnect();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-
-            ps.setInt(1, id);
-            return ps.executeUpdate() > 0; // Retorna true se deletou uma linha
-
+    /* =======================================================
+      DRS REGIONS
+======================================================= */
+    public synchronized boolean deleteDRSRegionByID(int id) {
+        String sql = "DELETE FROM fr_drs WHERE id = ?";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, id);
+                ps.executeUpdate();
+            }
         } catch (SQLException e) {
-            Bukkit.getLogger().severe("[FormulaRacing] Erro ao deletar região por ID: " + e.getMessage());
-            return false;
+            handleSqlError(e);
         }
+        return false;
     }
+
+
+    /* =======================================================
+       LEADERBOARD JAVA
+ ======================================================= */
+    public synchronized List<PlayerTime> getLeaderboardJava(String trackName) {
+        List<PlayerTime> leaderboard = new ArrayList<>();
+        String trackWS = trackName.replaceAll("\\s+", "");
+
+        try {
+            int totalCheckpoints = getCheckpointCount(trackWS);
+
+            String sql = """
+            SELECT player_uuid, player_name, bestTime, checkpointsReached, finished
+            FROM (
+                SELECT *, ROW_NUMBER() OVER (
+                    PARTITION BY player_uuid
+                    ORDER BY
+                        finished DESC,
+                        CASE WHEN finished = 1 THEN bestTime ELSE 999999 END ASC,
+                        checkpointsReached DESC,
+                        bestTime ASC
+                ) as rn
+                FROM fr_player_times
+                WHERE LOWER(trackNameWS) = LOWER(?) AND platform = 'JAVA'
+            ) t
+            WHERE rn = 1
+            ORDER BY
+                finished DESC,
+                CASE WHEN finished = 1 THEN bestTime ELSE 999999 END ASC,
+                checkpointsReached DESC,
+                bestTime ASC
+            """;
+
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackWS);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        String uuidString = rs.getString("player_uuid");
+                        UUID playerUuid = (uuidString != null) ? UUID.fromString(uuidString) : null;
+
+                        leaderboard.add(new PlayerTime(
+                                playerUuid,
+                                rs.getString("player_name"),
+                                rs.getDouble("bestTime"),
+                                rs.getInt("checkpointsReached"),
+                                totalCheckpoints,
+                                rs.getBoolean("finished")
+                        ));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return leaderboard;
+    }
+
+    /* =======================================================
+          LEADERBOARD BEDROCK
+    ======================================================= */
+    public synchronized List<PlayerTime> getLeaderboardBedrock(String trackName) {
+        List<PlayerTime> leaderboard = new ArrayList<>();
+        String trackWS = trackName.replaceAll("\\s+", "");
+
+        try {
+            int totalCheckpoints = getCheckpointCount(trackWS);
+
+            String sql = """
+            SELECT player_uuid, player_name, bestTime, checkpointsReached, finished
+            FROM (
+                SELECT *, ROW_NUMBER() OVER (
+                    PARTITION BY player_uuid
+                    ORDER BY
+                        finished DESC,
+                        CASE WHEN finished = 1 THEN bestTime ELSE 999999 END ASC,
+                        checkpointsReached DESC,
+                        bestTime ASC
+                ) as rn
+                FROM fr_player_times
+                WHERE LOWER(trackNameWS) = LOWER(?) AND platform = 'BEDROCK'
+            ) t
+            WHERE rn = 1
+            ORDER BY
+                finished DESC,
+                CASE WHEN finished = 1 THEN bestTime ELSE 999999 END ASC,
+                checkpointsReached DESC,
+                bestTime ASC
+            """;
+
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackWS);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        String uuidString = rs.getString("player_uuid");
+                        UUID playerUuid = (uuidString != null) ? UUID.fromString(uuidString) : null;
+
+                        leaderboard.add(new PlayerTime(
+                                playerUuid,
+                                rs.getString("player_name"),
+                                rs.getDouble("bestTime"),
+                                rs.getInt("checkpointsReached"),
+                                totalCheckpoints,
+                                rs.getBoolean("finished")
+                        ));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return leaderboard;
+    }
+
 
     /**
      * ✅ MIGRAÇÃO: Normaliza todos os trackNameWS no banco de dados
