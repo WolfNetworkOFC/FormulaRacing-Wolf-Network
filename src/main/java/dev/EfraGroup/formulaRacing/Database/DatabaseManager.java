@@ -737,7 +737,7 @@ public class DatabaseManager {
                         bestTime ASC
                 ) as rn
                 FROM fr_player_times
-                WHERE LOWER(trackNameWS) = LOWER(?) AND platform = 'JAVA'
+                WHERE LOWER(trackNameWS) = LOWER(?) AND plataforma = 'JAVA'
             ) t
             WHERE rn = 1
             ORDER BY
@@ -794,7 +794,7 @@ public class DatabaseManager {
                         bestTime ASC
                 ) as rn
                 FROM fr_player_times
-                WHERE LOWER(trackNameWS) = LOWER(?) AND platform = 'BEDROCK'
+                WHERE LOWER(trackNameWS) = LOWER(?) AND plataforma = 'BEDROCK'
             ) t
             WHERE rn = 1
             ORDER BY
@@ -3834,21 +3834,24 @@ public class DatabaseManager {
                 }
             }
 
-            // --- TRANSAÇÃO DE ESCRITA ---
+// --- TRANSAÇÃO DE ESCRITA ---
             try {
                 conn.setAutoCommit(false);
 
                 Integer generatedId = null;
 
+                // Determina a plataforma com base no nome
+                String platform = playerName.startsWith(".") ? "BEDROCK" : "JAVA";
+
                 if (shouldSaveTime) {
                     // Salva o tempo normalmente (é um novo recorde pessoal)
                     String insertSql =
-                        "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished) VALUES (?, ?, ?, ?, ?, ?)";
+                            "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, platform) VALUES (?, ?, ?, ?, ?, ?, ?)";
                     try (
-                        PreparedStatement ps = conn.prepareStatement(
-                            insertSql,
-                            Statement.RETURN_GENERATED_KEYS
-                        )
+                            PreparedStatement ps = conn.prepareStatement(
+                                    insertSql,
+                                    Statement.RETURN_GENERATED_KEYS
+                            )
                     ) {
                         ps.setString(1, trackNameWS);
                         ps.setString(2, playerUUID.toString());
@@ -3856,6 +3859,7 @@ public class DatabaseManager {
                         ps.setDouble(4, roundedTime);
                         ps.setInt(5, checkpointsReached);
                         ps.setBoolean(6, true);
+                        ps.setString(7, platform); // salva a plataforma
                         ps.executeUpdate();
 
                         try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -3864,14 +3868,13 @@ public class DatabaseManager {
                     }
                 } else if (shouldSaveCheckpoints) {
                     // Não é recorde pessoal, mas é melhor que o tempo com checkpoints
-                    // Cria um registro separado APENAS para os checkpoints (não conta como recorde oficial)
                     String insertSql =
-                        "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished) VALUES (?, ?, ?, ?, ?, ?)";
+                            "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, platform) VALUES (?, ?, ?, ?, ?, ?, ?)";
                     try (
-                        PreparedStatement ps = conn.prepareStatement(
-                            insertSql,
-                            Statement.RETURN_GENERATED_KEYS
-                        )
+                            PreparedStatement ps = conn.prepareStatement(
+                                    insertSql,
+                                    Statement.RETURN_GENERATED_KEYS
+                            )
                     ) {
                         ps.setString(1, trackNameWS);
                         ps.setString(2, playerUUID.toString());
@@ -3879,17 +3882,16 @@ public class DatabaseManager {
                         ps.setDouble(4, roundedTime);
                         ps.setInt(5, checkpointsReached);
                         ps.setBoolean(6, true);
+                        ps.setString(7, platform); // salva a plataforma
                         ps.executeUpdate();
 
                         try (ResultSet rs = ps.getGeneratedKeys()) {
                             if (rs.next()) generatedId = rs.getInt(1);
                         }
                     }
-                    plugin
-                        .getDebugManager()
-                        .logTimeTrialSystem(
+                    plugin.getDebugManager().logTimeTrialSystem(
                             "[saveFullTime] ✅ Registro criado para checkpoints (não é PB, mas tem checkpoints melhores)"
-                        );
+                    );
                 }
 
                 if (generatedId != null) {
@@ -3952,20 +3954,25 @@ public class DatabaseManager {
 
                 if (roundedTime < prevTime) {
                     Integer generatedId = null;
+
+                    // Determina a plataforma com base no nome do jogador
+                    String platform = playerName.startsWith(".") ? "BEDROCK" : "JAVA";
+
                     String insertSql =
-                        "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished) VALUES (?, ?, ?, ?, ?, FALSE)";
+                            "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, platform) VALUES (?, ?, ?, ?, ?, FALSE, ?)";
 
                     try (
-                        PreparedStatement ps = conn.prepareStatement(
-                            insertSql,
-                            Statement.RETURN_GENERATED_KEYS
-                        )
+                            PreparedStatement ps = conn.prepareStatement(
+                                    insertSql,
+                                    Statement.RETURN_GENERATED_KEYS
+                            )
                     ) {
                         ps.setString(1, trackNameWS);
                         ps.setString(2, playerUUID.toString());
                         ps.setString(3, playerName);
                         ps.setDouble(4, roundedTime);
                         ps.setInt(5, lastCheckpoint);
+                        ps.setString(6, platform); // salva a plataforma
                         ps.executeUpdate();
 
                         try (ResultSet keys = ps.getGeneratedKeys()) {
@@ -3973,7 +3980,9 @@ public class DatabaseManager {
                         }
                     }
 
-                    if (generatedId != null) {
+
+
+                if (generatedId != null) {
                         saveCheckpointTimes(
                             conn,
                             playerUUID,
