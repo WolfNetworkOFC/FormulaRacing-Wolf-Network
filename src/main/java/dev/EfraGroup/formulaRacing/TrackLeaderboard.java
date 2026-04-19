@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -80,15 +81,23 @@ public abstract class TrackLeaderboard {
                 .limit(10)
                 .toList();
 
-        // Puxa as linhas da config baseado no tipo (java ou bedrock)
+        // Puxa as linhas da config
         List<String> configLines = this.plugin.getConfig().getStringList("leaderboards.fastesttime-" + type + ".lines");
-        List<String> lines = new ArrayList<>();
+
+        // Se a config falhar, tenta um fallback básico para não ficar vazio
+        if (configLines.isEmpty()) {
+            configLines = new ArrayList<>();
+            configLines.add("§6§lLeaderboard §e" + this.trackName);
+            configLines.add("§7Nenhum tempo registrado");
+        }
+
+        List<String> finalLines = new ArrayList<>();
 
         for (String configLine : configLines) {
-            // Primeiro substitui o nome do mapa (isso garante que o título apareça)
-            String line = configLine.replace("{mapname}", this.trackName);
+            // CORREÇÃO: Traduz as cores primeiro e aplica o nome do mapa
+            String line = configLine.replace("&", "§").replace("{mapname}", this.trackName);
 
-            // Depois substitui as posições de 1 a 10
+            // Substitui os placeholders de 1 a 10
             for (int j = 1; j <= 10; ++j) {
                 String nameKey = "{name" + j + "}";
                 String timeKey = "{time" + j + "}";
@@ -103,26 +112,28 @@ public abstract class TrackLeaderboard {
 
                     line = line.replace(nameKey, p.getPlayerName()).replace(timeKey, displayTime);
                 } else {
+                    // Se não tiver jogador, limpa as chaves
                     line = line.replace(nameKey, "----").replace(timeKey, "----");
                 }
             }
-            lines.add(line);
+            finalLines.add(line);
         }
 
-        // Volta para a Main Thread para mexer no DecentHolograms
+        // Task Síncrona para o DecentHolograms
         Bukkit.getScheduler().runTask(this.plugin, () -> {
-            String holoName = "leaderboard-" + type + "-" + this.trackName.toLowerCase().replace(" ", "_");
+            String holoName = "lb_" + type + "_" + this.trackName.toLowerCase().replace(" ", "_");
 
-            // Offset: Se for Bedrock, coloca um pouco pro lado para não encavalar no Java
             double xOffset = type.equals("bedrock") ? 3.0 : 0.0;
             Location holoLoc = this.location.clone().add(xOffset, 0.5, 0.0);
 
             Hologram holo = holograms.get(type);
             if (holo == null) {
-                holo = DHAPI.createHologram(holoName, holoLoc, false, lines);
+                // Cria o holograma e força a exibição
+                holo = DHAPI.createHologram(holoName, holoLoc, false, finalLines);
                 holograms.put(type, holo);
             } else {
-                DHAPI.setHologramLines(holo, lines);
+                // REFRESH TOTAL: Remove as linhas e coloca as novas para forçar o título
+                DHAPI.setHologramLines(holo, finalLines);
             }
         });
     }

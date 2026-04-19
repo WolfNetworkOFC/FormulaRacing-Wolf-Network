@@ -701,7 +701,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                     public void updateLeaderboard() {
                         this.updateJavaLeaderboard(); // chama o método específico
                     }
-                }t
+                }
         );
     }
 
