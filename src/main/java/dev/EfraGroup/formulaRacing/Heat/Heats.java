@@ -925,47 +925,35 @@ public class Heats {
     }
 
     public void resetHeat() {
-        this.plugin.getLonelyController().clearGhostForPlayers(
-            this.drivers.keySet()
-        );
-        if (
-            this.heatState != HeatState.RACING &&
-            this.heatState != HeatState.STARTING &&
-            this.heatState != HeatState.QUALIFYING
-        ) {
-            if (
-                this.heatState != HeatState.SETUP &&
+        // Se estava em andamento, força parada
+        if (this.heatState != HeatState.SETUP &&
                 this.heatState != HeatState.FINISHED &&
-                this.heatState != HeatState.PRACTICE
-            ) {
-                EventAnnouncements announcements =
-                    this.round != null && this.round.getEvent() != null
-                        ? this.round.getEvent().getAnnouncements()
-                        : this.plugin.getEventAnnouncements();
-                announcements.broadcastSessionCancelled(this);
+                this.heatState != HeatState.PRACTICE) {
 
-                for (Driver driver : this.drivers.values()) {
-                    Player player = Bukkit.getPlayer(driver.getUuid());
-                    if (player != null && player.isOnline()) {
-                        this.clearTimeTrialActionBar(player);
-                    }
+            EventAnnouncements announcements =
+                    this.round != null && this.round.getEvent() != null
+                            ? this.round.getEvent().getAnnouncements()
+                            : this.plugin.getEventAnnouncements();
+            announcements.broadcastSessionCancelled(this);
+
+            for (Driver driver : this.drivers.values()) {
+                Player player = Bukkit.getPlayer(driver.getUuid());
+                if (player != null && player.isOnline()) {
+                    this.clearTimeTrialActionBar(player);
                 }
             }
         } else {
             DebugManager var10000 = this.plugin.getDebugManager();
             int var10001 = this.id;
             var10000.logRaceSystem(
-                "Heat " +
-                    var10001 +
-                    " em andamento (" +
-                    String.valueOf(this.heatState) +
-                    ") - forçando parada antes do reset..."
+                    "Heat " + var10001 + " em andamento (" + String.valueOf(this.heatState) +
+                            ") - forçando parada antes do reset..."
             );
             if (this.heatState != HeatState.PRACTICE) {
                 EventAnnouncements announcements =
-                    this.round != null && this.round.getEvent() != null
-                        ? this.round.getEvent().getAnnouncements()
-                        : this.plugin.getEventAnnouncements();
+                        this.round != null && this.round.getEvent() != null
+                                ? this.round.getEvent().getAnnouncements()
+                                : this.plugin.getEventAnnouncements();
                 announcements.broadcastSessionCancelled(this);
 
                 for (Driver driver : this.drivers.values()) {
@@ -982,54 +970,60 @@ public class Heats {
             }
         }
 
+        // Limpa timers e managers
         this.stopSessionTimer();
         this.stopOfflineMonitoring();
         if (this.plugin.getPitStopManager() != null) {
             this.plugin.getPitStopManager().clear();
         }
-
         this.gridManager.clear();
         this.plugin.getRaceActionBarManager().removeHeat(this);
         this.plugin.getRaceScoreboardManager().removeHeat(this);
+
+        // Reset de variáveis internas
         this.startTime = null;
         this.endTime = null;
         this.fastestLapUUID = null;
-        if (this.startPositions != null) {
-            this.startPositions.clear();
-        }
+        if (this.startPositions != null) this.startPositions.clear();
+        if (this.livePositions != null) this.livePositions.clear();
 
-        if (this.livePositions != null) {
-            this.livePositions.clear();
-        }
-
+        // Reset completo dos drivers
         for (Driver driver : this.drivers.values()) {
-            driver.reset();
+            driver.reset();                // limpa laps, pits, etc.
+            driver.resetLagFlags();        // garante que lagStart/lagEnd sejam resetados
+            driver.setCheckpointsReached(0);
+            driver.setFinished(false);
+            driver.setDnf(false);
+
             Player player = Bukkit.getPlayer(driver.getUuid());
             if (player != null && player.isOnline()) {
                 boolean dbLonely =
-                    this.plugin.getDatabaseManager().getLonelyModePlayer(
-                        player.getUniqueId()
-                    );
-                this.plugin.getLonelyController().setLonelyMode(
-                    player,
-                    dbLonely
-                );
+                        this.plugin.getDatabaseManager().getLonelyModePlayer(player.getUniqueId());
+                this.plugin.getLonelyController().setLonelyMode(player, dbLonely);
             }
         }
 
+        // Limpa lookup para não ficar preso ao Heat antigo
         if (this.plugin != null && this.plugin.getDriverLookup() != null) {
             for (UUID uuid : this.drivers.keySet()) {
                 this.plugin.getDriverLookup().unregister(uuid);
             }
         }
 
+        // Limpa checkpoints no listener (evita cooldown bloqueando novos CPs)
+        if (this.plugin.getRaceCheckpointListener() != null) {
+            this.plugin.getRaceCheckpointListener().cleanupHeatPlayers(this.drivers.keySet());
+        }
+
+        // Volta para estado inicial
         if (this.heatState != HeatState.SETUP) {
             this.setHeatState(HeatState.SETUP);
         }
         this.plugin.getDebugManager().logRaceSystem(
-            "✓ Heat " + this.id + " resetado para estado inicial."
+                "✓ Heat " + this.id + " resetado para estado inicial."
         );
     }
+
 
     public long getSessionTimeRemaining() {
         if (this.startTime == null) {
