@@ -3869,7 +3869,7 @@ public class DatabaseManager {
                 } else if (shouldSaveCheckpoints) {
                     // Não é recorde pessoal, mas é melhor que o tempo com checkpoints
                     String insertSql =
-                            "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, platform) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                            "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, plataforma) VALUES (?, ?, ?, ?, ?, ?, ?)";
                     try (
                             PreparedStatement ps = conn.prepareStatement(
                                     insertSql,
@@ -3959,7 +3959,7 @@ public class DatabaseManager {
                     String platform = playerName.startsWith(".") ? "BEDROCK" : "JAVA";
 
                     String insertSql =
-                            "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, platform) VALUES (?, ?, ?, ?, ?, FALSE, ?)";
+                            "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, plataforma) VALUES (?, ?, ?, ?, ?, FALSE, ?)";
 
                     try (
                             PreparedStatement ps = conn.prepareStatement(
