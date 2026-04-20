@@ -3846,7 +3846,7 @@ public class DatabaseManager {
                 if (shouldSaveTime) {
                     // Salva o tempo normalmente (é um novo recorde pessoal)
                     String insertSql =
-                            "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, platform) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                            "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, plataforma) VALUES (?, ?, ?, ?, ?, ?, ?)";
                     try (
                             PreparedStatement ps = conn.prepareStatement(
                                     insertSql,
