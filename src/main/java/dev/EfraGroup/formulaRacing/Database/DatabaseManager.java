@@ -265,7 +265,7 @@ public class DatabaseManager {
                     yaw REAL NOT NULL, pitch REAL NOT NULL
                 )"""
             );
-
+            stmt.executeUpdate("UPDATE fr_player_times SET plataforma = 'Java' WHERE plataforma IS NULL");
             stmt.executeUpdate(
                 """
                 CREATE TABLE IF NOT EXISTS fr_tracks (

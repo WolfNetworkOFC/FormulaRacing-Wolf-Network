@@ -1364,7 +1364,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                         String eventName = configs[2];
                         String roundName = configs[3];
                         Events event =
-                            (Events) this.raceEventManager.getEventByName(
+                             this.raceEventManager.getEventByName(
                                 eventName
                             ).orElse(null);
                         if (event != null) {
