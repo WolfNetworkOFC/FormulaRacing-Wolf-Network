@@ -58,13 +58,11 @@ public class TrackLeaderboard { // Removido o 'abstract'
         this.location = newLocation;
         this.mySQLManager.saveHologramLocation(this.trackName, newLocation);
 
-        Bukkit.getScheduler().runTask(this.plugin, () -> {
-            holograms.forEach((type, holo) -> {
-                double xOffset = type.equals("bedrock") ? 3.0 : 0.0;
-                Location holoLoc = newLocation.clone().add(xOffset, 0.5, 0.0);
-                holo.setLocation(holoLoc);
-            });
-        });
+        Bukkit.getScheduler().runTask(this.plugin, () -> holograms.forEach((type, holo) -> {
+            double xOffset = type.equals("bedrock") ? 3.0 : 0.0;
+            Location holoLoc = newLocation.clone().add(xOffset, 0.5, 0.0);
+            holo.setLocation(holoLoc);
+        }));
     }
     private void processAndShow(List<DatabaseManager.PlayerTime> leaderboard, String type) {
         int totalCheckpoints = this.mySQLManager.getCheckpointCount(this.trackName);
@@ -78,9 +76,6 @@ public class TrackLeaderboard { // Removido o 'abstract'
 
         String configPath = "leaderboards.fastesttime-" + type + ".lines";
         List<String> configLines = this.plugin.getConfig().getStringList(configPath);
-
-        // --- DEBUG ---
-        this.plugin.getLogger().info("[LB-DEBUG] Atualizando: " + type + " | Pista: " + this.trackName);
 
         if (configLines.isEmpty()) {
             configLines = new ArrayList<>();
@@ -125,7 +120,6 @@ public class TrackLeaderboard { // Removido o 'abstract'
         }
 
         // Debug para ver se o título converteu o $ corretamente
-        this.plugin.getLogger().info("[LB-DEBUG] Linha 1 Final: " + finalLines.get(0));
 
         Bukkit.getScheduler().runTask(this.plugin, () -> {
             try {
@@ -142,8 +136,7 @@ public class TrackLeaderboard { // Removido o 'abstract'
                 } else {
                     DHAPI.setHologramLines(holo, finalLines);
                 }
-            } catch (Exception e) {
-                this.plugin.getLogger().severe("[LB-DEBUG] Erro no DHAPI: " + e.getMessage());
+            } catch (Exception ignored) {
             }
         });
     }

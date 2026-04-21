@@ -1,24 +1,20 @@
 package dev.EfraGroup.formulaRacing;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
-import dev.EfraGroup.formulaRacing.FormulaRacing;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.text.Normalizer;
 import java.util.*;
 
 public class PacketSender {
 
     private final DatabaseManager db;
-    private final FormulaRacing plugin;
 
     public PacketSender(DatabaseManager db, FormulaRacing plugin) {
         this.db = db;
-        this.plugin = plugin;
     }
 
     public void sendBoatSetting(Player player, int packetId, Object... values) {
