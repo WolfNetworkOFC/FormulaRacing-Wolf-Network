@@ -810,6 +810,20 @@ public class RegionListener implements Listener {
         }.runTaskTimerAsynchronously(this.plugin, 0L, 1200L); // Recarrega a cada 1 minuto (1200 ticks)
     }
 
+    @EventHandler
+    public void onPlayerTeleport(PlayerTeleportEvent event) {
+        Player player = event.getPlayer();
+        String from = String.format("X=%.2f, Y=%.2f, Z=%.2f",
+                event.getFrom().getX(), event.getFrom().getY(), event.getFrom().getZ());
+        String to = String.format("X=%.2f, Y=%.2f, Z=%.2f",
+                event.getTo().getX(), event.getTo().getY(), event.getTo().getZ());
+
+        plugin.getDebugManager().logRegionDetection(
+                String.format("[DEBUG-TELEPORT] %s teleportou de %s para %s. Cause=%s",
+                        player.getName(), from, to, event.getCause().name())
+        );
+    }
+
     private void startRegionChecker() {
         Bukkit.getScheduler().runTaskTimerAsynchronously(this.plugin, () -> {
             if (regions.isEmpty()) return;
