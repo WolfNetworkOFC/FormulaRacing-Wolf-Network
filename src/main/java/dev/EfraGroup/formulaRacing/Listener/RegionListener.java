@@ -192,158 +192,154 @@ public class RegionListener implements Listener {
         this.plugin.getDebugManager().logRegionDetection("§6========================================");
     }
 
-        private void checkPlayerRegions(Player player) {
-            UUID uuid = player.getUniqueId();
-            if (!this.justTeleported.contains(uuid)) {
-                Location current = player.getLocation();
-                Location previous = (Location)this.lastLocation.get(uuid);
-                this.lastLocation.put(uuid, current);
-                if (previous == null) {
-                    previous = current;
-                }
+    private void checkPlayerRegions(Player player) {
+        UUID uuid = player.getUniqueId();
+        if (!this.justTeleported.contains(uuid)) {
+            Location current = player.getLocation();
+            Location previous = this.lastLocation.get(uuid);
 
-                // DEBUG: posição atual do jogador
+            // Se for Bedrock e estiver em barco, usar posição do barco
+            if (FloodgateApi.getInstance().isFloodgatePlayer(uuid) && player.isInsideVehicle() && player.getVehicle() instanceof Boat) {
+                current = player.getVehicle().getLocation();
                 this.plugin.getDebugManager().logRegionDetection(
-                        String.format("[DEBUG] Player=%s Pos=(%.2f, %.2f, %.2f)",
+                        String.format("[DEBUG] Player=%s é Bedrock, usando BoatPos=(%.2f, %.2f, %.2f) para detecção",
                                 player.getName(), current.getX(), current.getY(), current.getZ())
                 );
+            }
 
-                // DEBUG: posição do barco, se estiver dentro
-                if (player.isInsideVehicle() && player.getVehicle() instanceof Boat) {
-                    Location boatLoc = player.getVehicle().getLocation();
-                    this.plugin.getDebugManager().logRegionDetection(
-                            String.format("[DEBUG] Player=%s BoatPos=(%.2f, %.2f, %.2f)",
-                                    player.getName(), boatLoc.getX(), boatLoc.getY(), boatLoc.getZ())
-                    );
-                }
+            this.lastLocation.put(uuid, current);
+            if (previous == null) {
+                previous = current;
+            }
 
-                double distSq = previous.distanceSquared(current);
-                if (!(distSq < 0.05)) {
-                    if (distSq > 2500.0F) {
-                        this.lastLocation.put(uuid, current);
-                    } else {
-                        if (current.getWorld() == null) {
-                            this.plugin.getDebugManager().logRegionDetection("[RegionListener] Mundo null detectado para jogador " + player.getName());
-                        } else {
-                            String worldName = current.getWorld().getName().toLowerCase();
-                            List<DatabaseManager.RegionData> worldRegions = this.regions.get(worldName);
+            // DEBUG: posição atual do jogador
+            this.plugin.getDebugManager().logRegionDetection(
+                    String.format("[DEBUG] Player=%s Pos=(%.2f, %.2f, %.2f)",
+                            player.getName(), player.getLocation().getX(), player.getLocation().getY(), player.getLocation().getZ())
+            );
 
-                            if (worldRegions != null && !worldRegions.isEmpty()) {
-                                // DEBUG: região mais próxima
-                                DatabaseManager.RegionData nearest = null;
-                                double nearestDist = Double.MAX_VALUE;
-                                for (DatabaseManager.RegionData region : worldRegions) {
-                                    double cx = (region.getMinX() + region.getMaxX()) / 2.0;
-                                    double cy = (region.getMinY() + region.getMaxY()) / 2.0;
-                                    double cz = (region.getMinZ() + region.getMaxZ()) / 2.0;
-                                    Location center = new Location(current.getWorld(), cx, cy, cz);
-                                    double dist = current.distance(center);
-                                    if (dist < nearestDist) {
-                                        nearestDist = dist;
-                                        nearest = region;
-                                    }
-                                }
-                                if (nearest != null) {
-                                    this.plugin.getDebugManager().logRegionDetection(
-                                            String.format("[DEBUG] Player=%s Região mais próxima: %s (%s) ID=%d Dist=%.2f",
-                                                    player.getName(),
-                                                    nearest.getTrackName(),
-                                                    nearest.getType(),
-                                                    nearest.getId(),
-                                                    nearestDist
-                                            )
-                                    );
-                                }
+            // DEBUG: posição do barco, se estiver dentro
+            if (player.isInsideVehicle() && player.getVehicle() instanceof Boat) {
+                Location boatLoc = player.getVehicle().getLocation();
+                this.plugin.getDebugManager().logRegionDetection(
+                        String.format("[DEBUG] Player=%s BoatPos=(%.2f, %.2f, %.2f)",
+                                player.getName(), boatLoc.getX(), boatLoc.getY(), boatLoc.getZ())
+                );
+            }
+
+            double distSq = previous.distanceSquared(current);
+            if (!(distSq < 0.05)) {
+                if (distSq > 2500.0F) {
+                    this.lastLocation.put(uuid, current);
+                } else {
+                    if (player.isInsideVehicle()) {
+                        Entity vehicle = player.getVehicle();
+                        if (vehicle instanceof Boat) {
+                            List<Entity> passengers = vehicle.getPassengers();
+                            if (!passengers.contains(player)) {
+                                return;
                             }
                         }
                     }
-                    }
 
-                if (!(distSq < 0.05)) {
-                    if (distSq > (double)2500.0F) {
-                        this.lastLocation.put(uuid, current);
+                    if (current.getWorld() == null) {
+                        this.plugin.getDebugManager().logRegionDetection("[RegionListener] Mundo null detectado para jogador " + player.getName());
                     } else {
-                        if (player.isInsideVehicle()) {
-                            Entity vehicle = player.getVehicle();
-                            if (vehicle instanceof Boat) {
-                                List<Entity> passengers = vehicle.getPassengers();
-                                if (!passengers.contains(player)) {
+                        String worldName = current.getWorld().getName().toLowerCase();
+                        List<DatabaseManager.RegionData> worldRegions = this.regions.get(worldName);
+
+                        if (worldRegions != null && !worldRegions.isEmpty()) {
+                            // DEBUG: região mais próxima
+                            DatabaseManager.RegionData nearest = null;
+                            double nearestDist = Double.MAX_VALUE;
+                            for (DatabaseManager.RegionData region : worldRegions) {
+                                double cx = (region.getMinX() + region.getMaxX()) / 2.0;
+                                double cy = (region.getMinY() + region.getMaxY()) / 2.0;
+                                double cz = (region.getMinZ() + region.getMaxZ()) / 2.0;
+                                Location center = new Location(current.getWorld(), cx, cy, cz);
+                                double dist = current.distance(center);
+                                if (dist < nearestDist) {
+                                    nearestDist = dist;
+                                    nearest = region;
+                                }
+                            }
+                            if (nearest != null) {
+                                this.plugin.getDebugManager().logRegionDetection(
+                                        String.format("[DEBUG] Player=%s Região mais próxima: %s (%s) ID=%d Dist=%.2f Min=(%.2f, %.2f, %.2f) Max=(%.2f, %.2f, %.2f)",
+                                                player.getName(),
+                                                nearest.getTrackName(),
+                                                nearest.getType(),
+                                                nearest.getId(),
+                                                nearestDist,
+                                                nearest.getMinX(), nearest.getMinY(), nearest.getMinZ(),
+                                                nearest.getMaxX(), nearest.getMaxY(), nearest.getMaxZ()
+                                        )
+                                );
+                            }
+
+                            // Checar se cruzou região START/END
+                            DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, current, worldRegions);
+                            if (startEndRegion != null) {
+                                Location finalFrom = previous.clone();
+                                Location finalTo = current.clone();
+                                this.plugin.getDebugManager().logRegionDetection(
+                                        String.format("[DEBUG] Player=%s cruzou região %s (%s) ID=%d",
+                                                player.getName(),
+                                                startEndRegion.getTrackName(),
+                                                startEndRegion.getType(),
+                                                startEndRegion.getId())
+                                );
+                                Bukkit.getScheduler().runTask(this.plugin, () -> this.handleRegion(player, startEndRegion, finalFrom, finalTo));
+                            }
+
+                            // Lógica de checkpoints e duelos
+                            String activeTrack = this.timerUtils.getActiveTrack(player);
+                            int activeDuelId = this.timeTrialDuels.getActiveDuelIdCached(uuid);
+                            boolean isInDuel = activeDuelId != -1;
+                            if (activeTrack != null || isInDuel) {
+                                String trackForCheckpoints = isInDuel ? this.timeTrialDuels.getDuelTrackNameCached(activeDuelId) : activeTrack;
+
+                                if (!(player.getVehicle() instanceof Boat)) {
                                     return;
                                 }
-                            }
-                        }
-    
-                        if (current.getWorld() == null) {
-                            this.plugin.getDebugManager().logRegionDetection("[RegionListener] Mundo null detectado para jogador " + player.getName());
-                        } else {
-                            String worldName = current.getWorld().getName().toLowerCase();
-                            List<DatabaseManager.RegionData> worldRegions = (List)this.regions.get(worldName);
-                            if (worldRegions != null && !worldRegions.isEmpty()) {
-                                DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, current, worldRegions);
-                                if (startEndRegion != null) {
-                                    Location finalFrom = previous.clone();
-                                    Location finalTo = current.clone();
-                                    Bukkit.getScheduler().runTask(this.plugin, () -> this.handleRegion(player, startEndRegion, finalFrom, finalTo));
+                                if (trackForCheckpoints == null) {
+                                    return;
                                 }
-    
-                                String activeTrack = this.timerUtils.getActiveTrack(player);
-                                int activeDuelId = this.timeTrialDuels.getActiveDuelIdCached(uuid);
-                                boolean isInDuel = activeDuelId != -1;
-                                if (activeTrack != null || isInDuel) {
-                                    String trackForCheckpoints;
-                                    if (isInDuel) {
-                                        trackForCheckpoints = this.timeTrialDuels.getDuelTrackNameCached(activeDuelId);
-                                    } else {
-                                        trackForCheckpoints = activeTrack;
-                                    }
-    
-                                    if (!(player.getVehicle() instanceof Boat)) {
-                                        return;
-                                    }
-    
-                                    if (trackForCheckpoints == null) {
-                                        return;
-                                    }
-    
-                                    List<DatabaseManager.RegionData> checkpoints = this.database.getCheckpoints(trackForCheckpoints);
-                                    if (this.plugin.getDebugManager().isRegionDetectionEnabled() && checkpoints.isEmpty()) {
-                                        this.plugin.getDebugManager().logRegionDetection("§e[DEBUG] Pista " + trackForCheckpoints + " não tem checkpoints configurados!");
-                                    }
+
+                                List<DatabaseManager.RegionData> checkpoints = this.database.getCheckpoints(trackForCheckpoints);
+                                if (this.plugin.getDebugManager().isRegionDetectionEnabled() && checkpoints.isEmpty()) {
+                                    this.plugin.getDebugManager().logRegionDetection("§e[DEBUG] Pista " + trackForCheckpoints + " não tem checkpoints configurados!");
+                                }
 
                                 if (!isInDuel && activeTrack != null) {
                                     TimerUtils.PlayerTimerData data = this.timerUtils.getTimerData(player, activeTrack);
                                     if (data != null) {
                                         int nextExpectedIndex = data.getCheckpointsReached();
                                         if (nextExpectedIndex < checkpoints.size()) {
-                                            DatabaseManager.RegionData nextCp = (DatabaseManager.RegionData)checkpoints.get(nextExpectedIndex);
+                                            DatabaseManager.RegionData nextCp = checkpoints.get(nextExpectedIndex);
                                             if (RegionMathUtils.intersectsRegion(previous, current, nextCp)) {
                                                 double proportion = RegionMathUtils.calculateRegionEntryProportion(previous, current, nextCp);
                                                 long tickDurationMs = 50L;
-                                                long adjustmentMs = (long)(((double)1.0F - proportion) * (double)tickDurationMs);
+                                                long adjustmentMs = (long) ((1.0F - proportion) * tickDurationMs);
                                                 long preciseTimeMs = System.currentTimeMillis() - adjustmentMs;
                                                 TimeTrialSession session = this.timeTrialController.getSession(player);
-                                                long splitTime;
+                                                long splitTime = session != null ? preciseTimeMs - session.getStartTime().toEpochMilli() : 0L;
+
                                                 if (session != null) {
-                                                    splitTime = preciseTimeMs - session.getStartTime().toEpochMilli();
-                                                    session.addCheckpointTime((double)splitTime / (double)1000.0F);
-                                                } else {
-                                                    splitTime = 0L;
+                                                    session.addCheckpointTime(splitTime / 1000.0F);
                                                 }
 
                                                 int cpId = nextCp.getId();
-                                                double elapsed = session != null ? (double)splitTime / (double)1000.0F : this.timerUtils.getPlayerElapsedTime(player);
+                                                double elapsed = session != null ? splitTime / 1000.0F : this.timerUtils.getPlayerElapsedTime(player);
                                                 Bukkit.getScheduler().runTask(this.plugin, () -> {
                                                     if (session != null) {
                                                         TimeTrialCheckpointEvent event = new TimeTrialCheckpointEvent(player, session, cpId, splitTime);
                                                         Bukkit.getPluginManager().callEvent(event);
                                                     }
-
                                                     this.timerUtils.addCheckpoint(player, cpId);
                                                     this.timerUtils.addTempCheckpoint(uuid, cpId, elapsed, activeTrack);
                                                     player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.5F);
-                                                    DebugManager var10000 = this.plugin.getDebugManager();
-                                                    String var10001 = player.getName();
-                                                    var10000.logRegionDetection(var10001 + " coletou checkpoint na pista " + activeTrack);
+                                                    this.plugin.getDebugManager().logRegionDetection(player.getName() + " coletou checkpoint na pista " + activeTrack);
                                                 });
                                             }
                                         }
@@ -354,12 +350,11 @@ public class RegionListener implements Listener {
                                         int lapWhenTimeLimitReached = this.timeTrialDuels.getLapWhenTimeLimitReached(uuid, activeDuelId);
                                         if (lapWhenTimeLimitReached >= 0 && currentLap > lapWhenTimeLimitReached) {
                                             long now = System.currentTimeMillis();
-                                            Long lastLog = (Long)this.lastTimeLimitLog.get(uuid);
+                                            Long lastLog = this.lastTimeLimitLog.get(uuid);
                                             if (lastLog == null || now - lastLog >= 2000L) {
                                                 this.plugin.getDebugManager().logRegionDetection("§e[TIME LIMIT] " + player.getName() + " limite de tempo excedido.");
                                                 this.lastTimeLimitLog.put(uuid, now);
                                             }
-
                                             return;
                                         }
                                     }
@@ -367,34 +362,34 @@ public class RegionListener implements Listener {
                                     Map<Integer, Double> collectedCheckpoints = this.database.getDuelCheckpointTimes(uuid, activeDuelId);
                                     int nextExpectedIndex = collectedCheckpoints.size();
                                     if (nextExpectedIndex < checkpoints.size()) {
-                                        DatabaseManager.RegionData nextCp = (DatabaseManager.RegionData)checkpoints.get(nextExpectedIndex);
+                                        DatabaseManager.RegionData nextCp = checkpoints.get(nextExpectedIndex);
                                         if (RegionMathUtils.intersectsRegion(previous, current, nextCp)) {
                                             double elapsedTime = this.DuelsTimer.getPlayerLapElapsedSeconds(player);
                                             int cpId = nextCp.getId();
                                             Bukkit.getScheduler().runTask(this.plugin, () -> {
                                                 this.database.saveDuelCheckpointTime(uuid, activeDuelId, trackForCheckpoints, cpId, elapsedTime);
                                                 player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.5F);
-                                                DebugManager var10000 = this.plugin.getDebugManager();
-                                                String var10001 = player.getName();
-                                                var10000.logRegionDetection(var10001 + " coletou checkpoint no duelo #" + activeDuelId);
-                                            });
+                                                    DebugManager var10000 = this.plugin.getDebugManager();
+                                                    String var10001 = player.getName();
+                                                    var10000.logRegionDetection(var10001 + " coletou checkpoint no duelo #" + activeDuelId);
+                                                });
+                                            }
                                         }
                                     }
                                 }
+    
+                            } else {
+                                if (!this.warnedWorlds.contains(worldName)) {
+                                    this.warnedWorlds.add(worldName);
+                                    this.plugin.getDebugManager().logRegionDetection("[FormulaRacing] Nenhuma região registrada para o mundo " + worldName);
+                                }
+    
                             }
-
-                        } else {
-                            if (!this.warnedWorlds.contains(worldName)) {
-                                this.warnedWorlds.add(worldName);
-                                this.plugin.getDebugManager().logRegionDetection("[FormulaRacing] Nenhuma região registrada para o mundo " + worldName);
-                            }
-
                         }
                     }
                 }
             }
         }
-    }
 
     private void handleRegion(Player player, DatabaseManager.RegionData region, Location from, Location to) {
         UUID uuid = player.getUniqueId();
