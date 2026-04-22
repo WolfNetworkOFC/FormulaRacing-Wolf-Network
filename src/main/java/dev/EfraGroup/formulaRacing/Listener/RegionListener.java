@@ -358,18 +358,17 @@ public class RegionListener implements Listener {
                                             return;
                                         }
                                     }
-
-                                    Map<Integer, Double> collectedCheckpoints = this.database.getDuelCheckpointTimes(uuid, activeDuelId);
-                                    int nextExpectedIndex = collectedCheckpoints.size();
-                                    if (nextExpectedIndex < checkpoints.size()) {
-                                        DatabaseManager.RegionData nextCp = checkpoints.get(nextExpectedIndex);
-                                        if (RegionMathUtils.intersectsRegion(previous, current, nextCp)) {
-                                            double elapsedTime = this.DuelsTimer.getPlayerLapElapsedSeconds(player);
-                                            int cpId = nextCp.getId();
-                                            Bukkit.getScheduler().runTask(this.plugin, () -> {
-                                                this.database.saveDuelCheckpointTime(uuid, activeDuelId, trackForCheckpoints, cpId, elapsedTime);
-                                                player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.5F);
-                                                    DebugManager var10000 = this.plugin.getDebugManager();
+                                        Map<Integer, Double> collectedCheckpoints = this.database.getDuelCheckpointTimes(uuid, activeDuelId);
+                                        int nextExpectedIndex = collectedCheckpoints.size();
+                                        if (nextExpectedIndex < checkpoints.size()) {
+                                            DatabaseManager.RegionData nextCp = checkpoints.get(nextExpectedIndex);
+                                            if (RegionMathUtils.intersectsRegion(previous, current, nextCp)) {
+                                                double elapsedTime = this.DuelsTimer.getPlayerLapElapsedSeconds(player);
+                                                int cpId = nextCp.getId();
+                                                Bukkit.getScheduler().runTask(this.plugin, () -> {
+                                                    this.database.saveDuelCheckpointTime(uuid, activeDuelId, trackForCheckpoints, cpId, elapsedTime);
+                                                    player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.5F);
+                                                        DebugManager var10000 = this.plugin.getDebugManager();
                                                     String var10001 = player.getName();
                                                     var10000.logRegionDetection(var10001 + " coletou checkpoint no duelo #" + activeDuelId);
                                                 });
