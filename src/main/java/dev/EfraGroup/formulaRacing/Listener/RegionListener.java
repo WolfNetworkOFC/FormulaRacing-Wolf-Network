@@ -221,14 +221,30 @@ public class RegionListener implements Listener {
                         this.plugin.getDebugManager().logRegionDetection("[RegionListener] Mundo null detectado para jogador " + player.getName());
                     } else {
                         String worldName = current.getWorld().getName().toLowerCase();
-                        List<DatabaseManager.RegionData> worldRegions = (List)this.regions.get(worldName);
+                        List<DatabaseManager.RegionData> worldRegions = this.regions.get(worldName);
                         if (worldRegions != null && !worldRegions.isEmpty()) {
                             DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, current, worldRegions);
                             if (startEndRegion != null) {
                                 Location finalFrom = previous.clone();
                                 Location finalTo = current.clone();
-                                Bukkit.getScheduler().runTask(this.plugin, () -> this.handleRegion(player, startEndRegion, finalFrom, finalTo));
+
+                                // DEBUG extra: logando quem cruzou a região
+                                this.plugin.getDebugManager().logRegionDetection(
+                                        String.format("[DEBUG-REGION] %s cruzou região %s (%s) ID=%d | From=(%.2f, %.2f, %.2f) -> To=(%.2f, %.2f, %.2f)",
+                                                player.getName(),
+                                                startEndRegion.getTrackName(),
+                                                startEndRegion.getType(),
+                                                startEndRegion.getId(),
+                                                finalFrom.getX(), finalFrom.getY(), finalFrom.getZ(),
+                                                finalTo.getX(), finalTo.getY(), finalTo.getZ()
+                                        )
+                                );
+
+                                Bukkit.getScheduler().runTask(this.plugin, () ->
+                                        this.handleRegion(player, startEndRegion, finalFrom, finalTo)
+                                );
                             }
+
 
                             String activeTrack = this.timerUtils.getActiveTrack(player);
                             int activeDuelId = this.timeTrialDuels.getActiveDuelIdCached(uuid);
