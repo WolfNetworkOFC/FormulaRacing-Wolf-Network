@@ -3174,6 +3174,26 @@ public class DatabaseManager {
         return trackDataMap;
     }
 
+    public synchronized int getOpenTracksCount() {
+        String sql = "SELECT COUNT(*) FROM fr_tracks WHERE open = 1";
+
+        try {
+            Connection conn = getOrConnect();
+            try (
+                PreparedStatement ps = conn.prepareStatement(sql);
+                ResultSet rs = ps.executeQuery()
+            ) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+
+        return 0;
+    }
+
     public synchronized void setTrackOpen(String trackName, boolean open) {
         String sql =
             "UPDATE fr_tracks SET open = ? WHERE LOWER(trackNameWS) = LOWER(?)";

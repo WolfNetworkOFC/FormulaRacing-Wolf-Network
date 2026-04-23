@@ -46,6 +46,7 @@ import dev.EfraGroup.formulaRacing.Listener.PitStopListener;
 import dev.EfraGroup.formulaRacing.Listener.RaceCheckpointListener;
 import dev.EfraGroup.formulaRacing.Listener.RaceMovementListener;
 import dev.EfraGroup.formulaRacing.Listener.RegionListener;
+import dev.EfraGroup.formulaRacing.PlaceHolder.PlaceholderRegister;
 import dev.EfraGroup.formulaRacing.Participant.DriverLookup;
 import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
@@ -138,6 +139,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private TrackVisualizer trackVisualizer;
     private EventAnnouncements eventAnnouncements;
     private TimeTrialController timeTrialController;
+    private PlaceholderRegister placeholderRegister;
     private PaperCommandManager commandManager;
     private TaskChainFactory taskChainFactory;
     private ReadyCheckManager readyCheckManager;
@@ -315,6 +317,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.registerCommandCompletions();
             this.registerListeners();
             this.registerCommands();
+            this.registerPlaceholders();
             this.loadLeaderboards();
             this.startLeaderboardUpdater();
             Bukkit.getScheduler().runTaskAsynchronously(this, () ->
@@ -349,6 +352,11 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     public void onDisable() {
         if (this.debugManager != null) {
             this.getLogger().info("[FormulaRacing] Desativando plugin...");
+        }
+
+        if (this.placeholderRegister != null) {
+            this.placeholderRegister.stop();
+            this.placeholderRegister = null;
         }
 
         GuiManager.getInstance().closeAll();
@@ -444,6 +452,28 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             ),
             this
         );
+    }
+
+    private void registerPlaceholders() {
+        if (!Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            this.getLogger().info(
+                "[FormulaRacing] PlaceholderAPI não encontrado. Placeholder %open_tracks_count% não será registrado."
+            );
+            return;
+        }
+
+        this.placeholderRegister = new PlaceholderRegister(this);
+        if (this.placeholderRegister.registerExpansion()) {
+            this.getLogger().info(
+                "[FormulaRacing] Placeholder %open_tracks_count% registrado com sucesso."
+            );
+            return;
+        }
+
+        this.getLogger().warning(
+            "[FormulaRacing] Não foi possível registrar o placeholder %open_tracks_count%."
+        );
+        this.placeholderRegister = null;
     }
 
     private void registerCommands() {

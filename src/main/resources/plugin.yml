@@ -12,6 +12,7 @@ softdepend:
   - PlayerPoints
   - HeadDatabase
   - LuckPerms
+  - PlaceholderAPI
 commands:
   boat:
     description: Dá um barco ao jogador
