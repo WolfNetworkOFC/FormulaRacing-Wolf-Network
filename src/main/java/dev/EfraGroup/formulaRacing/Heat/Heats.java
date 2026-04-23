@@ -524,6 +524,13 @@ public class Heats {
                 }
             }
 
+            // Re-registra todos os drivers no lookup após reset+load
+            if (this.plugin != null && this.plugin.getDriverLookup() != null) {
+                for (Driver driver : this.drivers.values()) {
+                    this.plugin.getDriverLookup().register(driver, this);
+                }
+            }
+
             this.setHeatState(HeatState.LOADED);
             this.saveConfigIfDirty();
             var10000 = this.plugin.getDebugManager();

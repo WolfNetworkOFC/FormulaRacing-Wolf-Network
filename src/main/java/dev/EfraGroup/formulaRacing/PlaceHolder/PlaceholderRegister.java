@@ -61,7 +61,6 @@ public class PlaceholderRegister extends PlaceholderExpansion {
         }
     }
 
-    @Override
     public @NotNull String getIdentifier() {
         return "open";
     }
@@ -89,4 +88,4 @@ public class PlaceholderRegister extends PlaceholderExpansion {
 
         return null;
     }
-}
+}import me.clip.placeholderapi.expansion.PlaceholderExpansion;

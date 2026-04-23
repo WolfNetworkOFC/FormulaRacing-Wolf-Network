@@ -325,8 +325,7 @@ public class EventAnnouncements {
             Player p = Bukkit.getPlayer(d.getUuid());
             if (p != null && p.isOnline()) {
                 String title = this.t.getTranslated(p, "event_session_cancelled_title", new String[0]);
-                String subtitle = this.t.getTranslated(p, "event_session_cancelled_subtitle", new String[0]);
-                TitleHelper.sendThemedTitle(p, title, subtitle, 10, 60, 20);
+                TitleHelper.sendThemedTitle(p, title, "", 10, 60, 20);
             }
         }
 
