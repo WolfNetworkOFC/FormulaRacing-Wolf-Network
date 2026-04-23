@@ -2,7 +2,7 @@ package dev.EfraGroup.formulaRacing.Command;
 
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.*;
-import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Controllers.QuickRaceManager;
 import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.PacketSender;
@@ -437,7 +437,13 @@ public class DuelCommand extends BaseCommand implements Listener {
         try {
             playSound(responder, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f);
             playSound(challenger, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f);
-            timeTrialDuels.startDuelPreparation(challenger, responder, track, laps, timeLimitSeconds, isLonely, isTimeTrialMode);
+            if (isTimeTrialMode) {
+                timeTrialDuels.startDuelPreparation(challenger, responder, track, laps, timeLimitSeconds, isLonely, isTimeTrialMode);
+            } else {
+                // For race mode, use QuickRaceManager
+                QuickRaceManager qrm = plugin.getQuickRaceManager();
+                qrm.createDuelRace(challenger, responder, track, laps, 0); // pits = 0 for duels
+            }
         } catch (Exception e) {
             e.printStackTrace();
             responder.sendMessage("§c§lERRO §8» §7Falha crítica ao iniciar o duelo.");

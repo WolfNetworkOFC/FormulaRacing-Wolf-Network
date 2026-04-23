@@ -160,6 +160,93 @@ public class QuickRaceManager {
         return true;
     }
 
+    public boolean createDuelRace(Player p1, Player p2, String trackName, int laps, int pits) {
+        cleanupFinishedQuickRaces();
+
+        if (currentQuickRace != null) {
+            plugin.sendMessage(p1, "quickrace_already_active");
+            return false;
+        }
+
+        DatabaseManager.TrackData trackData = database.getTrackData(trackName);
+        if (trackData == null) {
+            plugin.sendMessage(p1, "track_not_found", "{track}", trackName);
+            return false;
+        }
+
+        String finalTrackName = trackData.getTrackName();
+        String trackNameWS = finalTrackName.replaceAll("\\s+", "").toLowerCase();
+
+        if (!database.isCircuit(trackNameWS) && (laps > 1 || pits > 0)) {
+            plugin.sendMessage(p1, "quickrace_ptp_adjustment");
+            laps = 1;
+            pits = 0;
+        }
+
+        int finalLaps = Math.max(1, laps);
+        int finalPits = Math.min(Math.max(0, pits), finalLaps - 1);
+        String eventName = "DuelRace_" + System.currentTimeMillis();
+
+        java.util.concurrent.CompletableFuture<Object> future = eventManager.createQuickRace(
+                p1.getUniqueId(), eventName, finalTrackName, finalLaps, finalPits
+        );
+
+        future.thenAccept(obj -> {
+            if (obj == null || !(obj instanceof Events)) {
+                plugin.sendMessage(p1, "quickrace_create_error");
+                return;
+            }
+
+            Events event = (Events) obj;
+            this.currentQuickRace = event;
+
+            this.currentRound = event.getEventSchedule().getRounds().values().stream()
+                    .findFirst()
+                    .map(r -> (Rounds) r)
+                    .orElse(null);
+
+            if (currentRound == null) {
+                plugin.sendMessage(p1, "quickrace_round_error");
+                deleteQuickRace();
+                return;
+            }
+
+            this.currentHeat = currentRound.getHeats().values().stream()
+                    .findFirst()
+                    .map(h -> (Heats) h)
+                    .orElse(null);
+
+            if (currentHeat == null) {
+                plugin.sendMessage(p1, "quickrace_heat_error");
+                deleteQuickRace();
+                return;
+            }
+
+            // Set max drivers to 2 for duel
+            currentHeat.setMaxDrivers(2);
+
+            // Add both players
+            boolean added1 = addPlayer(p1);
+            boolean added2 = addPlayer(p2);
+
+            if (!added1 || !added2) {
+                plugin.sendMessage(p1, "quickrace_add_error");
+                deleteQuickRace();
+                return;
+            }
+
+            database.setPlayerSelectedEvent(p1.getUniqueId(), currentQuickRace);
+            database.setPlayerSelectedEvent(p2.getUniqueId(), currentQuickRace);
+
+            // Start immediately, skip lobby
+            startQuickRace(p1);
+
+            plugin.getDebugManager().logRaceSystem("Duel Race created by " + p1.getName() + " vs " + p2.getName() + " on track " + finalTrackName);
+        });
+
+        return true;
+    }
+
     public boolean addPlayer(Player player) {
         if (this.currentHeat == null) {
             this.plugin.sendMessage(player, "quickrace_none_active", new String[0]);

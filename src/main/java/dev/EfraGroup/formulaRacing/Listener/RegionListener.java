@@ -206,15 +206,18 @@ public class RegionListener implements Listener {
             Location previous = previousRaw;
 
             // Se for Bedrock e estiver em barco, usar posição do barco
-            if (this.isBedrockPlayer(uuid) && player.isInsideVehicle() && player.getVehicle() instanceof Boat) {
-                current = player.getVehicle().getLocation();
+            if (bedrockBoatDetection) {
+                current = this.normalizeRegionLocation(player.getVehicle().getLocation(), true);
+                if (previous != null) {
+                    previous = this.normalizeRegionLocation(previous, true);
+                }
                 this.plugin.getDebugManager().logRegionDetection(
                         String.format("[DEBUG] Player=%s é Bedrock, usando BoatPos=(%.2f, %.2f, %.2f) para detecção",
                                 player.getName(), current.getX(), current.getY(), current.getZ())
                 );
             }
 
-            this.lastLocation.put(uuid, current);
+            this.lastLocation.put(uuid, currentRaw);
             if (previous == null || previous.getWorld() == null || current.getWorld() == null || previous.getWorld() != current.getWorld()) {
                 previous = current;
             }
@@ -222,7 +225,7 @@ public class RegionListener implements Listener {
             // DEBUG: posição atual do jogador
             this.plugin.getDebugManager().logRegionDetection(
                     String.format("[DEBUG] Player=%s Pos=(%.2f, %.2f, %.2f)",
-                            player.getName(), current.getX(), current.getY(), current.getZ())
+                            player.getName(), currentRaw.getX(), currentRaw.getY(), currentRaw.getZ())
             );
 
             // DEBUG: posição do barco, se estiver dentro
@@ -237,13 +240,13 @@ public class RegionListener implements Listener {
             double distSq = previous.distanceSquared(current);
             if (!(distSq < 0.05)) {
                 if (distSq > 2500.0F) {
-                    this.lastLocation.put(uuid, current);
+                    this.lastLocation.put(uuid, currentRaw);
                 } else {
                     if (player.isInsideVehicle()) {
                         Entity vehicle = player.getVehicle();
                         if (vehicle instanceof Boat) {
                             List<Entity> passengers = vehicle.getPassengers();
-                            if (!passengers.contains(player) && !this.isBedrockPlayer(uuid)) {
+                            if (!passengers.contains(player) && !bedrockBoatDetection) {
                                 return;
                             }
                         }
@@ -761,6 +764,16 @@ public class RegionListener implements Listener {
 
         Player player = Bukkit.getPlayer(uuid);
         return player != null && player.getName().startsWith("*");
+    }
+
+    private Location normalizeRegionLocation(Location location, boolean bedrockBoatDetection) {
+        if (location == null || !bedrockBoatDetection) {
+            return location;
+        }
+
+        Location adjusted = location.clone();
+        adjusted.setY(adjusted.getY() - BEDROCK_REGION_Y_OFFSET);
+        return adjusted;
     }
 
     private Location getDetectionLocation(Player player) {
