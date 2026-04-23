@@ -32,7 +32,7 @@ public class DuelCommand extends BaseCommand implements Listener {
     private final TimeTrialDuels timeTrialDuels;
     private final TimeTrialDuelsAction ttda;
 
-    private final Map<UUID, String> searchingPlayers = new HashMap<>();
+    private static final Map<UUID, String> searchingPlayers = new HashMap<>();
     private final String GUI_SETUP = "§8Configurar Duelo";
     private final String GUI_TRACKS = "§8Selecionar Pista";
     private final String GUI_DUEL = "§b§lDUEL • TIME TRIAL";
@@ -43,7 +43,7 @@ public class DuelCommand extends BaseCommand implements Listener {
     private final NamespacedKey KEY_LAPS = new NamespacedKey("formula", "laps");
     private final NamespacedKey KEY_MODE = new NamespacedKey("formula", "mode");
     private final NamespacedKey KEY_LONELY = new NamespacedKey("formula", "lonely");
-    private final Map<UUID, UUID> pendingInvites = new HashMap<>();
+    private static final Map<UUID, UUID> pendingInvites = new HashMap<>();
 
     // Construtor
     public DuelCommand(FormulaRacing plugin, DatabaseManager databaseManager, TimeTrialDuels timeTrialDuels, TimeTrialDuelsAction ttda, PacketSender packetSender) {
