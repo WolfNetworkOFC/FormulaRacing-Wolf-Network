@@ -46,9 +46,9 @@ public class DuelCommand extends BaseCommand implements Listener {
     private final Map<UUID, UUID> pendingInvites = new HashMap<>();
 
     // Construtor
-    public DuelCommand(FormulaRacing plugin) {
+    public DuelCommand(FormulaRacing plugin, DatabaseManager databaseManager, TimeTrialDuels timeTrialDuels, TimeTrialDuelsAction ttda, PacketSender packetSender) {
         this.plugin = plugin;
-        this.databaseManager = plugin.getDatabaseManager();
+        this.databaseManager = databaseManager;
         this.timeTrialDuels = timeTrialDuels;
         this.ttda = ttda;
         this.packet = packetSender;
