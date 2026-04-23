@@ -3,6 +3,7 @@ package dev.EfraGroup.formulaRacing.Command;
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.*;
 import dev.EfraGroup.formulaRacing.Controllers.QuickRaceManager;
+import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.PacketSender;
@@ -45,9 +46,9 @@ public class DuelCommand extends BaseCommand implements Listener {
     private final Map<UUID, UUID> pendingInvites = new HashMap<>();
 
     // Construtor
-    public DuelCommand(FormulaRacing plugin, DatabaseManager databaseManager, TimeTrialDuels timeTrialDuels, TimeTrialDuelsAction ttda, PacketSender packetSender) {
+    public DuelCommand(FormulaRacing plugin) {
         this.plugin = plugin;
-        this.databaseManager = databaseManager;
+        this.databaseManager = plugin.getDatabaseManager();
         this.timeTrialDuels = timeTrialDuels;
         this.ttda = ttda;
         this.packet = packetSender;
