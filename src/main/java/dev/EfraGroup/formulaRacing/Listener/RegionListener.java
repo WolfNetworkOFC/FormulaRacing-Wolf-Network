@@ -72,6 +72,7 @@ public class RegionListener implements Listener {
     private final Set<UUID> justTeleported = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<UUID, Long> lastTTDisabledWarning = new ConcurrentHashMap<>();
     private static final long TT_DISABLED_WARNING_COOLDOWN = 60000L;
+    private static final double BEDROCK_REGION_Y_OFFSET = 0.25D;
 
     public void cleanupPlayer(UUID uuid) {
         this.playerRegion.remove(uuid);
@@ -195,11 +196,14 @@ public class RegionListener implements Listener {
     private void checkPlayerRegions(Player player) {
         UUID uuid = player.getUniqueId();
         if (!this.justTeleported.contains(uuid)) {
-            Location current = this.getDetectionLocation(player);
-            if (current == null) {
+            boolean bedrockBoatDetection = this.isBedrockPlayer(uuid) && player.isInsideVehicle() && player.getVehicle() instanceof Boat;
+            Location currentRaw = this.getDetectionLocation(player);
+            if (currentRaw == null) {
                 return;
             }
-            Location previous = this.lastLocation.get(uuid);
+            Location previousRaw = this.lastLocation.get(uuid);
+            Location current = currentRaw;
+            Location previous = previousRaw;
 
             // Se for Bedrock e estiver em barco, usar posição do barco
             if (this.isBedrockPlayer(uuid) && player.isInsideVehicle() && player.getVehicle() instanceof Boat) {
