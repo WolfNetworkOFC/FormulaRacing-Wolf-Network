@@ -119,7 +119,7 @@ public class RegionListener implements Listener {
         if (activeDuelId != -1) {
             if (event.getCause() != TeleportCause.PLUGIN && event.getCause() != TeleportCause.COMMAND) {
                 if (TimeTrialDuels.isPlayerBeingLapReset(player.getUniqueId())) {
-                    this.lastLocation.put(player.getUniqueId(), event.getTo());
+                    this.lastLocation.remove(player.getUniqueId());
                     this.markJustTeleported(player);
                 } else {
                     event.setCancelled(true);
@@ -128,11 +128,11 @@ public class RegionListener implements Listener {
                     this.plugin.getDebugManager().logRegionDetection("§c[TELEPORT] Cancelado pelo RegionListener (Duel Protection). Cause: " + String.valueOf(event.getCause()));
                 }
             } else {
-                this.lastLocation.put(player.getUniqueId(), event.getTo());
+                this.lastLocation.remove(player.getUniqueId());
                 this.markJustTeleported(player);
             }
         } else {
-            this.lastLocation.put(player.getUniqueId(), event.getTo());
+            this.lastLocation.remove(player.getUniqueId());
             this.markJustTeleported(player);
         }
     }
@@ -195,11 +195,14 @@ public class RegionListener implements Listener {
     private void checkPlayerRegions(Player player) {
         UUID uuid = player.getUniqueId();
         if (!this.justTeleported.contains(uuid)) {
-            Location current = player.getLocation();
+            Location current = this.getDetectionLocation(player);
+            if (current == null) {
+                return;
+            }
             Location previous = this.lastLocation.get(uuid);
 
             // Se for Bedrock e estiver em barco, usar posição do barco
-            if (FloodgateApi.getInstance().isFloodgatePlayer(uuid) && player.isInsideVehicle() && player.getVehicle() instanceof Boat) {
+            if (this.isBedrockPlayer(uuid) && player.isInsideVehicle() && player.getVehicle() instanceof Boat) {
                 current = player.getVehicle().getLocation();
                 this.plugin.getDebugManager().logRegionDetection(
                         String.format("[DEBUG] Player=%s é Bedrock, usando BoatPos=(%.2f, %.2f, %.2f) para detecção",
@@ -208,14 +211,14 @@ public class RegionListener implements Listener {
             }
 
             this.lastLocation.put(uuid, current);
-            if (previous == null) {
+            if (previous == null || previous.getWorld() == null || current.getWorld() == null || previous.getWorld() != current.getWorld()) {
                 previous = current;
             }
 
             // DEBUG: posição atual do jogador
             this.plugin.getDebugManager().logRegionDetection(
                     String.format("[DEBUG] Player=%s Pos=(%.2f, %.2f, %.2f)",
-                            player.getName(), player.getLocation().getX(), player.getLocation().getY(), player.getLocation().getZ())
+                            player.getName(), current.getX(), current.getY(), current.getZ())
             );
 
             // DEBUG: posição do barco, se estiver dentro
@@ -236,7 +239,7 @@ public class RegionListener implements Listener {
                         Entity vehicle = player.getVehicle();
                         if (vehicle instanceof Boat) {
                             List<Entity> passengers = vehicle.getPassengers();
-                            if (!passengers.contains(player)) {
+                            if (!passengers.contains(player) && !this.isBedrockPlayer(uuid)) {
                                 return;
                             }
                         }
@@ -746,7 +749,7 @@ public class RegionListener implements Listener {
 
     private boolean isBedrockPlayer(UUID uuid) {
         try {
-            if (Bukkit.getPluginManager().isPluginEnabled("Floodgate")) {
+            if (Bukkit.getPluginManager().isPluginEnabled("Floodgate") || Bukkit.getPluginManager().isPluginEnabled("floodgate")) {
                 return FloodgateApi.getInstance().isFloodgatePlayer(uuid);
             }
         } catch (NoClassDefFoundError var3) {
@@ -754,6 +757,29 @@ public class RegionListener implements Listener {
 
         Player player = Bukkit.getPlayer(uuid);
         return player != null && player.getName().startsWith("*");
+    }
+
+    private Location getDetectionLocation(Player player) {
+        if (player == null) {
+            return null;
+        }
+
+        UUID uuid = player.getUniqueId();
+        if (this.isBedrockPlayer(uuid) && player.isInsideVehicle() && player.getVehicle() instanceof Boat) {
+            Location boatLocation = player.getVehicle().getLocation();
+            this.plugin.getDebugManager().logRegionDetection(
+                String.format(
+                    "[DEBUG] Player=%s Ã© Bedrock, usando BoatPos=(%.2f, %.2f, %.2f) para detecÃ§Ã£o",
+                    player.getName(),
+                    boatLocation.getX(),
+                    boatLocation.getY(),
+                    boatLocation.getZ()
+                )
+            );
+            return boatLocation;
+        }
+
+        return player.getLocation();
     }
 
     private void startSoloTimer(Player player, String regionTrackDisplayName, String regionTrackWS, String type, long startTime) {
@@ -862,7 +888,7 @@ public class RegionListener implements Listener {
 
 
     private void startRegionChecker() {
-        Bukkit.getScheduler().runTaskTimerAsynchronously(this.plugin, () -> {
+        Bukkit.getScheduler().runTaskTimer(this.plugin, () -> {
             if (regions.isEmpty()) return;
 
             for (Player player : Bukkit.getOnlinePlayers()) {

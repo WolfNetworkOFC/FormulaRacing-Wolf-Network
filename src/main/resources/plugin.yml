@@ -13,6 +13,8 @@ softdepend:
   - HeadDatabase
   - LuckPerms
   - PlaceholderAPI
+  - floodgate
+  - Geyser-Spigot
 commands:
   boat:
     description: Dá um barco ao jogador
