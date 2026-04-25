@@ -211,31 +211,14 @@ public class RegionListener implements Listener {
                 if (previous != null) {
                     previous = this.normalizeRegionLocation(previous, true);
                 }
-                this.plugin.getDebugManager().logRegionDetection(
-                        String.format("[DEBUG] Player=%s é Bedrock, usando BoatPos=(%.2f, %.2f, %.2f) para detecção",
-                                player.getName(), current.getX(), current.getY(), current.getZ())
-                );
-            }
+
 
             this.lastLocation.put(uuid, currentRaw);
             if (previous == null || previous.getWorld() == null || current.getWorld() == null || previous.getWorld() != current.getWorld()) {
                 previous = current;
             }
 
-            // DEBUG: posição atual do jogador
-            this.plugin.getDebugManager().logRegionDetection(
-                    String.format("[DEBUG] Player=%s Pos=(%.2f, %.2f, %.2f)",
-                            player.getName(), currentRaw.getX(), currentRaw.getY(), currentRaw.getZ())
-            );
 
-            // DEBUG: posição do barco, se estiver dentro
-            if (player.isInsideVehicle() && player.getVehicle() instanceof Boat) {
-                Location boatLoc = player.getVehicle().getLocation();
-                this.plugin.getDebugManager().logRegionDetection(
-                        String.format("[DEBUG] Player=%s BoatPos=(%.2f, %.2f, %.2f)",
-                                player.getName(), boatLoc.getX(), boatLoc.getY(), boatLoc.getZ())
-                );
-            }
 
             double distSq = previous.distanceSquared(current);
             if (!(distSq < 0.05)) {
@@ -273,20 +256,6 @@ public class RegionListener implements Listener {
                                     nearest = region;
                                 }
                             }
-                            if (nearest != null) {
-                                this.plugin.getDebugManager().logRegionDetection(
-                                        String.format("[DEBUG] Player=%s Região mais próxima: %s (%s) ID=%d Dist=%.2f Min=(%.2f, %.2f, %.2f) Max=(%.2f, %.2f, %.2f)",
-                                                player.getName(),
-                                                nearest.getTrackName(),
-                                                nearest.getType(),
-                                                nearest.getId(),
-                                                nearestDist,
-                                                nearest.getMinX(), nearest.getMinY(), nearest.getMinZ(),
-                                                nearest.getMaxX(), nearest.getMaxY(), nearest.getMaxZ()
-                                        )
-                                );
-                            }
-
                             // Checar se cruzou região START/END
                             DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, current, worldRegions);
                             if (startEndRegion != null) {
