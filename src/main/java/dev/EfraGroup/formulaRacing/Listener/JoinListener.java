@@ -60,7 +60,7 @@ public class JoinListener implements Listener {
                 if (isFloodgatePlayer(uuid)) {
                     return ":bedrock:";
                 } else {
-                    return ":java:";
+                    return ":java:  ";
                 }
 
         }
