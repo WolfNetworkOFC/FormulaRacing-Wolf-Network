@@ -212,6 +212,7 @@ public class RegionListener implements Listener {
                     previous = this.normalizeRegionLocation(previous, true);
                 }
 
+            }
 
             this.lastLocation.put(uuid, currentRaw);
             if (previous == null || previous.getWorld() == null || current.getWorld() == null || previous.getWorld() != current.getWorld()) {
@@ -256,18 +257,12 @@ public class RegionListener implements Listener {
                                     nearest = region;
                                 }
                             }
+
                             // Checar se cruzou região START/END
                             DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, current, worldRegions);
                             if (startEndRegion != null) {
                                 Location finalFrom = previous.clone();
                                 Location finalTo = current.clone();
-                                this.plugin.getDebugManager().logRegionDetection(
-                                        String.format("[DEBUG] Player=%s cruzou região %s (%s) ID=%d",
-                                                player.getName(),
-                                                startEndRegion.getTrackName(),
-                                                startEndRegion.getType(),
-                                                startEndRegion.getId())
-                                );
                                 Bukkit.getScheduler().runTask(this.plugin, () -> this.handleRegion(player, startEndRegion, finalFrom, finalTo));
                             }
 
@@ -286,9 +281,7 @@ public class RegionListener implements Listener {
                                 }
 
                                 List<DatabaseManager.RegionData> checkpoints = this.database.getCheckpoints(trackForCheckpoints);
-                                if (this.plugin.getDebugManager().isRegionDetectionEnabled() && checkpoints.isEmpty()) {
-                                    this.plugin.getDebugManager().logRegionDetection("§e[DEBUG] Pista " + trackForCheckpoints + " não tem checkpoints configurados!");
-                                }
+
 
                                 if (!isInDuel && activeTrack != null) {
                                     TimerUtils.PlayerTimerData data = this.timerUtils.getTimerData(player, activeTrack);
@@ -337,37 +330,37 @@ public class RegionListener implements Listener {
                                             return;
                                         }
                                     }
-                                        Map<Integer, Double> collectedCheckpoints = this.database.getDuelCheckpointTimes(uuid, activeDuelId);
-                                        int nextExpectedIndex = collectedCheckpoints.size();
-                                        if (nextExpectedIndex < checkpoints.size()) {
-                                            DatabaseManager.RegionData nextCp = checkpoints.get(nextExpectedIndex);
-                                            if (RegionMathUtils.intersectsRegion(previous, current, nextCp)) {
-                                                double elapsedTime = this.DuelsTimer.getPlayerLapElapsedSeconds(player);
-                                                int cpId = nextCp.getId();
-                                                Bukkit.getScheduler().runTask(this.plugin, () -> {
-                                                    this.database.saveDuelCheckpointTime(uuid, activeDuelId, trackForCheckpoints, cpId, elapsedTime);
-                                                    player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.5F);
-                                                        DebugManager var10000 = this.plugin.getDebugManager();
-                                                    String var10001 = player.getName();
-                                                    var10000.logRegionDetection(var10001 + " coletou checkpoint no duelo #" + activeDuelId);
-                                                });
-                                            }
+                                    Map<Integer, Double> collectedCheckpoints = this.database.getDuelCheckpointTimes(uuid, activeDuelId);
+                                    int nextExpectedIndex = collectedCheckpoints.size();
+                                    if (nextExpectedIndex < checkpoints.size()) {
+                                        DatabaseManager.RegionData nextCp = checkpoints.get(nextExpectedIndex);
+                                        if (RegionMathUtils.intersectsRegion(previous, current, nextCp)) {
+                                            double elapsedTime = this.DuelsTimer.getPlayerLapElapsedSeconds(player);
+                                            int cpId = nextCp.getId();
+                                            Bukkit.getScheduler().runTask(this.plugin, () -> {
+                                                this.database.saveDuelCheckpointTime(uuid, activeDuelId, trackForCheckpoints, cpId, elapsedTime);
+                                                player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.5F);
+                                                DebugManager var10000 = this.plugin.getDebugManager();
+                                                String var10001 = player.getName();
+                                                var10000.logRegionDetection(var10001 + " coletou checkpoint no duelo #" + activeDuelId);
+                                            });
                                         }
                                     }
                                 }
-    
-                            } else {
-                                if (!this.warnedWorlds.contains(worldName)) {
-                                    this.warnedWorlds.add(worldName);
-                                    this.plugin.getDebugManager().logRegionDetection("[FormulaRacing] Nenhuma região registrada para o mundo " + worldName);
-                                }
-    
                             }
+
+                        } else {
+                            if (!this.warnedWorlds.contains(worldName)) {
+                                this.warnedWorlds.add(worldName);
+                                this.plugin.getDebugManager().logRegionDetection("[FormulaRacing] Nenhuma região registrada para o mundo " + worldName);
+                            }
+
                         }
                     }
                 }
             }
         }
+    }
 
     private void handleRegion(Player player, DatabaseManager.RegionData region, Location from, Location to) {
         UUID uuid = player.getUniqueId();
@@ -382,32 +375,32 @@ public class RegionListener implements Listener {
                 boolean isRunningSolo = this.timerUtils.isTimerRunning(player, regionTrackWS);
                 boolean ttEnabled = this.database.getTimeTrialEnabled(uuid);
                 this.plugin.getDebugManager().logTimeTrialSystem(String.format("[AUTO TT] %s - handleRegion: track=%s, trackWS=%s, type=%s, duelId=%d, runningSolo=%b, ttEnabled=%b", player.getName(), regionTrackDisplayName, regionTrackWS, type, activeDuelId, isRunningSolo, ttEnabled));
-                        if (type.equals("RESET")) {
-                            Location targetLoc = null;
-                            if (!isRunningDuel) {
-                                Optional<Heats> heatOpt = this.plugin.getRaceEventManager().getPlayerActiveHeat(player.getUniqueId());
-                                if (heatOpt.isPresent()) {
-                                    Heats heat = (Heats)heatOpt.get();
-                                    Driver driver = heat.getDriver(player.getUniqueId());
-                                    if (driver != null) {
-                                        regionTrackWS = heat.getTrackNameWS();
-                                        int checkpointsReached = driver.getCheckpointsReached();
-                                        List<DatabaseManager.RegionData> checkpointByIdList = this.plugin.getTrackIntegrationManager().getCheckpointById(regionTrackWS, checkpointsReached - 1);
-                                        if (driver.getResetCount() == 0 && checkpointsReached > 0 && checkpointByIdList != null && !checkpointByIdList.isEmpty()) {
-                                            DatabaseManager.RegionData cp = checkpointByIdList.get(0);
-                                            targetLoc = new Location(Bukkit.getWorld(cp.getWorld()), (cp.getMinX() + cp.getMaxX()) / (double)2.0F, cp.getMaxY() - (double)0.5F, (cp.getMinZ() + cp.getMaxZ()) / (double)2.0F, player.getLocation().getYaw(), player.getLocation().getPitch());
-                                            driver.incrementResetCount();
-                                            DebugManager var10000 = this.plugin.getDebugManager();
-                                            String var10001 = player.getName();
-                                            var10000.logRaceSystem("[RESET-HEAT] " + var10001 + " -> CP " + checkpointsReached + " (resetCount=" + driver.getResetCount() + ")");
-                                        } else if (driver.getResetCount() >= 1) {
-                                            targetLoc = this.plugin.getTrackIntegrationManager().getTrackSpawn(regionTrackWS);
-                                            DebugManager var10000 = this.plugin.getDebugManager();
-                                            String var10001 = player.getName();
-                                            var10000.logRaceSystem("[RESET-HEAT] " + var10001 + " -> Track Spawn (resetCount=" + driver.getResetCount() + ")");
-                                        }
-                                    }
+                if (type.equals("RESET")) {
+                    Location targetLoc = null;
+                    if (!isRunningDuel) {
+                        Optional<Heats> heatOpt = this.plugin.getRaceEventManager().getPlayerActiveHeat(player.getUniqueId());
+                        if (heatOpt.isPresent()) {
+                            Heats heat = (Heats)heatOpt.get();
+                            Driver driver = heat.getDriver(player.getUniqueId());
+                            if (driver != null) {
+                                regionTrackWS = heat.getTrackNameWS();
+                                int checkpointsReached = driver.getCheckpointsReached();
+                                List<DatabaseManager.RegionData> checkpointByIdList = this.plugin.getTrackIntegrationManager().getCheckpointById(regionTrackWS, checkpointsReached - 1);
+                                if (driver.getResetCount() == 0 && checkpointsReached > 0 && checkpointByIdList != null && !checkpointByIdList.isEmpty()) {
+                                    DatabaseManager.RegionData cp = checkpointByIdList.get(0);
+                                    targetLoc = new Location(Bukkit.getWorld(cp.getWorld()), (cp.getMinX() + cp.getMaxX()) / (double)2.0F, cp.getMaxY() - (double)0.5F, (cp.getMinZ() + cp.getMaxZ()) / (double)2.0F, player.getLocation().getYaw(), player.getLocation().getPitch());
+                                    driver.incrementResetCount();
+                                    DebugManager var10000 = this.plugin.getDebugManager();
+                                    String var10001 = player.getName();
+                                    var10000.logRaceSystem("[RESET-HEAT] " + var10001 + " -> CP " + checkpointsReached + " (resetCount=" + driver.getResetCount() + ")");
+                                } else if (driver.getResetCount() >= 1) {
+                                    targetLoc = this.plugin.getTrackIntegrationManager().getTrackSpawn(regionTrackWS);
+                                    DebugManager var10000 = this.plugin.getDebugManager();
+                                    String var10001 = player.getName();
+                                    var10000.logRaceSystem("[RESET-HEAT] " + var10001 + " -> Track Spawn (resetCount=" + driver.getResetCount() + ")");
                                 }
+                            }
+                        }
 
                         if (targetLoc == null) {
                             String activeTrackKey = this.timerUtils.getActiveTrack(player);
@@ -496,7 +489,7 @@ public class RegionListener implements Listener {
                                 finalDebug.logTimeTrialSystem("[RESET] " + finalPlayer.getName() + " -> API Spawn Boat executed (Delayed).");
                             }
                         }, 1L);
-                        }
+                    }
                 }
 
                 if (isRunningDuel) {
@@ -753,15 +746,6 @@ public class RegionListener implements Listener {
         UUID uuid = player.getUniqueId();
         if (this.isBedrockPlayer(uuid) && player.isInsideVehicle() && player.getVehicle() instanceof Boat) {
             Location boatLocation = player.getVehicle().getLocation();
-            this.plugin.getDebugManager().logRegionDetection(
-                String.format(
-                    "[DEBUG] Player=%s Ã© Bedrock, usando BoatPos=(%.2f, %.2f, %.2f) para detecÃ§Ã£o",
-                    player.getName(),
-                    boatLocation.getX(),
-                    boatLocation.getY(),
-                    boatLocation.getZ()
-                )
-            );
             return boatLocation;
         }
 
