@@ -18,6 +18,7 @@ import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.cacheddata.CachedMetaData;
 import net.luckperms.api.model.user.User;
+import net.luckperms.api.node.types.PrefixNode;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -60,7 +61,7 @@ public class JoinListener implements Listener {
                 if (isFloodgatePlayer(uuid)) {
                     return ":bedrock:";
                 } else {
-                    return ":java:  ";
+                    return ":java:";
                 }
 
         }
@@ -160,6 +161,8 @@ public class JoinListener implements Listener {
     }
 
     public void updatePlayerPrefix(Player player) {
+        if (!this.hasLuckPerms) return;
+
         // 1. Obter a instância do LuckPerms
         LuckPerms luckPerms = LuckPermsProvider.get();
         User user = luckPerms.getUserManager().getUser(player.getUniqueId());
@@ -174,12 +177,20 @@ public class JoinListener implements Listener {
         String primaryGroup = user.getPrimaryGroup();
 
         if (primaryGroup.equalsIgnoreCase("default")) {
+            String prefix;
             if (isFloodgatePlayer(player.getUniqueId())){
+                prefix = ":bedrock: ";
                 TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, "%img_bedrock% §r");
 
             } else{
+                prefix = ":java: ";
                 TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, "%img_java% §r");
             }
+
+            // 4. Atualizar meta prefix no LuckPerms
+            user.data().clear(node -> node instanceof PrefixNode);
+            user.data().add(PrefixNode.builder(prefix, 100).build());
+            luckPerms.getUserManager().saveUser(user);
         }
     }
 
