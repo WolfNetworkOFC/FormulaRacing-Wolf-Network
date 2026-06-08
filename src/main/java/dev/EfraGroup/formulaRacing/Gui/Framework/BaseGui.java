@@ -62,7 +62,7 @@ public class BaseGui implements InventoryHolder {
     }
 
     public void show(Player player) {
-        GuiManager.getInstance().setOpenGui(player, this);
+        this.plugin.getGuiManager().setOpenGui(player, this);
         player.openInventory(this.inventory);
     }
 

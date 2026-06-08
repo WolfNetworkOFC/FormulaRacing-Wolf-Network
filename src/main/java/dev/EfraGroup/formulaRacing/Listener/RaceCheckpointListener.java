@@ -63,7 +63,7 @@ public class RaceCheckpointListener implements Listener {
         this.driverLookup = plugin.getDriverLookup();
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onVehicleMove(VehicleMoveEvent event) {
         Vehicle vehicle = event.getVehicle();
         if (!vehicle.getPassengers().isEmpty()) {
@@ -880,34 +880,13 @@ public class RaceCheckpointListener implements Listener {
             }
 
             if (sessionState == HeatState.RACING) {
-                this.plugin.getServer()
-                    .getScheduler()
-                    .runTaskLater(
-                        this.plugin,
-                        () -> {
-                            if (player.isOnline()) {
-                                this.plugin.getAPI().recoverPlayerBoatState(
-                                    player
-                                );
-                                if (this.plugin.getPacketSender() != null) {
-                                    this.plugin.getPacketSender().resetBoatUtilsToVanilla(
-                                        player
-                                    );
-                                    boolean dbLonely =
-                                        this.plugin.getDatabaseManager().getLonelyModePlayer(
-                                            player.getUniqueId()
-                                        );
-                                    this.plugin.getLonelyController().setLonelyMode(
-                                        player,
-                                        dbLonely
-                                    );
-                                }
-
-                                this.teleportToSpectatorArea(player, heat);
-                            }
-                        },
-                        60L
-                    );
+                this.plugin.getAPI().recoverPlayerBoatState(player);
+                if (this.plugin.getPacketSender() != null) {
+                    this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
+                    boolean dbLonely = this.plugin.getDatabaseManager().getLonelyModePlayer(player.getUniqueId());
+                    this.plugin.getLonelyController().setLonelyMode(player, dbLonely);
+                }
+                this.teleportToSpectatorArea(player, heat);
             }
 
             this.checkAllFinished(heat);

@@ -138,111 +138,94 @@ public class RaceSession implements SessionLogic {
         }
     }
 
+    private boolean completeLap(Heats heat, Driver driver, Player player, boolean precise) {
+        RaceCheckpointListener checkpointListener = heat.getPlugin().getRaceCheckpointListener();
+        if (checkpointListener != null) {
+            if (heat.getPlugin().getDebugManager().isRaceSystemVerboseEnabled()) {
+                heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] Chamando handleLapCompleted...");
+            }
+            if (!precise) {
+                driver.finishLap();
+            }
+            checkpointListener.handleLapCompleted(driver, heat, player);
+            if (precise && !driver.isFinished()) {
+                Bukkit.getPluginManager().callEvent(new DriverNewLapEvent(driver, driver.getCurrentLap()));
+            }
+            return true;
+        }
+
+        if (heat.getTotalLaps() != null && heat.getTotalLaps() > 0 && driver.getLapCount() >= heat.getTotalLaps()) {
+            heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] " + player.getName() + " FINALIZOU a corrida!");
+            if (precise) {
+                driver.setFinished(true);
+                heat.updateLivePositions();
+                if (heat.getDrivers().values().stream().allMatch((d) -> d.isFinished() || d.isDnf())) {
+                    heat.finishHeat();
+                }
+            } else {
+                boolean finished = DriverFinishUtils.finishDriver(driver, heat, heat.getPlugin());
+                if (finished && heat.getDrivers().values().stream().allMatch((d) -> d.isFinished() || d.isDnf())) {
+                    heat.finishHeat();
+                }
+            }
+            return true;
+        }
+
+        heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] Iniciando nova volta para " + player.getName());
+        driver.newLap();
+        Bukkit.getPluginManager().callEvent(new DriverNewLapEvent(driver, driver.getCurrentLap()));
+        return true;
+    }
+
     public boolean passLap(Heats heat, Driver driver) {
         Player player = Bukkit.getPlayer(driver.getUuid());
         if (player == null) {
             return false;
-        } else {
-            if (heat.getPlugin().getDebugManager().isRaceSystemVerboseEnabled()) {
-                heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] passLap chamado para " + player.getName());
-            }
-
-            if (driver.getCurrentLap() == null) {
-                heat.getPlugin().getDebugManager().logRaceSystem("[RACE] " + player.getName() + " iniciando primeira volta");
-                driver.newLap();
-                heat.updateLivePositions();
-                Bukkit.getPluginManager().callEvent(new DriverNewLapEvent(driver, driver.getCurrentLap()));
-                return true;
-            } else {
-                int totalCheckpoints = heat.getPlugin().getTrackIntegrationManager().getCheckpointCount(heat.getTrackNameWS());
-                if (!driver.hasPassedAllCheckpoints(totalCheckpoints)) {
-                    if (heat.getPlugin().getDebugManager().isRaceSystemVerboseEnabled()) {
-                        heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] " + player.getName() + " NÃO passou por todos os checkpoints!");
-                    }
-
-                    heat.getPlugin().sendMessage(player, "timetrial_incomplete_lap", new String[]{"{count}", String.valueOf(driver.getCheckpointsReached()), "{total}", String.valueOf(totalCheckpoints)});
-                    return false;
-                } else {
-                    if (heat.getPlugin().getDebugManager().isRaceSystemVerboseEnabled()) {
-                        heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] " + player.getName() + " passou por todos os checkpoints!");
-                    }
-
-                    RaceCheckpointListener checkpointListener = heat.getPlugin().getRaceCheckpointListener();
-                    if (checkpointListener != null) {
-                        if (heat.getPlugin().getDebugManager().isRaceSystemVerboseEnabled()) {
-                            heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] Chamando handleLapCompleted...");
-                        }
-
-                        driver.finishLap();
-                        checkpointListener.handleLapCompleted(driver, heat, player);
-                        return true;
-                    }
-
-                    if (heat.getTotalLaps() != null && heat.getTotalLaps() > 0 && driver.getLapCount() >= heat.getTotalLaps()) {
-                        heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] " + player.getName() + " FINALIZOU a corrida!");
-                        boolean finished = DriverFinishUtils.finishDriver(driver, heat, heat.getPlugin());
-                        if (finished && heat.getDrivers().values().stream().allMatch((d) -> d.isFinished() || d.isDnf())) {
-                            heat.finishHeat();
-                        }
-
-                        return true;
-                    } else {
-                        heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] Iniciando nova volta para " + player.getName());
-                        driver.newLap();
-                        Bukkit.getPluginManager().callEvent(new DriverNewLapEvent(driver, driver.getCurrentLap()));
-                        return true;
-                    }
-                }
-            }
         }
+        if (heat.getPlugin().getDebugManager().isRaceSystemVerboseEnabled()) {
+            heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] passLap chamado para " + player.getName());
+        }
+        if (driver.getCurrentLap() == null) {
+            heat.getPlugin().getDebugManager().logRaceSystem("[RACE] " + player.getName() + " iniciando primeira volta");
+            driver.newLap();
+            heat.updateLivePositions();
+            Bukkit.getPluginManager().callEvent(new DriverNewLapEvent(driver, driver.getCurrentLap()));
+            return true;
+        }
+        int totalCheckpoints = heat.getPlugin().getTrackIntegrationManager().getCheckpointCount(heat.getTrackNameWS());
+        if (!driver.hasPassedAllCheckpoints(totalCheckpoints)) {
+            if (heat.getPlugin().getDebugManager().isRaceSystemVerboseEnabled()) {
+                heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] " + player.getName() + " NÃO passou por todos os checkpoints!");
+            }
+            heat.getPlugin().sendMessage(player, "timetrial_incomplete_lap", new String[]{"{count}", String.valueOf(driver.getCheckpointsReached()), "{total}", String.valueOf(totalCheckpoints)});
+            return false;
+        }
+        if (heat.getPlugin().getDebugManager().isRaceSystemVerboseEnabled()) {
+            heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] " + player.getName() + " passou por todos os checkpoints!");
+        }
+        return completeLap(heat, driver, player, false);
     }
 
     public boolean passLap(Heats heat, Driver driver, Location from, Location to, RegionBox region) {
         Player player = Bukkit.getPlayer(driver.getUuid());
         if (player == null) {
             return false;
-        } else {
-            heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] passLap(com localização) chamado para " + player.getName());
-            if (driver.getCurrentLap() == null) {
-                heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] Primeira volta - inicializando");
-                driver.newLap();
-                heat.updateLivePositions();
-                Bukkit.getPluginManager().callEvent(new DriverNewLapEvent(driver, driver.getCurrentLap()));
-                return true;
-            } else {
-                int totalCheckpoints = heat.getPlugin().getTrackIntegrationManager().getCheckpointCount(heat.getTrackNameWS());
-                if (!driver.hasPassedAllCheckpoints(totalCheckpoints)) {
-                    heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] " + player.getName() + " NÃO passou por todos os checkpoints!");
-                    heat.getPlugin().sendMessage(player, "timetrial_incomplete_lap", new String[]{"{count}", String.valueOf(driver.getCheckpointsReached()), "{total}", String.valueOf(totalCheckpoints)});
-                    return false;
-                } else {
-                    driver.finishLap(from, to, region);
-                    RaceCheckpointListener checkpointListener = heat.getPlugin().getRaceCheckpointListener();
-                    if (checkpointListener != null) {
-                        heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] Chamando handleLapCompleted...");
-                        checkpointListener.handleLapCompleted(driver, heat, player);
-                        if (!driver.isFinished()) {
-                            Bukkit.getPluginManager().callEvent(new DriverNewLapEvent(driver, driver.getCurrentLap()));
-                        }
-
-                        return true;
-                    } else if (heat.getTotalLaps() != null && heat.getTotalLaps() > 0 && driver.getLapCount() >= heat.getTotalLaps()) {
-                        heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] " + player.getName() + " FINALIZOU a corrida!");
-                        driver.setFinished(true);
-                        heat.updateLivePositions();
-                        if (heat.getDrivers().values().stream().allMatch((d) -> d.isFinished() || d.isDnf())) {
-                            heat.finishHeat();
-                        }
-
-                        return true;
-                    } else {
-                        heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] Iniciando nova volta para " + player.getName());
-                        driver.newLap();
-                        Bukkit.getPluginManager().callEvent(new DriverNewLapEvent(driver, driver.getCurrentLap()));
-                        return true;
-                    }
-                }
-            }
         }
+        heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] passLap(com localização) chamado para " + player.getName());
+        if (driver.getCurrentLap() == null) {
+            heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] Primeira volta - inicializando");
+            driver.newLap();
+            heat.updateLivePositions();
+            Bukkit.getPluginManager().callEvent(new DriverNewLapEvent(driver, driver.getCurrentLap()));
+            return true;
+        }
+        int totalCheckpoints = heat.getPlugin().getTrackIntegrationManager().getCheckpointCount(heat.getTrackNameWS());
+        if (!driver.hasPassedAllCheckpoints(totalCheckpoints)) {
+            heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] " + player.getName() + " NÃO passou por todos os checkpoints!");
+            heat.getPlugin().sendMessage(player, "timetrial_incomplete_lap", new String[]{"{count}", String.valueOf(driver.getCheckpointsReached()), "{total}", String.valueOf(totalCheckpoints)});
+            return false;
+        }
+        driver.finishLap(from, to, region);
+        return completeLap(heat, driver, player, true);
     }
 }

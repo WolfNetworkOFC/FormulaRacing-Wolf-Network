@@ -125,6 +125,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private RaceVoteManager raceVoteManager;
     private DrsManager drsManager;
     private PTPManager ptpManager;
+    private ERSManager ersManager;
     private TranslationUtil translationUtil;
     private DailyRaceManager dailyRaceManager;
     private RaceActionBarManager raceActionBarManager;
@@ -137,6 +138,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private PlaceholderRegister placeholderRegister;
     private PaperCommandManager commandManager;
     private TaskChainFactory taskChainFactory;
+    private GuiManager guiManager;
     private ReadyCheckManager readyCheckManager;
     private RaceCheckpointListener raceCheckpointListener;
     private PodiumManager podiumManager;
@@ -264,6 +266,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 this.packetSender
             );
             this.ptpManager = new PTPManager(this);
+            this.ersManager = new ERSManager(this);
             this.raceVoteManager = new RaceVoteManager(
                 this,
                 this.dm,
@@ -310,6 +313,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.taskChainFactory = BukkitTaskChainFactory.create(this);
             this.registerCommandContexts();
             this.registerCommandCompletions();
+            this.guiManager = new GuiManager();
             this.registerListeners();
             this.registerCommands();
             this.registerPlaceholders();
@@ -354,8 +358,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.placeholderRegister = null;
         }
 
-        GuiManager.getInstance().closeAll();
-        GuiManager.getInstance().closeAll();
+        if (this.guiManager != null) {
+            this.guiManager.closeAll();
+        }
         this.leaderboards.values().forEach(TrackLeaderboard::removeHologram);
         this.leaderboards.clear();
         if (this.dailyRaceManager != null) {
@@ -392,7 +397,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     }
 
     private void registerListeners() {
-        Bukkit.getPluginManager().registerEvents(new GuiListener(), this);
+        Bukkit.getPluginManager().registerEvents(new GuiListener(this.guiManager), this);
         Bukkit.getPluginManager().registerEvents(
             new HotbarListener(this, this.hotbarController),
             this
@@ -1475,7 +1480,11 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return this.ptpManager;
     }
     public ERSManager getERS() {
-        return new ERSManager(this);
+        return this.ersManager;
+    }
+
+    public GuiManager getGuiManager() {
+        return this.guiManager;
     }
 
     public void checkAndWarnOBU(Player player, String trackName) {

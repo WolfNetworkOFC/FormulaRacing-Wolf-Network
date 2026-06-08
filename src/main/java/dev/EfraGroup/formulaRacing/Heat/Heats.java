@@ -739,9 +739,11 @@ public class Heats {
 
             this.gridManager.clear();
             if (this.plugin.getPacketSender() != null) {
+                long now = System.currentTimeMillis();
                 for (Driver driver : this.drivers.values()) {
                     if (!driver.isFinished() && !driver.isDnf()) {
-                        driver.setFinished(true);
+                        driver.setEndTime(now);
+                        driver.setDnf(true);
                     }
                 }
 

@@ -99,60 +99,45 @@ public class PracticeSession implements SessionLogic {
         }
     }
 
+    private boolean completeLap(Heats heat, Driver driver, Player player) {
+        RaceCheckpointListener checkpointListener = heat
+            .getPlugin()
+            .getRaceCheckpointListener();
+        if (checkpointListener != null) {
+            checkpointListener.handleLapCompleted(driver, heat, player);
+            return true;
+        } else {
+            driver.newLap();
+            return true;
+        }
+    }
+
     public boolean passLap(Heats heat, Driver driver) {
         Player player = Bukkit.getPlayer(driver.getUuid());
         if (player == null) {
             return false;
-        } else if (driver.getCurrentLap() == null) {
-            heat
-                .getPlugin()
-                .getDebugManager()
-                .logRaceSystem(
-                    "[PRACTICE] " +
-                        player.getName() +
-                        " iniciando primeira volta"
-                );
-            long now = System.currentTimeMillis();
-            driver.setStartTime(now);
+        }
+        if (driver.getCurrentLap() == null) {
+            heat.getPlugin().getDebugManager().logRaceSystem(
+                "[PRACTICE] " + player.getName() + " iniciando primeira volta"
+            );
+            driver.setStartTime(System.currentTimeMillis());
             driver.newLap();
             heat.updateLivePositions();
             return true;
-        } else {
-            int totalCheckpoints = heat
-                .getPlugin()
-                .getTrackIntegrationManager()
-                .getCheckpointCount(heat.getTrackNameWS());
-            boolean sessionExpired = heat.getSessionTimeRemaining() <= 0L;
-            if (
-                !sessionExpired &&
-                !driver.hasPassedAllCheckpoints(totalCheckpoints)
-            ) {
-                heat
-                    .getPlugin()
-                    .sendMessage(
-                        player,
-                        "timetrial_incomplete_lap",
-                        new String[] {
-                            "{count}",
-                            String.valueOf(driver.getCheckpointsReached()),
-                            "{total}",
-                            String.valueOf(totalCheckpoints),
-                        }
-                    );
-                return false;
-            } else {
-                RaceCheckpointListener checkpointListener = heat
-                    .getPlugin()
-                    .getRaceCheckpointListener();
-                if (checkpointListener != null) {
-                    checkpointListener.handleLapCompleted(driver, heat, player);
-                    return true;
-                } else {
-                    driver.newLap();
-                    return true;
-                }
-            }
         }
+        int totalCheckpoints = heat.getPlugin()
+            .getTrackIntegrationManager()
+            .getCheckpointCount(heat.getTrackNameWS());
+        boolean sessionExpired = heat.getSessionTimeRemaining() <= 0L;
+        if (!sessionExpired && !driver.hasPassedAllCheckpoints(totalCheckpoints)) {
+            heat.getPlugin().sendMessage(
+                player, "timetrial_incomplete_lap",
+                new String[]{"{count}", String.valueOf(driver.getCheckpointsReached()), "{total}", String.valueOf(totalCheckpoints)}
+            );
+            return false;
+        }
+        return completeLap(heat, driver, player);
     }
 
     public boolean passLap(
@@ -165,73 +150,34 @@ public class PracticeSession implements SessionLogic {
         Player player = Bukkit.getPlayer(driver.getUuid());
         if (player == null) {
             return false;
-        } else {
-            int totalCheckpoints = heat
-                .getPlugin()
-                .getTrackIntegrationManager()
-                .getCheckpointCount(heat.getTrackNameWS());
-            if (driver.getCurrentLap() == null) {
-                heat
-                    .getPlugin()
-                    .getDebugManager()
-                    .logRaceSystem(
-                        "[PRACTICE] PRECISE START " + player.getName()
-                    );
-                double proportion =
-                    RegionMathUtils.calculateRegionEntryProportion(
-                        from,
-                        to,
-                        region
-                    );
-                long tickDurationMs = 50L;
-                long adjustmentMs = (long) (((double) 1.0F - proportion) *
-                    (double) tickDurationMs);
-                long preciseTime = System.currentTimeMillis() - adjustmentMs;
-                driver.setStartTime(preciseTime);
-                driver.newLap();
-                if (driver.getCurrentLap() != null) {
-                    driver.getCurrentLap().setLapStart(preciseTime);
-                }
-
-                heat.updateLivePositions();
-                return true;
-            } else {
-                boolean sessionExpired = heat.getSessionTimeRemaining() <= 0L;
-                if (
-                    !sessionExpired &&
-                    !driver.hasPassedAllCheckpoints(totalCheckpoints)
-                ) {
-                    heat
-                        .getPlugin()
-                        .sendMessage(
-                            player,
-                            "timetrial_incomplete_lap",
-                            new String[] {
-                                "{count}",
-                                String.valueOf(driver.getCheckpointsReached()),
-                                "{total}",
-                                String.valueOf(totalCheckpoints),
-                            }
-                        );
-                    return false;
-                } else {
-                    driver.finishLap(from, to, region);
-                    RaceCheckpointListener checkpointListener = heat
-                        .getPlugin()
-                        .getRaceCheckpointListener();
-                    if (checkpointListener != null) {
-                        checkpointListener.handleLapCompleted(
-                            driver,
-                            heat,
-                            player
-                        );
-                        return true;
-                    } else {
-                        driver.newLap();
-                        return true;
-                    }
-                }
-            }
         }
+        if (driver.getCurrentLap() == null) {
+            heat.getPlugin().getDebugManager().logRaceSystem(
+                "[PRACTICE] PRECISE START " + player.getName()
+            );
+            double proportion = RegionMathUtils.calculateRegionEntryProportion(from, to, region);
+            long adjustmentMs = (long) ((1.0 - proportion) * 50.0);
+            long preciseTime = System.currentTimeMillis() - adjustmentMs;
+            driver.setStartTime(preciseTime);
+            driver.newLap();
+            if (driver.getCurrentLap() != null) {
+                driver.getCurrentLap().setLapStart(preciseTime);
+            }
+            heat.updateLivePositions();
+            return true;
+        }
+        int totalCheckpoints = heat.getPlugin()
+            .getTrackIntegrationManager()
+            .getCheckpointCount(heat.getTrackNameWS());
+        boolean sessionExpired = heat.getSessionTimeRemaining() <= 0L;
+        if (!sessionExpired && !driver.hasPassedAllCheckpoints(totalCheckpoints)) {
+            heat.getPlugin().sendMessage(
+                player, "timetrial_incomplete_lap",
+                new String[]{"{count}", String.valueOf(driver.getCheckpointsReached()), "{total}", String.valueOf(totalCheckpoints)}
+            );
+            return false;
+        }
+        driver.finishLap(from, to, region);
+        return completeLap(heat, driver, player);
     }
 }

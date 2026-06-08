@@ -13,18 +13,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 public class GuiManager {
-    private static GuiManager instance;
     private final Map<UUID, BaseGui> openGuis = new HashMap();
 
-    private GuiManager() {
-    }
-
-    public static GuiManager getInstance() {
-        if (instance == null) {
-            instance = new GuiManager();
-        }
-
-        return instance;
+    public GuiManager() {
     }
 
     public void setOpenGui(Player player, BaseGui gui) {
@@ -40,8 +31,8 @@ public class GuiManager {
     }
 
     public void closeAll() {
-        for(Object uuid : new HashSet(this.openGuis.keySet())) {
-            Player p = Bukkit.getPlayer(uuid.toString());
+        for (UUID uuid : new HashSet<>(this.openGuis.keySet())) {
+            Player p = Bukkit.getPlayer(uuid);
             if (p != null) {
                 p.closeInventory();
             }

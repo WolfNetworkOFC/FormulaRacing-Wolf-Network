@@ -102,19 +102,63 @@ public class QualifyingSession implements SessionLogic {
         }
     }
 
+    private boolean completeLap(Heats heat, Driver driver, Player player) {
+        RaceCheckpointListener checkpointListener = heat
+            .getPlugin()
+            .getRaceCheckpointListener();
+        if (checkpointListener != null) {
+            checkpointListener.handleLapCompleted(driver, heat, player);
+            if (!driver.isFinished()) {
+                Bukkit.getPluginManager().callEvent(
+                    new DriverNewLapEvent(driver, driver.getCurrentLap())
+                );
+            }
+            return true;
+        } else {
+            driver.newLap();
+            Bukkit.getPluginManager().callEvent(
+                new DriverNewLapEvent(driver, driver.getCurrentLap())
+            );
+            return true;
+        }
+    }
+
+    private boolean processCheckpoints(
+        Heats heat,
+        Driver driver,
+        Player player,
+        int totalCheckpoints
+    ) {
+        boolean timeExpired = heat.getSessionTimeRemaining() <= 0L;
+        if (timeExpired && driver.getCurrentLap() != null) {
+            driver.forceCompleteCheckpoints(totalCheckpoints);
+        }
+
+        if (!driver.hasPassedAllCheckpoints(totalCheckpoints)) {
+            heat.getPlugin().sendMessage(
+                player,
+                "timetrial_incomplete_lap",
+                new String[] {
+                    "{count}",
+                    String.valueOf(driver.getCheckpointsReached()),
+                    "{total}",
+                    String.valueOf(totalCheckpoints),
+                }
+            );
+            return false;
+        }
+        return true;
+    }
+
     public boolean passLap(Heats heat, Driver driver) {
         Player player = Bukkit.getPlayer(driver.getUuid());
         if (player == null) {
             return false;
-        } else if (driver.getCurrentLap() == null) {
-            heat
-                .getPlugin()
-                .getDebugManager()
-                .logRaceSystem(
-                    "[QUALIFYING] " +
-                        player.getName() +
-                        " iniciando primeira volta"
-                );
+        }
+        if (driver.getCurrentLap() == null) {
+            heat.getPlugin().getDebugManager().logRaceSystem(
+                "[QUALIFYING] " + player.getName() + " iniciando primeira volta"
+            );
             driver.setStartTime(System.currentTimeMillis());
             driver.newLap();
             heat.updateLivePositions();
@@ -122,46 +166,14 @@ public class QualifyingSession implements SessionLogic {
                 new DriverNewLapEvent(driver, driver.getCurrentLap())
             );
             return true;
-        } else {
-            int totalCheckpoints = heat
-                .getPlugin()
-                .getTrackIntegrationManager()
-                .getCheckpointCount(heat.getTrackNameWS());
-            boolean timeExpired = heat.getSessionTimeRemaining() <= 0L;
-            if (timeExpired && driver.getCurrentLap() != null) {
-                driver.forceCompleteCheckpoints(totalCheckpoints);
-            }
-
-            if (!driver.hasPassedAllCheckpoints(totalCheckpoints)) {
-                heat
-                    .getPlugin()
-                    .sendMessage(
-                        player,
-                        "timetrial_incomplete_lap",
-                        new String[] {
-                            "{count}",
-                            String.valueOf(driver.getCheckpointsReached()),
-                            "{total}",
-                            String.valueOf(totalCheckpoints),
-                        }
-                    );
-                return false;
-            } else {
-                RaceCheckpointListener checkpointListener = heat
-                    .getPlugin()
-                    .getRaceCheckpointListener();
-                if (checkpointListener != null) {
-                    checkpointListener.handleLapCompleted(driver, heat, player);
-                    return true;
-                } else {
-                    driver.newLap();
-                    Bukkit.getPluginManager().callEvent(
-                        new DriverNewLapEvent(driver, driver.getCurrentLap())
-                    );
-                    return true;
-                }
-            }
         }
+        int totalCheckpoints = heat.getPlugin()
+            .getTrackIntegrationManager()
+            .getCheckpointCount(heat.getTrackNameWS());
+        if (!processCheckpoints(heat, driver, player, totalCheckpoints)) {
+            return false;
+        }
+        return completeLap(heat, driver, player);
     }
 
     public boolean passLap(
@@ -174,7 +186,8 @@ public class QualifyingSession implements SessionLogic {
         Player player = Bukkit.getPlayer(driver.getUuid());
         if (player == null) {
             return false;
-        } else if (driver.getCurrentLap() == null) {
+        }
+        if (driver.getCurrentLap() == null) {
             driver.setStartTime(System.currentTimeMillis());
             driver.newLap();
             heat.updateLivePositions();
@@ -182,55 +195,14 @@ public class QualifyingSession implements SessionLogic {
                 new DriverNewLapEvent(driver, driver.getCurrentLap())
             );
             return true;
-        } else {
-            int totalCheckpoints = heat
-                .getPlugin()
-                .getTrackIntegrationManager()
-                .getCheckpointCount(heat.getTrackNameWS());
-            boolean timeExpired = heat.getSessionTimeRemaining() <= 0L;
-            if (timeExpired && driver.getCurrentLap() != null) {
-                driver.forceCompleteCheckpoints(totalCheckpoints);
-            }
-
-            if (!driver.hasPassedAllCheckpoints(totalCheckpoints)) {
-                heat
-                    .getPlugin()
-                    .sendMessage(
-                        player,
-                        "timetrial_incomplete_lap",
-                        new String[] {
-                            "{count}",
-                            String.valueOf(driver.getCheckpointsReached()),
-                            "{total}",
-                            String.valueOf(totalCheckpoints),
-                        }
-                    );
-                return false;
-            } else {
-                driver.finishLap(from, to, region);
-                RaceCheckpointListener checkpointListener = heat
-                    .getPlugin()
-                    .getRaceCheckpointListener();
-                if (checkpointListener != null) {
-                    checkpointListener.handleLapCompleted(driver, heat, player);
-                    if (!driver.isFinished()) {
-                        Bukkit.getPluginManager().callEvent(
-                            new DriverNewLapEvent(
-                                driver,
-                                driver.getCurrentLap()
-                            )
-                        );
-                    }
-
-                    return true;
-                } else {
-                    driver.newLap();
-                    Bukkit.getPluginManager().callEvent(
-                        new DriverNewLapEvent(driver, driver.getCurrentLap())
-                    );
-                    return true;
-                }
-            }
         }
+        int totalCheckpoints = heat.getPlugin()
+            .getTrackIntegrationManager()
+            .getCheckpointCount(heat.getTrackNameWS());
+        if (!processCheckpoints(heat, driver, player, totalCheckpoints)) {
+            return false;
+        }
+        driver.finishLap(from, to, region);
+        return completeLap(heat, driver, player);
     }
 }

@@ -6366,7 +6366,7 @@ public class DatabaseManager {
 
     public void setTrackFinishAll(String trackNameWS, Location loc) {
         String sql =
-            "UPDATE fr_tracks SET finishAll_x = ?, finishAll_y = ?, finishAll_z = ?, finishAll_yaw = ?, finishAll_pitch = ? WHERE trackNameWS = ?";
+            "UPDATE fr_tracks SET finishAll_x = ?, finishAll_y = ?, finishAll_z = ?, finishAll_yaw = ?, finishAll_pitch = ?, worldName = ? WHERE trackNameWS = ?";
         try (
             Connection conn = getOrConnect();
             PreparedStatement ps = conn.prepareStatement(sql)
@@ -6376,7 +6376,8 @@ public class DatabaseManager {
             ps.setDouble(3, loc.getZ());
             ps.setDouble(4, loc.getYaw());
             ps.setDouble(5, loc.getPitch());
-            ps.setString(6, trackNameWS);
+            ps.setString(6, loc.getWorld().getName());
+            ps.setString(7, trackNameWS);
             ps.executeUpdate();
         } catch (SQLException e) {
             handleSqlError(e);
