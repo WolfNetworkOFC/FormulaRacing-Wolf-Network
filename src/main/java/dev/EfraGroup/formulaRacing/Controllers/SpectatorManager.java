@@ -143,7 +143,7 @@ public class SpectatorManager {
         player.setGameMode(GameMode.SPECTATOR);
         Location spectatorLocation = this.getSpectatorLocation(event);
         if (spectatorLocation != null) {
-            player.teleport(spectatorLocation);
+            SchedulerHelper.teleport(player, spectatorLocation);
         }
 
         String title = this.plugin.getTranslation("spectator_title_mode", this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId()), new String[0]);
@@ -191,7 +191,7 @@ public class SpectatorManager {
                     } else {
                         spectator.setFollowingDriverUUID(driverPlayer.getUniqueId());
                         spectator.setMode(SpectatorMode.FOLLOW_DRIVER);
-                        spectatorPlayer.teleport(driverPlayer.getLocation());
+                        SchedulerHelper.teleport(spectatorPlayer, driverPlayer.getLocation());
                         this.plugin.sendMessage(spectatorPlayer, "spectator_following", new String[]{"{driver}", driverName});
                         this.plugin.sendMessage(spectatorPlayer, "spectator_help_unfollow", new String[0]);
                         return true;
@@ -233,7 +233,7 @@ public class SpectatorManager {
                                 spectatorLoc.add(driverLoc.getDirection().multiply(-5));
                                 spectatorLoc.setY(spectatorLoc.getY() + (double)2.0F);
                                 spectatorLoc.setDirection(driverLoc.toVector().subtract(spectatorLoc.toVector()));
-                                spectatorPlayer.teleport(spectatorLoc);
+                                SchedulerHelper.teleport(spectatorPlayer, spectatorLoc);
                             } else {
                                 spectator.setFollowingDriverUUID((UUID)null);
                                 spectator.setMode(SpectatorMode.FREE_CAM);

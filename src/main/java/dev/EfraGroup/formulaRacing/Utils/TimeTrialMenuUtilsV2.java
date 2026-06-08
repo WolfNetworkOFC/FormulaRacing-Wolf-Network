@@ -27,6 +27,7 @@ package dev.EfraGroup.formulaRacing.Utils;
 import dev.EfraGroup.formulaRacing.APIFormulaRacing;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.PacketSender;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -488,7 +489,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             this.plugin.getTimeTrialController().endSession(player);
         }
 
-        player.teleport(loc);
+        SchedulerHelper.teleport(player, loc);
         this.plugin.setLastTimeTrialTrack(uuid, trackName);
         this.plugin.getDebugManager().logTimeTrialSystem(
             "[TT] Starting track '" +

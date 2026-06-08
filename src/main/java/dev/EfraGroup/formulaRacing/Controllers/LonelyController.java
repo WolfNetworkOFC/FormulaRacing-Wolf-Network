@@ -157,7 +157,7 @@ public class LonelyController implements Listener {
      * Equivalent to TS {@code updatePlayersVisibility}.
      */
     public void updatePlayersVisibility(Player viewer) {
-        this.scheduleReconcile(() -> this.processViewerVisibility(viewer));
+        this.scheduleReconcile(viewer, () -> this.processViewerVisibility(viewer));
     }
 
     /**
@@ -165,7 +165,7 @@ public class LonelyController implements Listener {
      * Equivalent to TS {@code updatePlayerVisibility}.
      */
     public void updatePlayerVisibility(Player target) {
-        this.scheduleReconcile(() -> {
+        this.scheduleReconcile(target, () -> {
             if (!target.isOnline()) return;
             for (Player viewer : Bukkit.getOnlinePlayers()) {
                 if (viewer.equals(target)) continue;
@@ -285,7 +285,6 @@ public class LonelyController implements Listener {
             return;
         }
 
-        // Walking viewers see everything
         if (!isPlayerInBoat(viewer)) {
             showPlayer(viewer, target);
             return;
@@ -377,34 +376,42 @@ public class LonelyController implements Listener {
     // -------------------------------------------------------------------------
 
     private void showPlayer(Player viewer, Player target) {
-        viewer.showPlayer(plugin, target);
-        Entity vehicle = target.getVehicle();
-        if (vehicle != null) {
-            viewer.showEntity(plugin, vehicle);
-            if (plugin.getConfig().getBoolean("FrostHexAddOn", false)) {
-                for (Entity passenger : vehicle.getPassengers()) {
-                    viewer.showEntity(plugin, passenger);
+        SchedulerHelper.runTaskFor(plugin, viewer, () -> viewer.showPlayer(plugin, target));
+        SchedulerHelper.runTaskFor(plugin, target, () -> {
+            Entity vehicle = target.getVehicle();
+            if (vehicle != null) {
+                viewer.showEntity(plugin, vehicle);
+                if (plugin.getConfig().getBoolean("FrostHexAddOn", false)) {
+                    for (Entity passenger : vehicle.getPassengers()) {
+                        viewer.showEntity(plugin, passenger);
+                    }
                 }
             }
-        }
+        });
     }
 
     private void hidePlayer(Player viewer, Player target) {
-        viewer.hidePlayer(plugin, target);
-        Entity vehicle = target.getVehicle();
-        if (vehicle != null) {
-            viewer.hideEntity(plugin, vehicle);
-            if (plugin.getConfig().getBoolean("FrostHexAddOn", false)) {
-                for (Entity passenger : vehicle.getPassengers()) {
-                    viewer.hideEntity(plugin, passenger);
+        SchedulerHelper.runTaskFor(plugin, viewer, () -> viewer.hidePlayer(plugin, target));
+        SchedulerHelper.runTaskFor(plugin, target, () -> {
+            Entity vehicle = target.getVehicle();
+            if (vehicle != null) {
+                viewer.hideEntity(plugin, vehicle);
+                if (plugin.getConfig().getBoolean("FrostHexAddOn", false)) {
+                    for (Entity passenger : vehicle.getPassengers()) {
+                        viewer.hideEntity(plugin, passenger);
+                    }
                 }
             }
-        }
+        });
     }
 
     private boolean isPlayerInBoat(Player player) {
         Entity vehicle = player.getVehicle();
         return vehicle instanceof Boat || vehicle instanceof ChestBoat;
+    }
+
+    private void scheduleReconcile(Player player, Runnable runnable) {
+        SchedulerHelper.runTaskFor(plugin, player, runnable);
     }
 
     private void scheduleReconcile(Runnable runnable) {
@@ -416,19 +423,21 @@ public class LonelyController implements Listener {
     // -------------------------------------------------------------------------
 
     private void setVanillaCollision(Player player, boolean preventCollision) {
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
-        Team team = scoreboard.getTeam("fr_nocol");
-        if (team == null) {
-            team = scoreboard.registerNewTeam("fr_nocol");
-            team.setOption(Option.COLLISION_RULE, OptionStatus.NEVER);
-            team.setCanSeeFriendlyInvisibles(false);
-            plugin.getDebugManager().logPacketHandling("[FormulaRacing] Time 'fr_nocol' criado no MainScoreboard.");
-        }
-        if (preventCollision) {
-            if (!team.hasEntry(player.getName())) team.addEntry(player.getName());
-        } else {
-            if (team.hasEntry(player.getName())) team.removeEntry(player.getName());
-        }
+        SchedulerHelper.runTask(plugin, () -> {
+            Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
+            Team team = scoreboard.getTeam("fr_nocol");
+            if (team == null) {
+                team = scoreboard.registerNewTeam("fr_nocol");
+                team.setOption(Option.COLLISION_RULE, OptionStatus.NEVER);
+                team.setCanSeeFriendlyInvisibles(false);
+                plugin.getDebugManager().logPacketHandling("[FormulaRacing] Time 'fr_nocol' criado no MainScoreboard.");
+            }
+            if (preventCollision) {
+                if (!team.hasEntry(player.getName())) team.addEntry(player.getName());
+            } else {
+                if (team.hasEntry(player.getName())) team.removeEntry(player.getName());
+            }
+        });
     }
 
     // -------------------------------------------------------------------------

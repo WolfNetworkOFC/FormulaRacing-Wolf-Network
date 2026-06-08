@@ -435,7 +435,7 @@ public class Heats {
                         Player player = Bukkit.getPlayer(driver.getUuid());
                         if (player != null && player.isOnline()) {
                             this.plugin.getAPI().recoverPlayerBoatState(player);
-                            player.teleport(spawnLoc);
+                            SchedulerHelper.teleport(player, spawnLoc);
                             this.spawnQualiDriver(player, driver);
                         }
                     }
@@ -450,7 +450,7 @@ public class Heats {
                             if (gridIndex >= 0 && gridIndex < qualiGridPositions.size()) {
                                 Location qualiLoc = qualiGridPositions.get(gridIndex);
                                 this.plugin.getAPI().recoverPlayerBoatState(player);
-                                player.teleport(qualiLoc);
+                                SchedulerHelper.teleport(player, qualiLoc);
                                 this.spawnQualiDriver(player, driver);
                             } else {
                                 player.sendMessage("§cPosição inválida no qualigrid.");
@@ -825,7 +825,7 @@ public class Heats {
                             Player p = Bukkit.getPlayer(d.getUuid());
                             if (p != null && p.isOnline()) {
                                 this.plugin.getAPI().recoverPlayerBoatState(p);
-                                p.teleport(targetLoc);
+                                SchedulerHelper.teleport(p, targetLoc);
                             }
                         }
                     }
@@ -1362,7 +1362,7 @@ public class Heats {
                                 this.trackNameWS
                             );
                         if (spawnLoc != null) {
-                            player.teleport(spawnLoc);
+                            SchedulerHelper.teleport(player, spawnLoc);
                             this.plugin.getAPI().spawnBoat(
                                 player,
                                 false,
@@ -1421,7 +1421,7 @@ public class Heats {
                 this.trackNameWS
             );
             if (spawnLoc != null) {
-                player.teleport(spawnLoc);
+                SchedulerHelper.teleport(player, spawnLoc);
             }
         }
     }

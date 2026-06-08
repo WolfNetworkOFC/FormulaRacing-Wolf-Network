@@ -217,7 +217,7 @@ import org.bukkit.inventory.meta.ItemMeta;
              this.api.recoverPlayerBoatState(player);
              this.ps.sendBoatSetting(player, 0, new Object[0]);
              this.ps.applyBoatUtilsToPlayer(player, trackName);
-             player.teleport(loc);
+             SchedulerHelper.teleport(player, loc);
              this.api.spawnBoat(player, true, false, false);
              this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);
              DatabaseManager.TrackData trackData = this.mysql.getTrackData(trackName);

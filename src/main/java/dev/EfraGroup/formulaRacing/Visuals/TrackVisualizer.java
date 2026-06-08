@@ -15,13 +15,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class TrackVisualizer {
     private final FormulaRacing plugin;
@@ -76,22 +78,20 @@ public class TrackVisualizer {
     }
 
     private void startVisualizationTask() {
-        (new BukkitRunnable() {
-            public void run() {
-                if (!TrackVisualizer.this.activeViewers.isEmpty()) {
-                    for(Map.Entry<UUID, String> entry : TrackVisualizer.this.activeViewers.entrySet()) {
-                        Player player = TrackVisualizer.this.plugin.getServer().getPlayer((UUID)entry.getKey());
-                        if (player != null && player.isOnline()) {
-                            String trackName = (String)entry.getValue();
-                            TrackVisualizer.this.renderTrackRegions(player, trackName);
-                        } else {
-                            TrackVisualizer.this.activeViewers.remove(entry.getKey());
-                        }
+        SchedulerHelper.runTaskTimer(this.plugin, (scheduledTask) -> {
+            if (!this.activeViewers.isEmpty()) {
+                for(Map.Entry<UUID, String> entry : this.activeViewers.entrySet()) {
+                    Player player = this.plugin.getServer().getPlayer((UUID)entry.getKey());
+                    if (player != null && player.isOnline()) {
+                        String trackName = (String)entry.getValue();
+                        this.renderTrackRegions(player, trackName);
+                    } else {
+                        this.activeViewers.remove(entry.getKey());
                     }
-
                 }
+
             }
-        }).runTaskTimer(this.plugin, 0L, 10L);
+        }, 0L, 10L);
     }
 
     private void renderTrackRegions(Player player, String trackName) {

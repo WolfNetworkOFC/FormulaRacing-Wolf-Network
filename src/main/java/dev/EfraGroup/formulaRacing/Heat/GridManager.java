@@ -86,7 +86,7 @@ public class GridManager {
 
                             SchedulerHelper.runTaskLater(this.plugin, () -> {
                                 if (player.isOnline()) {
-                                    player.teleport(gridLoc);
+                                    SchedulerHelper.teleport(player, gridLoc);
                                     this.removePlayerFromTimeTrial(player);
                                     this.spawnBoatWithTrackConfig(player, gridLoc, driver);
                                     DebugManager var10000 = this.plugin.getDebugManager();
@@ -153,7 +153,7 @@ public class GridManager {
 
                     SchedulerHelper.runTaskLater(this.plugin, () -> {
                         if (player.isOnline()) {
-                            player.teleport(gridLoc);
+                            SchedulerHelper.teleport(player, gridLoc);
                             this.removePlayerFromTimeTrial(player);
                             this.spawnBoatWithTrackConfig(player, gridLoc, driver);
                             HeatState state = this.heat.getHeatState();

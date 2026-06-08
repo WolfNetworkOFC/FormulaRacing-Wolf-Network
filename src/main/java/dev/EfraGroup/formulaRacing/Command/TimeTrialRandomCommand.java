@@ -95,7 +95,7 @@ public class TimeTrialRandomCommand extends BaseCommand {
         api.recoverPlayerBoatState(player);
 
         // Teleporte e Mensagens
-        player.teleport(loc);
+        SchedulerHelper.teleport(player, loc);
         String langCode = mysql.getPlayerLanguage(player.getUniqueId());
         player.sendMessage(plugin.getTranslation("timetrial_teleport", langCode, "{track}", trackName));
 

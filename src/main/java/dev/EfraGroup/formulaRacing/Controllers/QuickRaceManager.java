@@ -393,7 +393,7 @@ public class QuickRaceManager {
                     respawn = player.getWorld().getSpawnLocation();
                 }
 
-                player.teleport(respawn);
+                SchedulerHelper.teleport(player, respawn);
                 this.plugin.sendMessage(player, "quickrace_left_dnf", new String[0]);
                 return true;
             } else {
@@ -502,7 +502,7 @@ public class QuickRaceManager {
                             respawnLoc = ((World)this.plugin.getServer().getWorlds().get(0)).getSpawnLocation();
                         }
 
-                        p.teleport(respawnLoc);
+                        SchedulerHelper.teleport(p, respawnLoc);
                     }
                 }
 

@@ -7,8 +7,8 @@ author: EfraGroup
 description: Plugin de corrida de formula 1
 depend:
   - WorldEdit
-  - TAB
 softdepend:
+  - TAB
   - DecentHolograms
   - PlayerPoints
   - HeadDatabase

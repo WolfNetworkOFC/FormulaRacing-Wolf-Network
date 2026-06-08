@@ -6,6 +6,7 @@ import dev.EfraGroup.formulaRacing.Controllers.QuickRaceManager;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.PacketSender;
 import dev.EfraGroup.formulaRacing.Utils.TimeTrialDuelsAction;
 import net.md_5.bungee.api.chat.ClickEvent;
@@ -308,7 +309,7 @@ public class DuelCommand extends BaseCommand implements Listener {
             searchingPlayers.remove(player.getUniqueId());
             player.sendMessage("§cBusca cancelada.");
             playSound(player, Sound.BLOCK_NOTE_BLOCK_BASS, 0.5f);
-            Bukkit.getScheduler().runTask(plugin, () -> openTrackSelector(player));
+            SchedulerHelper.runTask(plugin, () -> openTrackSelector(player));
             return;
         }
 
@@ -320,7 +321,7 @@ public class DuelCommand extends BaseCommand implements Listener {
         if (foundTrack != null) {
             searchingPlayers.remove(player.getUniqueId());
             String finalTrack = foundTrack;
-            Bukkit.getScheduler().runTask(plugin, () -> {
+            SchedulerHelper.runTask(plugin, () -> {
                 player.getPersistentDataContainer().set(KEY_TRACK, PersistentDataType.STRING, finalTrack);
                 player.sendMessage("§aPista selecionada: §f" + finalTrack);
                 playSound(player, Sound.ENTITY_PLAYER_LEVELUP, 1.5f);
@@ -363,7 +364,7 @@ public class DuelCommand extends BaseCommand implements Listener {
 
         playSound(target, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f);
 
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        SchedulerHelper.runTaskLater(plugin, () -> {
             if (pendingInvites.containsKey(targetUUID) && pendingInvites.get(targetUUID).equals(challengerUUID)) {
                 pendingInvites.remove(targetUUID);
 

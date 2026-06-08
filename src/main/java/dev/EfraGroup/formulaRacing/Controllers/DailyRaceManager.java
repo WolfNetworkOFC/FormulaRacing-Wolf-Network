@@ -200,7 +200,7 @@ public class DailyRaceManager {
 
                 this.plugin.getAPI().recoverPlayerBoatState(player);
 
-                player.teleport(loc);
+                SchedulerHelper.teleport(player, loc);
                 this.plugin.sendMessage(player, "daily_teleport_practice", new String[0]);
                 this.plugin.getAPI().spawnBoat(player, false, false, false);
                 this.notifyPlayerJoinPractice(player);

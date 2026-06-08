@@ -184,7 +184,7 @@ public class TrackEditorCommand extends BaseCommand {
                 if (!isViewing) {
                     Location spawn = this.mysql.getTrackSpawn(trackName);
                     if (spawn != null) {
-                        player.teleport(spawn);
+                        SchedulerHelper.teleport(player, spawn);
                         this.plugin.sendMessage(player, "te_teleported", new String[]{"{track}", trackName});
                     }
                 }
@@ -1122,7 +1122,7 @@ public class TrackEditorCommand extends BaseCommand {
                     this.plugin.getServer().getScheduler().runTaskLater(this.plugin, () -> {
                         Location loc = pos.toLocation(this.plugin.getServer());
                         if (loc != null) {
-                            player.teleport(loc);
+                            SchedulerHelper.teleport(player, loc);
                             TitleHelper.sendThemedTitle(player, "&wP" + pos.getPosition(), "§7" + this.formatLocation(loc), 5, 30, 10);
                         }
 
@@ -1256,7 +1256,7 @@ public class TrackEditorCommand extends BaseCommand {
                     this.plugin.getServer().getScheduler().runTaskLater(this.plugin, () -> {
                         Location loc = pos.toLocation(this.plugin.getServer());
                         if (loc != null) {
-                            player.teleport(loc);
+                            SchedulerHelper.teleport(player, loc);
                             TitleHelper.sendThemedTitle(player, "&wQ" + pos.getPosition(), "§7" + this.formatLocation(loc), 5, 30, 10);
                         }
                     }, (long)delay);

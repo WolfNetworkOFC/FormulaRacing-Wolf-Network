@@ -10,6 +10,7 @@ import java.util.Map;
 
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -123,6 +124,9 @@ public class TrackLeaderboard { // Removido o 'abstract'
         // Debug para ver se o título converteu o $ corretamente
 
         SchedulerHelper.runTask(this.plugin, () -> {
+            if (!Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
+                return;
+            }
             try {
                 String safeTrackName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
                 String holoName = "lb_" + type + "_" + safeTrackName;

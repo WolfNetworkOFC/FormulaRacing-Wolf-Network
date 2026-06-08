@@ -8,6 +8,7 @@ package dev.EfraGroup.formulaRacing.Database;
 import dev.EfraGroup.formulaRacing.Event.EventState;
 import dev.EfraGroup.formulaRacing.Event.Events;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Heat.CollisionMode;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
@@ -33,7 +34,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
-import org.bukkit.Bukkit;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Location;
 import org.bukkit.World;
 
@@ -55,7 +56,7 @@ public class EventsDatabaseManager {
         String operationName,
         Consumer<PreparedStatement> binder
     ) {
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
                 if (conn == null) {
@@ -86,7 +87,7 @@ public class EventsDatabaseManager {
         String sql =
             "INSERT INTO fr_events (creatorUUID, name, trackNameWS, creationTime, state, openSign) VALUES (?, ?, ?, ?, ?, ?)";
         String sanitizedName = this.sanitizeEventName(name, trackNameWS);
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
 
@@ -173,7 +174,7 @@ public class EventsDatabaseManager {
         CompletableFuture<Integer> future = new CompletableFuture();
         String sql =
             "INSERT INTO fr_rounds (eventId, roundIndex, type, state) VALUES (?, ?, ?, ?)";
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
 
@@ -235,7 +236,7 @@ public class EventsDatabaseManager {
         CompletableFuture<Integer> future = new CompletableFuture();
         String sql =
             "INSERT INTO fr_heats (roundId, heatNumber, state, totalLaps, totalPitstops, timeLimit, startDelay, maxDrivers, lonely, canReset, lapReset, drs, driverswap, colisao, drsdowntime, drsdownpower, reversegrid, ghostingdelta, pushtopass, pushtopasspower, realistc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
 
@@ -998,7 +999,7 @@ public class EventsDatabaseManager {
     }
 
     public void deleteEvent(int eventId) {
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
                 conn.setAutoCommit(false);
@@ -1139,7 +1140,7 @@ public class EventsDatabaseManager {
     }
 
     public void deleteRound(int roundId) {
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
                 conn.setAutoCommit(false);
@@ -1257,7 +1258,7 @@ public class EventsDatabaseManager {
     }
 
     public void deleteHeat(int heatId) {
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
                 conn.setAutoCommit(false);
@@ -1727,7 +1728,7 @@ public class EventsDatabaseManager {
             "UPDATE fr_drivers SET position = position + 1, startPosition = startPosition + 1 WHERE heatId = ? AND position >= ?";
         String insertSql =
             "INSERT INTO fr_drivers (uuid, heatId, position, startPosition, pitstops) VALUES (?, ?, ?, ?, ?)";
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
                 if (conn == null) {
@@ -1874,7 +1875,7 @@ public class EventsDatabaseManager {
     }
 
     public void removeDriverFromHeatWithShift(UUID uuid, int heatId) {
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
                 if (conn != null) {
@@ -2090,7 +2091,7 @@ public class EventsDatabaseManager {
     ) {
         String sql =
             "UPDATE fr_drivers SET position = ?, startPosition = ? WHERE heatId = ? AND uuid = ?";
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
                 if (conn == null) {
@@ -2156,7 +2157,7 @@ public class EventsDatabaseManager {
     public void createDriver(Driver driver) {
         String sql =
             "INSERT INTO fr_drivers (uuid, heatId, position, startPosition, pitstops) VALUES (?, ?, ?, ?, ?)";
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
                 if (conn == null) {

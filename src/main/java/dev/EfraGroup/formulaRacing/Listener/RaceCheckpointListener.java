@@ -422,7 +422,7 @@ public class RaceCheckpointListener implements Listener {
             () -> {
                 if (player.isOnline()) {
                     this.plugin.getAPI().recoverPlayerBoatState(player);
-                    player.teleport(finalTargetLoc);
+                    SchedulerHelper.teleport(player, finalTargetLoc);
                     player.playSound(
                         finalTargetLoc,
                         Sound.ENTITY_ENDERMAN_TELEPORT,
@@ -967,7 +967,7 @@ public class RaceCheckpointListener implements Listener {
                     driver.getPosition()
                 );
                 if (finishPosLoc != null) {
-                    player.teleport(finishPosLoc);
+                    SchedulerHelper.teleport(player, finishPosLoc);
                     player.playSound(
                         player.getLocation(),
                         Sound.ENTITY_PLAYER_LEVELUP,
@@ -989,7 +989,7 @@ public class RaceCheckpointListener implements Listener {
 
             Location finishAllLoc = db.getTrackFinishAll(trackNameWS);
             if (finishAllLoc != null) {
-                player.teleport(finishAllLoc);
+                SchedulerHelper.teleport(player, finishAllLoc);
                 if (driver != null) {
                     String title = "§6§l" + driver.getPosition() + "º LUGAR!";
                     TitleHelper.sendThemedTitle(

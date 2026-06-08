@@ -71,7 +71,7 @@ public class ResetCommand implements CommandExecutor {
         // =========================
         // Teleporte e cria barco
         // =========================
-        player.teleport(spawn);
+        SchedulerHelper.teleport(player, spawn);
         api.spawnBoat(player, false, false, false);
 
         return true;

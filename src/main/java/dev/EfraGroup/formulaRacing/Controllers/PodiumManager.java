@@ -219,7 +219,7 @@ public class PodiumManager implements Listener {
                 continue;
             }
 
-            player.teleport(audience);
+            SchedulerHelper.teleport(player, audience);
             player.sendMessage(startMessage);
 
             if (snowballEnabled) {
@@ -299,7 +299,7 @@ public class PodiumManager implements Listener {
             return;
         }
 
-        podiumPlayer.teleport(podiumLocation);
+        SchedulerHelper.teleport(podiumPlayer, podiumLocation);
         if (this.config().getBoolean(CONFIG_ROOT + ".effects.particles", true)) {
             podiumPlayer.getWorld().spawnParticle(Particle.FIREWORK, podiumLocation.clone().add(0.0D, 1.0D, 0.0D), 50);
         }
@@ -339,7 +339,7 @@ public class PodiumManager implements Listener {
 
             p.sendMessage(endMessage);
             if (lobby != null) {
-                p.teleport(lobby);
+                SchedulerHelper.teleport(p, lobby);
             }
         }
 

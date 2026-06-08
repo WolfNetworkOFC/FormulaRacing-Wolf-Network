@@ -509,7 +509,7 @@ public class TimeTrialDuels implements Listener {
     }
 
     private void setupPlayerInGrid(Player player, Location baseLoc) {
-        player.teleport(baseLoc);
+        SchedulerHelper.teleport(player, baseLoc);
         Location asLoc = baseLoc.clone().add((double)0.0F, (double)1.0F, (double)0.0F);
         ArmorStand stand = (ArmorStand)baseLoc.getWorld().spawnEntity(asLoc, EntityType.ARMOR_STAND);
         stand.setVisible(false);
@@ -675,7 +675,7 @@ public class TimeTrialDuels implements Listener {
                                     this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Removeu barco antigo de " + player.getName());
                                 }
 
-                                boolean teleported = player.teleport(spawnLoc);
+                                boolean teleported = SchedulerHelper.teleport(player, spawnLoc);
                                 state.setNeedsLapTimerReset(true);
 
                                 if (teleported) {

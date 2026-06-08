@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -3819,7 +3820,7 @@ public class DatabaseManager {
             ? "UPDATE fr_timetrial_duels SET state = ?, finished_in = CURRENT_TIMESTAMP WHERE id = ?"
             : "UPDATE fr_timetrial_duels SET state = ? WHERE id = ?";
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        SchedulerHelper.runAsync(plugin, () -> {
             synchronized (this) {
                 // Sincronização mesmo em task assíncrona
                 try {
@@ -6526,7 +6527,7 @@ public class DatabaseManager {
             "UPDATE fr_timetrial_duels SET state = ?, winner = ?, finished_in = CURRENT_TIMESTAMP WHERE id = ?";
         String winnerStr = winnerUUID.toString();
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        SchedulerHelper.runAsync(plugin, () -> {
             synchronized (this) {
                 try {
                     Connection conn = getOrConnect();
@@ -8190,7 +8191,7 @@ public class DatabaseManager {
         double time,
         int checkpointsReached
     ) {
-        org.bukkit.Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        SchedulerHelper.runAsync(plugin, () -> {
             saveFullTime(
                 playerUUID,
                 playerName,
@@ -8206,7 +8207,7 @@ public class DatabaseManager {
         String trackName
     ) {
         CompletableFuture<Object[]> future = new CompletableFuture<>();
-        org.bukkit.Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        SchedulerHelper.runAsync(plugin, () -> {
             future.complete(getPlayerBestTime(playerName, trackName));
         });
         return future;
@@ -8217,7 +8218,7 @@ public class DatabaseManager {
         String trackNameWS
     ) {
         CompletableFuture<Integer> future = new CompletableFuture<>();
-        org.bukkit.Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        SchedulerHelper.runAsync(plugin, () -> {
             future.complete(getPlayerRank(playerUUID, trackNameWS));
         });
         return future;

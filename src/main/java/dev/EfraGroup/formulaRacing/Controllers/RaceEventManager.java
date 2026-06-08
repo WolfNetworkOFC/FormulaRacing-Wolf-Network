@@ -900,7 +900,7 @@ public class RaceEventManager {
                     respawn = player.getWorld().getSpawnLocation();
                 }
 
-                player.teleport(respawn);
+                SchedulerHelper.teleport(player, respawn);
                 event.removeSubscriber(uuid);
                 this.playerActiveEvent.remove(uuid);
                 player.sendMessage(

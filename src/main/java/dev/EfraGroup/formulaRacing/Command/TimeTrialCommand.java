@@ -7,8 +7,9 @@
 
     import dev.EfraGroup.formulaRacing.APIFormulaRacing;
     import dev.EfraGroup.formulaRacing.Command.Help.CommandHelpService;
-    import dev.EfraGroup.formulaRacing.FormulaRacing;
-    import dev.EfraGroup.formulaRacing.PacketSender;
+import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import dev.EfraGroup.formulaRacing.PacketSender;
     import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
     import dev.EfraGroup.formulaRacing.Heat.HeatState;
     import dev.EfraGroup.formulaRacing.Heat.Heats;
@@ -142,7 +143,7 @@
 
                     this.timerUtils.stopTimer(player);
                     this.timeTrialController.endSession(player);
-                    player.teleport(loc);
+                    SchedulerHelper.teleport(player, loc);
                     this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);
                     this.plugin.getDebugManager().logTimeTrialSystem("[TT] Starting track '" + trackName + "' for player " + player.getName());
                     this.plugin.sendMessage(player, "timetrial_teleport", new String[]{"{track}", trackName});
@@ -322,7 +323,7 @@
                             }
 
                             this.api.recoverPlayerBoatState(player);
-                            player.teleport(spawn);
+                            SchedulerHelper.teleport(player, spawn);
                             this.api.spawnBoat(player, false, false, false);
                             if (activeHeat == null) {
                                 String owner = null;

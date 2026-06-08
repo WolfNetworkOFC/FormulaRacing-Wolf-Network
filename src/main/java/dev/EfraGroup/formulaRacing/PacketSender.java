@@ -1,6 +1,7 @@
 package dev.EfraGroup.formulaRacing;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -308,45 +309,45 @@ public class PacketSender {
             lonelyPlayers.add(uuid);
 
             if (hasMod) {
-                // Packet 27, Valor 4: Sem colisão com barcos e players
                 sendBoatSetting(player, (short) 27, (short) 4);
             } else {
-                // Fallback para quem não tem o MOD
-                org.bukkit.entity.Entity boat = player.getVehicle();
+                SchedulerHelper.runTaskFor(FormulaRacing.getInstance(), player, () -> {
+                    org.bukkit.entity.Entity boat = player.getVehicle();
 
-                for (Player other : Bukkit.getOnlinePlayers()) {
-                    if (other.equals(player)) continue;
+                    for (Player other : Bukkit.getOnlinePlayers()) {
+                        if (other.equals(player)) continue;
 
-                    // Esconde o jogador
-                    other.hidePlayer(FormulaRacing.getInstance(), player);
-
-                    // Esconde o barco (se ele estiver em um)
-                    if (boat != null) {
-                        other.hideEntity(FormulaRacing.getInstance(), boat);
+                        SchedulerHelper.runTaskFor(FormulaRacing.getInstance(), other, () -> {
+                            other.hidePlayer(FormulaRacing.getInstance(), player);
+                            if (boat != null) {
+                                other.hideEntity(FormulaRacing.getInstance(), boat);
+                            }
+                        });
                     }
-                }
-                Bukkit.getLogger().info("[FormulaRacing] Lonely ON (Invisibilidade total) para: " + player.getName());
+                    Bukkit.getLogger().info("[FormulaRacing] Lonely ON (Invisibilidade total) para: " + player.getName());
+                });
             }
         } else {
             lonelyPlayers.remove(uuid);
 
             if (hasMod) {
-                // Retorna ao Vanilla
                 sendBoatSetting(player, (short) 27, (short) 0);
             } else {
-                org.bukkit.entity.Entity boat = player.getVehicle();
+                SchedulerHelper.runTaskFor(FormulaRacing.getInstance(), player, () -> {
+                    org.bukkit.entity.Entity boat = player.getVehicle();
 
-                for (Player other : Bukkit.getOnlinePlayers()) {
-                    if (other.equals(player)) continue;
+                    for (Player other : Bukkit.getOnlinePlayers()) {
+                        if (other.equals(player)) continue;
 
-                    other.showPlayer(FormulaRacing.getInstance(), player);
-
-                    // Mostra o barco novamente
-                    if (boat != null) {
-                        other.showEntity(FormulaRacing.getInstance(), boat);
+                        SchedulerHelper.runTaskFor(FormulaRacing.getInstance(), other, () -> {
+                            other.showPlayer(FormulaRacing.getInstance(), player);
+                            if (boat != null) {
+                                other.showEntity(FormulaRacing.getInstance(), boat);
+                            }
+                        });
                     }
-                }
-                Bukkit.getLogger().info("[FormulaRacing] Lonely OFF (Visibilidade total) para: " + player.getName());
+                    Bukkit.getLogger().info("[FormulaRacing] Lonely OFF (Visibilidade total) para: " + player.getName());
+                });
             }
         }
     }

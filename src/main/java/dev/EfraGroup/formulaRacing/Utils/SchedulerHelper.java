@@ -104,6 +104,10 @@ public final class SchedulerHelper {
         ASYNC.runDelayed(plugin, t -> task.run(), delayTicks * 50L, TimeUnit.MILLISECONDS);
     }
 
+    public static void runAsyncTimer(Plugin plugin, Runnable task, long delayTicks, long periodTicks) {
+        ASYNC.runAtFixedRate(plugin, t -> task.run(), delayTicks * 50L, periodTicks * 50L, TimeUnit.MILLISECONDS);
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  Teleport (Folia-safe)
     // ═══════════════════════════════════════════════════════════

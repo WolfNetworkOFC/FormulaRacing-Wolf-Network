@@ -34,7 +34,7 @@ public class CamUtils {
         this.lastCameraNormal.remove(follower.getUniqueId());
         Location nearest = this.getNearestCamera(target);
         if (nearest != null) {
-            follower.teleport(nearest);
+            SchedulerHelper.teleport(follower, nearest);
             this.lastCameraNormal.put(follower.getUniqueId(), nearest);
         }
         String langCode = this.mysql.getPlayerLanguage(follower.getUniqueId());
@@ -69,7 +69,7 @@ public class CamUtils {
             Player target;
             Player follower = Bukkit.getPlayer(followerId);
             if (follower == null || !follower.isOnline() || (target = this.getTargetNormal(follower)) == null || !target.isOnline() || (nearest = this.getNearestCamera(target)) == null || (last = this.lastCameraNormal.get(followerId)) != null && this.locationsEqualBlock(last, nearest)) continue;
-            follower.teleport(nearest);
+            SchedulerHelper.teleport(follower, nearest);
             this.lastCameraNormal.put(followerId, nearest);
         }
     }

@@ -481,7 +481,7 @@ public class RegionListener implements Listener {
                             // Verificamos se o jogador ainda está online após o delay de 1 tick
                             if (finalPlayer.isOnline()) {
                                 // Teleporte e efeito sonoro usando as referências finais
-                                finalPlayer.teleport(finalTargetLoc);
+                                SchedulerHelper.teleport(finalPlayer, finalTargetLoc);
                                 finalPlayer.playSound(finalTargetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
 
                                 // Gera o barco através da API
@@ -837,7 +837,7 @@ public class RegionListener implements Listener {
     // --- MÉTODOS DE INICIALIZAÇÃO QUE ESTAVAM FALTANDO ---
 
     private void startRegionLoader() {
-        Bukkit.getScheduler().runTaskTimerAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsyncTimer(this.plugin, () -> {
             List<DatabaseManager.RegionData> allRegions = database.getAllRegions();
             SchedulerHelper.runTask(plugin, () -> {
                 Map<String, List<DatabaseManager.RegionData>> newRegionsMap = new HashMap<>();
@@ -853,12 +853,14 @@ public class RegionListener implements Listener {
 
 
     private void startRegionChecker() {
-        SchedulerHelper.runTaskTimer(this.plugin, () -> {
+        SchedulerHelper.runTaskTimer(this.plugin, (scheduledTask) -> {
             if (regions.isEmpty()) return;
 
             for (Player player : Bukkit.getOnlinePlayers()) {
                 if (player.getVehicle() instanceof Boat) {
-                    this.checkPlayerRegions(player);
+                    SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                        this.checkPlayerRegions(player);
+                    });
                 }
             }
         }, 0L, 1L);
