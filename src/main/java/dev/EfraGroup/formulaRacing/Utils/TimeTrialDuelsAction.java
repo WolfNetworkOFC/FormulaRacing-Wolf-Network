@@ -17,16 +17,17 @@
   */
  package dev.EfraGroup.formulaRacing.Utils;
 
- import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
- import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
- import dev.EfraGroup.formulaRacing.Event.Events;
- import dev.EfraGroup.formulaRacing.FormulaRacing;
- import dev.EfraGroup.formulaRacing.Heat.HeatState;
- import dev.EfraGroup.formulaRacing.Heat.Heats;
- import dev.EfraGroup.formulaRacing.Participant.Driver;
- import dev.EfraGroup.formulaRacing.Round.Rounds;
+import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
+import dev.EfraGroup.formulaRacing.Event.Events;
+import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Heat.HeatState;
+import dev.EfraGroup.formulaRacing.Heat.Heats;
+import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Round.Rounds;
+import org.bukkit.World;
 
- import java.util.*;
+import java.util.*;
  import java.util.concurrent.ConcurrentHashMap;
  import net.md_5.bungee.api.ChatMessageType;
  import net.md_5.bungee.api.chat.BaseComponent;
@@ -154,28 +155,28 @@
          return (double)session.getCurrentTimeMillis() / 1000.0;
      }
 
-     public double getPlayerLapElapsedSeconds(Player player) {
-         DuelSession session = this.activeTimers.get(player.getUniqueId());
-         if (session == null) {
-             return 0.0;
-         }
-         return session.getCurrentLapTime();
-     }
+public double getPlayerLapElapsedSeconds(Player player) {
+          DuelSession session = this.activeTimers.get(player.getUniqueId());
+          if (session == null) {
+              return 0.0;
+          }
+          return session.getCurrentLapTime();
+      }
 
-private void startGlobalUpdateTask() {
-           World world = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
-           if (world == null) {
-               SchedulerHelper.runTaskTimer(this.plugin, () -> {
-                   updateDuelVisuals();
-               }, 1L, 20L);
-           } else {
-               SchedulerHelper.runTaskTimerAt(this.plugin, world, 0, 0, task -> {
-                   updateDuelVisuals();
-               }, 1L, 20L);
-           }
-       }
-       
-       private void updateDuelVisuals() {
+      private void startGlobalUpdateTask() {
+          World world = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
+          if (world == null) {
+              SchedulerHelper.runTaskTimer(this.plugin, () -> {
+                  this.updateDuelVisuals();
+              }, 1L, 20L);
+          } else {
+              SchedulerHelper.runTaskTimerAt(this.plugin, world, 0, 0, task -> {
+                  this.updateDuelVisuals();
+              }, 1L, 20L);
+          }
+      }
+      
+      private void updateDuelVisuals() {
            TimeTrialDuelsAction.this.activeVisuals.forEach((uuid, duelId) -> {
                Player player = Bukkit.getPlayer((UUID)uuid);
                if (player == null || !player.isOnline()) {
@@ -210,10 +211,9 @@ private void startGlobalUpdateTask() {
                       TimeTrialDuelsAction.this.sendDuelActionBar(player, "\u00a7f\u00a7l" + waitingText, "00:00.000", "\u00a77--:--.---", "");
                   }
               });
-          }, 0L, 1L);
-      }
-
-     private boolean isPlayerInActiveHeatRace(UUID playerUUID) {
+}
+              
+      private boolean isPlayerInActiveHeatRace(UUID playerUUID) {
          if (this.plugin.getRaceEventManager() == null) {
              return false;
          }
