@@ -38,6 +38,10 @@ public final class SchedulerHelper {
         return new ScheduledTaskWrapper(bukkitTask);
     }
 
+    public static ScheduledTask runTaskTimer(Plugin plugin, Runnable task) {
+        return runTaskTimer(plugin, task, 1L, 1L);
+    }
+
     public static void runTaskAt(Plugin plugin, Location location, Runnable task) {
         REGION.execute(plugin, location, task);
     }
