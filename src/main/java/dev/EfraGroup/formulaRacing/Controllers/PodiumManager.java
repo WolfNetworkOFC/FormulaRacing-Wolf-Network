@@ -3,6 +3,7 @@ package dev.EfraGroup.formulaRacing.Controllers;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Event.Events;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,7 +30,7 @@ import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class PodiumManager implements Listener {
     private static final String CONFIG_ROOT = "podium";
@@ -101,7 +102,7 @@ public class PodiumManager implements Listener {
         this.teleportAudienceAndPrepare(session);
 
         long periodTicks = Math.max(1L, this.config().getLong(CONFIG_ROOT + ".reveal-interval-ticks", 50L));
-        session.revealTask = new PodiumRunnable(session).runTaskTimer(this.plugin, periodTicks, periodTicks);
+        session.revealTask = SchedulerHelper.runTaskTimer(this.plugin, new PodiumRunnable(session), periodTicks, periodTicks);
     }
 
     public boolean setLocation(String key, Location location) {
@@ -200,14 +201,11 @@ public class PodiumManager implements Listener {
             return;
         }
 
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (player.isOnline()) {
-                    player.getInventory().setItemInMainHand(new ItemStack(Material.SNOWBALL, 1));
-                }
+        SchedulerHelper.runTaskLater(this.plugin, () -> {
+            if (player.isOnline()) {
+                player.getInventory().setItemInMainHand(new ItemStack(Material.SNOWBALL, 1));
             }
-        }.runTaskLater(this.plugin, 1L);
+        }, 1L);
     }
 
     private void teleportAudienceAndPrepare(PodiumCeremonySession session) {
@@ -309,18 +307,15 @@ public class PodiumManager implements Listener {
 
     private void finishCeremonyWithDelay(PodiumCeremonySession session) {
         long delay = Math.max(0L, this.config().getLong(CONFIG_ROOT + ".final-delay-ticks", 60L));
-        session.finalizeTask = new BukkitRunnable() {
-            @Override
-            public void run() {
-                synchronized (PodiumManager.this) {
-                    if (activeSession != session) {
-                        return;
-                    }
-
-                    completeAndCleanup(session);
+        session.finalizeTask = SchedulerHelper.runTaskLater(this.plugin, () -> {
+            synchronized (PodiumManager.this) {
+                if (activeSession != session) {
+                    return;
                 }
+
+                completeAndCleanup(session);
             }
-        }.runTaskLater(this.plugin, delay);
+        }, delay);
     }
 
     private void completeAndCleanup(PodiumCeremonySession session) {
@@ -419,8 +414,8 @@ public class PodiumManager implements Listener {
         private final Set<UUID> participants;
         private final int topLimitUsed;
         private final AtomicInteger currentRevealPosition;
-        private BukkitTask revealTask;
-        private BukkitTask finalizeTask;
+        private ScheduledTask revealTask;
+        private ScheduledTask finalizeTask;
 
         private PodiumCeremonySession(Events event, List<Driver> results, Set<UUID> participants, int topLimitUsed, AtomicInteger currentRevealPosition) {
             this.event = event;

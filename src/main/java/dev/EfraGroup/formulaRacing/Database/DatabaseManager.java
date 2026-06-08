@@ -302,9 +302,17 @@ public class DatabaseManager {
                     trackNameWS TEXT DEFAULT NULL,
                     regionType TEXT, regionShape TEXT, worldName TEXT,
                     min_x REAL, min_y REAL, min_z REAL,
-                    max_x REAL, max_y REAL, max_z REAL
+                    max_x REAL, max_y REAL, max_z REAL,
+                    points TEXT
                 )"""
             );
+            
+            try {
+                stmt.executeUpdate("ALTER TABLE fr_regions ADD COLUMN regionShape TEXT DEFAULT 'AABB'");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.executeUpdate("ALTER TABLE fr_regions ADD COLUMN points TEXT");
+            } catch (SQLException ignored) {}
 
             // 2. Sistema de Corridas Oficiais (Events, Rounds, Heats, Drivers, Laps)
             stmt.executeUpdate(
@@ -675,6 +683,11 @@ public class DatabaseManager {
                     // Coluna já existe – ignora
                 }
             }
+
+            // Adiciona coluna game_time na tabela fr_tracks
+            try {
+                stmt.executeUpdate("ALTER TABLE fr_tracks ADD COLUMN game_time INTEGER DEFAULT NULL");
+            } catch (SQLException ignored) {}
 
             // [NOVO] Adiciona colunas para "finishAll" na tabela fr_tracks
             String[] finishAllColumns = {
@@ -2075,8 +2088,8 @@ public class DatabaseManager {
     public synchronized List<RegionData> getAllRegions() {
         List<RegionData> list = new ArrayList<>();
         String sql =
-            "SELECT r.id, r.trackNameWS, r.regionType, r.worldName, " +
-            "r.min_x, r.min_y, r.min_z, r.max_x, r.max_y, r.max_z, " +
+            "SELECT r.id, r.trackNameWS, r.regionType, r.regionShape, r.worldName, " +
+            "r.min_x, r.min_y, r.min_z, r.max_x, r.max_y, r.max_z, r.points, " +
             "COALESCE(t.trackName, r.trackNameWS) as displayName " +
             "FROM fr_regions r " +
             "LEFT JOIN fr_tracks t ON LOWER(r.trackNameWS) = LOWER(t.trackNameWS)";
@@ -2093,6 +2106,8 @@ public class DatabaseManager {
                             rs.getString("displayName"),
                             rs.getString("trackNameWS"),
                             rs.getString("regionType"),
+                            rs.getString("regionShape"),
+                            rs.getString("points"),
                             rs.getDouble("min_x"),
                             rs.getDouble("min_y"),
                             rs.getDouble("min_z"),
@@ -2108,6 +2123,37 @@ public class DatabaseManager {
             handleSqlError(e);
         }
         return list;
+    }
+
+    public synchronized List<double[]> getItemBoxes(String trackName) {
+        List<double[]> boxes = new ArrayList<>();
+        String trackWS = trackName.replaceAll("\\s+", "");
+        String sql = """
+            SELECT id, min_x, min_y, min_z, max_x, max_y, max_z
+            FROM fr_regions
+            WHERE LOWER(trackNameWS) = LOWER(?) AND regionType = 'ITEMBOX'
+            """;
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackWS);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        double x = (rs.getDouble("min_x") + rs.getDouble("max_x")) / 2.0;
+                        double y = (rs.getDouble("min_y") + rs.getDouble("max_y")) / 2.0;
+                        double z = (rs.getDouble("min_z") + rs.getDouble("max_z")) / 2.0;
+                        double radius = Math.max(
+                            Math.abs(rs.getDouble("max_x") - rs.getDouble("min_x")),
+                            Math.abs(rs.getDouble("max_z") - rs.getDouble("min_z"))
+                        ) / 2.0;
+                        boxes.add(new double[]{x, y, z, radius, rs.getInt("id")});
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return boxes;
     }
 
     /**
@@ -2502,11 +2548,24 @@ public class DatabaseManager {
         Location max,
         String type
     ) {
+        return saveRegion(track, min, max, type, "AABB", null);
+    }
+    
+    public synchronized int saveRegion(
+        String track,
+        Location min,
+        Location max,
+        String type,
+        String shape,
+        List<Location> points
+    ) {
         if (
             track == null || min == null || max == null || type == null
         ) return -1;
         String trackWS = track.replace(" ", "").toLowerCase();
         String normalizedType = type.toUpperCase();
+        String regionShape = shape != null ? shape.toUpperCase() : "AABB";
+        String pointsStr = WorldEditSelect.getPointsString(points);
 
         double minX = Math.min(min.getX(), max.getX()),
             minY = Math.min(min.getY(), max.getY()),
@@ -2546,7 +2605,7 @@ public class DatabaseManager {
             }
 
             String insertSql =
-                "INSERT INTO fr_regions (trackNameWS, regionType, worldName, min_x, min_y, min_z, max_x, max_y, max_z) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "INSERT INTO fr_regions (trackNameWS, regionType, regionShape, worldName, min_x, min_y, min_z, max_x, max_y, max_z, points) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             try (
                 PreparedStatement psIns = conn.prepareStatement(
                     insertSql,
@@ -2555,13 +2614,15 @@ public class DatabaseManager {
             ) {
                 psIns.setString(1, trackWS);
                 psIns.setString(2, normalizedType);
-                psIns.setString(3, min.getWorld().getName());
-                psIns.setDouble(4, minX);
-                psIns.setDouble(5, minY);
-                psIns.setDouble(6, minZ);
-                psIns.setDouble(7, maxX);
-                psIns.setDouble(8, maxY);
-                psIns.setDouble(9, maxZ);
+                psIns.setString(3, regionShape);
+                psIns.setString(4, min.getWorld().getName());
+                psIns.setDouble(5, minX);
+                psIns.setDouble(6, minY);
+                psIns.setDouble(7, minZ);
+                psIns.setDouble(8, maxX);
+                psIns.setDouble(9, maxY);
+                psIns.setDouble(10, maxZ);
+                psIns.setString(11, pointsStr);
                 psIns.executeUpdate();
                 try (ResultSet keys = psIns.getGeneratedKeys()) {
                     if (keys.next()) return keys.getInt(1);
@@ -2735,9 +2796,41 @@ public class DatabaseManager {
         return null;
     }
 
+    public synchronized Map<String, String> getTrackRankTimes(String trackName) {
+        Map<String, String> ranks = new LinkedHashMap<>();
+        String trackWS = trackName.replaceAll("\\s+", "");
+        String sql = """
+            SELECT player_name, bestTime
+            FROM (
+                SELECT player_name, bestTime, ROW_NUMBER() OVER (PARTITION BY player_uuid ORDER BY finished DESC, bestTime ASC) as rn
+                FROM fr_player_times
+                WHERE LOWER(trackNameWS) = LOWER(?) AND finished = TRUE
+            ) t
+            WHERE rn = 1
+            ORDER BY bestTime ASC
+            LIMIT 3
+            """;
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackWS);
+                try (ResultSet rs = ps.executeQuery()) {
+                    String[] medals = { "gold", "silver", "bronze" };
+                    int i = 0;
+                    while (rs.next() && i < medals.length) {
+                        ranks.put(medals[i++], String.valueOf(rs.getDouble("bestTime")));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return ranks;
+    }
+
     /* =======================================================
-          LEADERBOARD, GRIDS, CÂMERAS E CONFIGS
-======================================================= */
+          LEADERBOARD, GRIDS, CÃMERAS E CONFIGS
+====================================================== */
     public synchronized List<PlayerTime> getLeaderboard(String trackName) {
         List<PlayerTime> leaderboard = new ArrayList<>();
         String trackWS = trackName.replaceAll("\\s+", "");
@@ -3218,7 +3311,7 @@ public class DatabaseManager {
         Map<String, TrackData> trackDataMap = new HashMap<>();
         String sql =
             "SELECT trackName, trackNameWS, worldName, spawnPoint_x, spawnPoint_y, spawnPoint_z, " +
-            "spawnPoint_yaw, spawnPoint_pitch, creatorName, icon_name FROM fr_tracks";
+            "spawnPoint_yaw, spawnPoint_pitch, creatorName, icon_name, game_time FROM fr_tracks";
         try {
             Connection conn = getOrConnect();
             try (
@@ -3256,7 +3349,7 @@ public class DatabaseManager {
                     trackDataMap.put(
                         trackName,
                         new TrackData(
-                            trackName, // Nome original para exibição
+                            trackName,
                             spawnLocation,
                             worldName,
                             rs.getString("creatorName"),
@@ -3265,7 +3358,8 @@ public class DatabaseManager {
                                 : "N/A",
                             getCheckpointCount(
                                 trackNameWS.replaceAll("\\s+", "").toLowerCase()
-                            ) // Normaliza ao buscar checkpoints
+                            ),
+                            getGameTimeFromResultSet(rs)
                         )
                     );
                 }
@@ -3317,6 +3411,23 @@ public class DatabaseManager {
         } catch (SQLException e) {
             handleSqlError(e);
         }
+    }
+
+    public synchronized Set<String> getOpenTracks() {
+        Set<String> openTracks = new HashSet<>();
+        String sql = "SELECT trackName FROM fr_tracks WHERE open = 1";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql);
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    openTracks.add(rs.getString("trackName"));
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return openTracks;
     }
 
     /**
@@ -4297,6 +4408,32 @@ public class DatabaseManager {
         return null;
     }
 
+    public synchronized Double getPlayerBestFinishedTime(UUID uuid, String trackName) {
+        String trackWS = trackName.replaceAll("\\s+", "");
+        String sql = """
+            SELECT MIN(bestTime) as bestTime
+            FROM fr_player_times
+            WHERE player_uuid = ? AND LOWER(trackNameWS) = LOWER(?) AND finished = TRUE
+            """;
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, trackWS);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        double time = rs.getDouble("bestTime");
+                        if (rs.wasNull()) return null;
+                        return time;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return null;
+    }
+
     public synchronized int getPlayerRank(UUID playerUUID, String trackNameWS) {
         // 1. Verificar se o jogador tem tempo
         String checkTimeSql =
@@ -4386,7 +4523,9 @@ public class DatabaseManager {
                                 rs.getDouble("bestTime"),
                                 rs.getInt("checkpointsReached"),
                                 rs.getBoolean("finished"),
-                                rs.getString("created_at")
+                                rs.getTimestamp("created_at") != null
+                                    ? rs.getTimestamp("created_at").getTime()
+                                    : 0L
                             )
                         );
                     }
@@ -4424,7 +4563,7 @@ public class DatabaseManager {
         // ✅ Usa LOWER() na query
         String sql =
             "SELECT trackName, worldName, spawnPoint_x, spawnPoint_y, spawnPoint_z, " +
-            "spawnPoint_pitch, spawnPoint_yaw, creatorName, creatorUUID, icon_name " +
+            "spawnPoint_pitch, spawnPoint_yaw, creatorName, creatorUUID, icon_name, game_time " +
             "FROM fr_tracks WHERE LOWER(trackNameWS) = LOWER(?)";
         try {
             Connection conn = getOrConnect();
@@ -4432,7 +4571,7 @@ public class DatabaseManager {
             // 1. Tenta buscar pelo nome exato (display name) primeiro - Resolve conflitos de "Floor is Lava" vs "floorislava"
             String sqlExact =
                 "SELECT trackName, worldName, spawnPoint_x, spawnPoint_y, spawnPoint_z, " +
-                "spawnPoint_pitch, spawnPoint_yaw, creatorName, creatorUUID, icon_name, trackNameWS " +
+                "spawnPoint_pitch, spawnPoint_yaw, creatorName, creatorUUID, icon_name, trackNameWS, game_time " +
                 "FROM fr_tracks WHERE LOWER(trackName) = LOWER(?)";
 
             try (PreparedStatement ps = conn.prepareStatement(sqlExact)) {
@@ -4469,12 +4608,13 @@ public class DatabaseManager {
                         );
 
                         return new TrackData(
-                            trackNameOriginal, // ✅ Nome original como primeiro parâmetro
+                            trackNameOriginal,
                             spawnLocation,
                             worldName,
                             rs.getString("creatorName"),
                             rs.getString("icon_name"),
-                            getCheckpointCount(trackNameWS)
+                            getCheckpointCount(trackNameWS),
+                            getGameTimeFromResultSet(rs)
                         );
                     }
                 }
@@ -7369,6 +7509,16 @@ public class DatabaseManager {
         }
     }
 
+    public synchronized void closePool() {
+        try {
+            if (connection != null && !connection.isClosed()) {
+                connection.close();
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "[FormulaRacing] Erro ao fechar conexão com o banco de dados", e);
+        }
+    }
+
     // ======================== CLASSES INTERNAS ========================
 
     public class PlayerTime {
@@ -7430,6 +7580,7 @@ public class DatabaseManager {
         private final String ownerName; // Nome do criador/dono da pista
         private final String iconName; // Nome do ícone (Material) usado no menu
         private final int totalCheckpoints; // Número total de checkpoints da pista
+        private final Long gameTime; // Tempo do dia fixado (ticks), null = usar padrão do servidor
 
         // --- Construtor ---
         public TrackData(
@@ -7438,7 +7589,8 @@ public class DatabaseManager {
             String worldName,
             String ownerName,
             String iconName,
-            int totalCheckpoints
+            int totalCheckpoints,
+            Long gameTime
         ) {
             this.trackName = trackName;
             this.spawnLocation = spawnLocation;
@@ -7446,6 +7598,7 @@ public class DatabaseManager {
             this.ownerName = ownerName;
             this.iconName = iconName;
             this.totalCheckpoints = totalCheckpoints;
+            this.gameTime = gameTime;
         }
 
         // --- Getters ---
@@ -7471,6 +7624,10 @@ public class DatabaseManager {
 
         public int getTotalCheckpoints() {
             return totalCheckpoints;
+        }
+
+        public Long getGameTime() {
+            return gameTime;
         }
     }
 
@@ -7627,14 +7784,14 @@ public class DatabaseManager {
         private final double time;
         private final int checkpointsReached;
         private final boolean finished;
-        private final String timeCreated; // 🔹 Data/hora em que o tempo foi feito
+        private final long timeCreated;
 
         public TrackRecord(
             String playerName,
             double time,
             int checkpointsReached,
             boolean finished,
-            String timeCreated
+            long timeCreated
         ) {
             this.playerName = playerName;
             this.time = time;
@@ -7659,7 +7816,7 @@ public class DatabaseManager {
             return finished;
         }
 
-        public String getTimeCreated() {
+        public long getTimeCreated() {
             return timeCreated;
         }
     }
@@ -8011,8 +8168,17 @@ public class DatabaseManager {
             worldName,
             rs.getString("creatorName"),
             rs.getString("icon_name"),
-            getCheckpointCount(effectiveTrackWS) // Usa o WS correto para contar checkpoints
+            getCheckpointCount(effectiveTrackWS),
+            getGameTimeFromResultSet(rs)
         );
+    }
+
+    private Long getGameTimeFromResultSet(ResultSet rs) throws SQLException {
+        try {
+            return rs.getObject("game_time", Long.class);
+        } catch (SQLException e) {
+            return null;
+        }
     }
 
     // --- ASYNC WRAPPERS ---

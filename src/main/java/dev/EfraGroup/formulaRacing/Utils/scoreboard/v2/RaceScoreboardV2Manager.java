@@ -5,6 +5,7 @@ import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardService;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.ScoreboardOwnershipCoordinator;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder.DefaultStateViewModelBuilder;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder.FinishedViewModelBuilder;
@@ -34,8 +35,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class RaceScoreboardV2Manager implements RaceScoreboardService {
     private final FormulaRacing plugin;
@@ -53,7 +53,7 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
     private final Map<UUID, Heats> playerHeats;
     private final Map<UUID, Heats> spectatorHeats;
     private final Map<Heats, Instant> lastHeatUpdate;
-    private BukkitTask updateTask;
+    private ScheduledTask updateTask;
     private Instant lastMetricsLog = Instant.now();
     private long updatesOk;
     private long updatesFailed;
@@ -190,55 +190,52 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
     }
 
     private void startAutoUpdate() {
-        this.updateTask = new BukkitRunnable() {
-            @Override
-            public void run() {
-                Instant now = Instant.now();
-                Map<Heats, List<Player>> playersByHeat = new HashMap<>();
-                for (Map.Entry<UUID, Heats> entry : RaceScoreboardV2Manager.this.playerHeats.entrySet()) {
-                    Player player = Bukkit.getPlayer(entry.getKey());
-                    if (player == null || !player.isOnline()) {
-                        continue;
-                    }
-                    playersByHeat.computeIfAbsent(entry.getValue(), ignored -> new ArrayList<>()).add(player);
+        this.updateTask = SchedulerHelper.runTaskTimer(this.plugin, () -> {
+            Instant now = Instant.now();
+            Map<Heats, List<Player>> playersByHeat = new HashMap<>();
+            for (Map.Entry<UUID, Heats> entry : RaceScoreboardV2Manager.this.playerHeats.entrySet()) {
+                Player player = Bukkit.getPlayer(entry.getKey());
+                if (player == null || !player.isOnline()) {
+                    continue;
                 }
-
-                Map<Heats, List<Player>> spectatorsByHeat = new HashMap<>();
-                for (Map.Entry<UUID, Heats> entry : RaceScoreboardV2Manager.this.spectatorHeats.entrySet()) {
-                    Player player = Bukkit.getPlayer(entry.getKey());
-                    if (player == null || !player.isOnline()) {
-                        continue;
-                    }
-                    spectatorsByHeat.computeIfAbsent(entry.getValue(), ignored -> new ArrayList<>()).add(player);
-                }
-
-                Set<Heats> heatsToRender = new HashSet<>();
-                heatsToRender.addAll(playersByHeat.keySet());
-                heatsToRender.addAll(spectatorsByHeat.keySet());
-                RaceScoreboardV2Manager.this.lastHeatUpdate.entrySet().removeIf(entry -> !heatsToRender.contains(entry.getKey()));
-
-                for (Heats heat : heatsToRender) {
-                    if (!RaceScoreboardV2Manager.this.shouldUpdateHeat(heat, now)) {
-                        continue;
-                    }
-                    List<Driver> sorted = RaceScoreboardV2Manager.this.getSortedDriversForHeat(heat);
-                    List<Player> racePlayers = playersByHeat.get(heat);
-                    if (racePlayers != null) {
-                        for (Player player : racePlayers) {
-                            RaceScoreboardV2Manager.this.renderPlayer(player, heat, false, sorted);
-                        }
-                    }
-                    List<Player> spectatorPlayers = spectatorsByHeat.get(heat);
-                    if (spectatorPlayers != null) {
-                        for (Player player : spectatorPlayers) {
-                            RaceScoreboardV2Manager.this.renderPlayer(player, heat, true, sorted);
-                        }
-                    }
-                }
-
-                RaceScoreboardV2Manager.this.logMetricsIfNeeded();
+                playersByHeat.computeIfAbsent(entry.getValue(), ignored -> new ArrayList<>()).add(player);
             }
-        }.runTaskTimer(this.plugin, 0L, 2L);
+
+            Map<Heats, List<Player>> spectatorsByHeat = new HashMap<>();
+            for (Map.Entry<UUID, Heats> entry : RaceScoreboardV2Manager.this.spectatorHeats.entrySet()) {
+                Player player = Bukkit.getPlayer(entry.getKey());
+                if (player == null || !player.isOnline()) {
+                    continue;
+                }
+                spectatorsByHeat.computeIfAbsent(entry.getValue(), ignored -> new ArrayList<>()).add(player);
+            }
+
+            Set<Heats> heatsToRender = new HashSet<>();
+            heatsToRender.addAll(playersByHeat.keySet());
+            heatsToRender.addAll(spectatorsByHeat.keySet());
+            RaceScoreboardV2Manager.this.lastHeatUpdate.entrySet().removeIf(entry -> !heatsToRender.contains(entry.getKey()));
+
+            for (Heats heat : heatsToRender) {
+                if (!RaceScoreboardV2Manager.this.shouldUpdateHeat(heat, now)) {
+                    continue;
+                }
+                List<Driver> sorted = RaceScoreboardV2Manager.this.getSortedDriversForHeat(heat);
+                List<Player> racePlayers = playersByHeat.get(heat);
+                if (racePlayers != null) {
+                    for (Player player : racePlayers) {
+                        RaceScoreboardV2Manager.this.renderPlayer(player, heat, false, sorted);
+                    }
+                }
+                List<Player> spectatorPlayers = spectatorsByHeat.get(heat);
+                if (spectatorPlayers != null) {
+                    for (Player player : spectatorPlayers) {
+                        RaceScoreboardV2Manager.this.renderPlayer(player, heat, true, sorted);
+                    }
+                }
+            }
+
+            RaceScoreboardV2Manager.this.logMetricsIfNeeded();
+        }, 0L, 2L);
     }
 
     private boolean shouldUpdateHeat(Heats heat, Instant now) {

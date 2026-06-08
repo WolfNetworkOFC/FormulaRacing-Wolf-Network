@@ -16,6 +16,7 @@ import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import java.util.Map;
 import java.util.UUID;
@@ -32,7 +33,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.event.vehicle.VehicleDestroyEvent;
 import org.bukkit.event.vehicle.VehicleExitEvent;
-import org.bukkit.scheduler.BukkitRunnable;
+
 
 public class FormulaRacingListener implements Listener {
     private final APIFormulaRacing api;
@@ -53,25 +54,23 @@ public class FormulaRacingListener implements Listener {
     }
 
     private void startBoatCleaner() {
-        (new BukkitRunnable() {
-            public void run() {
-                int removedCount = 0;
+        SchedulerHelper.runTaskTimer(this.plugin, () -> {
+            int removedCount = 0;
 
-                for(World world : Bukkit.getWorlds()) {
-                    for(Boat boat : world.getEntitiesByClass(Boat.class)) {
-                        if (boat.getPassengers().isEmpty()) {
-                            FormulaRacingListener.this.api.deleteBoat(boat);
-                            ++removedCount;
-                        }
+            for(World world : Bukkit.getWorlds()) {
+                for(Boat boat : world.getEntitiesByClass(Boat.class)) {
+                    if (boat.getPassengers().isEmpty()) {
+                        this.api.queueDeleteBoat(boat);
+                        ++removedCount;
                     }
                 }
-
-                if (removedCount > 0) {
-                    FormulaRacingListener.this.plugin.getDebugManager().logRaceSystem("[FormulaRacing] Limpeza: " + removedCount + " barcos abandonados foram removidos.");
-                }
-
             }
-        }).runTaskTimer(this.plugin, 1200L, 6000L);
+
+            if (removedCount > 0) {
+                this.plugin.getDebugManager().logRaceSystem("[FormulaRacing] Limpeza: " + removedCount + " barcos abandonados foram removidos.");
+            }
+
+        }, 1200L, 6000L);
     }
 
     @EventHandler(

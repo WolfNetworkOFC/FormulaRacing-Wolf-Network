@@ -31,13 +31,12 @@
  import net.md_5.bungee.api.ChatMessageType;
  import net.md_5.bungee.api.chat.BaseComponent;
  import net.md_5.bungee.api.chat.TextComponent;
- import org.bukkit.Bukkit;
- import org.bukkit.Color;
- import org.bukkit.Particle;
- import org.bukkit.Sound;
- import org.bukkit.entity.Player;
- import org.bukkit.plugin.Plugin;
- import org.bukkit.scheduler.BukkitRunnable;
+  import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+  import org.bukkit.Bukkit;
+  import org.bukkit.Color;
+  import org.bukkit.Particle;
+  import org.bukkit.Sound;
+  import org.bukkit.entity.Player;
 
  public class TimeTrialDuelsAction {
      private final FormulaRacing plugin;
@@ -163,47 +162,44 @@
          return session.getCurrentLapTime();
      }
 
-     private void startGlobalUpdateTask() {
-         new BukkitRunnable(){
-
-             public void run() {
-                 TimeTrialDuelsAction.this.activeVisuals.forEach((uuid, duelId) -> {
-                     Player player = Bukkit.getPlayer((UUID)uuid);
-                     if (player == null || !player.isOnline()) {
-                         TimeTrialDuelsAction.this.activeVisuals.remove(uuid);
-                         TimeTrialDuelsAction.this.activeTimers.remove(uuid);
-                         return;
-                     }
-                     if (TimeTrialDuelsAction.this.isPlayerInActiveHeatRace((UUID)uuid)) {
-                         return;
-                     }
-                     DuelSession session = TimeTrialDuelsAction.this.activeTimers.get(uuid);
-                     if (session != null) {
-                         if (session.shouldUpdateData()) {
-                             TimeTrialDuelsAction.this.updateDataAsync(player, session);
-                         }
-                         if (session.getCachedPosition().contains("1\u00ba") || session.getCachedPosition().contains("1st")) {
-                             TimeTrialDuelsAction.this.spawnLeaderParticles(player);
-                         }
-                         if (session.isWaitingForOthers()) {
-                             String langCode = TimeTrialDuelsAction.this.dm.getPlayerLanguage(uuid);
-                             String waitingMsg = TimeTrialDuelsAction.this.plugin.getDirectTranslation("duel_waiting_others", langCode);
-                             if (waitingMsg == null || waitingMsg.isEmpty()) {
-                                 waitingMsg = "Aguardando outros jogadores...";
-                             }
-                             TimeTrialDuelsAction.this.sendWaitingForOthersActionBar(player, session.getFormattedLapTime(), waitingMsg);
-                         } else {
-                             TimeTrialDuelsAction.this.sendDuelActionBar(player, session.getCachedPosition(), session.getFormattedLapTime(), session.getPersonalBest(), session.getCachedDelta());
-                         }
-                     } else {
-                         String langCode = TimeTrialDuelsAction.this.dm.getPlayerLanguage(uuid);
-                         String waitingText = TimeTrialDuelsAction.this.plugin.getDirectTranslation("duel_waiting", langCode);
-                         TimeTrialDuelsAction.this.sendDuelActionBar(player, "\u00a7f\u00a7l" + waitingText, "00:00.000", "\u00a77--:--.---", "");
-                     }
-                 });
-             }
-         }.runTaskTimer((Plugin)this.plugin, 0L, 1L);
-     }
+      private void startGlobalUpdateTask() {
+          SchedulerHelper.runTaskTimer(this.plugin, () -> {
+              TimeTrialDuelsAction.this.activeVisuals.forEach((uuid, duelId) -> {
+                  Player player = Bukkit.getPlayer((UUID)uuid);
+                  if (player == null || !player.isOnline()) {
+                      TimeTrialDuelsAction.this.activeVisuals.remove(uuid);
+                      TimeTrialDuelsAction.this.activeTimers.remove(uuid);
+                      return;
+                  }
+                  if (TimeTrialDuelsAction.this.isPlayerInActiveHeatRace((UUID)uuid)) {
+                      return;
+                  }
+                  DuelSession session = TimeTrialDuelsAction.this.activeTimers.get(uuid);
+                  if (session != null) {
+                      if (session.shouldUpdateData()) {
+                          TimeTrialDuelsAction.this.updateDataAsync(player, session);
+                      }
+                      if (session.getCachedPosition().contains("1\u00ba") || session.getCachedPosition().contains("1st")) {
+                          TimeTrialDuelsAction.this.spawnLeaderParticles(player);
+                      }
+                      if (session.isWaitingForOthers()) {
+                          String langCode = TimeTrialDuelsAction.this.dm.getPlayerLanguage(uuid);
+                          String waitingMsg = TimeTrialDuelsAction.this.plugin.getDirectTranslation("duel_waiting_others", langCode);
+                          if (waitingMsg == null || waitingMsg.isEmpty()) {
+                              waitingMsg = "Aguardando outros jogadores...";
+                          }
+                          TimeTrialDuelsAction.this.sendWaitingForOthersActionBar(player, session.getFormattedLapTime(), waitingMsg);
+                      } else {
+                          TimeTrialDuelsAction.this.sendDuelActionBar(player, session.getCachedPosition(), session.getFormattedLapTime(), session.getPersonalBest(), session.getCachedDelta());
+                      }
+                  } else {
+                      String langCode = TimeTrialDuelsAction.this.dm.getPlayerLanguage(uuid);
+                      String waitingText = TimeTrialDuelsAction.this.plugin.getDirectTranslation("duel_waiting", langCode);
+                      TimeTrialDuelsAction.this.sendDuelActionBar(player, "\u00a7f\u00a7l" + waitingText, "00:00.000", "\u00a77--:--.---", "");
+                  }
+              });
+          }, 0L, 1L);
+      }
 
      private boolean isPlayerInActiveHeatRace(UUID playerUUID) {
          if (this.plugin.getRaceEventManager() == null) {
@@ -234,8 +230,8 @@
          player.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(message));
      }
 
-     private void updateDataAsync(Player player, DuelSession session) {
-         Bukkit.getScheduler().runTaskAsynchronously((Plugin)this.plugin, () -> {
+      private void updateDataAsync(Player player, DuelSession session) {
+          SchedulerHelper.runAsync(this.plugin, () -> {
              Double bestLap;
              String langCode = this.dm.getPlayerLanguage(player.getUniqueId());
              session.setLangCode(langCode);

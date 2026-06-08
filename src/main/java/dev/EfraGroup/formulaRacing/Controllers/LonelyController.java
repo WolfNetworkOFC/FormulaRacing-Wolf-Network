@@ -3,6 +3,7 @@ package dev.EfraGroup.formulaRacing.Controllers;
 import dev.EfraGroup.formulaRacing.BoatUtils.NocolManager;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Heat.CollisionMode;
 import dev.EfraGroup.formulaRacing.Loneliness.ScopeResolver;
 import dev.EfraGroup.formulaRacing.Loneliness.VisibilityScope;
@@ -407,7 +408,7 @@ public class LonelyController implements Listener {
     }
 
     private void scheduleReconcile(Runnable runnable) {
-        Bukkit.getScheduler().runTaskLater(plugin, runnable, VISIBILITY_UPDATE_DELAY);
+        SchedulerHelper.runTaskLater(plugin, runnable, VISIBILITY_UPDATE_DELAY);
     }
 
     // -------------------------------------------------------------------------

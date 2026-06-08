@@ -9,6 +9,7 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.PacketSender;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardDuelsTimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimeTrialDuelsAction;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
@@ -26,6 +27,7 @@ import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Sound;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Boat;
 import org.bukkit.entity.Entity;
@@ -33,7 +35,6 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Boat.Type;
 import org.bukkit.event.Listener;
-import org.bukkit.scheduler.BukkitRunnable;
 
 public class TimeTrialDuels implements Listener {
     private final FormulaRacing plugin;
@@ -114,7 +115,7 @@ public class TimeTrialDuels implements Listener {
             String modeStr = isTimeTrialMode ? "TIME TRIAL" : "CORRIDA";
             this.plugin.getDebugManager().logDuelSystem("[SETUP] Modo de duelo: " + modeStr);
             int[] duelIdHolder = new int[]{-1};
-            Bukkit.getScheduler().runTask(this.plugin, () -> {
+            SchedulerHelper.runTask(this.plugin, () -> {
                 this.dm.createDuel(p1, participants, trackNameWS, laps, timeLimit, lonely);
                 int duelId = this.dm.getActiveDuelId(p1.getUniqueId());
                 duelIdHolder[0] = duelId;
@@ -150,7 +151,7 @@ public class TimeTrialDuels implements Listener {
                     this.packet.resetBoatUtilsToVanilla(p2);
                     this.packet.applyBoatUtilsToPlayer(p1, trackNameWS);
                     this.packet.applyBoatUtilsToPlayer(p2, trackNameWS);
-                    Bukkit.getScheduler().runTaskLater(this.plugin, () -> {
+                    SchedulerHelper.runTaskLater(this.plugin, () -> {
                         this.ttda.toggleVisuals(p1, duelId, true);
                         this.ttda.toggleVisuals(p2, duelId, true);
                         this.scoreboardDuelsUtils.applyDuelBoard(p1, duelId, laps, trackName);
@@ -174,7 +175,8 @@ public class TimeTrialDuels implements Listener {
     }
 
     private void startFullCountdownSequence(final Player p1, final Player p2, final int duelId, final int timeLimit) {
-        (new BukkitRunnable() {
+        ScheduledTask[] cdTask = {null};
+        cdTask[0] = SchedulerHelper.runTaskTimer(this.plugin, new Runnable() {
             int countdown = 5;
 
             public void run() {
@@ -213,29 +215,30 @@ public class TimeTrialDuels implements Listener {
                             TimeTrialDuels.this.startTimeLimitTimer(duelId, timeLimit);
                         }
 
-                        this.cancel();
+                        if (cdTask[0] != null) cdTask[0].cancel();
                     }
 
                 } else {
-                    this.cancel();
+                    if (cdTask[0] != null) cdTask[0].cancel();
                     TimeTrialDuels.this.endDuelByDisconnect(duelId);
                 }
             }
-        }).runTaskTimer(this.plugin, 0L, 20L);
+        }, 0L, 20L);
     }
 
     private void startTimeLimitTimer(final int duelId, final int timeLimitSeconds) {
         DuelState duelState = (DuelState)this.activeDuels.get(duelId);
         if (duelState != null) {
-            (new BukkitRunnable() {
+            ScheduledTask[] tlimitTask = {null};
+            tlimitTask[0] = SchedulerHelper.runTaskTimer(this.plugin, new Runnable() {
                 int secondsRemaining = timeLimitSeconds;
 
                 public void run() {
                     DuelState state = (DuelState)TimeTrialDuels.this.activeDuels.get(duelId);
                     if (state == null) {
-                        this.cancel();
+                        if (tlimitTask[0] != null) tlimitTask[0].cancel();
                     } else if (state.getFinishCount() >= state.getPlayerCount()) {
-                        this.cancel();
+                        if (tlimitTask[0] != null) tlimitTask[0].cancel();
                     } else {
                         --this.secondsRemaining;
                         if (this.secondsRemaining == 60 || this.secondsRemaining == 30 || this.secondsRemaining == 10 || this.secondsRemaining == 5) {
@@ -252,12 +255,12 @@ public class TimeTrialDuels implements Listener {
 
                         if (this.secondsRemaining <= 0) {
                             TimeTrialDuels.this.endDuelByTimeLimit(duelId);
-                            this.cancel();
+                            if (tlimitTask[0] != null) tlimitTask[0].cancel();
                         }
 
                     }
                 }
-            }).runTaskTimer(this.plugin, 20L, 20L);
+            }, 20L, 20L);
         }
     }
 
@@ -324,13 +327,14 @@ public class TimeTrialDuels implements Listener {
             }
 
             this.plugin.getDebugManager().logDuelSystem("§e[TIME LIMIT] Timeout configurado: " + timeoutSeconds + "s (baseado no melhor tempo: " + String.format("%.1f", bestLapTime) + "s)");
-            (new BukkitRunnable() {
+            ScheduledTask[] checkTask = {null};
+            checkTask[0] = SchedulerHelper.runTaskTimer(this.plugin, new Runnable() {
                 int checksRemaining = timeoutSeconds;
 
                 public void run() {
                     DuelState duelState = (DuelState)TimeTrialDuels.this.activeDuels.get(duelId);
                     if (duelState == null) {
-                        this.cancel();
+                        if (checkTask[0] != null) checkTask[0].cancel();
                     } else {
                         boolean allPlayersReady = true;
 
@@ -348,17 +352,17 @@ public class TimeTrialDuels implements Listener {
                         if (allPlayersReady) {
                             TimeTrialDuels.this.plugin.getDebugManager().logDuelSystem("§a[TIME LIMIT] Todos os jogadores completaram a volta atual - finalizando duelo #" + duelId);
                             TimeTrialDuels.this.finalizeDuelAfterTimeLimit(duelId);
-                            this.cancel();
+                            if (checkTask[0] != null) checkTask[0].cancel();
                         } else if (this.checksRemaining <= 0) {
                             TimeTrialDuels.this.plugin.getDebugManager().logDuelSystem("§c[TIME LIMIT] Timeout esgotado (" + timeoutSeconds + "s) - finalizando duelo #" + duelId + " (possível AFK/trollagem)");
                             TimeTrialDuels.this.finalizeDuelAfterTimeLimit(duelId);
-                            this.cancel();
+                            if (checkTask[0] != null) checkTask[0].cancel();
                         } else {
                             --this.checksRemaining;
                         }
                     }
                 }
-            }).runTaskTimer(this.plugin, 20L, 20L);
+            }, 20L, 20L);
         }
     }
 
@@ -385,7 +389,7 @@ public class TimeTrialDuels implements Listener {
 
             if (allPlayersReady) {
                 this.plugin.getDebugManager().logDuelSystem("§a[TIME LIMIT] Todos os jogadores completaram a volta atual - finalizando duelo #" + duelId);
-                Bukkit.getScheduler().runTask(this.plugin, () -> this.finalizeDuelAfterTimeLimit(duelId));
+                SchedulerHelper.runTask(this.plugin, () -> this.finalizeDuelAfterTimeLimit(duelId));
             }
 
         }
@@ -654,7 +658,7 @@ public class TimeTrialDuels implements Listener {
                             // Capturamos newLap como final para o uso em lambdas aninhados
                             final int finalNewLap = newLap;
 
-                            Bukkit.getScheduler().runTask(this.plugin, () -> {
+                            SchedulerHelper.runTask(this.plugin, () -> {
                                 this.ttda.pauseLapTimer(player);
                                 this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Timer pausado para " + player.getName());
 
@@ -678,7 +682,7 @@ public class TimeTrialDuels implements Listener {
                                     // Capturamos o tipo de madeira como final
                                     final Boat.Type finalWoodType = boatWoodType;
 
-                                    Bukkit.getScheduler().runTaskLater(this.plugin, () -> {
+                                    SchedulerHelper.runTaskLater(this.plugin, () -> {
                                         // Clone para segurança e leve ajuste de altura para não bugar no bloco
                                         Location boatLoc = spawnLoc.clone().add(0, 0.5, 0);
 
@@ -695,13 +699,13 @@ public class TimeTrialDuels implements Listener {
                                         }
 
                                         // Remove a proteção de ejeção após estabilizar
-                                        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                                        SchedulerHelper.runTaskLater(plugin, () -> {
                                             playersBeingLapReset.remove(player.getUniqueId());
                                             plugin.getDebugManager().logDuelSystem("[LAP RESET] Proteção de ejeção removida.");
                                         }, 3L);
                                     }, 2L);
                                 } else {
-                                    Bukkit.getScheduler().runTaskLater(this.plugin, () ->
+                                    SchedulerHelper.runTaskLater(this.plugin, () ->
                                             playersBeingLapReset.remove(player.getUniqueId()), 3L);
                                 }
                             });
@@ -848,12 +852,12 @@ public class TimeTrialDuels implements Listener {
                         });
                         if (allFinished) {
                             this.plugin.getDebugManager().logDuelSystem("[TIME TRIAL] Todos os jogadores finalizaram - encerrando duelo");
-                            Bukkit.getScheduler().runTaskLater(this.plugin, () -> this.endDuel(duelId), 20L);
+                            SchedulerHelper.runTaskLater(this.plugin, () -> this.endDuel(duelId), 20L);
                         } else {
                             this.plugin.getDebugManager().logDuelSystem("[TIME TRIAL] " + player.getName() + " finalizou - aguardando outros jogadores");
                         }
                     } else if (duelState.getFinishCount() == 1) {
-                        Bukkit.getScheduler().runTaskLater(this.plugin, () -> {
+                        SchedulerHelper.runTaskLater(this.plugin, () -> {
                             DuelState currentState = (DuelState)this.activeDuels.get(duelId);
                             if (currentState != null && !currentState.isTimeLimitReached()) {
                                 this.endDuel(duelId);
@@ -1053,7 +1057,7 @@ public class TimeTrialDuels implements Listener {
             UUID uuid = player.getUniqueId();
             this.plugin.getTimerUtils().stopTimer(player);
             this.dm.setTimeTrialEnabled(uuid, false);
-            Bukkit.getScheduler().runTask(this.plugin, () -> {
+            SchedulerHelper.runTask(this.plugin, () -> {
                 if (player.isOnline()) {
                     player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(""));
                 }

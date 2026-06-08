@@ -397,6 +397,18 @@ public class EventsDatabaseManager {
         });
     }
 
+    public void updateEventLeague(int eventId, String leagueName) {
+        String sql = "UPDATE fr_events SET league = ? WHERE id = ?";
+        this.executeAsync(sql, "updateEventLeague", stmt -> {
+            try {
+                stmt.setString(1, leagueName);
+                stmt.setInt(2, eventId);
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
     public void heatSet(int heatId, String column, String value) {
         if (
             !column.matches(

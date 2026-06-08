@@ -4,6 +4,7 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRTheme;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeResolver;
@@ -20,9 +21,7 @@ import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class RaceActionBarManager {
     private final FormulaRacing plugin;
@@ -39,7 +38,7 @@ public class RaceActionBarManager {
     private final String progressEndColor;
     private final String progressEmptyColor;
     private final String progressBracketColor;
-    private BukkitTask updateTask;
+    private ScheduledTask updateTask;
 
     public RaceActionBarManager(FormulaRacing plugin) {
         this.plugin = plugin;
@@ -74,46 +73,43 @@ public class RaceActionBarManager {
     }
 
     private void startAutoUpdate() {
-        this.updateTask = new BukkitRunnable() {
-            @Override
-            public void run() {
-                long now = System.currentTimeMillis();
-                for (Map.Entry<UUID, Heats> entry : RaceActionBarManager.this.playerHeats.entrySet()) {
-                    UUID playerId = entry.getKey();
-                    Player player = Bukkit.getPlayer(playerId);
-                    if (player == null || !player.isOnline()) {
-                        continue;
-                    }
-                    Heats heat = entry.getValue();
-                    if (RaceActionBarManager.this.shouldSkipUpdate(playerId, heat.getHeatState(), now)) {
-                        continue;
-                    }
-                    RaceActionBarManager.this.updateDriverActionBar(player, heat);
+        this.updateTask = SchedulerHelper.runTaskTimer(this.plugin, () -> {
+            long now = System.currentTimeMillis();
+            for (Map.Entry<UUID, Heats> entry : RaceActionBarManager.this.playerHeats.entrySet()) {
+                UUID playerId = entry.getKey();
+                Player player = Bukkit.getPlayer(playerId);
+                if (player == null || !player.isOnline()) {
+                    continue;
                 }
-
-                for (Map.Entry<UUID, SpectatorTarget> entry : RaceActionBarManager.this.spectatorTargets.entrySet()) {
-                    UUID spectatorId = entry.getKey();
-                    Player spectator = Bukkit.getPlayer(spectatorId);
-                    if (spectator == null || !spectator.isOnline()) {
-                        RaceActionBarManager.this.clearSpectatorTarget(spectatorId);
-                        continue;
-                    }
-                    SpectatorTarget target = entry.getValue();
-                    if (target == null || target.heat == null || target.driverId == null) {
-                        continue;
-                    }
-                    Driver driver = target.heat.getDriver(target.driverId);
-                    if (driver == null) {
-                        RaceActionBarManager.this.clearSpectatorTarget(spectator);
-                        continue;
-                    }
-                    if (RaceActionBarManager.this.shouldSkipUpdate(spectatorId, target.heat.getHeatState(), now)) {
-                        continue;
-                    }
-                    RaceActionBarManager.this.updateActionBarForDriver(spectator, target.heat, driver);
+                Heats heat = entry.getValue();
+                if (RaceActionBarManager.this.shouldSkipUpdate(playerId, heat.getHeatState(), now)) {
+                    continue;
                 }
+                RaceActionBarManager.this.updateDriverActionBar(player, heat);
             }
-        }.runTaskTimer(this.plugin, 0L, this.dynamicUpdateIntervalTicks);
+
+            for (Map.Entry<UUID, SpectatorTarget> entry : RaceActionBarManager.this.spectatorTargets.entrySet()) {
+                UUID spectatorId = entry.getKey();
+                Player spectator = Bukkit.getPlayer(spectatorId);
+                if (spectator == null || !spectator.isOnline()) {
+                    RaceActionBarManager.this.clearSpectatorTarget(spectatorId);
+                    continue;
+                }
+                SpectatorTarget target = entry.getValue();
+                if (target == null || target.heat == null || target.driverId == null) {
+                    continue;
+                }
+                Driver driver = target.heat.getDriver(target.driverId);
+                if (driver == null) {
+                    RaceActionBarManager.this.clearSpectatorTarget(spectator);
+                    continue;
+                }
+                if (RaceActionBarManager.this.shouldSkipUpdate(spectatorId, target.heat.getHeatState(), now)) {
+                    continue;
+                }
+                RaceActionBarManager.this.updateActionBarForDriver(spectator, target.heat, driver);
+            }
+        }, 0L, this.dynamicUpdateIntervalTicks);
     }
 
     private boolean shouldSkipUpdate(UUID playerId, HeatState state, long now) {

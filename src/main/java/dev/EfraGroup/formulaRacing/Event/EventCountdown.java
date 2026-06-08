@@ -7,6 +7,7 @@ package dev.EfraGroup.formulaRacing.Event;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Participant.Subscriber;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRTheme;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeDefaults;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
@@ -20,13 +21,13 @@ import org.bukkit.boss.BarFlag;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitTask;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class EventCountdown {
     private final FormulaRacing plugin;
     private final Events event;
     private BossBar bossBar;
-    private BukkitTask countdownTask;
+    private ScheduledTask countdownTask;
     private int totalSeconds;
     private int remainingSeconds;
     private String label;
@@ -50,7 +51,7 @@ public class EventCountdown {
         this.active = true;
         this.bossBar = Bukkit.createBossBar(this.formatTitle(), BarColor.GREEN, BarStyle.SOLID, new BarFlag[0]);
         this.showToAll();
-        this.countdownTask = Bukkit.getScheduler().runTaskTimer(this.plugin, () -> {
+        this.countdownTask = SchedulerHelper.runTaskTimer(this.plugin, () -> {
             if (this.remainingSeconds <= 0) {
                 this.finish();
             } else {

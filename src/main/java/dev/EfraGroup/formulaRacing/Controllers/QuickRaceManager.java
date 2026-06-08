@@ -18,6 +18,7 @@ import dev.EfraGroup.formulaRacing.Round.RoundState;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 
 import java.util.ArrayList;
@@ -33,7 +34,7 @@ import org.bukkit.entity.Boat;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.scheduler.BukkitTask;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class QuickRaceManager {
     private final FormulaRacing plugin;
@@ -44,8 +45,8 @@ public class QuickRaceManager {
     private Rounds currentRound;
     private Heats currentHeat;
     private volatile boolean creating = false;
-    private BukkitTask lobbyTimerTask;
-    private BukkitTask completionMonitorTask;
+    private ScheduledTask lobbyTimerTask;
+    private ScheduledTask completionMonitorTask;
     private int lobbyTimerSeconds = 60;
     private static final int TIMER_LONG = 60;
     private static final int TIMER_SHORT = 15;
@@ -147,7 +148,16 @@ public class QuickRaceManager {
                 return;
             }
 
-            // 4. Finalização e Logs
+            // 5. Validação de grid
+            int gridCount = plugin.getTrackIntegrationManager().getGridPositionCount(trackNameWS);
+            if (gridCount <= 0) {
+                plugin.getDebugManager().logRaceSystem("[QuickRace] Pista " + finalTrackName + " não possui grid definido!");
+                creator.sendMessage("§c✗ A pista §e" + finalTrackName + " §cnão possui posições de grid definidas!");
+                deleteQuickRace();
+                return;
+            }
+
+            // 6. Finalização e Logs
             database.setPlayerSelectedEvent(creator.getUniqueId(), currentQuickRace);
             startLobbyTimer();
 
@@ -550,7 +560,7 @@ public class QuickRaceManager {
 
     private void startCompletionMonitor() {
         this.stopCompletionMonitor();
-        this.completionMonitorTask = this.plugin.getServer().getScheduler().runTaskTimer(this.plugin, () -> {
+        this.completionMonitorTask = SchedulerHelper.runTaskTimer(this.plugin, () -> {
             if (this.currentQuickRace == null || this.currentHeat == null) {
                 this.stopCompletionMonitor();
                 return;
@@ -620,7 +630,7 @@ public class QuickRaceManager {
     private void startLobbyTimer() {
         this.stopLobbyTimer();
         this.lobbyTimerSeconds = 60;
-        this.lobbyTimerTask = this.plugin.getServer().getScheduler().runTaskTimer(this.plugin, this::tickLobby, 20L, 20L);
+        this.lobbyTimerTask = SchedulerHelper.runTaskTimer(this.plugin, this::tickLobby, 20L, 20L);
     }
 
     private void stopLobbyTimer() {

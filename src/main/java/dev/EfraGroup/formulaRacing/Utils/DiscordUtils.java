@@ -3,7 +3,7 @@ package dev.EfraGroup.formulaRacing.Utils;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
-import org.bukkit.Bukkit;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
@@ -22,7 +22,7 @@ public class DiscordUtils {
     private static final String ROLE_MENTION = "<@&1403835295153000560>";
 
     public static void sendNewTrackEmbed(JavaPlugin plugin, String trackName, String creator, String description, String imageUrl) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        SchedulerHelper.runAsync(plugin, () -> {
             try {
                 URL url = URI.create(WEBHOOK).toURL();
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -81,7 +81,7 @@ public class DiscordUtils {
     }
 
     public static void sendRecordMessage(JavaPlugin plugin, String firstPlayer, double firstTime, String secondPlayer, double secondTime, String trackName) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        SchedulerHelper.runAsync(plugin, () -> {
             try {
                 URL url = URI.create(WEBHOOK).toURL();
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();

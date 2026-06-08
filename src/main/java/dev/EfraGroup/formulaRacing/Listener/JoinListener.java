@@ -9,6 +9,7 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.PacketSender;
 import dev.EfraGroup.formulaRacing.Controllers.HotbarController;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import java.sql.SQLException;
 import java.util.UUID;
 
@@ -86,7 +87,7 @@ public class JoinListener implements Listener {
         String rank = this.getPlayerRank(uuid);
         event.setJoinMessage(null);
         this.updatePlayerPrefix(player);
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 boolean isFirstJoin = false;
                 if (!this.mysql.playerExists(uuid)) {
@@ -109,17 +110,17 @@ public class JoinListener implements Listener {
                         msg = this.plugin.getConfig().getString("message-settings.join.message", "[+] {rank} {player}").replace("{player}", playerName).replace("{rank}", rank);
                     }
 
-                    Bukkit.getScheduler().runTask(this.plugin, () -> Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', msg)));
+                    SchedulerHelper.runTask(this.plugin, () -> Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', msg)));
                 }
 
-                Bukkit.getScheduler().runTaskLater(this.plugin, () -> {
+                SchedulerHelper.runTaskLater(this.plugin, () -> {
                     if (player.isOnline()) {
                         this.plugin.getDailyRaceManager().notifyPlayerOfAllActiveEvents(player);
                     }
 
                 }, 40L);
                 this.plugin.getTranslationUtil().loadPlayerLanguage(uuid);
-                Bukkit.getScheduler().runTask(this.plugin, () -> {
+                SchedulerHelper.runTask(this.plugin, () -> {
                     try {
                         this.hotbarController.giveHotbarItems(player);
                     } catch (Exception var4) {
@@ -235,7 +236,7 @@ public class JoinListener implements Listener {
             player.getVehicle().remove();
         }
 
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 if (this.mysql.hasParty(uuid)) {
                     UUID owner = this.mysql.getOwner(uuid);

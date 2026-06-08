@@ -16,6 +16,7 @@ import dev.EfraGroup.formulaRacing.Round.RoundState;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -43,7 +44,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitTask;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class DailyRaceManager {
     private static final UUID DAILY_CREATOR_UUID = new UUID(0L, 0L);
@@ -52,9 +53,9 @@ public class DailyRaceManager {
     private final FormulaRacing plugin;
     private final EventSignupService signupService;
     private final Random random = new Random();
-    private BukkitTask scheduleTickTask;
-    private BukkitTask phaseTask;
-    private BukkitTask monitorTask;
+    private ScheduledTask scheduleTickTask;
+    private ScheduledTask phaseTask;
+    private ScheduledTask monitorTask;
     private volatile Integer activeEventId;
     private volatile String activeEventName;
     private volatile Phase phase;
@@ -72,7 +73,7 @@ public class DailyRaceManager {
     public void start() {
         this.stop();
         if (this.isEnabled()) {
-            this.scheduleTickTask = Bukkit.getScheduler().runTaskTimer(this.plugin, this::tickSchedule, 40L, 1200L);
+            this.scheduleTickTask = SchedulerHelper.runTaskTimer(this.plugin, this::tickSchedule, 40L, 1200L);
         }
     }
 
@@ -377,7 +378,7 @@ public class DailyRaceManager {
 
     private void startMonitor() {
         if (this.monitorTask == null) {
-            this.monitorTask = Bukkit.getScheduler().runTaskTimer(this.plugin, this::tickMonitor, 40L, 40L);
+            this.monitorTask = SchedulerHelper.runTaskTimer(this.plugin, this::tickMonitor, 40L, 40L);
         }
     }
 

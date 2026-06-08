@@ -8,7 +8,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.bukkit.Bukkit;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -18,7 +19,7 @@ public class TrackLeaderboard { // Removido o 'abstract'
     private Location location;
     private final DatabaseManager mySQLManager;
     private final JavaPlugin plugin;
-    private int taskId = -1;
+    private ScheduledTask task;
 
     private final Map<String, Hologram> holograms = new HashMap<>();
 
@@ -31,24 +32,24 @@ public class TrackLeaderboard { // Removido o 'abstract'
     }
 
     public void startAutoUpdate() {
-        if (this.taskId == -1) {
+        if (this.task == null || this.task.isCancelled()) {
             long ticks = this.plugin.getConfig().getLong("leaderboards.updateticks", 200L);
-            this.taskId = Bukkit.getScheduler().runTaskTimer(this.plugin, () -> {
+            this.task = SchedulerHelper.runTaskTimer(this.plugin, () -> {
                 this.updateJavaLeaderboard();
                 this.updateBedrockLeaderboard();
-            }, 0L, ticks).getTaskId();
+            }, 0L, ticks);
         }
     }
 
     public void updateJavaLeaderboard() {
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             List<DatabaseManager.PlayerTime> leaderboard = this.mySQLManager.getLeaderboardJava(this.trackName);
             processAndShow(leaderboard, "java");
         });
     }
 
     public void updateBedrockLeaderboard() {
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             List<DatabaseManager.PlayerTime> leaderboard = this.mySQLManager.getLeaderboardBedrock(this.trackName);
             processAndShow(leaderboard, "bedrock");
         });
@@ -58,7 +59,7 @@ public class TrackLeaderboard { // Removido o 'abstract'
         this.location = newLocation;
         this.mySQLManager.saveHologramLocation(this.trackName, newLocation);
 
-        Bukkit.getScheduler().runTask(this.plugin, () -> holograms.forEach((type, holo) -> {
+        SchedulerHelper.runTask(this.plugin, () -> holograms.forEach((type, holo) -> {
             double xOffset = type.equals("bedrock") ? 3.0 : 0.0;
             Location holoLoc = newLocation.clone().add(xOffset, 0.5, 0.0);
             holo.setLocation(holoLoc);
@@ -121,7 +122,7 @@ public class TrackLeaderboard { // Removido o 'abstract'
 
         // Debug para ver se o título converteu o $ corretamente
 
-        Bukkit.getScheduler().runTask(this.plugin, () -> {
+        SchedulerHelper.runTask(this.plugin, () -> {
             try {
                 String safeTrackName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
                 String holoName = "lb_" + type + "_" + safeTrackName;
@@ -143,16 +144,16 @@ public class TrackLeaderboard { // Removido o 'abstract'
 
     public synchronized void removeHologram() {
         this.cancelUpdateTask();
-        Bukkit.getScheduler().runTask(this.plugin, () -> {
+        SchedulerHelper.runTask(this.plugin, () -> {
             holograms.values().forEach(Hologram::delete);
             holograms.clear();
         });
     }
 
     public void cancelUpdateTask() {
-        if (this.taskId != -1) {
-            Bukkit.getScheduler().cancelTask(this.taskId);
-            this.taskId = -1;
+        if (this.task != null && !this.task.isCancelled()) {
+            this.task.cancel();
+            this.task = null;
         }
     }
 

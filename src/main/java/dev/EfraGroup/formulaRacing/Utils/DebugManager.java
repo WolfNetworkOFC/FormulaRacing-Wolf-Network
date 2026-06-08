@@ -125,11 +125,83 @@
          return this.pitStopSystem;
      }
 
-     public boolean isSpectatorSystemEnabled() {
-         return this.spectatorSystem;
-     }
+    public boolean isSpectatorSystemEnabled() {
+        return this.spectatorSystem;
+    }
 
-     public void logRegionDetection(String message) {
+    public boolean isGuiSystemEnabled() {
+        return this.guiSystem;
+    }
+
+    public boolean isFileSystemEnabled() {
+        return this.fileSystem;
+    }
+
+    public void setRegionDetection(boolean value) {
+        this.regionDetection = value;
+    }
+
+    public void setDuelSystem(boolean value) {
+        this.duelSystem = value;
+    }
+
+    public void setDuelSystemVerbose(boolean value) {
+        this.duelSystemVerbose = value;
+    }
+
+    public void setTimeTrialSystem(boolean value) {
+        this.timeTrialSystem = value;
+    }
+
+    public void setBoatUtils(boolean value) {
+        this.boatUtils = value;
+    }
+
+    public void setDatabaseOperations(boolean value) {
+        this.databaseOperations = value;
+    }
+
+    public void setEventSystem(boolean value) {
+        this.eventSystem = value;
+    }
+
+    public void setPacketHandling(boolean value) {
+        this.packetHandling = value;
+    }
+
+    public void setPerformanceMetrics(boolean value) {
+        this.performanceMetrics = value;
+    }
+
+    public void setRaceSystem(boolean value) {
+        this.raceSystem = value;
+    }
+
+    public void setRaceSystemVerbose(boolean value) {
+        this.raceSystemVerbose = value;
+    }
+
+    public void setQualificationSystem(boolean value) {
+        this.qualificationSystem = value;
+    }
+
+    public void setPitStopSystem(boolean value) {
+        this.pitStopSystem = value;
+    }
+
+    public void setSpectatorSystem(boolean value) {
+        this.spectatorSystem = value;
+    }
+
+    public void setGuiSystem(boolean value) {
+        this.guiSystem = value;
+    }
+
+    public void setFileSystem(boolean value) {
+        this.fileSystem = value;
+    }
+
+    public void logRegionDetection(String message) {
          if (this.regionDetection) {
              this.plugin.getLogger().info("\u00a7b[REGION DEBUG] " + message);
          }

@@ -33,7 +33,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitTask;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 
 public class Heats {
 
@@ -61,7 +62,7 @@ public class Heats {
     private String trackNameWS;
     private GridManager gridManager;
     private boolean drsEnabled;
-    private BukkitTask offlineMonitorTask;
+    private ScheduledTask offlineMonitorTask;
     private List<DrsRegion> drsRegions = new ArrayList<>();
     private boolean pushtopass;
     private int deltaghosting;
@@ -71,10 +72,12 @@ public class Heats {
     private boolean realistc;
     private boolean reversegrid;
     private double pushtopasspower;
-    private BukkitTask sessionTask;
+    private ScheduledTask sessionTask;
     private boolean configDirty = false;
     private boolean onlyBedrock = false;
     private boolean ErsEnabled = false;
+    private boolean gridReversed = false;
+    private Map<Integer, Integer> originalPositions = new HashMap<>();
 
     public Heats(FormulaRacing plugin, int id, Rounds round, int heatNumber) {
         this.plugin = plugin;
@@ -734,7 +737,7 @@ public class Heats {
                     }
                 }
 
-                Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+                SchedulerHelper.runAsync(this.plugin, () -> {
                     Map<UUID, Boolean> lonelyStates = new HashMap();
 
                     for (UUID uuid : driverUUIDs) {
@@ -745,7 +748,7 @@ public class Heats {
                         lonelyStates.put(uuid, dbLonely);
                     }
 
-                    Bukkit.getScheduler().runTask(this.plugin, () -> {
+                    SchedulerHelper.runTask(this.plugin, () -> {
                         for (Map.Entry<
                             UUID,
                             Boolean
@@ -772,16 +775,14 @@ public class Heats {
                 }
             }
 
-            this.plugin.getServer()
-                .getScheduler()
-                .runTaskLater(
-                    this.plugin,
-                    () -> {
-                        this.plugin.getRaceScoreboardManager().removeHeat(this);
-                        this.plugin.getRaceActionBarManager().removeHeat(this);
-                    },
-                    60L
-                );
+            SchedulerHelper.runTaskLater(
+                this.plugin,
+                () -> {
+                    this.plugin.getRaceScoreboardManager().removeHeat(this);
+                    this.plugin.getRaceActionBarManager().removeHeat(this);
+                },
+                60L
+            );
             if (
                 this.plugin != null &&
                 this.id > 0 &&
@@ -1044,10 +1045,8 @@ public class Heats {
 
     public void startOfflineMonitoring() {
         this.stopOfflineMonitoring();
-        this.offlineMonitorTask = this.plugin.getServer()
-            .getScheduler()
-            .runTaskTimer(
-                this.plugin,
+        this.offlineMonitorTask = SchedulerHelper.runTaskTimer(
+            this.plugin,
                 () -> {
                     if (this.heatState != HeatState.RACING) {
                         this.stopOfflineMonitoring();
@@ -1091,9 +1090,7 @@ public class Heats {
                             this.plugin.getDebugManager().logRaceSystem(
                                 "Todos os pilotos finalizaram ou foram marcados como DNF - finalizando heat"
                             );
-                            this.plugin.getServer()
-                                .getScheduler()
-                                .runTask(this.plugin, () -> this.finishHeat());
+                            SchedulerHelper.runTask(this.plugin, () -> this.finishHeat());
                         }
                     }
                 },
@@ -1223,7 +1220,7 @@ public class Heats {
 
     private void spawnQualiDriver(Player player, Driver driver) {
         this.plugin.getLonelyController().updatePlayersVisibility(player);
-        this.plugin.getServer().getScheduler().runTaskLater(this.plugin, () -> {
+        SchedulerHelper.runTaskLater(this.plugin, () -> {
             if (player.isOnline()) {
                 if (this.plugin.getPacketSender() != null) {
                     this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
@@ -1661,7 +1658,7 @@ public class Heats {
     public void startSessionTimer() {
         this.stopSessionTimer();
         if (this.timeLimit != null && this.timeLimit > 0) {
-            this.sessionTask = Bukkit.getScheduler().runTaskTimer(
+            this.sessionTask = SchedulerHelper.runTaskTimer(
                 this.plugin,
                 () -> {
                     long remaining = this.getSessionTimeRemaining();
@@ -1700,7 +1697,7 @@ public class Heats {
                             this.finishHeat();
                         } else {
                             announcements.broadcastSessionExpired(this, true);
-                            Bukkit.getScheduler().runTaskLater(
+                            SchedulerHelper.runTaskLater(
                                 this.plugin,
                                 () -> {
                                     if (
@@ -1898,6 +1895,79 @@ public class Heats {
         }
     }
 
+    public void reverseFullGrid() {
+        if (this.heatState != HeatState.SETUP && this.heatState != HeatState.LOADED) {
+            return;
+        }
+        this.originalPositions.clear();
+        for (Driver driver : this.startPositions) {
+            this.originalPositions.put(driver.getId(), driver.getStartPosition());
+        }
+        List<Driver> reversed = new ArrayList<>(this.startPositions);
+        Collections.reverse(reversed);
+        for (int i = 0; i < reversed.size(); i++) {
+            Driver driver = reversed.get(i);
+            int newPos = i + 1;
+            driver.setStartPosition(newPos);
+            driver.setPosition(newPos);
+        }
+        this.startPositions = reversed;
+        this.reorderGrid();
+        this.gridReversed = true;
+        if (this.plugin != null && this.id > 0 && this.plugin.getRaceEventManager() != null) {
+            Map<UUID, Integer> positions = new HashMap<>();
+            for (Driver d : this.drivers.values()) {
+                positions.put(d.getUuid(), d.getStartPosition());
+            }
+            this.plugin.getRaceEventManager().getDatabaseManager().updateHeatGridPositions(this.id, positions);
+        }
+    }
+
+    public void restoreOriginalGrid() {
+        if (!this.gridReversed || this.originalPositions.isEmpty()) {
+            return;
+        }
+        for (Driver driver : this.drivers.values()) {
+            Integer origPos = this.originalPositions.get(driver.getId());
+            if (origPos != null) {
+                driver.setStartPosition(origPos);
+                driver.setPosition(origPos);
+            }
+        }
+        this.originalPositions.clear();
+        this.gridReversed = false;
+        this.reorderGrid();
+        if (this.plugin != null && this.id > 0 && this.plugin.getRaceEventManager() != null) {
+            Map<UUID, Integer> positions = new HashMap<>();
+            for (Driver d : this.drivers.values()) {
+                positions.put(d.getUuid(), d.getStartPosition());
+            }
+            this.plugin.getRaceEventManager().getDatabaseManager().updateHeatGridPositions(this.id, positions);
+        }
+    }
+
+    public boolean isGridReversed() {
+        return this.gridReversed;
+    }
+
+    public void handleDriverDNF(Driver driver, String reason) {
+        if (driver == null || driver.isDnf() || driver.isFinished()) {
+            return;
+        }
+        driver.setDnf(true);
+        driver.setEndTime(System.currentTimeMillis());
+        driver.setPtpActive(false);
+        driver.setPtpEnergy(0.0);
+        EventAnnouncements announcements = this.round != null && this.round.getEvent() != null
+            ? this.round.getEvent().getAnnouncements()
+            : this.plugin.getEventAnnouncements();
+        announcements.broadcastDNF(this, driver, reason);
+        boolean allFinished = this.drivers.values().stream().allMatch(d -> d.isFinished() || d.isDnf());
+        if (allFinished) {
+            SchedulerHelper.runTask(this.plugin, (Runnable) this::finishHeat);
+        }
+    }
+
     public String getTrackNameWS() {
         return this.trackNameWS;
     }
@@ -1979,6 +2049,23 @@ public class Heats {
             this.totalLaps +
             "}"
         );
+    }
+
+    private HeatConfig heatConfig;
+
+    public HeatConfig getHeatConfig() {
+        if (heatConfig == null) {
+            heatConfig = new HeatConfig();
+        }
+        return heatConfig;
+    }
+
+    public void setHeatConfig(HeatConfig heatConfig) {
+        this.heatConfig = heatConfig;
+    }
+
+    public void markPositionsDirty() {
+        // Flag para indicar que as posições precisam ser recalculadas
     }
 
     public static class DrsRegion {

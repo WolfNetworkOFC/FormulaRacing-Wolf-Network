@@ -14,6 +14,7 @@ import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.ApiUtilities;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -180,9 +181,7 @@ public class EventCommand extends BaseCommand {
             name,
             trackNameWS
         ).thenAccept(event -> {
-            this.plugin.getServer()
-                .getScheduler()
-                .runTask(this.plugin, () -> {
+            SchedulerHelper.runTask(this.plugin, () -> {
                     if (event != null) {
                         this.plugin.sendMessage(
                             player,

@@ -14,7 +14,8 @@ import org.bukkit.boss.BarFlag;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class ERSManager {
     private final FormulaRacing plugin;
@@ -25,24 +26,22 @@ public class ERSManager {
     }
 
     public void startERSTask(final Heats heat) {
-        (new BukkitRunnable() {
-            public void run() {
-                if (heat.getHeatState() != HeatState.RACING) {
-                    ERSManager.this.clearAllBars();
-                    this.cancel();
-                } else {
-                    for (Driver driver : heat.getDrivers().values()) {
-                        Player player = Bukkit.getPlayer(driver.getUuid());
-                        if (player != null && player.isOnline()) {
-                            ERSManager.this.updateERS(player, driver, heat);
-                        } else {
-                            // Limpeza automática se o player deslogar
-                            ERSManager.this.removePlayer(driver.getUuid());
-                        }
+        SchedulerHelper.runTaskTimer(this.plugin, (scheduledTask) -> {
+            if (heat.getHeatState() != HeatState.RACING) {
+                ERSManager.this.clearAllBars();
+                scheduledTask.cancel();
+            } else {
+                for (Driver driver : heat.getDrivers().values()) {
+                    Player player = Bukkit.getPlayer(driver.getUuid());
+                    if (player != null && player.isOnline()) {
+                        ERSManager.this.updateERS(player, driver, heat);
+                    } else {
+                        // Limpeza automática se o player deslogar
+                        ERSManager.this.removePlayer(driver.getUuid());
                     }
                 }
             }
-        }).runTaskTimer(this.plugin, 0L, 2L);
+        }, 0L, 2L);
     }
 
     private void updateERS(Player player, Driver driver, Heats heat) {

@@ -2,6 +2,7 @@ package dev.EfraGroup.formulaRacing.Controllers;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
@@ -184,7 +185,7 @@ public class HeatDriverCommandService {
 
     private <T> CompletableFuture<T> supplyAsync(Supplier<T> supplier) {
         CompletableFuture<T> future = new CompletableFuture<>();
-        this.plugin.getServer().getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 future.complete(supplier.get());
             } catch (Throwable throwable) {

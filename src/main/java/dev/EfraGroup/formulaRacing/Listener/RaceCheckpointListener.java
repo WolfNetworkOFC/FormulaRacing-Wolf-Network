@@ -18,6 +18,7 @@ import dev.EfraGroup.formulaRacing.Heat.Lap;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Participant.DriverLookup;
 import dev.EfraGroup.formulaRacing.Utils.RegionMathUtils;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -416,30 +417,28 @@ public class RaceCheckpointListener implements Listener {
             return;
         }
         final Location finalTargetLoc = targetLoc;
-        this.plugin.getServer()
-            .getScheduler()
-            .runTaskLater(
-                this.plugin,
-                () -> {
-                    if (player.isOnline()) {
-                        this.plugin.getAPI().recoverPlayerBoatState(player);
-                        player.teleport(finalTargetLoc);
-                        player.playSound(
-                            finalTargetLoc,
-                            Sound.ENTITY_ENDERMAN_TELEPORT,
-                            1.0F,
-                            1.0F
-                        );
-                        this.plugin.getAPI().spawnBoat(
-                            player,
-                            false,
-                            false,
-                            false
-                        );
-                    }
-                },
-                1L
-            );
+        SchedulerHelper.runTaskLater(
+            this.plugin,
+            () -> {
+                if (player.isOnline()) {
+                    this.plugin.getAPI().recoverPlayerBoatState(player);
+                    player.teleport(finalTargetLoc);
+                    player.playSound(
+                        finalTargetLoc,
+                        Sound.ENTITY_ENDERMAN_TELEPORT,
+                        1.0F,
+                        1.0F
+                    );
+                    this.plugin.getAPI().spawnBoat(
+                        player,
+                        false,
+                        false,
+                        false
+                    );
+                }
+            },
+            1L
+        );
         this.plugin.sendMessage(
             player,
             "race_checkpoint_missed",
@@ -931,24 +930,22 @@ public class RaceCheckpointListener implements Listener {
                 "Todos os pilotos finalizaram ou foram marcados como DNF no Heat " +
                     heat.getId()
             );
-            this.plugin.getServer()
-                .getScheduler()
-                .runTaskLater(
-                    this.plugin,
-                    () -> {
-                        heat.finishHeat();
-                        Events event =
-                            heat.getRound() != null
-                                ? heat.getRound().getEvent()
-                                : null;
-                        EventAnnouncements announcements =
-                            event != null
-                                ? event.getAnnouncements()
-                                : this.plugin.getEventAnnouncements();
-                        announcements.broadcastHeatComplete(heat);
-                    },
-                    100L
-                );
+            SchedulerHelper.runTaskLater(
+                this.plugin,
+                () -> {
+                    heat.finishHeat();
+                    Events event =
+                        heat.getRound() != null
+                            ? heat.getRound().getEvent()
+                            : null;
+                    EventAnnouncements announcements =
+                        event != null
+                            ? event.getAnnouncements()
+                            : this.plugin.getEventAnnouncements();
+                    announcements.broadcastHeatComplete(heat);
+                },
+                100L
+            );
         }
     }
 

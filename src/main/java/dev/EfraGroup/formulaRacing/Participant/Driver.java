@@ -8,6 +8,7 @@ package dev.EfraGroup.formulaRacing.Participant;
 import dev.EfraGroup.formulaRacing.RegionBox;
 import dev.EfraGroup.formulaRacing.Event.Driver.DriverFinishLapEvent;
 import dev.EfraGroup.formulaRacing.Heat.Lap;
+import dev.EfraGroup.formulaRacing.Heat.Logic.TireCompound;
 import dev.EfraGroup.formulaRacing.Heat.PitStopManager;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,7 +48,13 @@ public class Driver {
     private boolean lagStartPassed;
     private boolean lagEndPassed;
     private String ersmode;
-private double ersenergy;
+    private double ersenergy;
+    private TireCompound tireCompound;
+    private int tireWear;
+    private String customName;
+    private boolean aiControlled;
+    private double fuelLevel;
+    private double fuelCapacity;
 
     public Driver(UUID uuid, int heatId, int startPosition) {
         this.state = DriverState.SETUP;
@@ -73,6 +80,12 @@ private double ersenergy;
         this.state = DriverState.SETUP;
         this.ersenergy = 50;
         this.ersmode = "Disabled";
+        this.tireCompound = TireCompound.MEDIUM;
+        this.tireWear = 0;
+        this.customName = null;
+        this.aiControlled = false;
+        this.fuelCapacity = 100.0D;
+        this.fuelLevel = 100.0D;
 
     }
 
@@ -524,6 +537,67 @@ private double ersenergy;
     public void resetLagFlags() {
         this.lagStartPassed = false;
         this.lagEndPassed = false;
+    }
+
+    public TireCompound getTireCompound() {
+        return tireCompound;
+    }
+
+    public void setTireCompound(TireCompound tireCompound) {
+        this.tireCompound = tireCompound == null ? TireCompound.MEDIUM : tireCompound;
+    }
+
+    public int getTireWear() {
+        return tireWear;
+    }
+
+    public void setTireWear(int tireWear) {
+        this.tireWear = Math.max(0, Math.min(100, tireWear));
+    }
+
+    public String getCustomName() {
+        return this.customName;
+    }
+
+    public void setCustomName(String customName) {
+        this.customName = customName;
+    }
+
+    public boolean isAiControlled() {
+        return this.aiControlled;
+    }
+
+    public void setAiControlled(boolean aiControlled) {
+        this.aiControlled = aiControlled;
+    }
+
+    public double getFuelLevel() {
+        return this.fuelLevel;
+    }
+
+    public void setFuelLevel(double fuelLevel) {
+        this.fuelLevel = Math.max(0.0D, Math.min(this.fuelCapacity, fuelLevel));
+    }
+
+    public double getFuelCapacity() {
+        return this.fuelCapacity;
+    }
+
+    public void setFuelCapacity(double fuelCapacity) {
+        this.fuelCapacity = Math.max(1.0D, fuelCapacity);
+        this.fuelLevel = Math.max(0.0D, Math.min(this.fuelCapacity, this.fuelLevel));
+    }
+
+    public void refuelToFull() {
+        this.fuelLevel = this.fuelCapacity;
+    }
+
+    public void addFuel(double amount) {
+        this.setFuelLevel(this.fuelLevel + amount);
+    }
+
+    public void consumeFuel(double amount) {
+        this.setFuelLevel(this.fuelLevel - Math.max(0.0D, amount));
     }
 
     public String toString() {

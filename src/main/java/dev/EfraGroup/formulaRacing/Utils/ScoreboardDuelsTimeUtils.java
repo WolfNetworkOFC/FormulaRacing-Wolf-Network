@@ -3,6 +3,7 @@ package dev.EfraGroup.formulaRacing.Utils;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.ScoreboardOwnershipCoordinator;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.ScoreboardAdapter;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.style.TimingScoreboardStyle;
@@ -13,8 +14,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
 
 public class ScoreboardDuelsTimeUtils {
     private static final int MAX_LINES = 15;
@@ -48,39 +47,36 @@ public class ScoreboardDuelsTimeUtils {
     }
 
     private void startAutoUpdateTask() {
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                for (UUID uuid : ScoreboardDuelsTimeUtils.this.duelContexts.keySet()) {
-                    Player player = Bukkit.getPlayer(uuid);
-                    DuelContext ctx = ScoreboardDuelsTimeUtils.this.duelContexts.get(uuid);
-                    if (player == null || !player.isOnline() || ctx == null) {
-                        ScoreboardDuelsTimeUtils.this.removeBoard(uuid);
-                        continue;
-                    }
-                    if (!ScoreboardDuelsTimeUtils.this.ownershipCoordinator.isOwner(uuid, ScoreboardOwnershipCoordinator.Mode.DUEL)) {
-                        if (!ScoreboardDuelsTimeUtils.this.ownershipCoordinator.acquire(uuid, ScoreboardOwnershipCoordinator.Mode.DUEL)) {
-                            continue;
-                        }
-                        if (!ScoreboardDuelsTimeUtils.this.ownershipCoordinator.isOwner(uuid, ScoreboardOwnershipCoordinator.Mode.DUEL)) {
-                            continue;
-                        }
-                        ScoreboardDuelsTimeUtils.this.adapter.create(player);
-                        ScoreboardDuelsTimeUtils.this.adapter.updateTitle(player,
-                                ScoreboardDuelsTimeUtils.this.boldTitle(
-                                        ScoreboardDuelsTimeUtils.this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_title")
-                                )
-                        );
-                    }
-                    if (!ScoreboardDuelsTimeUtils.this.ownershipCoordinator.isOwner(uuid, ScoreboardOwnershipCoordinator.Mode.DUEL)) {
-                        continue;
-                    }
-                    double elapsedSeconds = ScoreboardDuelsTimeUtils.this.ttda.getPlayerElapsedSeconds(player);
-                    String formattedTime = ScoreboardDuelsTimeUtils.this.formatTime(elapsedSeconds);
-                    ScoreboardDuelsTimeUtils.this.update(player, ctx.duelId, formattedTime, ctx.currentLap, ctx.totalLaps, ctx.trackName);
+        SchedulerHelper.runTaskTimer(this.plugin, () -> {
+            for (UUID uuid : ScoreboardDuelsTimeUtils.this.duelContexts.keySet()) {
+                Player player = Bukkit.getPlayer(uuid);
+                DuelContext ctx = ScoreboardDuelsTimeUtils.this.duelContexts.get(uuid);
+                if (player == null || !player.isOnline() || ctx == null) {
+                    ScoreboardDuelsTimeUtils.this.removeBoard(uuid);
+                    continue;
                 }
+                if (!ScoreboardDuelsTimeUtils.this.ownershipCoordinator.isOwner(uuid, ScoreboardOwnershipCoordinator.Mode.DUEL)) {
+                    if (!ScoreboardDuelsTimeUtils.this.ownershipCoordinator.acquire(uuid, ScoreboardOwnershipCoordinator.Mode.DUEL)) {
+                        continue;
+                    }
+                    if (!ScoreboardDuelsTimeUtils.this.ownershipCoordinator.isOwner(uuid, ScoreboardOwnershipCoordinator.Mode.DUEL)) {
+                        continue;
+                    }
+                    ScoreboardDuelsTimeUtils.this.adapter.create(player);
+                    ScoreboardDuelsTimeUtils.this.adapter.updateTitle(player,
+                            ScoreboardDuelsTimeUtils.this.boldTitle(
+                                    ScoreboardDuelsTimeUtils.this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_duel_title")
+                            )
+                    );
+                }
+                if (!ScoreboardDuelsTimeUtils.this.ownershipCoordinator.isOwner(uuid, ScoreboardOwnershipCoordinator.Mode.DUEL)) {
+                    continue;
+                }
+                double elapsedSeconds = ScoreboardDuelsTimeUtils.this.ttda.getPlayerElapsedSeconds(player);
+                String formattedTime = ScoreboardDuelsTimeUtils.this.formatTime(elapsedSeconds);
+                ScoreboardDuelsTimeUtils.this.update(player, ctx.duelId, formattedTime, ctx.currentLap, ctx.totalLaps, ctx.trackName);
             }
-        }.runTaskTimer((Plugin) this.plugin, 0L, 2L);
+        }, 0L, 2L);
     }
 
     public void applyDuelBoard(Player player, int duelId, int totalLaps, String trackName) {
@@ -104,7 +100,7 @@ public class ScoreboardDuelsTimeUtils {
             return;
         }
 
-        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             String posDisplay;
             String langCode = this.mysql.getPlayerLanguage(player.getUniqueId());
             Double bestLap = this.mysql.getPlayerBestLapTimeInDuel(player.getUniqueId(), duelId);
@@ -129,11 +125,11 @@ public class ScoreboardDuelsTimeUtils {
                         + "§c" + this.formatTimeRemaining(timeRemaining);
             }
 
-            final String finalPB = pbDisplay;
-            final String finalPos = posDisplay;
-            final String finalTimeRemaining = timeRemainingDisplay;
+            String finalPB = pbDisplay;
+            String finalPos = posDisplay;
+            String finalTimeRemaining = timeRemainingDisplay;
 
-            Bukkit.getScheduler().runTask(this.plugin, () ->
+            SchedulerHelper.runTask(this.plugin, () ->
                     this.updateBoardLines(player, timeRemaining, finalPos, lap, totalLaps, currentFormattedTime, finalPB, finalTimeRemaining, trackName)
             );
         });
@@ -252,7 +248,7 @@ public class ScoreboardDuelsTimeUtils {
         this.adapter.updateLines(player, lines);
     }
 
-    private static class DuelContext {
+    public static class DuelContext {
         int duelId;
         int totalLaps;
         int currentLap = 0;

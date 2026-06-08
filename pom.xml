@@ -52,6 +52,10 @@
             <id>placeholderapi</id>
             <url>https://repo.helpch.at/releases/</url>
         </repository>
+        <repository>
+            <id>spigotmc</id>
+            <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -63,18 +67,18 @@
         </dependency>
 
         <dependency>
+            <groupId>io.papermc.paper</groupId>
+            <artifactId>paper-api</artifactId>
+            <version>1.21.8-R0.1-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot</artifactId>
             <version>1.21.4-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
             <classifier>remapped-mojang</classifier>
-        </dependency>
-
-        <dependency>
-            <groupId>io.papermc.paper</groupId>
-            <artifactId>paper-api</artifactId>
-            <version>1.21.8-R0.1-SNAPSHOT</version>
-            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -174,6 +178,13 @@
             <version>3.7.2</version>
             <scope>compile</scope>
         </dependency>
+
+        <!-- Spark REST API -->
+        <dependency>
+            <groupId>com.sparkjava</groupId>
+            <artifactId>spark-core</artifactId>
+            <version>2.9.4</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -272,7 +283,7 @@
                         <configuration>
                             <fromFile>${project.build.directory}/${project.build.finalName}.jar</fromFile>
                             <url>sftp://node1.faws.net.br:2022/plugins</url>
-                            <serverId>meu-servidor-minecraft</serverId>
+                            <serverId>meu-servidor-minecraft1</serverId>
                         </configuration>
                     </execution>
                 </executions>

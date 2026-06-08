@@ -2,6 +2,7 @@ package dev.EfraGroup.formulaRacing.Controllers;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.HoverEvent;
@@ -10,7 +11,7 @@ import net.md_5.bungee.api.chat.hover.content.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitTask;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,6 +44,13 @@ public class RaceVoteManager {
             return false;
         }
 
+        String trackNameWS = trackData.getTrackName().replaceAll("\\s+", "").toLowerCase();
+        int gridCount = plugin.getTrackIntegrationManager().getGridPositionCount(trackNameWS);
+        if (gridCount <= 0) {
+            proposer.sendMessage("§c✗ A pista §e" + trackData.getTrackName() + " §cnão possui grid definido!");
+            return false;
+        }
+
         this.currentProposal = new RaceProposal(proposer, trackData.getTrackName(), laps, pits);
         this.currentProposal.start();
         return true;
@@ -66,7 +74,7 @@ public class RaceVoteManager {
         private final int requiredVotes; // Nova variável para guardar a meta de votos
         private final Set<UUID> voters = ConcurrentHashMap.newKeySet();
         private boolean expired = false;
-        private BukkitTask timeoutTask;
+        private ScheduledTask timeoutTask;
 
         public RaceProposal(Player proposer, String trackName, int laps, int pits) {
             this.proposerUUID = proposer.getUniqueId();
@@ -89,7 +97,7 @@ public class RaceVoteManager {
             if (voters.size() >= requiredVotes) {
                 approve();
             } else {
-                this.timeoutTask = Bukkit.getScheduler().runTaskLater(plugin, () -> { if (!expired) expire(); }, 2400L);
+                this.timeoutTask = SchedulerHelper.runTaskLater(plugin, () -> { if (!expired) expire(); }, 2400L);
             }
         }
 
@@ -145,7 +153,7 @@ public class RaceVoteManager {
             Bukkit.broadcastMessage("§7Config: §f" + laps + " Voltas | " + pits + " Pits");
             Bukkit.broadcastMessage("§6§l═══════════════════════════════════════");
 
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            SchedulerHelper.runTaskLater(plugin, () -> {
                 Player creator = Bukkit.getPlayer(proposerUUID);
                 if (creator != null) quickRaceManager.createQuickRace(creator, trackName, laps, pits);
                 currentProposal = null;

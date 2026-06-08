@@ -9,6 +9,7 @@ import dev.EfraGroup.formulaRacing.Participant.Spectator;
 import dev.EfraGroup.formulaRacing.Participant.Spectator.SpectatorMode;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.ScoreboardOwnershipCoordinator;
 import java.util.ArrayList;
@@ -23,8 +24,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class SpectatorManager {
     private final FormulaRacing plugin;
@@ -34,9 +34,9 @@ public class SpectatorManager {
     private final Map<Integer, Set<UUID>> eventToSpectators;
     private final Map<UUID, Heats> spectatorBoundHeat;
     private final Map<UUID, GameMode> previousGameModes;
-    private BukkitTask followTask;
-    private BukkitTask bindingTask;
-    private BukkitTask proximityActionBarTask;
+    private ScheduledTask followTask;
+    private ScheduledTask bindingTask;
+    private ScheduledTask proximityActionBarTask;
     private static final int FOLLOW_UPDATE_INTERVAL_TICKS = 5;
     private static final int BINDING_UPDATE_INTERVAL_TICKS = 10;
     private final boolean proximityActionBarEnabled;
@@ -218,59 +218,55 @@ public class SpectatorManager {
     }
 
     private void startFollowTask() {
-        this.followTask = (new BukkitRunnable() {
-            public void run() {
-                for(Map.Entry<UUID, Spectator> entry : new ArrayList<>(SpectatorManager.this.spectators.entrySet())) {
-                    Spectator spectator = (Spectator)entry.getValue();
-                    if (spectator.getMode() == SpectatorMode.FOLLOW_DRIVER) {
-                        UUID driverUUID = spectator.getFollowingDriverUUID();
-                        if (driverUUID != null) {
-                            Player spectatorPlayer = Bukkit.getPlayer((UUID)entry.getKey());
-                            Player driverPlayer = Bukkit.getPlayer(driverUUID);
-                            if (spectatorPlayer != null && spectatorPlayer.isOnline()) {
-                                if (driverPlayer != null && driverPlayer.isOnline()) {
-                                    Location driverLoc = driverPlayer.getLocation();
-                                    Location spectatorLoc = driverLoc.clone();
-                                    spectatorLoc.add(driverLoc.getDirection().multiply(-5));
-                                    spectatorLoc.setY(spectatorLoc.getY() + (double)2.0F);
-                                    spectatorLoc.setDirection(driverLoc.toVector().subtract(spectatorLoc.toVector()));
-                                    spectatorPlayer.teleport(spectatorLoc);
-                                } else {
-                                    spectator.setFollowingDriverUUID((UUID)null);
-                                    spectator.setMode(SpectatorMode.FREE_CAM);
-                                    SpectatorManager.this.plugin.sendMessage(spectatorPlayer, "spectator_target_left", new String[0]);
-                                }
+        this.followTask = SchedulerHelper.runTaskTimer(this.plugin, () -> {
+            for(Map.Entry<UUID, Spectator> entry : new ArrayList<>(SpectatorManager.this.spectators.entrySet())) {
+                Spectator spectator = (Spectator)entry.getValue();
+                if (spectator.getMode() == SpectatorMode.FOLLOW_DRIVER) {
+                    UUID driverUUID = spectator.getFollowingDriverUUID();
+                    if (driverUUID != null) {
+                        Player spectatorPlayer = Bukkit.getPlayer((UUID)entry.getKey());
+                        Player driverPlayer = Bukkit.getPlayer(driverUUID);
+                        if (spectatorPlayer != null && spectatorPlayer.isOnline()) {
+                            if (driverPlayer != null && driverPlayer.isOnline()) {
+                                Location driverLoc = driverPlayer.getLocation();
+                                Location spectatorLoc = driverLoc.clone();
+                                spectatorLoc.add(driverLoc.getDirection().multiply(-5));
+                                spectatorLoc.setY(spectatorLoc.getY() + (double)2.0F);
+                                spectatorLoc.setDirection(driverLoc.toVector().subtract(spectatorLoc.toVector()));
+                                spectatorPlayer.teleport(spectatorLoc);
+                            } else {
+                                spectator.setFollowingDriverUUID((UUID)null);
+                                spectator.setMode(SpectatorMode.FREE_CAM);
+                                SpectatorManager.this.plugin.sendMessage(spectatorPlayer, "spectator_target_left", new String[0]);
                             }
                         }
                     }
                 }
-
             }
-        }).runTaskTimer(this.plugin, 0L, FOLLOW_UPDATE_INTERVAL_TICKS);
+
+        }, 0L, FOLLOW_UPDATE_INTERVAL_TICKS);
     }
 
     private void startBindingTask() {
-        this.bindingTask = (new BukkitRunnable() {
-            public void run() {
-                for(Map.Entry<UUID, Events> entry : new ArrayList<>(SpectatorManager.this.spectatorToEvent.entrySet())) {
-                    UUID spectatorId = (UUID)entry.getKey();
-                    Events event = (Events)entry.getValue();
-                    Player player = Bukkit.getPlayer(spectatorId);
-                    if (player == null || !player.isOnline()) {
-                        SpectatorManager.this.cleanupSpectatorState(spectatorId, event);
-                        continue;
-                    }
-
-                    if (!SpectatorManager.this.isEventTrackable(event) || !event.isActive()) {
-                        SpectatorManager.this.removeSpectator(player);
-                        continue;
-                    }
-
-                    SpectatorManager.this.syncBindingFor(spectatorId, player, event);
+        this.bindingTask = SchedulerHelper.runTaskTimer(this.plugin, () -> {
+            for(Map.Entry<UUID, Events> entry : new ArrayList<>(SpectatorManager.this.spectatorToEvent.entrySet())) {
+                UUID spectatorId = (UUID)entry.getKey();
+                Events event = (Events)entry.getValue();
+                Player player = Bukkit.getPlayer(spectatorId);
+                if (player == null || !player.isOnline()) {
+                    SpectatorManager.this.cleanupSpectatorState(spectatorId, event);
+                    continue;
                 }
 
+                if (!SpectatorManager.this.isEventTrackable(event) || !event.isActive()) {
+                    SpectatorManager.this.removeSpectator(player);
+                    continue;
+                }
+
+                SpectatorManager.this.syncBindingFor(spectatorId, player, event);
             }
-        }).runTaskTimer(this.plugin, 0L, BINDING_UPDATE_INTERVAL_TICKS);
+
+        }, 0L, BINDING_UPDATE_INTERVAL_TICKS);
     }
 
     private void cleanupSpectatorState(UUID spectatorId, Events fallbackEvent) {
@@ -356,32 +352,30 @@ public class SpectatorManager {
     }
 
     private void startProximityActionBarTask() {
-        this.proximityActionBarTask = (new BukkitRunnable() {
-            public void run() {
-                for (Map.Entry<UUID, Spectator> entry : new ArrayList<>(SpectatorManager.this.spectators.entrySet())) {
-                    UUID spectatorId = (UUID)entry.getKey();
-                    Player spectatorPlayer = Bukkit.getPlayer((UUID)spectatorId);
-                    if (spectatorPlayer == null || !spectatorPlayer.isOnline()) {
-                        continue;
-                    }
-                    if (SpectatorManager.this.plugin.getRaceActionBarManager() == null) {
-                        continue;
-                    }
-                    Heats boundHeat = (Heats)SpectatorManager.this.spectatorBoundHeat.get(spectatorId);
-                    if (boundHeat == null) {
-                        SpectatorManager.this.plugin.getRaceActionBarManager().clearSpectatorTarget(spectatorPlayer);
-                        continue;
-                    }
-                    Spectator spectator = (Spectator)entry.getValue();
-                    UUID targetDriverId = SpectatorManager.this.resolveTargetDriverId(spectatorPlayer, spectator, boundHeat);
-                    if (targetDriverId == null) {
-                        SpectatorManager.this.plugin.getRaceActionBarManager().clearSpectatorTarget(spectatorPlayer);
-                        continue;
-                    }
-                    SpectatorManager.this.plugin.getRaceActionBarManager().setSpectatorTarget(spectatorPlayer, boundHeat, targetDriverId);
+        this.proximityActionBarTask = SchedulerHelper.runTaskTimer(this.plugin, () -> {
+            for (Map.Entry<UUID, Spectator> entry : new ArrayList<>(SpectatorManager.this.spectators.entrySet())) {
+                UUID spectatorId = (UUID)entry.getKey();
+                Player spectatorPlayer = Bukkit.getPlayer((UUID)spectatorId);
+                if (spectatorPlayer == null || !spectatorPlayer.isOnline()) {
+                    continue;
                 }
+                if (SpectatorManager.this.plugin.getRaceActionBarManager() == null) {
+                    continue;
+                }
+                Heats boundHeat = (Heats)SpectatorManager.this.spectatorBoundHeat.get(spectatorId);
+                if (boundHeat == null) {
+                    SpectatorManager.this.plugin.getRaceActionBarManager().clearSpectatorTarget(spectatorPlayer);
+                    continue;
+                }
+                Spectator spectator = (Spectator)entry.getValue();
+                UUID targetDriverId = SpectatorManager.this.resolveTargetDriverId(spectatorPlayer, spectator, boundHeat);
+                if (targetDriverId == null) {
+                    SpectatorManager.this.plugin.getRaceActionBarManager().clearSpectatorTarget(spectatorPlayer);
+                    continue;
+                }
+                SpectatorManager.this.plugin.getRaceActionBarManager().setSpectatorTarget(spectatorPlayer, boundHeat, targetDriverId);
             }
-        }).runTaskTimer(this.plugin, 0L, (long)this.proximityIntervalTicks);
+        }, 0L, (long)this.proximityIntervalTicks);
     }
 
     private UUID resolveTargetDriverId(Player spectatorPlayer, Spectator spectator, Heats boundHeat) {

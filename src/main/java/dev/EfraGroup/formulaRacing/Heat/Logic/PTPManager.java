@@ -23,7 +23,8 @@ import org.bukkit.boss.BarFlag;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class PTPManager {
     private final FormulaRacing plugin;
@@ -34,43 +35,41 @@ public class PTPManager {
     }
 
     public void startPTPTask(final Heats heat) {
-        (new BukkitRunnable() {
-            public void run() {
-                if (heat.getHeatState() != HeatState.RACING) {
-                    for(Driver driver : heat.getDrivers().values()) {
-                        Player player = Bukkit.getPlayer(driver.getUuid());
-                        if (player != null && player.isOnline()) {
-                            PTPManager.this.disablePTP(player, driver);
+        SchedulerHelper.runTaskTimer(this.plugin, (scheduledTask) -> {
+            if (heat.getHeatState() != HeatState.RACING) {
+                for(Driver driver : heat.getDrivers().values()) {
+                    Player player = Bukkit.getPlayer(driver.getUuid());
+                    if (player != null && player.isOnline()) {
+                        PTPManager.this.disablePTP(player, driver);
+                    } else {
+                        driver.setPtpActive(false);
+                        driver.setPtpEnergy(0.0);
+                    }
+                }
+
+                PTPManager.this.clearAllBars();
+                scheduledTask.cancel();
+            } else {
+                for(Driver driver : heat.getDrivers().values()) {
+                    if (driver.isFinished() || driver.isDnf()) {
+                        Player finishedPlayer = Bukkit.getPlayer(driver.getUuid());
+                        if (finishedPlayer != null && finishedPlayer.isOnline()) {
+                            PTPManager.this.disablePTP(finishedPlayer, driver);
                         } else {
                             driver.setPtpActive(false);
-                            driver.setPtpEnergy((double)0.0F);
+                            driver.setPtpEnergy(0.0);
                         }
+                        continue;
                     }
 
-                    PTPManager.this.clearAllBars();
-                    this.cancel();
-                } else {
-                    for(Driver driver : heat.getDrivers().values()) {
-                        if (driver.isFinished() || driver.isDnf()) {
-                            Player finishedPlayer = Bukkit.getPlayer(driver.getUuid());
-                            if (finishedPlayer != null && finishedPlayer.isOnline()) {
-                                PTPManager.this.disablePTP(finishedPlayer, driver);
-                            } else {
-                                driver.setPtpActive(false);
-                                driver.setPtpEnergy((double)0.0F);
-                            }
-                            continue;
-                        }
-
-                        Player player = Bukkit.getPlayer(driver.getUuid());
-                        if (player != null && player.isOnline()) {
-                            PTPManager.this.updatePTP(player, driver, heat);
-                        }
+                    Player player = Bukkit.getPlayer(driver.getUuid());
+                    if (player != null && player.isOnline()) {
+                        PTPManager.this.updatePTP(player, driver, heat);
                     }
-
                 }
+
             }
-        }).runTaskTimer(this.plugin, 0L, 2L);
+        }, 0L, 2L);
     }
 
     private void updatePTP(Player player, Driver driver, Heats heat) {

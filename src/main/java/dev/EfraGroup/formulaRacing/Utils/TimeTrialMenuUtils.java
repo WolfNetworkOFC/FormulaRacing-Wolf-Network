@@ -32,19 +32,19 @@
  import java.util.Map;
  import java.util.UUID;
  import java.util.concurrent.ConcurrentHashMap;
- import org.bukkit.Bukkit;
- import org.bukkit.ChatColor;
- import org.bukkit.Location;
- import org.bukkit.Material;
- import org.bukkit.entity.Player;
- import org.bukkit.event.EventHandler;
- import org.bukkit.event.EventPriority;
- import org.bukkit.event.Listener;
- import org.bukkit.event.inventory.InventoryClickEvent;
- import org.bukkit.inventory.Inventory;
- import org.bukkit.inventory.ItemStack;
- import org.bukkit.inventory.meta.ItemMeta;
- import org.bukkit.plugin.Plugin;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 
  public class TimeTrialMenuUtils
          implements Listener {
@@ -175,13 +175,13 @@
              this.lastClickTime.put(uuid, now);
          }
          player.closeInventory();
-         Bukkit.getScheduler().runTaskLater(this.plugin, () -> {
-             try {
-                 this.processTeleport(player, trackName);
-             } catch (Exception e) {
-                 this.plugin.getDebugManager().logGuiSystem("[ERROR] Error processing teleport: " + e.getMessage());
-             }
-         }, 1L);
+          SchedulerHelper.runTaskLater(this.plugin, () -> {
+              try {
+                  this.processTeleport(player, trackName);
+              } catch (Exception e) {
+                  this.plugin.getDebugManager().logGuiSystem("[ERROR] Error processing teleport: " + e.getMessage());
+              }
+          }, 1L);
      }
 
      private void processTeleport(Player player, String trackName) {

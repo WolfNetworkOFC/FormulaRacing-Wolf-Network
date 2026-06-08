@@ -289,13 +289,15 @@ public class TrackEditorCommand extends BaseCommand {
     public void onRegionStart(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
-            WorldEditSelect var10000 = this.worldEditSelect;
             if (!WorldEditSelect.hasSelection(player)) {
                 this.plugin.sendMessage(player, "te_no_selection", new String[0]);
             } else {
-                Location regionMin = WorldEditSelect.getMin(player);
-                Location regionMax = WorldEditSelect.getMax(player);
-                int savedId = this.mysql.saveRegion(trackName, regionMin, regionMax, "START");
+                WorldEditSelect.SelectionData data = WorldEditSelect.getSelectionData(player);
+                if (data == null) {
+                    this.plugin.sendMessage(player, "te_no_selection", new String[0]);
+                    return;
+                }
+                int savedId = this.mysql.saveRegion(trackName, data.getMin(), data.getMax(), "START", data.getShape(), data.getPoints());
                 if (savedId >= 0) {
                     this.plugin.sendMessage(player, "te_region_start_saved", new String[]{"{id}", String.valueOf(savedId)});
                     this.plugin.getRegionListener().reloadRegions();
@@ -313,13 +315,15 @@ public class TrackEditorCommand extends BaseCommand {
     public void onRegionReset(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
-            WorldEditSelect var10000 = this.worldEditSelect;
             if (!WorldEditSelect.hasSelection(player)) {
                 this.plugin.sendMessage(player, "te_no_selection", new String[0]);
             } else {
-                Location regionMin = WorldEditSelect.getMin(player);
-                Location regionMax = WorldEditSelect.getMax(player);
-                int savedId = this.mysql.saveRegion(trackName, regionMin, regionMax, "RESET");
+                WorldEditSelect.SelectionData data = WorldEditSelect.getSelectionData(player);
+                if (data == null) {
+                    this.plugin.sendMessage(player, "te_no_selection", new String[0]);
+                    return;
+                }
+                int savedId = this.mysql.saveRegion(trackName, data.getMin(), data.getMax(), "RESET", data.getShape(), data.getPoints());
                 if (savedId >= 0) {
                     player.sendMessage("§aRegião de RESET definida com sucesso! ID: " + savedId);
                     this.plugin.getRegionListener().reloadRegions();
@@ -337,13 +341,15 @@ public class TrackEditorCommand extends BaseCommand {
     public void onRegionEnd(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
-            WorldEditSelect var10000 = this.worldEditSelect;
             if (!WorldEditSelect.hasSelection(player)) {
                 this.plugin.sendMessage(player, "te_no_selection", new String[0]);
             } else {
-                Location regionMin = WorldEditSelect.getMin(player);
-                Location regionMax = WorldEditSelect.getMax(player);
-                int savedId = this.mysql.saveRegion(trackName, regionMin, regionMax, "END");
+                WorldEditSelect.SelectionData data = WorldEditSelect.getSelectionData(player);
+                if (data == null) {
+                    this.plugin.sendMessage(player, "te_no_selection", new String[0]);
+                    return;
+                }
+                int savedId = this.mysql.saveRegion(trackName, data.getMin(), data.getMax(), "END", data.getShape(), data.getPoints());
                 if (savedId >= 0) {
                     this.plugin.sendMessage(player, "te_region_end_saved", new String[]{"{id}", String.valueOf(savedId)});
                     this.plugin.getRegionListener().reloadRegions();

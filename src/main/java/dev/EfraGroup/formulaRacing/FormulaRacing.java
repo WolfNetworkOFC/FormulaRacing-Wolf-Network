@@ -5,9 +5,10 @@ import co.aikar.commands.PaperCommandManager;
 import co.aikar.taskchain.BukkitTaskChainFactory;
 import co.aikar.taskchain.TaskChain;
 import co.aikar.taskchain.TaskChainFactory;
+import dev.EfraGroup.formulaRacing.AI.AIOpponentManager;
+import dev.EfraGroup.formulaRacing.AI.AIRacingLineManager;
 import dev.EfraGroup.formulaRacing.Command.*;
-//import dev.EfraGroup.formulaRacing.Command.PitCommand;
-//import dev.EfraGroup.formulaRacing.Command.PlayerCommand;
+import dev.EfraGroup.formulaRacing.Listener.AIRacingLineRecorderListener;
 import dev.EfraGroup.formulaRacing.Command.TrackEditorCommand.BoatUtilsGroupMode;
 import dev.EfraGroup.formulaRacing.Config.PitStopConfigManager;
 import dev.EfraGroup.formulaRacing.Controllers.DailyRaceManager;
@@ -51,6 +52,7 @@ import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
 import dev.EfraGroup.formulaRacing.Utils.RaceActionBarManager;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardService;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardDuelsTimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardTimeTrialUtils;
@@ -64,7 +66,11 @@ import dev.EfraGroup.formulaRacing.Utils.scoreboard.ScoreboardOwnershipCoordinat
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.RaceScoreboardV2Manager;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.MegavexAdapter;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.ScoreboardAdapter;
+import dev.EfraGroup.formulaRacing.Api.ApiManager;
+import dev.EfraGroup.formulaRacing.Controllers.LeagueManager;
+import dev.EfraGroup.formulaRacing.Heat.GimmickManager;
 import dev.EfraGroup.formulaRacing.Visuals.TrackVisualizer;
+import dev.EfraGroup.formulaRacing.Weather.WeatherManager;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.sql.SQLException;
@@ -143,6 +149,12 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private RaceCheckpointListener raceCheckpointListener;
     private PodiumManager podiumManager;
     private DriverLookup driverLookup;
+    private AIOpponentManager aiOpponentManager;
+    private AIRacingLineManager aiRacingLineManager;
+    private ApiManager apiManager;
+    private GimmickManager gimmickManager;
+    private LeagueManager leagueManager;
+    private WeatherManager weatherManager;
 
     public static FormulaRacing getInstance() {
         return instance;
@@ -198,6 +210,46 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     public DriverLookup getDriverLookup() {
         return this.driverLookup;
+    }
+
+    public AIOpponentManager getAIOpponentManager() {
+        return this.aiOpponentManager;
+    }
+
+    public AIRacingLineManager getAIRacingLineManager() {
+        return this.aiRacingLineManager;
+    }
+
+    public ApiManager getApiManager() {
+        if (this.apiManager == null) {
+            this.apiManager = new ApiManager(this);
+        }
+        return this.apiManager;
+    }
+
+    public GimmickManager getGimmickManager() {
+        if (this.gimmickManager == null) {
+            this.gimmickManager = new GimmickManager(this);
+        }
+        return this.gimmickManager;
+    }
+
+    public LeagueManager getLeagueManager() {
+        if (this.leagueManager == null) {
+            this.leagueManager = new LeagueManager(this);
+        }
+        return this.leagueManager;
+    }
+
+    public WeatherManager getWeatherManager() {
+        if (this.weatherManager == null) {
+            this.weatherManager = new WeatherManager(this);
+        }
+        return this.weatherManager;
+    }
+
+    public Map<String, TrackLeaderboard> getTrackLeaderboards() {
+        return this.trackLeaderboards;
     }
 
     public void onEnable() {
@@ -273,6 +325,13 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 this.quickRaceManager
             );
             this.podiumManager = new PodiumManager(this);
+            this.aiOpponentManager = new AIOpponentManager(this);
+            this.aiRacingLineManager = new AIRacingLineManager(this);
+            this.aiRacingLineManager.initialize();
+            this.apiManager = new ApiManager(this);
+            this.gimmickManager = new GimmickManager(this);
+            this.leagueManager = new LeagueManager(this);
+            this.weatherManager = new WeatherManager(this);
             this.raceEventManager.loadActiveEventsFromDatabase();
             this.dailyRaceManager = new DailyRaceManager(this);
             this.dailyRaceManager.start();
@@ -319,7 +378,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.registerPlaceholders();
             this.loadLeaderboards();
             this.startLeaderboardUpdater();
-            Bukkit.getScheduler().runTaskAsynchronously(this, () ->
+            SchedulerHelper.runAsync(this, () ->
                 this.dm.cleanOrphanedCheckpoints()
             );
             if (this.debugManager != null) {
@@ -381,6 +440,15 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
         if (this.sharedScoreboardAdapter != null) {
             this.sharedScoreboardAdapter.shutdown();
+        }
+
+        if (this.aiRacingLineManager != null) {
+            this.aiRacingLineManager.saveAllRacingLines();
+            this.aiRacingLineManager.getRecorder().cleanup();
+        }
+
+        if (this.aiOpponentManager != null) {
+            this.aiOpponentManager.clearAll();
         }
 
         try {
@@ -452,6 +520,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             ),
             this
         );
+        Bukkit.getPluginManager().registerEvents(
+            new AIRacingLineRecorderListener(this),
+            this
+        );
     }
 
     private void registerPlaceholders() {
@@ -520,6 +592,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.commandManager.registerCommand(new HotbarItemsCommand(this));
             this.commandManager.registerCommand(new GhostCommand(this));
             this.commandManager.registerCommand(new UnghostCommand(this));
+            this.commandManager.registerCommand(new AICommand(this));
         } catch (Exception e) {
             if (this.debugManager != null) {
                 this.debugManager.logRaceSystem(
@@ -703,7 +776,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         // Puxa o intervalo do config (ex: 18000 ticks) ou usa 300 como fallback
         long ticks = this.getConfig().getLong("leaderboards.updateticks", 300L);
 
-        Bukkit.getScheduler().runTaskTimer(
+        SchedulerHelper.runTaskTimer(
                 this,
                 () -> {
                     // Só processa se houver jogadores online para economizar recursos do banco
@@ -1491,7 +1564,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     }
 
     public void checkAndWarnOBU(Player player, String trackName) {
-        Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+        SchedulerHelper.runAsync(this, () -> {
             String trackWS = trackName.replaceAll("\\s+", "");
             Map<String, Object> data = this.dm.getBoatUtilsRaw(trackWS);
             if (data != null && !data.isEmpty()) {
@@ -1512,7 +1585,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 }
 
                 if (requiresOBU && !hasOpenBoatUtilsMod(player)) {
-                    Bukkit.getScheduler().runTask(this, () -> {
+                    SchedulerHelper.runTask(this, () -> {
                         player.sendMessage(" ");
                         player.sendMessage(
                             "§c§l⚠ ATENÇÃO: §fEsta pista requer que seu barco suba blocos!"

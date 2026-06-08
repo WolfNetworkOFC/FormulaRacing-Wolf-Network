@@ -18,7 +18,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.scheduler.BukkitRunnable;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 
 public class GridManager {
     private final FormulaRacing plugin;
@@ -84,7 +84,7 @@ public class GridManager {
                             Location gridLoc = (Location)this.gridPositions.get(gridPosition);
                             this.plugin.getAPI().recoverPlayerBoatState(player);
 
-                            this.plugin.getServer().getScheduler().runTaskLater(this.plugin, () -> {
+                            SchedulerHelper.runTaskLater(this.plugin, () -> {
                                 if (player.isOnline()) {
                                     player.teleport(gridLoc);
                                     this.removePlayerFromTimeTrial(player);
@@ -151,7 +151,7 @@ public class GridManager {
                     Location gridLoc = (Location)this.gridPositions.get(gridPosition);
                     this.plugin.getAPI().recoverPlayerBoatState(player);
 
-                    this.plugin.getServer().getScheduler().runTaskLater(this.plugin, () -> {
+                    SchedulerHelper.runTaskLater(this.plugin, () -> {
                         if (player.isOnline()) {
                             player.teleport(gridLoc);
                             this.removePlayerFromTimeTrial(player);
@@ -212,18 +212,16 @@ public class GridManager {
     private void spawnBoatWithTrackConfig(final Player player, Location location, Driver driver) {
         final String trackNameWS = this.heat.getTrackNameWS();
         this.plugin.getAPI().releaseBoat(player);
-        (new BukkitRunnable() {
-            public void run() {
-                if (player.isOnline()) {
-                    GridManager.this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackNameWS);
-                    GridManager.this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
-                    GridManager.this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, trackNameWS);
-                    HeatState state = GridManager.this.heat.getHeatState();
-                    boolean locked = state == HeatState.LOADED || state == HeatState.STARTING;
-                    GridManager.this.plugin.getAPI().spawnBoat(player, false, locked, false);
-                    GridManager.this.plugin.getDebugManager().logRaceSystem("Barco spawnado para " + player.getName() + " no grid (pista: " + trackNameWS + ", locked: " + locked + ")");
-                }
+        SchedulerHelper.runTaskLater(this.plugin, () -> {
+            if (player.isOnline()) {
+                GridManager.this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackNameWS);
+                GridManager.this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
+                GridManager.this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, trackNameWS);
+                HeatState state = GridManager.this.heat.getHeatState();
+                boolean locked = state == HeatState.LOADED || state == HeatState.STARTING;
+                GridManager.this.plugin.getAPI().spawnBoat(player, false, locked, false);
+                GridManager.this.plugin.getDebugManager().logRaceSystem("Barco spawnado para " + player.getName() + " no grid (pista: " + trackNameWS + ", locked: " + locked + ")");
             }
-        }).runTaskLater(this.plugin, 10L);
+        }, 10L);
     }
 }

@@ -22,6 +22,7 @@ import dev.EfraGroup.formulaRacing.TimeTrial.TimeTrialController;
 import dev.EfraGroup.formulaRacing.TimeTrial.TimeTrialSession;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.RegionMathUtils;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardTimeTrialUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimeTrialDuelsAction;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
@@ -47,7 +48,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerTeleportEvent.TeleportCause;
-import org.bukkit.scheduler.BukkitRunnable;
+
 import org.geysermc.floodgate.api.FloodgateApi;
 
 public class RegionListener implements Listener {
@@ -110,7 +111,7 @@ public class RegionListener implements Listener {
 
     private void markJustTeleported(Player player) {
         this.justTeleported.add(player.getUniqueId());
-        Bukkit.getScheduler().runTaskLater(this.plugin, () -> this.justTeleported.remove(player.getUniqueId()), 10L);
+        SchedulerHelper.runTaskLater(this.plugin, () -> this.justTeleported.remove(player.getUniqueId()), 10L);
     }
 
     @EventHandler
@@ -263,7 +264,7 @@ public class RegionListener implements Listener {
                             if (startEndRegion != null) {
                                 Location finalFrom = previous.clone();
                                 Location finalTo = current.clone();
-                                Bukkit.getScheduler().runTask(this.plugin, () -> this.handleRegion(player, startEndRegion, finalFrom, finalTo));
+                                SchedulerHelper.runTask(this.plugin, () -> this.handleRegion(player, startEndRegion, finalFrom, finalTo));
                             }
 
                             // Lógica de checkpoints e duelos
@@ -303,7 +304,7 @@ public class RegionListener implements Listener {
 
                                                 int cpId = nextCp.getId();
                                                 double elapsed = session != null ? splitTime / 1000.0F : this.timerUtils.getPlayerElapsedTime(player);
-                                                Bukkit.getScheduler().runTask(this.plugin, () -> {
+                                                SchedulerHelper.runTask(this.plugin, () -> {
                                                     if (session != null) {
                                                         TimeTrialCheckpointEvent event = new TimeTrialCheckpointEvent(player, session, cpId, splitTime);
                                                         Bukkit.getPluginManager().callEvent(event);
@@ -337,7 +338,7 @@ public class RegionListener implements Listener {
                                         if (RegionMathUtils.intersectsRegion(previous, current, nextCp)) {
                                             double elapsedTime = this.DuelsTimer.getPlayerLapElapsedSeconds(player);
                                             int cpId = nextCp.getId();
-                                            Bukkit.getScheduler().runTask(this.plugin, () -> {
+                                            SchedulerHelper.runTask(this.plugin, () -> {
                                                 this.database.saveDuelCheckpointTime(uuid, activeDuelId, trackForCheckpoints, cpId, elapsedTime);
                                                 player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.5F);
                                                 DebugManager var10000 = this.plugin.getDebugManager();
@@ -476,7 +477,7 @@ public class RegionListener implements Listener {
                         final Location finalTargetLoc = targetLoc;
                         final Player finalPlayer = player;
 
-                        Bukkit.getScheduler().runTaskLater(this.plugin, () -> {
+                        SchedulerHelper.runTaskLater(this.plugin, () -> {
                             // Verificamos se o jogador ainda está online após o delay de 1 tick
                             if (finalPlayer.isOnline()) {
                                 // Teleporte e efeito sonoro usando as referências finais
@@ -651,18 +652,18 @@ public class RegionListener implements Listener {
                         TimeTrialSession session = this.timeTrialController.getSession(player);
                         long totalTimeMillis = session != null ? preciseFinishTime - session.getStartTime().toEpochMilli() : (long)(rawElapsed * (double)1000.0F);
                         double preciseElapsedSeconds = (double)totalTimeMillis / (double)1000.0F;
-                        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+                        SchedulerHelper.runAsync(this.plugin, () -> {
                             Object[] pb = this.database.getPlayerBestTime(player.getName(), regionTrackWS);
                             double bestTime = pb != null && pb[0] != null ? (Double)pb[0] : Double.MAX_VALUE;
                             boolean isPB = preciseElapsedSeconds < bestTime;
-                            Bukkit.getScheduler().runTask(this.plugin, () -> {
+                            SchedulerHelper.runTask(this.plugin, () -> {
                                 TimeTrialFinishEvent event = new TimeTrialFinishEvent(player, session, totalTimeMillis, isPB);
                                 Bukkit.getPluginManager().callEvent(event);
                             });
                             int oldRank = this.database.getPlayerRank(uuid, regionTrackWS);
                             this.database.saveFullTime(uuid, player.getName(), regionTrackWS, preciseElapsedSeconds, checkpoints);
                             int newRank = this.database.getPlayerRank(uuid, regionTrackWS);
-                            Bukkit.getScheduler().runTask(this.plugin, () -> {
+                            SchedulerHelper.runTask(this.plugin, () -> {
                                 if (player.isOnline()) {
                                     String msg = this.plugin.getTranslation("timetrial_completed", lang_code, new String[]{"{time}", this.formatTime(preciseElapsedSeconds)});
                                     player.sendMessage(msg);
@@ -683,9 +684,9 @@ public class RegionListener implements Listener {
                                     this.plugin.getDebugManager().logTimeTrialSystem(String.format("[SOLO TT] %s completou volta na pista %s (%s) em %s", player.getName(), regionTrackDisplayName, regionTrackWS, this.formatTime(preciseElapsedSeconds)));
                                     this.timerUtils.stopTimer(player, regionTrackWS);
                                     if (shouldLoop) {
-                                        Bukkit.getScheduler().runTaskAsynchronously(this.plugin, () -> {
+                                        SchedulerHelper.runAsync(this.plugin, () -> {
                                             this.timerUtils.reloadCacheAsync(player, regionTrackWS);
-                                            Bukkit.getScheduler().runTask(this.plugin, () -> this.startSoloTimer(player, regionTrackDisplayName, regionTrackWS, "START", System.currentTimeMillis()));
+                                            SchedulerHelper.runTask(this.plugin, () -> this.startSoloTimer(player, regionTrackDisplayName, regionTrackWS, "START", System.currentTimeMillis()));
                                         });
                                     } else {
                                         this.plugin.getDebugManager().logTimeTrialSystem("[SOLO TT] Sprint finalizado. Timer parado.");
@@ -836,38 +837,31 @@ public class RegionListener implements Listener {
     // --- MÉTODOS DE INICIALIZAÇÃO QUE ESTAVAM FALTANDO ---
 
     private void startRegionLoader() {
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                // Carrega do banco de forma assíncrona
-                List<DatabaseManager.RegionData> allRegions = database.getAllRegions();
-
-                // Sincroniza com a Main Thread para atualizar o mapa
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    Map<String, List<DatabaseManager.RegionData>> newRegionsMap = new HashMap<>();
-                    for (DatabaseManager.RegionData r : allRegions) {
-                        String world = r.getWorld().toLowerCase();
-                        newRegionsMap.computeIfAbsent(world, k -> new ArrayList<>()).add(r);
-                    }
-                    regions.clear();
-                    regions.putAll(newRegionsMap);
-                });
-            }
-        }.runTaskTimerAsynchronously(this.plugin, 0L, 1200L); // Recarrega a cada 1 minuto (1200 ticks)
+        Bukkit.getScheduler().runTaskTimerAsynchronously(this.plugin, () -> {
+            List<DatabaseManager.RegionData> allRegions = database.getAllRegions();
+            SchedulerHelper.runTask(plugin, () -> {
+                Map<String, List<DatabaseManager.RegionData>> newRegionsMap = new HashMap<>();
+                for (DatabaseManager.RegionData r : allRegions) {
+                    String world = r.getWorld().toLowerCase();
+                    newRegionsMap.computeIfAbsent(world, k -> new ArrayList<>()).add(r);
+                }
+                regions.clear();
+                regions.putAll(newRegionsMap);
+            });
+        }, 0L, 1200L);
     }
 
 
     private void startRegionChecker() {
-        Bukkit.getScheduler().runTaskTimer(this.plugin, () -> {
+        SchedulerHelper.runTaskTimer(this.plugin, () -> {
             if (regions.isEmpty()) return;
 
             for (Player player : Bukkit.getOnlinePlayers()) {
-                // Apenas processa quem está em barcos (performance)
                 if (player.getVehicle() instanceof Boat) {
                     this.checkPlayerRegions(player);
                 }
             }
-        }, 0L, 1L); // Checa a cada 1 tick para máxima precisão
+        }, 0L, 1L);
     }
 
 }

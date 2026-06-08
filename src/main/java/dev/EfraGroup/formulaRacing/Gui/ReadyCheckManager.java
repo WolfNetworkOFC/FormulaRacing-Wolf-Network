@@ -8,6 +8,7 @@ package dev.EfraGroup.formulaRacing.Gui;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -23,15 +24,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class ReadyCheckManager implements Listener {
     private final FormulaRacing plugin;
     private final Map<Integer, Set<UUID>> readyPlayersByHeat = new HashMap();
     private final Map<Integer, ReadyCheckView> activeViews = new HashMap();
     private final Map<Integer, Runnable> callbacks = new HashMap();
-    private final Map<Integer, BukkitTask> activeTasks = new HashMap();
+    private final Map<Integer, ScheduledTask> activeTasks = new HashMap();
     private final Map<Integer, UUID> initiatorsByHeat = new HashMap();
 
     public ReadyCheckManager(FormulaRacing plugin) {
@@ -68,31 +68,28 @@ public class ReadyCheckManager implements Listener {
             }
         }
 
-        BukkitTask task = (new BukkitRunnable() {
-            public void run() {
-                Set<UUID> ready = (Set)ReadyCheckManager.this.readyPlayersByHeat.get(heatId);
-                if (ready == null) {
-                    this.cancel();
-                } else {
-                    for(Driver driver : heat.getDrivers().values()) {
-                        if (!ready.contains(driver.getUuid())) {
-                            Player p = Bukkit.getPlayer(driver.getUuid());
-                            if (p != null && p.isOnline()) {
-                                String playerLang = plugin.getDatabaseManager().getPlayerLanguage(p.getUniqueId());
-                                p.sendMessage(plugin.getDirectTranslation("ready_check_ready_text", playerLang));
-                                p.sendMessage(plugin.getDirectTranslation("ready_check_press_text", playerLang));
-                                TitleHelper.sendThemedTitle(p,
-                                    plugin.getTranslation("ready_check_title", playerLang),
-                                    plugin.getDirectTranslation("ready_check_press_text", playerLang),
-                                    10, 280, 10);
-                                p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 1.0F);
-                            }
+        ScheduledTask task = SchedulerHelper.runTaskTimer(this.plugin, (scheduledTask) -> {
+            Set<UUID> ready = ReadyCheckManager.this.readyPlayersByHeat.get(heatId);
+            if (ready == null) {
+                scheduledTask.cancel();
+            } else {
+                for(Driver driver : heat.getDrivers().values()) {
+                    if (!ready.contains(driver.getUuid())) {
+                        Player p = Bukkit.getPlayer(driver.getUuid());
+                        if (p != null && p.isOnline()) {
+                            String playerLang = plugin.getDatabaseManager().getPlayerLanguage(p.getUniqueId());
+                            p.sendMessage(plugin.getDirectTranslation("ready_check_ready_text", playerLang));
+                            p.sendMessage(plugin.getDirectTranslation("ready_check_press_text", playerLang));
+                            TitleHelper.sendThemedTitle(p,
+                                plugin.getTranslation("ready_check_title", playerLang),
+                                plugin.getDirectTranslation("ready_check_press_text", playerLang),
+                                10, 280, 10);
+                            p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 1.0F);
                         }
                     }
-
                 }
             }
-        }).runTaskTimer(this.plugin, 0L, 300L);
+        }, 0L, 300L);
         this.activeTasks.put(heatId, task);
     }
 
@@ -198,7 +195,7 @@ public class ReadyCheckManager implements Listener {
         this.readyPlayersByHeat.remove(heatId);
         this.initiatorsByHeat.remove(heatId);
         this.callbacks.remove(heatId);
-        BukkitTask task = (BukkitTask)this.activeTasks.remove(heatId);
+        ScheduledTask task = (ScheduledTask)this.activeTasks.remove(heatId);
         if (task != null) {
             task.cancel();
         }

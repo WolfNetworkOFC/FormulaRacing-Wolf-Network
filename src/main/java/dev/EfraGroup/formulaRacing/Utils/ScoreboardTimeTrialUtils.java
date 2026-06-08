@@ -2,6 +2,7 @@ package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.ScoreboardOwnershipCoordinator;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.style.TimingScoreboardStyle;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.ScoreboardAdapter;
@@ -14,7 +15,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
 
 public class ScoreboardTimeTrialUtils {
 
@@ -50,22 +50,18 @@ public class ScoreboardTimeTrialUtils {
             return;
         }
         this.running = true;
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                for (Player player : Bukkit.getOnlinePlayers()) {
-                    String trackName =
-                        ScoreboardTimeTrialUtils.this.playerTracks.get(
-                            player.getUniqueId()
-                        );
-                    if (trackName == null) {
-                        continue;
-                    }
-                    ScoreboardTimeTrialUtils.this.show(player, trackName);
+        SchedulerHelper.runTaskTimer(FormulaRacing.getInstance(), () -> {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                String trackName =
+                    ScoreboardTimeTrialUtils.this.playerTracks.get(
+                        player.getUniqueId()
+                    );
+                if (trackName == null) {
+                    continue;
                 }
+                ScoreboardTimeTrialUtils.this.show(player, trackName);
             }
-        }
-            .runTaskTimer(FormulaRacing.getInstance(), 0L, 20L);
+        }, 0L, 20L);
     }
 
     public void setPlayerTrack(

@@ -1,10 +1,10 @@
 package dev.EfraGroup.formulaRacing.PlaceHolder;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
-import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.scheduler.BukkitTask;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.jetbrains.annotations.NotNull;
 
 public class PlaceholderRegister extends PlaceholderExpansion {
@@ -13,7 +13,7 @@ public class PlaceholderRegister extends PlaceholderExpansion {
 
     private final FormulaRacing plugin;
     private volatile int cachedOpenTracksCount;
-    private BukkitTask refreshTask;
+    private ScheduledTask refreshTask;
 
     public PlaceholderRegister(FormulaRacing plugin) {
         this.plugin = plugin;
@@ -39,12 +39,7 @@ public class PlaceholderRegister extends PlaceholderExpansion {
 
     private void startRefreshTask() {
         this.stop();
-        this.refreshTask = Bukkit.getScheduler().runTaskTimerAsynchronously(
-            this.plugin,
-            this::refreshCache,
-            UPDATE_INTERVAL_TICKS,
-            UPDATE_INTERVAL_TICKS
-        );
+        this.refreshTask = SchedulerHelper.runTaskTimer(this.plugin, this::refreshCache, UPDATE_INTERVAL_TICKS, UPDATE_INTERVAL_TICKS);
     }
 
     private void refreshCache() {

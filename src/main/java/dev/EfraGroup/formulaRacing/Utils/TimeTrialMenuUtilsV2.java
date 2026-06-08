@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -86,7 +87,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     }
 
     public void open(Player player) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        SchedulerHelper.runAsync(plugin, () -> {
             try {
                 // Corrigido: Definindo os tipos para o Map retornado pelo MySQL
                 Map<String, DatabaseManager.TrackData> tracksData =
@@ -127,7 +128,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                 this.applySortAndFilter(session);
 
                 // Volta para a Thread Principal (Sync) para abrir o inventário
-                Bukkit.getScheduler().runTask(this.plugin, () -> {
+                SchedulerHelper.runTask(this.plugin, () -> {
                     this.sessions.put(player.getUniqueId(), session);
                     this.openPage(player);
                 });

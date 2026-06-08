@@ -2,6 +2,7 @@ name: FormulaRacing
 version: 2.0
 main: dev.EfraGroup.formulaRacing.FormulaRacing
 api-version: 1.21
+folia-supported: true
 author: EfraGroup
 description: Plugin de corrida de formula 1
 depend:
@@ -120,3 +121,12 @@ commands:
     description: Gerenciamento de Daily Races
     usage: /daily <force|status|reload>
     permission: formularacing.admin.daily
+  ai:
+    description: Sistema de IA de oponentes
+    usage: /ai <record|line|add|remove|difficulty|list|info>
+    aliases: [opponent]
+    permission: formularacing.admin
+permissions:
+  formularacing.admin:
+    description: Permissao para comandos administrativos do FormulaRacing
+    default: op

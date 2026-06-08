@@ -28,6 +28,7 @@ import org.bukkit.util.Vector;
 
 public class PitStopManager {
     private final Set<UUID> pitStopCompleted = new HashSet();
+    private final Map<UUID, Set<Integer>> driverSwappedLaps = new ConcurrentHashMap<>();
     private final FormulaRacing plugin;
     private final DatabaseManager databaseManager;
     private final PitStopConfigManager pitConfigManager;
@@ -431,6 +432,7 @@ public class PitStopManager {
         this.playersInPit.clear();
         this.pitCooldowns.clear();
         this.pitStopCompleted.clear();
+        this.driverSwappedLaps.clear();
     }
 
     public void addPitStopEntry(String trackNameWS, Location min, Location max) {
@@ -543,6 +545,31 @@ public class PitStopManager {
         this.pitStartTimes.remove(playerId);
         this.activeMinigames.remove(playerId);
         this.pitStopCompleted.remove(playerId);
+    }
+
+    public PitBoxRegion getPitBoxAt(Location location) {
+        if (location == null || location.getWorld() == null) return null;
+        for (Map.Entry<String, PitStopRegion> entry : this.pitStopRegions.entrySet()) {
+            PitStopRegion region = entry.getValue();
+            RegionBox regionBox = region.getStartRegion() != null ? region.getStartRegion() : region.getAreaRegion();
+            if (regionBox != null && regionBox.contains(location)) {
+                return new PitBoxRegion(entry.getKey(), "", regionBox);
+            }
+        }
+        return null;
+    }
+
+    public boolean isDriverEligibleForSwap(UUID playerId, int lap) {
+        Set<Integer> swappedLaps = this.driverSwappedLaps.get(playerId);
+        return swappedLaps == null || !swappedLaps.contains(lap);
+    }
+
+    public boolean isPitStopCompleted(UUID playerId) {
+        return this.pitStopCompleted.contains(playerId);
+    }
+
+    public void markDriverSwapped(UUID playerId, int lap) {
+        this.driverSwappedLaps.computeIfAbsent(playerId, k -> new HashSet<>()).add(lap);
     }
 
     public boolean isPlayerInPitRegion(UUID playerId) {

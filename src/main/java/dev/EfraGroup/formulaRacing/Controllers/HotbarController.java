@@ -9,6 +9,7 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Gui.MainMenu;
 import dev.EfraGroup.formulaRacing.Gui.SettingsMenu;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +98,7 @@ public class HotbarController {
                         case "lonely_toggle":
                             boolean current = this.dm.getLonelyModePlayer(player.getUniqueId());
                             player.performCommand("lonely " + !current);
-                            this.plugin.getServer().getScheduler().runTaskLater(this.plugin, () -> this.updateLonelyItem(player), 15L);
+                            SchedulerHelper.runTaskLater(this.plugin, () -> this.updateLonelyItem(player), 15L);
                             break;
                         case "reset":
                             player.performCommand("reset");

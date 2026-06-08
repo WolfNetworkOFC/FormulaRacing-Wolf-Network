@@ -15,6 +15,7 @@ package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -28,8 +29,6 @@ import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitRunnable;
 
 public class TimerUtils {
     private final FormulaRacing plugin;
@@ -66,14 +65,14 @@ public class TimerUtils {
         if (!this.globalLoopRunning) {
             this.startGlobalLoop();
         }
-        Bukkit.getScheduler().runTaskAsynchronously((Plugin)this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 Object[] pb = this.databaseManager.getPlayerBestTime(playerName, trackName);
                 Map cp = this.databaseManager.getCheckpointTimes(uuid, trackName);
                 List cpIds = this.databaseManager.getCheckpointIds(trackName);
                 int realTotalCPs = cpIds != null ? cpIds.size() : 0;
                 RaceSessionCache cache = new RaceSessionCache(pb, cp);
-                Bukkit.getScheduler().runTask(this.plugin, () -> {
+                SchedulerHelper.runTask(this.plugin, () -> {
                     PlayerTimerData existingData = this.getTimerData(player, trackName);
                     if (existingData != null) {
                         existingData.setSessionCache(cache);
@@ -91,81 +90,77 @@ public class TimerUtils {
             return;
         }
         this.globalLoopRunning = true;
-        new BukkitRunnable(){
-
-            public void run() {
-                if (TimerUtils.this.activeTimers.isEmpty()) {
-                    TimerUtils.this.globalLoopRunning = false;
-                    this.cancel();
-                    return;
-                }
-                Bukkit.getScheduler().runTaskAsynchronously(TimerUtils.this.plugin, () -> {
-                    for (Map.Entry<UUID, Map<String, PlayerTimerData>> playerEntry : TimerUtils.this.activeTimers.entrySet()) {
-                        UUID uuid = playerEntry.getKey();
-                        Player player = Bukkit.getPlayer(uuid);
-                        if (player == null || !player.isOnline()) continue;
-                        for (Map.Entry<String, PlayerTimerData> trackEntry : playerEntry.getValue().entrySet()) {
-                            boolean worstTime;
-                            CheckpointData potentialCp;
-                            String trackName = trackEntry.getKey();
-                            PlayerTimerData data = trackEntry.getValue();
-                            List<CheckpointData> tempCps = TimerUtils.this.tempCheckpoints.get(uuid);
-                            CheckpointData lastCp = null;
-                            if (tempCps != null && !tempCps.isEmpty() && (potentialCp = tempCps.get(tempCps.size() - 1)).getTrack().equalsIgnoreCase(trackName)) {
-                                lastCp = potentialCp;
-                            }
-                            double elapsed = (double)(System.nanoTime() - data.getStartNanoTime()) / 1.0E9;
-                            RaceSessionCache cache = data.getSessionCache();
-                            Double pb = cache != null ? cache.getPbTime() : null;
-                            Map<Integer, Double> cpTimes = cache != null ? cache.getCpTimes() : null;
-                            StringBuilder sb = new StringBuilder(64);
-                            boolean bl = worstTime = pb != null && elapsed > pb;
-                            sb.append(pb == null ? "\u00a7a" : (worstTime ? "\u00a7c" : "\u00a7e"));
-                            int minutes = (int)(elapsed / 60.0);
-                            double sec = elapsed % 60.0;
-                            if (minutes > 0) {
-                                sb.append(minutes).append(":");
-                                if (sec < 10.0) {
-                                    sb.append("0");
-                                }
-                            }
-                            long s1000 = (long)(sec * 1000.0);
-                            sb.append(s1000 / 1000L).append(".");
-                            long milli = s1000 % 1000L;
-                            if (milli < 100L) {
-                                sb.append("0");
-                            }
-                            if (milli < 10L) {
-                                sb.append("0");
-                            }
-                            sb.append(milli);
-                            sb.append(" \u00a77(").append(data.getCheckpointsReached()).append("/").append(data.getTotalCheckpoints()).append(")");
-                            if (lastCp != null && cpTimes != null && cpTimes.containsKey(lastCp.getId())) {
-                                double delta = lastCp.getTime() - cpTimes.get(lastCp.getId());
-                                sb.append(delta < 0.0 ? " \u00a7a-" : " \u00a7c+");
-                                double absDelta = Math.abs(delta);
-                                long d1000 = (long)(absDelta * 1000.0);
-                                sb.append(d1000 / 1000L).append(".");
-                                long m = d1000 % 1000L;
-                                if (m < 100L) {
-                                    sb.append("0");
-                                }
-                                if (m < 10L) {
-                                    sb.append("0");
-                                }
-                                sb.append(m);
-                            }
-                            String finalHud = sb.toString();
-                            Bukkit.getScheduler().runTask((Plugin)TimerUtils.this.plugin, () -> {
-                                if (player.isOnline()) {
-                                    player.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(finalHud));
-                                }
-                            });
-                        }
-                    }
-                });
+        SchedulerHelper.runTaskTimer(this.plugin, () -> {
+            if (TimerUtils.this.activeTimers.isEmpty()) {
+                TimerUtils.this.globalLoopRunning = false;
+                return;
             }
-        }.runTaskTimer(this.plugin, 0L, 1L);
+            SchedulerHelper.runAsync(TimerUtils.this.plugin, () -> {
+                for (Map.Entry<UUID, Map<String, PlayerTimerData>> playerEntry : TimerUtils.this.activeTimers.entrySet()) {
+                    UUID uuid = playerEntry.getKey();
+                    Player player = Bukkit.getPlayer(uuid);
+                    if (player == null || !player.isOnline()) continue;
+                    for (Map.Entry<String, PlayerTimerData> trackEntry : playerEntry.getValue().entrySet()) {
+                        boolean worstTime;
+                        CheckpointData potentialCp;
+                        String trackName = trackEntry.getKey();
+                        PlayerTimerData data = trackEntry.getValue();
+                        List<CheckpointData> tempCps = TimerUtils.this.tempCheckpoints.get(uuid);
+                        CheckpointData lastCp = null;
+                        if (tempCps != null && !tempCps.isEmpty() && (potentialCp = tempCps.get(tempCps.size() - 1)).getTrack().equalsIgnoreCase(trackName)) {
+                            lastCp = potentialCp;
+                        }
+                        double elapsed = (double)(System.nanoTime() - data.getStartNanoTime()) / 1.0E9;
+                        RaceSessionCache cache = data.getSessionCache();
+                        Double pb = cache != null ? cache.getPbTime() : null;
+                        Map<Integer, Double> cpTimes = cache != null ? cache.getCpTimes() : null;
+                        StringBuilder sb = new StringBuilder(64);
+                        boolean bl = worstTime = pb != null && elapsed > pb;
+                        sb.append(pb == null ? "\u00a7a" : (worstTime ? "\u00a7c" : "\u00a7e"));
+                        int minutes = (int)(elapsed / 60.0);
+                        double sec = elapsed % 60.0;
+                        if (minutes > 0) {
+                            sb.append(minutes).append(":");
+                            if (sec < 10.0) {
+                                sb.append("0");
+                            }
+                        }
+                        long s1000 = (long)(sec * 1000.0);
+                        sb.append(s1000 / 1000L).append(".");
+                        long milli = s1000 % 1000L;
+                        if (milli < 100L) {
+                            sb.append("0");
+                        }
+                        if (milli < 10L) {
+                            sb.append("0");
+                        }
+                        sb.append(milli);
+                        sb.append(" \u00a77(").append(data.getCheckpointsReached()).append("/").append(data.getTotalCheckpoints()).append(")");
+                        if (lastCp != null && cpTimes != null && cpTimes.containsKey(lastCp.getId())) {
+                            double delta = lastCp.getTime() - cpTimes.get(lastCp.getId());
+                            sb.append(delta < 0.0 ? " \u00a7a-" : " \u00a7c+");
+                            double absDelta = Math.abs(delta);
+                            long d1000 = (long)(absDelta * 1000.0);
+                            sb.append(d1000 / 1000L).append(".");
+                            long m = d1000 % 1000L;
+                            if (m < 100L) {
+                                sb.append("0");
+                            }
+                            if (m < 10L) {
+                                sb.append("0");
+                            }
+                            sb.append(m);
+                        }
+                        String finalHud = sb.toString();
+                        SchedulerHelper.runTask(TimerUtils.this.plugin, () -> {
+                            if (player.isOnline()) {
+                                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(finalHud));
+                            }
+                        });
+                    }
+                }
+            });
+        }, 0L, 1L);
     }
 
     public void stopTimer(Player player) {
@@ -210,7 +205,7 @@ public class TimerUtils {
     public void reloadCacheAsync(Player player, String trackName) {
         UUID uuid = player.getUniqueId();
         String playerName = player.getName();
-        Bukkit.getScheduler().runTaskAsynchronously((Plugin)this.plugin, () -> {
+        SchedulerHelper.runAsync(this.plugin, () -> {
             int cpCount;
             Map cp;
             Object[] pb = this.databaseManager.getPlayerBestTime(playerName, trackName);
@@ -220,7 +215,7 @@ public class TimerUtils {
                 this.warnedPlayersNoCheckpoints.remove(uuid);
                 this.lastWarningTime.entrySet().removeIf(entry -> ((String)entry.getKey()).startsWith(uuid.toString() + ":"));
             }
-            Bukkit.getScheduler().runTask((Plugin)this.plugin, () -> {
+            SchedulerHelper.runTask(this.plugin, () -> {
                 PlayerTimerData data = this.getTimerData(player, trackName);
                 if (data != null) {
                     data.setSessionCache(newCache);

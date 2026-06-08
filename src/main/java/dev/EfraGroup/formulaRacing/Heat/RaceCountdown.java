@@ -7,18 +7,18 @@ package dev.EfraGroup.formulaRacing.Heat;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class RaceCountdown {
     private final FormulaRacing plugin;
     private final Heats heat;
     private final Runnable onComplete;
-    private BukkitTask countdownTask;
+    private ScheduledTask countdownTask;
     private int lightsOn;
     private boolean completed;
     private int maxLights;
@@ -48,30 +48,30 @@ public class RaceCountdown {
                 this.announceLocalizedToAll("race_countdown_prepare");
             }
 
-            this.countdownTask = (new BukkitRunnable() {
-                private int tick = 0;
+            int[] tick = {0};
+            this.countdownTask = SchedulerHelper.runTaskTimer(this.plugin, () -> {
+                if (RaceCountdown.this.heat.getHeatState() != HeatState.STARTING) {
+                    if (RaceCountdown.this.countdownTask != null) {
+                        RaceCountdown.this.countdownTask.cancel();
+                    }
+                } else {
+                    tick[0]++;
+                    if (tick[0] % 20 == 0 && RaceCountdown.this.lightsOn < RaceCountdown.this.maxLights) {
+                        RaceCountdown.this.lightsOn++;
+                        RaceCountdown.this.onLightOn(RaceCountdown.this.lightsOn);
+                    }
 
-                public void run() {
-                    if (RaceCountdown.this.heat.getHeatState() != HeatState.STARTING) {
-                        this.cancel();
-                    } else {
-                        ++this.tick;
-                        if (this.tick % 20 == 0 && RaceCountdown.this.lightsOn < RaceCountdown.this.maxLights) {
-                            ++RaceCountdown.this.lightsOn;
-                            RaceCountdown.this.onLightOn(RaceCountdown.this.lightsOn);
+                    if (tick[0] >= RaceCountdown.this.maxLights * 20 + 20) {
+                        RaceCountdown.this.onLightsOut();
+                        if (RaceCountdown.this.countdownTask != null) {
+                            RaceCountdown.this.countdownTask.cancel();
                         }
-
-                        if (this.tick >= RaceCountdown.this.maxLights * 20 + 20) {
-                            RaceCountdown.this.onLightsOut();
-                            this.cancel();
-                            if (RaceCountdown.this.heat.isPushtopass()) {
-                                RaceCountdown.this.heat.getPlugin().getPTP().startPTPTask(RaceCountdown.this.heat);
-                            }
+                        if (RaceCountdown.this.heat.isPushtopass()) {
+                            RaceCountdown.this.heat.getPlugin().getPTP().startPTPTask(RaceCountdown.this.heat);
                         }
-
                     }
                 }
-            }).runTaskTimer(this.plugin, 0L, 1L);
+            }, 0L, 1L);
         }
     }
 
@@ -119,7 +119,7 @@ public class RaceCountdown {
 
         this.plugin.getDebugManager().logRaceSystem(String.format("[Heat %d] LIGHTS OUT! %s iniciada!", this.heat.getId(), this.heat.isLonely() ? "Qualificatória" : "Corrida"));
         if (this.onComplete != null) {
-            Bukkit.getScheduler().runTask(this.plugin, this.onComplete);
+            SchedulerHelper.runTask(this.plugin, this.onComplete);
         }
 
     }

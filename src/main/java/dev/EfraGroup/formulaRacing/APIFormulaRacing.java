@@ -10,6 +10,7 @@ import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.entity.ArmorStand;
@@ -166,5 +167,23 @@ public class APIFormulaRacing {
             boat.remove();
         }
 
+    }
+
+    public void queueDeleteBoat(Entity boat) {
+        if (boat instanceof Boat) {
+            lockedBoats.values().removeIf((as) -> {
+                if (as.getPassengers().contains(boat)) {
+                    as.remove();
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            SchedulerHelper.runTask(this.plugin, () -> {
+                if (boat.isValid()) {
+                    boat.remove();
+                }
+            });
+        }
     }
 }
