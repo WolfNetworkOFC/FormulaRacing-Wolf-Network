@@ -162,31 +162,43 @@
          return session.getCurrentLapTime();
      }
 
-      private void startGlobalUpdateTask() {
-          SchedulerHelper.runTaskTimer(this.plugin, () -> {
-              TimeTrialDuelsAction.this.activeVisuals.forEach((uuid, duelId) -> {
-                  Player player = Bukkit.getPlayer((UUID)uuid);
-                  if (player == null || !player.isOnline()) {
-                      TimeTrialDuelsAction.this.activeVisuals.remove(uuid);
-                      TimeTrialDuelsAction.this.activeTimers.remove(uuid);
-                      return;
-                  }
-                  if (TimeTrialDuelsAction.this.isPlayerInActiveHeatRace((UUID)uuid)) {
-                      return;
-                  }
-                  DuelSession session = TimeTrialDuelsAction.this.activeTimers.get(uuid);
-                  if (session != null) {
-                      if (session.shouldUpdateData()) {
-                          TimeTrialDuelsAction.this.updateDataAsync(player, session);
-                      }
-                      if (session.getCachedPosition().contains("1\u00ba") || session.getCachedPosition().contains("1st")) {
-                          TimeTrialDuelsAction.this.spawnLeaderParticles(player);
-                      }
-                      if (session.isWaitingForOthers()) {
-                          String langCode = TimeTrialDuelsAction.this.dm.getPlayerLanguage(uuid);
-                          String waitingMsg = TimeTrialDuelsAction.this.plugin.getDirectTranslation("duel_waiting_others", langCode);
-                          if (waitingMsg == null || waitingMsg.isEmpty()) {
-                              waitingMsg = "Aguardando outros jogadores...";
+private void startGlobalUpdateTask() {
+           World world = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
+           if (world == null) {
+               SchedulerHelper.runTaskTimer(this.plugin, () -> {
+                   updateDuelVisuals();
+               }, 1L, 20L);
+           } else {
+               SchedulerHelper.runTaskTimerAt(this.plugin, world, 0, 0, task -> {
+                   updateDuelVisuals();
+               }, 1L, 20L);
+           }
+       }
+       
+       private void updateDuelVisuals() {
+           TimeTrialDuelsAction.this.activeVisuals.forEach((uuid, duelId) -> {
+               Player player = Bukkit.getPlayer((UUID)uuid);
+               if (player == null || !player.isOnline()) {
+                   TimeTrialDuelsAction.this.activeVisuals.remove(uuid);
+                   TimeTrialDuelsAction.this.activeTimers.remove(uuid);
+                   return;
+               }
+               if (TimeTrialDuelsAction.this.isPlayerInActiveHeatRace((UUID)uuid)) {
+                   return;
+               }
+               DuelSession session = TimeTrialDuelsAction.this.activeTimers.get(uuid);
+               if (session != null) {
+                   if (session.shouldUpdateData()) {
+                       TimeTrialDuelsAction.this.updateDataAsync(player, session);
+                   }
+                   if (session.getCachedPosition().contains("1\u00ba") || session.getCachedPosition().contains("1st")) {
+                       TimeTrialDuelsAction.this.spawnLeaderParticles(player);
+                   }
+                   if (session.isWaitingForOthers()) {
+                       String langCode = TimeTrialDuelsAction.this.dm.getPlayerLanguage(uuid);
+                       String waitingMsg = TimeTrialDuelsAction.this.plugin.getDirectTranslation("duel_waiting_others", langCode);
+                       if (waitingMsg == null || waitingMsg.isEmpty()) {
+                           waitingMsg = "Aguardando outros jogadores...";
                           }
                           TimeTrialDuelsAction.this.sendWaitingForOthersActionBar(player, session.getFormattedLapTime(), waitingMsg);
                       } else {

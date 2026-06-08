@@ -50,6 +50,11 @@ public final class SchedulerHelper {
         REGION.execute(plugin, world, chunkX, chunkZ, task);
     }
 
+    public static ScheduledTask runTaskTimerAt(Plugin plugin, Location location, Consumer<ScheduledTask> task, long delayTicks, long periodTicks) {
+        ScheduledTask scheduledTask = REGION.runAtFixedRate(plugin, location, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
+        return scheduledTask;
+    }
+
     public static void runTaskFor(Plugin plugin, Entity entity, Runnable task) {
         entity.getScheduler().execute(plugin, task, null, 1L);
     }
