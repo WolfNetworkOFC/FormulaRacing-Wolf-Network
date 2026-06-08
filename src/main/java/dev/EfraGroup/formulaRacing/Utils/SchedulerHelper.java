@@ -10,6 +10,7 @@ import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -24,32 +25,18 @@ public final class SchedulerHelper {
     private SchedulerHelper() {}
 
     public static void runTask(Plugin plugin, Runnable task) {
-        try {
-            GLOBAL.execute(plugin, task);
-        } catch (Exception e) {
-            Bukkit.getScheduler().runTask(plugin, task);
-        }
+        Bukkit.getScheduler().runTask(plugin, task);
     }
 
     public static ScheduledTask runTaskLater(Plugin plugin, Runnable task, long delayTicks) {
-        try {
-            return GLOBAL.runDelayed(plugin, t -> task.run(), Math.max(1, delayTicks));
-        } catch (Exception e) {
-            return Bukkit.getScheduler().runTaskLater(plugin, task, Math.max(1, delayTicks));
-        }
+        BukkitTask bukkitTask = Bukkit.getScheduler().runTaskLater(plugin, task, Math.max(1, delayTicks));
+        return new ScheduledTaskWrapper(bukkitTask);
     }
 
     public static ScheduledTask runTaskTimer(Plugin plugin, Runnable task, long delayTicks, long periodTicks) {
-        try {
-            return GLOBAL.runAtFixedRate(plugin, t -> task.run(), Math.max(1, delayTicks), Math.max(1, periodTicks));
-        } catch (Exception e) {
-            return Bukkit.getScheduler().runTaskTimer(plugin, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
-        }
+        BukkitTask bukkitTask = Bukkit.getScheduler().runTaskTimer(plugin, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
+        return new ScheduledTaskWrapper(bukkitTask);
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Region Scheduler (runs on region thread for chunk)
-    // ═══════════════════════════════════════════════════════════
 
     public static void runTaskAt(Plugin plugin, Location location, Runnable task) {
         REGION.execute(plugin, location, task);
@@ -59,25 +46,13 @@ public final class SchedulerHelper {
         REGION.execute(plugin, world, chunkX, chunkZ, task);
     }
 
-    public static ScheduledTask runTaskTimerAt(Plugin plugin, Location location, Consumer<ScheduledTask> task, long delayTicks, long periodTicks) {
-        return REGION.runAtFixedRate(plugin, location, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Entity Scheduler (runs on entity's owning region)
-    // ═══════════════════════════════════════════════════════════
-
     public static void runTaskFor(Plugin plugin, Entity entity, Runnable task) {
         entity.getScheduler().execute(plugin, task, null, 1L);
     }
 
-    public static ScheduledTask runTaskTimerFor(Plugin plugin, Entity entity, Consumer<ScheduledTask> task, long delayTicks, long periodTicks) {
-        return entity.getScheduler().runAtFixedRate(plugin, task, null, Math.max(1, delayTicks), Math.max(1, periodTicks));
+    public static void runTaskTimerFor(Plugin plugin, Entity entity, Consumer<ScheduledTask> task, long delayTicks, long periodTicks) {
+        entity.getScheduler().runAtFixedRate(plugin, task, null, Math.max(1, delayTicks), Math.max(1, periodTicks));
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Async Scheduler
-    // ═══════════════════════════════════════════════════════════
 
     public static void runAsync(Plugin plugin, Runnable task) {
         ASYNC.runNow(plugin, t -> task.run());
@@ -104,10 +79,6 @@ public final class SchedulerHelper {
         ASYNC.runAtFixedRate(plugin, t -> task.run(), delayTicks * 50L, periodTicks * 50L, TimeUnit.MILLISECONDS);
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Teleport (Folia-safe)
-    // ═══════════════════════════════════════════════════════════
-
     public static CompletableFuture<Boolean> teleport(Entity entity, Location destination) {
         if (entity instanceof Player player) {
             Entity vehicle = player.getVehicle();
@@ -122,15 +93,29 @@ public final class SchedulerHelper {
         runTaskFor(plugin, entity, () -> teleport(entity, destination));
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Cancel tasks
-    // ═══════════════════════════════════════════════════════════
-
     public static void cancelAllTasks(Plugin plugin) {
         GLOBAL.cancelTasks(plugin);
         ASYNC.cancelTasks(plugin);
     }
 
     public static void shutdownAsyncPool() {
+    }
+
+    private static class ScheduledTaskWrapper implements ScheduledTask {
+        private final BukkitTask bukkitTask;
+        
+        ScheduledTaskWrapper(BukkitTask task) {
+            this.bukkitTask = task;
+        }
+        
+        @Override
+        public boolean isCancelled() {
+            return bukkitTask.isCancelled();
+        }
+        
+        @Override
+        public void cancel() {
+            bukkitTask.cancel();
+        }
     }
 }
