@@ -413,64 +413,51 @@ public class Heats {
                 this.round != null &&
                 this.round.getRoundType() == RoundType.QUALIFICATION;
             if (isQuali) {
-                Location spawnLoc =
-                    this.plugin.getTrackIntegrationManager().getTrackSpawn(
-                        this.trackNameWS
-                    );
-                if (spawnLoc == null) {
-                    this.plugin.getDebugManager().logRaceSystem(
-                        "Falha ao obter spawn da pista para Qualificatória!"
-                    );
-                    return false;
-                }
-
-                for (Driver driver : this.drivers.values()) {
-                    Player player = Bukkit.getPlayer(driver.getUuid());
-                    if (player != null && player.isOnline()) {
-                        this.plugin.getAPI().recoverPlayerBoatState(player);
-
-                        player.teleport(spawnLoc);
-                        this.plugin.getLonelyController().updatePlayersVisibility(
-                            player
+                List<Location> qualiGridPositions = this.plugin
+                    .getTrackIntegrationManager()
+                    .generateQualiGridPositions(this.trackNameWS, this.drivers.size());
+                if (qualiGridPositions.isEmpty()) {
+                    Location spawnLoc =
+                        this.plugin.getTrackIntegrationManager().getTrackSpawn(
+                            this.trackNameWS
                         );
-                        this.plugin.getServer()
-                            .getScheduler()
-                            .runTaskLater(
-                                this.plugin,
-                                () -> {
-                                    if (player.isOnline()) {
-                                        if (
-                                            this.plugin.getPacketSender() !=
-                                            null
-                                        ) {
-                                            this.plugin.getPacketSender().resetBoatUtilsToVanilla(
-                                                player
-                                            );
-                                            this.plugin.getPacketSender().applyBoatUtilsToPlayer(
-                                                player,
-                                                this.trackNameWS
-                                            );
-                                            this.applyCollisionModeToPlayer(
-                                                player
-                                            );
-                                        }
-
-                                        this.plugin.getAPI().spawnBoat(
-                                            player,
-                                            false,
-                                            true,
-                                            false
-                                        );
-                                    }
-                                },
-                                10L
-                            );
+                    if (spawnLoc == null) {
+                        this.plugin.getDebugManager().logRaceSystem(
+                            "Falha ao obter spawn da pista para Qualificatória!"
+                        );
+                        return false;
                     }
-                }
 
-                this.plugin.getDebugManager().logRaceSystem(
-                    "Pilotos teleportados para o SPAWN para Qualificatória."
-                );
+                    for (Driver driver : this.drivers.values()) {
+                        Player player = Bukkit.getPlayer(driver.getUuid());
+                        if (player != null && player.isOnline()) {
+                            this.plugin.getAPI().recoverPlayerBoatState(player);
+                            player.teleport(spawnLoc);
+                            this.spawnQualiDriver(player, driver);
+                        }
+                    }
+                    this.plugin.getDebugManager().logRaceSystem(
+                        "Pilotos teleportados para o SPAWN para Qualificatória (qualigrid não configurado)."
+                    );
+                } else {
+                    for (Driver driver : this.drivers.values()) {
+                        Player player = Bukkit.getPlayer(driver.getUuid());
+                        if (player != null && player.isOnline()) {
+                            int gridIndex = driver.getStartPosition() - 1;
+                            if (gridIndex >= 0 && gridIndex < qualiGridPositions.size()) {
+                                Location qualiLoc = qualiGridPositions.get(gridIndex);
+                                this.plugin.getAPI().recoverPlayerBoatState(player);
+                                player.teleport(qualiLoc);
+                                this.spawnQualiDriver(player, driver);
+                            } else {
+                                player.sendMessage("§cPosição inválida no qualigrid.");
+                            }
+                        }
+                    }
+                    this.plugin.getDebugManager().logRaceSystem(
+                        "Pilotos teleportados para o QUALIGRID para Qualificatória."
+                    );
+                }
             } else {
                 for (Driver driver : this.drivers.values()) {
                     Player player = Bukkit.getPlayer(driver.getUuid());
@@ -1234,6 +1221,20 @@ public class Heats {
         }
     }
 
+    private void spawnQualiDriver(Player player, Driver driver) {
+        this.plugin.getLonelyController().updatePlayersVisibility(player);
+        this.plugin.getServer().getScheduler().runTaskLater(this.plugin, () -> {
+            if (player.isOnline()) {
+                if (this.plugin.getPacketSender() != null) {
+                    this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
+                    this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, this.trackNameWS);
+                    this.applyCollisionModeToPlayer(player);
+                }
+                this.plugin.getAPI().spawnBoat(player, false, true, false);
+            }
+        }, 10L);
+    }
+
     public boolean addDriver(UUID uuid, int gridPosition) {
         if (this.drivers.containsKey(uuid)) {
             return false;
@@ -1903,6 +1904,9 @@ public class Heats {
 
     public void setTrackNameWS(String trackNameWS) {
         this.trackNameWS = trackNameWS;
+        if (trackNameWS != null && !trackNameWS.isEmpty() && this.plugin != null) {
+            this.maxDrivers = this.plugin.getTrackIntegrationManager().getGridPositionCount(trackNameWS);
+        }
     }
 
     public int getDriverCount() {

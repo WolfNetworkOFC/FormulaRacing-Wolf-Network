@@ -833,6 +833,7 @@ public class RaceEventManager {
                                 driver,
                                 "Left event"
                             );
+                            heat.removeDriver(uuid);
                             player.sendMessage(
                                 "§e⚠ Você saiu da corrida e foi desqualificado."
                             );

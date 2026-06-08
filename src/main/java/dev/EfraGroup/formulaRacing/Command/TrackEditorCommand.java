@@ -1160,6 +1160,129 @@ public class TrackEditorCommand extends BaseCommand {
         }
     }
 
+    @Subcommand("location qualigrid")
+    @Description("Adiciona/atualiza uma posição do qualigrid (grid da qualificatória)")
+    @CommandCompletion("@nothing @tracks")
+    public void onLocationQualiGrid(Player player, int id, @Optional String trackNameArg) {
+        String trackName = this.getTargetTrack(player, trackNameArg);
+        if (trackName != null) {
+            if (this.mysql.addQualiGridPosition(trackName, id, player.getLocation())) {
+                player.sendMessage("§a✓ Posição Q" + id + " do qualigrid adicionada em §e" + trackName);
+                player.sendMessage("§7Localização: " + this.formatLocation(player.getLocation()));
+            } else {
+                player.sendMessage("§c✗ Erro ao adicionar posição do qualigrid.");
+            }
+        }
+    }
+
+    @Subcommand("qualigrid remove")
+    @Description("Remove uma posição do qualigrid")
+    @CommandCompletion("@nothing @tracks")
+    public void onQualiGridRemove(Player player, int id, @Optional String trackNameArg) {
+        String trackName = this.getTargetTrack(player, trackNameArg);
+        if (trackName != null) {
+            if (this.mysql.removeQualiGridPosition(trackName, id)) {
+                player.sendMessage("§a✓ Posição Q" + id + " do qualigrid removida de §e" + trackName);
+            } else {
+                player.sendMessage("§c✗ Erro ao remover posição do qualigrid.");
+            }
+        }
+    }
+
+    @Subcommand("qualigrid clear")
+    @Description("Limpa todas as posições do qualigrid")
+    @CommandCompletion("@tracks confirm")
+    public void onQualiGridClear(Player player, String trackName, @Optional String confirm) {
+        if (confirm != null && confirm.equalsIgnoreCase("confirm")) {
+            if (this.mysql.clearQualiGridPositions(trackName)) {
+                player.sendMessage("§a✓ Todas as posições do qualigrid foram removidas de §e" + trackName);
+            } else {
+                player.sendMessage("§c✗ Erro ao limpar o qualigrid.");
+            }
+        } else {
+            int count = this.mysql.getQualiGridPositions(trackName).size();
+            player.sendMessage("§e⚠ Isso removerá §c" + count + " posições §edo qualigrid!");
+            player.sendMessage("§7Use §f/trackedit qualigrid clear " + trackName + " confirm §7para confirmar.");
+        }
+    }
+
+    @Subcommand("qualigrid list")
+    @Description("Lista as posições do qualigrid")
+    @CommandCompletion("@tracks")
+    public void onQualiGridList(Player player, @Optional String trackNameArg) {
+        String trackName = this.getTargetTrack(player, trackNameArg);
+        if (trackName != null) {
+            List<GridPosition> positions = this.mysql.getQualiGridPositions(trackName);
+            player.sendMessage("§e═══════════════════════════════════");
+            player.sendMessage("§6§lQualigrid de §f" + trackName);
+            player.sendMessage("§e═══════════════════════════════════");
+            if (positions.isEmpty()) {
+                player.sendMessage("§7Nenhuma posição configurada.");
+                player.sendMessage("§7Use §f/trackedit location qualigrid <id> " + trackName + " §7para adicionar.");
+            } else {
+                player.sendMessage("§7Total: §f" + positions.size() + " posições");
+                player.sendMessage("");
+                for (GridPosition pos : positions) {
+                    Location loc = pos.toLocation(this.plugin.getServer());
+                    if (loc != null) {
+                        player.sendMessage("§6Q" + pos.getPosition() + " §8→ §7" + this.formatLocation(loc));
+                    }
+                }
+            }
+            player.sendMessage("§e═══════════════════════════════════");
+        }
+    }
+
+    @Subcommand("qualigrid test")
+    @Description("Testa as posições do qualigrid")
+    @CommandCompletion("@tracks")
+    public void onQualiGridTest(Player player, @Optional String trackNameArg) {
+        String trackName = this.getTargetTrack(player, trackNameArg);
+        if (trackName != null) {
+            List<GridPosition> positions = this.mysql.getQualiGridPositions(trackName);
+            if (positions.isEmpty()) {
+                player.sendMessage("§cNenhuma posição do qualigrid configurada para esta pista.");
+            } else {
+                player.sendMessage("§a✓ Testando qualigrid de §e" + trackName + "§a...");
+                for (int i = 0; i < positions.size(); ++i) {
+                    GridPosition pos = positions.get(i);
+                    int delay = i * 20;
+                    this.plugin.getServer().getScheduler().runTaskLater(this.plugin, () -> {
+                        Location loc = pos.toLocation(this.plugin.getServer());
+                        if (loc != null) {
+                            player.teleport(loc);
+                            TitleHelper.sendThemedTitle(player, "&wQ" + pos.getPosition(), "§7" + this.formatLocation(loc), 5, 30, 10);
+                        }
+                    }, (long)delay);
+                }
+            }
+        }
+    }
+
+    @Subcommand("qualigrid info")
+    @Description("Mostra informações do qualigrid")
+    @CommandCompletion("@tracks")
+    public void onQualiGridInfo(Player player, @Optional String trackNameArg) {
+        String trackName = this.getTargetTrack(player, trackNameArg);
+        if (trackName != null) {
+            List<GridPosition> positions = this.mysql.getQualiGridPositions(trackName);
+            player.sendMessage("§e═══════════════════════════════════");
+            player.sendMessage("§6§lInformações do Qualigrid: §f" + trackName);
+            player.sendMessage("§e═══════════════════════════════════");
+            player.sendMessage("§7Posições configuradas: §f" + positions.size());
+            if (positions.isEmpty()) {
+                player.sendMessage("§e⚠ Qualigrid não configurado");
+                player.sendMessage("§7A qualificatória usará o spawn da pista.");
+                player.sendMessage("§7Use §f/trackedit location qualigrid <id> " + trackName + " §7para configurar.");
+            } else {
+                player.sendMessage("§a✓ Qualigrid configurado manualmente");
+                player.sendMessage("§7Use §f/trackedit qualigrid list " + trackName + " §7para ver posições.");
+                player.sendMessage("§7Use §f/trackedit qualigrid test " + trackName + " §7para testar.");
+            }
+            player.sendMessage("§e═══════════════════════════════════");
+        }
+    }
+
     @Subcommand("pitstop entry")
     @Description("Adiciona a entrada do pit stop")
     @CommandCompletion("@tracks")

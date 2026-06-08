@@ -153,6 +153,29 @@ public class TrackIntegrationManager {
         this.noResetOnFutureCheckpointTracks.put(trackNameWS, value);
     }
 
+    public int getGridPositionCount(String trackNameWS) {
+        return this.getTrackGridLocations(trackNameWS).size();
+    }
+
+    public int getQualiGridPositionCount(String trackNameWS) {
+        return this.databaseManager.getQualiGridPositions(trackNameWS).size();
+    }
+
+    public List<Location> generateQualiGridPositions(String trackNameWS, int maxPositions) {
+        List<Location> gridLocations = new ArrayList();
+        List<GridPosition> qualGrids = this.databaseManager.getQualiGridPositions(trackNameWS);
+        this.plugin.getDebugManager().logRaceSystem("[QUALIGRID DEBUG] Posições encontradas: " + qualGrids.size());
+        int limit = Math.min(qualGrids.size(), maxPositions);
+        for (int i = 0; i < limit; i++) {
+            GridPosition gridPos = qualGrids.get(i);
+            Location loc = gridPos.toLocation(this.plugin.getServer());
+            if (loc != null) {
+                gridLocations.add(loc);
+            }
+        }
+        return gridLocations;
+    }
+
     public List<Location> generateGridPositions(String trackNameWS, int maxPositions) {
         List<Location> gridLocations = this.getTrackGridLocations(trackNameWS);
         if (gridLocations.isEmpty()) {

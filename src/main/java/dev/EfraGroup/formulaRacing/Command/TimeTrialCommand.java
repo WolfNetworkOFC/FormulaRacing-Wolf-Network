@@ -113,6 +113,7 @@
         }
 
         private void startTrack(Player player, String trackName, String ownerName) {
+            if (isBusy(player)) return;
             String lastTrack = this.plugin.getLastTimeTrialTrack(player.getUniqueId());
             if (lastTrack != null) {
                 TimerUtils.PlayerTimerData data = this.timerUtils.getTimerData(player, lastTrack);

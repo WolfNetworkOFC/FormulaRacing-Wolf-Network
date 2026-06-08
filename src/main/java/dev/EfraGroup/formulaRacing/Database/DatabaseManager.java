@@ -599,6 +599,18 @@ public class DatabaseManager {
             );
             stmt.executeUpdate(
                 """
+                CREATE TABLE IF NOT EXISTS fr_qualigrid_positions (
+                    id INTEGER NOT NULL,
+                    trackNameWS TEXT DEFAULT NULL,
+                    positionIndex INTEGER NOT NULL,
+                    x REAL NOT NULL, y REAL NOT NULL, z REAL NOT NULL,
+                    yaw REAL NOT NULL, pitch REAL NOT NULL, world TEXT,
+                    PRIMARY KEY (id, trackNameWS),
+                    UNIQUE (positionIndex, trackNameWS)
+                )"""
+            );
+            stmt.executeUpdate(
+                """
                 CREATE TABLE IF NOT EXISTS fr_pit_lanes (
                     trackNameWS TEXT NOT NULL,
                     pitId INTEGER NOT NULL,
@@ -2952,6 +2964,104 @@ public class DatabaseManager {
     public synchronized boolean clearGridPositions(String trackName) {
         String sql =
             "DELETE FROM fr_grid_positions WHERE LOWER(trackNameWS) = LOWER(?)";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackName.replaceAll("\\s+", ""));
+                ps.executeUpdate();
+                return true;
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
+    }
+
+    public synchronized boolean addQualiGridPosition(
+        String trackName,
+        int id,
+        Location location
+    ) {
+        String sql =
+            "INSERT INTO fr_qualigrid_positions (id, trackNameWS, positionIndex, x, y, z, yaw, pitch, world) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(trackNameWS, positionIndex) DO UPDATE SET " +
+            "x = excluded.x, y = excluded.y, z = excluded.z, yaw = excluded.yaw, pitch = excluded.pitch, world = excluded.world";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, id);
+                ps.setString(2, trackName.replaceAll("\\s+", "").toLowerCase());
+                ps.setInt(3, id);
+                ps.setDouble(4, location.getX());
+                ps.setDouble(5, location.getY());
+                ps.setDouble(6, location.getZ());
+                ps.setDouble(7, location.getYaw());
+                ps.setDouble(8, location.getPitch());
+                ps.setString(9, location.getWorld().getName());
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
+    }
+
+    public synchronized boolean removeQualiGridPosition(
+        String trackName,
+        int id
+    ) {
+        String sql =
+            "DELETE FROM fr_qualigrid_positions WHERE LOWER(trackNameWS) = LOWER(?) AND positionIndex = ?";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackName.replaceAll("\\s+", ""));
+                ps.setInt(2, id);
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
+    }
+
+    public synchronized List<GridPosition> getQualiGridPositions(String trackName) {
+        List<GridPosition> positions = new ArrayList<>();
+        String sql =
+            "SELECT positionIndex, x, y, z, yaw, pitch, world FROM fr_qualigrid_positions WHERE LOWER(trackNameWS) = LOWER(?) ORDER BY positionIndex ASC";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackName.replaceAll("\\s+", ""));
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        String worldName = rs.getString("world");
+                        World world = Bukkit.getWorld(worldName);
+                        if (world == null) continue;
+
+                        positions.add(
+                            new GridPosition(
+                                rs.getInt("positionIndex"),
+                                rs.getDouble("x"),
+                                rs.getDouble("y"),
+                                rs.getDouble("z"),
+                                rs.getDouble("yaw"),
+                                rs.getDouble("pitch"),
+                                worldName
+                            )
+                        );
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return positions;
+    }
+
+    public synchronized boolean clearQualiGridPositions(String trackName) {
+        String sql =
+            "DELETE FROM fr_qualigrid_positions WHERE LOWER(trackNameWS) = LOWER(?)";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {

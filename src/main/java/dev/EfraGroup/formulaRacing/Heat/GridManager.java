@@ -44,6 +44,7 @@ public class GridManager {
                 this.plugin.getDebugManager().logRaceSystem("Não foi possível gerar grid para pista: " + trackNameWS);
                 return false;
             } else {
+                this.heat.setMaxDrivers(this.gridPositions.size());
                 DebugManager var10000 = this.plugin.getDebugManager();
                 int var10001 = this.heat.getId();
                 var10000.logRaceSystem("Grid gerado para Heat " + var10001 + ": " + this.gridPositions.size() + " posições");

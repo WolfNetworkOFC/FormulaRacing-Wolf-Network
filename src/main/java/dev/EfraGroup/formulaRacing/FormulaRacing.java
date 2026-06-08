@@ -971,6 +971,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         if (this.raceCheckpointListener != null) {
             this.raceCheckpointListener.cleanupPlayer(uuid);
         }
+        if (this.driverLookup != null) {
+            this.driverLookup.unregister(uuid);
+        }
     }
 
     private void registerCommandContexts() {
