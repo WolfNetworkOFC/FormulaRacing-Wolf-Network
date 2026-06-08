@@ -107,6 +107,10 @@ public class APIFormulaRacing {
         }
     }
 
+    public void queueSpawnBoat(Player player, boolean trail, boolean locked, boolean checkground) {
+        Bukkit.getScheduler().runTask(this.plugin, () -> this.spawnBoat(player, trail, locked, checkground));
+    }
+
     public boolean recoverPlayerBoatState(Player player) {
         boolean recovered = false;
         UUID uuid = player.getUniqueId();

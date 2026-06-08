@@ -23,32 +23,28 @@ public final class SchedulerHelper {
 
     private SchedulerHelper() {}
 
-    // ═══════════════════════════════════════════════════════════
-    //  Global Region Scheduler (main-thread equivalent)
-    // ═══════════════════════════════════════════════════════════
-
     public static void runTask(Plugin plugin, Runnable task) {
-        GLOBAL.execute(plugin, task);
-    }
-
-    public static void runTask(Plugin plugin, Consumer<ScheduledTask> task) {
-        GLOBAL.run(plugin, task);
+        try {
+            GLOBAL.execute(plugin, task);
+        } catch (Exception e) {
+            Bukkit.getScheduler().runTask(plugin, task);
+        }
     }
 
     public static ScheduledTask runTaskLater(Plugin plugin, Runnable task, long delayTicks) {
-        return GLOBAL.runDelayed(plugin, t -> task.run(), Math.max(1, delayTicks));
+        try {
+            return GLOBAL.runDelayed(plugin, t -> task.run(), Math.max(1, delayTicks));
+        } catch (Exception e) {
+            return Bukkit.getScheduler().runTaskLater(plugin, task, Math.max(1, delayTicks));
+        }
     }
 
     public static ScheduledTask runTaskTimer(Plugin plugin, Runnable task, long delayTicks, long periodTicks) {
-        return GLOBAL.runAtFixedRate(plugin, t -> task.run(), Math.max(1, delayTicks), Math.max(1, periodTicks));
-    }
-
-    public static ScheduledTask runTaskTimer(Plugin plugin, Consumer<ScheduledTask> task, long delayTicks, long periodTicks) {
-        return GLOBAL.runAtFixedRate(plugin, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
-    }
-
-    public static ScheduledTask runTaskTimer(Plugin plugin, Runnable task) {
-        return runTaskTimer(plugin, task, 1L, 1L);
+        try {
+            return GLOBAL.runAtFixedRate(plugin, t -> task.run(), Math.max(1, delayTicks), Math.max(1, periodTicks));
+        } catch (Exception e) {
+            return Bukkit.getScheduler().runTaskTimer(plugin, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
+        }
     }
 
     // ═══════════════════════════════════════════════════════════

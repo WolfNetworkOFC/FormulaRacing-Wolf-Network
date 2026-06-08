@@ -506,7 +506,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         String ownerName = this.mysql.getTrackOwner(trackName);
         this.stt.setPlayerTrack(player, trackName, ownerName);
 
-        this.api.spawnBoat(player, false, false, false);
+        this.api.queueSpawnBoat(player, false, false, false);
     }
 
     private String formatTime(double time) {

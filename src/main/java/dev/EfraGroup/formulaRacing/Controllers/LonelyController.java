@@ -424,18 +424,22 @@ public class LonelyController implements Listener {
 
     private void setVanillaCollision(Player player, boolean preventCollision) {
         SchedulerHelper.runTask(plugin, () -> {
-            Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
-            Team team = scoreboard.getTeam("fr_nocol");
-            if (team == null) {
-                team = scoreboard.registerNewTeam("fr_nocol");
-                team.setOption(Option.COLLISION_RULE, OptionStatus.NEVER);
-                team.setCanSeeFriendlyInvisibles(false);
-                plugin.getDebugManager().logPacketHandling("[FormulaRacing] Time 'fr_nocol' criado no MainScoreboard.");
-            }
-            if (preventCollision) {
-                if (!team.hasEntry(player.getName())) team.addEntry(player.getName());
-            } else {
-                if (team.hasEntry(player.getName())) team.removeEntry(player.getName());
+            try {
+                Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
+                Team team = scoreboard.getTeam("fr_nocol");
+                if (team == null) {
+                    team = scoreboard.registerNewTeam("fr_nocol");
+                    team.setOption(Option.COLLISION_RULE, OptionStatus.NEVER);
+                    team.setCanSeeFriendlyInvisibles(false);
+                    plugin.getDebugManager().logPacketHandling("[FormulaRacing] Time 'fr_nocol' criado no MainScoreboard.");
+                }
+                if (preventCollision) {
+                    if (!team.hasEntry(player.getName())) team.addEntry(player.getName());
+                } else {
+                    if (team.hasEntry(player.getName())) team.removeEntry(player.getName());
+                }
+            } catch (Exception e) {
+                plugin.getLogger().warning("[FormulaRacing] Failed to set collision for " + player.getName() + ": " + e.getMessage());
             }
         });
     }

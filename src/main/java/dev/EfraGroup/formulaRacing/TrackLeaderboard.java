@@ -60,11 +60,22 @@ public class TrackLeaderboard { // Removido o 'abstract'
         this.location = newLocation;
         this.mySQLManager.saveHologramLocation(this.trackName, newLocation);
 
-        SchedulerHelper.runTask(this.plugin, () -> holograms.forEach((type, holo) -> {
-            double xOffset = type.equals("bedrock") ? 3.0 : 0.0;
-            Location holoLoc = newLocation.clone().add(xOffset, 0.5, 0.0);
-            holo.setLocation(holoLoc);
-        }));
+        SchedulerHelper.runTask(this.plugin, () -> {
+            if (!Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
+                return;
+            }
+            try {
+                holograms.forEach((type, holo) -> {
+                    if (holo != null) {
+                        double xOffset = type.equals("bedrock") ? 3.0 : 0.0;
+                        Location holoLoc = newLocation.clone().add(xOffset, 0.5, 0.0);
+                        holo.setLocation(holoLoc);
+                    }
+                });
+            } catch (Exception e) {
+                // Silently fail if hologram is invalid
+            }
+        });
     }
     private void processAndShow(List<DatabaseManager.PlayerTime> leaderboard, String type) {
         int totalCheckpoints = this.mySQLManager.getCheckpointCount(this.trackName);
