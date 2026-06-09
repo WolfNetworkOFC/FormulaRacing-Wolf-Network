@@ -18,6 +18,7 @@ import java.net.URI;
 import java.net.URL;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.logging.Level;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
@@ -30,12 +31,12 @@ public class SkullUtils {
     public static ItemStack createSkull(String textureValue) {
         ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
         if (textureValue == null || textureValue.isEmpty()) {
-            System.err.println("[SkullUtils] Texture value is null or empty!");
+            FormulaRacing.getInstance().getLogger().warning("[SkullUtils] Texture value is null or empty!");
             return skull;
         }
         SkullMeta meta = (SkullMeta)skull.getItemMeta();
         if (meta == null) {
-            System.err.println("[SkullUtils] SkullMeta is null!");
+            FormulaRacing.getInstance().getLogger().warning("[SkullUtils] SkullMeta is null!");
             return skull;
         }
         try {
@@ -52,7 +53,7 @@ public class SkullUtils {
                 return skull;
             }
         } catch (Exception e) {
-            System.err.println("[SkullUtils] Falha ao aplicar textura customizada: " + e.getMessage());
+            FormulaRacing.getInstance().getLogger().log(Level.WARNING, "[SkullUtils] Falha ao aplicar textura customizada: {0}", e.getMessage());
         }
         return skull;
     }
@@ -117,7 +118,7 @@ public class SkullUtils {
                 return decoded.substring(urlStart, urlEnd);
             }
         } catch (Exception e) {
-            System.err.println("[SkullUtils] Erro ao decodificar textura: " + e.getMessage());
+            FormulaRacing.getInstance().getLogger().log(Level.WARNING, "[SkullUtils] Erro ao decodificar textura: {0}", e.getMessage());
         }
         return null;
     }

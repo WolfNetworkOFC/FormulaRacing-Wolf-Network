@@ -2,6 +2,7 @@ package dev.EfraGroup.formulaRacing;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import java.util.logging.Level;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -100,11 +101,11 @@ public class PacketSender {
         try {
             defaultSlip = ((Number) data.get("defaultSlipperiness")).floatValue();
         } catch (Exception e) {
-            System.out.println("[DEBUG] Error parsing defaultSlipperiness: " + e.getMessage());
+            FormulaRacing.getInstance().getLogger().log(Level.WARNING, "[DEBUG] Error parsing defaultSlipperiness: {0}", e.getMessage());
         }
         if (defaultSlip != VANILLA_DEFAULT_SLIPPERINESS) {
             sendBoatSetting(player, (short)2, defaultSlip);
-            System.out.println("[DEBUG] Set default slipperiness -> " + defaultSlip);
+            FormulaRacing.getInstance().getLogger().info("[DEBUG] Set default slipperiness -> " + defaultSlip);
         }
 
         String customSlip = (String) data.get("customSlipperiness");
@@ -117,7 +118,7 @@ public class PacketSender {
 
                 String[] parts = entry.split(";", 2); // divide block:value
                 if (parts.length != 2) {
-                    System.out.println("[DEBUG] Skipping invalid entry: " + entry);
+                    FormulaRacing.getInstance().getLogger().warning("[DEBUG] Skipping invalid entry: " + entry);
                     continue;
                 }
 
@@ -126,7 +127,7 @@ public class PacketSender {
                 try {
                     slipValue = Float.parseFloat(parts[1].trim());
                 } catch (NumberFormatException e) {
-                    System.out.println("[DEBUG] Invalid float for block " + blockId + ":; " + parts[1]);
+                    FormulaRacing.getInstance().getLogger().warning("[DEBUG] Invalid float for block " + blockId + ": " + parts[1]);
                     continue;
                 }
 
@@ -138,7 +139,7 @@ public class PacketSender {
                 float value = e.getKey();
                 String blocks = String.join(",", e.getValue());
                 sendBoatSetting(player, (short)3, value, blocks);
-                System.out.println("[DEBUG] Set custom slipperiness -> Value: " + value + ", Blocks: " + blocks);
+                FormulaRacing.getInstance().getLogger().info("[DEBUG] Set custom slipperiness -> Value: " + value + ", Blocks: " + blocks);
             }
         }
 
