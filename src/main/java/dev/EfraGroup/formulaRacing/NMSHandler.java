@@ -13,7 +13,7 @@ public interface NMSHandler {
     default void setBoatType(String entityType) {
     }
 
-    Boat spawnBoat(Location var1);
+    Boat spawnBoat(Location location, boolean collidable);
 
-    ChestBoat spawnChestBoat(Location var1);
+    ChestBoat spawnChestBoat(Location location, boolean collidable);
 }

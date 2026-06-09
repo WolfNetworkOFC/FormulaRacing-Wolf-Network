@@ -29,7 +29,6 @@ import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class DrsManager {
     private final RaceSession rs;
@@ -86,7 +85,7 @@ public class DrsManager {
                                             sendThemedMessage(player, theme, "&a[DRS] Permissão concedida! Gap: &f" + String.format("%.3f", gapValue) + "s");
                                         }
                                     } else if (player.getTicksLived() % 40 == 0) {
-                                        sendThemedMessage(player, theme, "&x[DRS] Na zona de detecção, mas sem alvo à frente.");
+                                        sendThemedMessage(player, theme, "&a[DRS] Na zona de detecção, mas sem alvo à frente.");
                                     }
                                 }
                             }

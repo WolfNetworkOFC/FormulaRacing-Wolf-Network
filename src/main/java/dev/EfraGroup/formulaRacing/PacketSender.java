@@ -61,7 +61,7 @@ public class PacketSender {
     }
 
     public void applyBoatUtilsToPlayer(Player player, String trackNameWS) {
-        Map<String, Object> data = db.  getBoatUtilsRaw(trackNameWS);
+        Map<String, Object> data = db.getBoatUtilsRaw(trackNameWS);
         if (data == null || data.isEmpty()) {
             return; // não tem boatutils nessa pista
         }

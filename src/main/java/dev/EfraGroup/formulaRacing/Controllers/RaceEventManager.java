@@ -13,6 +13,7 @@ import dev.EfraGroup.formulaRacing.Heat.CollisionMode;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Round.EliminationRound;
 import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
@@ -176,7 +177,9 @@ public class RaceEventManager {
                                 (double) 0.0F,
                                 false,
                                 (double) 0.0F,
-                                false
+                                false,
+                                30,
+                                2
                             ).thenApply(heatId -> {
                                 if (heatId != -1) {
                                     Heats heat = round.createHeat(1);
@@ -284,7 +287,9 @@ public class RaceEventManager {
                                 (double) 0.0F,
                                 false,
                                 (double) 0.0F,
-                                false
+                                false,
+                                30,
+                                2
                             ).thenCompose(practiceHeatId -> {
                                 if (practiceHeatId != -1) {
                                     Heats practiceHeat =
@@ -340,7 +345,9 @@ public class RaceEventManager {
                                             (double) 0.0F,
                                             false,
                                             (double) 0.0F,
-                                            false
+                                            false,
+                                            30,
+                                            2
                                         ).thenCompose(qualHeatId -> {
                                             if (qualHeatId != -1) {
                                                 Heats qualHeat =
@@ -401,7 +408,9 @@ public class RaceEventManager {
                                                         (double) 0.0F,
                                                         false,
                                                         (double) 0.0F,
-                                                        false
+                                                        false,
+                                                        30,
+                                                        2
                                                     ).thenApply(finalHeatId -> {
                                                         if (finalHeatId != -1) {
                                                             Heats finalHeat =
@@ -554,7 +563,9 @@ public class RaceEventManager {
                         0.0,
                         false,
                         0.0,
-                        false
+                        false,
+                        30,
+                        2
                     ).thenAccept(pHeatId -> {
                         if (pHeatId != -1) {
                             Heats heat = pRound.createHeat(1);
@@ -605,7 +616,9 @@ public class RaceEventManager {
                         0.0,
                         false,
                         0.0,
-                        false
+                        false,
+                        30,
+                        2
                     ).thenCompose(qHeatId -> {
                         if (qHeatId != -1) {
                             Heats qHeat = qRound.createHeat(1);
@@ -651,7 +664,9 @@ public class RaceEventManager {
                                 0.0,
                                 false,
                                 0.0,
-                                false
+                                false,
+                                30,
+                                2
                             ).thenApply(fHeatId -> {
                                 if (fHeatId != -1) {
                                     Heats fHeat = fRound.createHeat(1);
@@ -1070,6 +1085,13 @@ public class RaceEventManager {
             timeLimit = 0;
         }
 
+        int eliminationIntervalSeconds = 30;
+        int minimumDrivers = 2;
+        if (round.getType() == RoundType.ELIMINATION && round instanceof EliminationRound) {
+            eliminationIntervalSeconds = ((EliminationRound) round).getEliminationIntervalSeconds();
+            minimumDrivers = ((EliminationRound) round).getMinimumDrivers();
+        }
+
         return this.dbManager.createHeat(
             round.getId(),
             1,
@@ -1090,7 +1112,9 @@ public class RaceEventManager {
             (double) 0.0F,
             false,
             (double) 0.0F,
-            false
+            false,
+            eliminationIntervalSeconds,
+            minimumDrivers
         ).thenApply(heatId -> {
             if (heatId == -1) {
                 this.plugin.getDebugManager().logDatabaseOperation(

@@ -122,7 +122,7 @@ public final class SchedulerHelper {
         ASYNC.runAtFixedRate(plugin, t -> task.run(), delayTicks * 50L, periodTicks * 50L, TimeUnit.MILLISECONDS);
     }
 
-public static void teleportNextTick(Plugin plugin, Entity entity, Location destination) {
+    public static void teleportNextTick(Plugin plugin, Entity entity, Location destination) {
         runTaskFor(plugin, entity, e -> {
             if (e instanceof Player player) {
                 Entity vehicle = player.getVehicle();
@@ -130,7 +130,7 @@ public static void teleportNextTick(Plugin plugin, Entity entity, Location desti
                     vehicle.removePassenger(player);
                 }
             }
-            e.teleport(destination);
+            e.teleportAsync(destination);
         });
     }
 

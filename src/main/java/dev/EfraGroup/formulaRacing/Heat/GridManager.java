@@ -16,8 +16,6 @@ import java.util.Set;
 import java.util.UUID;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 
 public class GridManager {
@@ -116,8 +114,6 @@ public class GridManager {
         for(Driver driver : this.heat.getDrivers().values()) {
             Player player = this.plugin.getServer().getPlayer(driver.getUuid());
             if (player != null && player.isOnline()) {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, Integer.MAX_VALUE, 255, false, false));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, Integer.MAX_VALUE, 200, false, false));
                 this.frozenPlayers.add(driver.getUuid());
                 this.plugin.sendMessage(player, "race_waiting_start", new String[0]);
             }
@@ -130,8 +126,6 @@ public class GridManager {
         for(UUID playerUUID : this.frozenPlayers) {
             Player player = this.plugin.getServer().getPlayer(playerUUID);
             if (player != null && player.isOnline()) {
-                player.removePotionEffect(PotionEffectType.SLOWNESS);
-                player.removePotionEffect(PotionEffectType.JUMP_BOOST);
                 this.plugin.getAPI().releaseBoat(player);
             }
         }
@@ -158,8 +152,6 @@ public class GridManager {
                             this.spawnBoatWithTrackConfig(player, gridLoc, driver);
                             HeatState state = this.heat.getHeatState();
                             if (state == HeatState.LOADED || state == HeatState.STARTING) {
-                                player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, Integer.MAX_VALUE, 255, false, false));
-                                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, Integer.MAX_VALUE, 200, false, false));
                                 this.frozenPlayers.add(driver.getUuid());
                             }
 
@@ -192,8 +184,6 @@ public class GridManager {
         for(Driver driver : this.heat.getDrivers().values()) {
             Player player = this.plugin.getServer().getPlayer(driver.getUuid());
             if (player != null && player.isOnline()) {
-                player.removePotionEffect(PotionEffectType.SLOWNESS);
-                player.removePotionEffect(PotionEffectType.JUMP_BOOST);
                 this.plugin.getAPI().releaseBoat(player);
                 this.plugin.getDebugManager().logRaceSystem("Barco liberado para " + player.getName() + " (clear)");
             }
@@ -219,8 +209,9 @@ public class GridManager {
                 GridManager.this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, trackNameWS);
                 HeatState state = GridManager.this.heat.getHeatState();
                 boolean locked = state == HeatState.LOADED || state == HeatState.STARTING;
-                GridManager.this.plugin.getAPI().spawnBoat(player, false, locked, false);
-                GridManager.this.plugin.getDebugManager().logRaceSystem("Barco spawnado para " + player.getName() + " no grid (pista: " + trackNameWS + ", locked: " + locked + ")");
+                boolean collidable = GridManager.this.heat.getCollisionMode() != CollisionMode.DISABLED;
+                GridManager.this.plugin.getAPI().spawnBoat(player, false, locked, false, collidable);
+                GridManager.this.plugin.getDebugManager().logRaceSystem("Barco spawnado para " + player.getName() + " no grid (pista: " + trackNameWS + ", locked: " + locked + ", collidable: " + collidable + ")");
             }
         }, 10L);
     }

@@ -14,16 +14,16 @@ public class NMSHandlerImpl implements NMSHandler {
 
     private static boolean collidableWarning = false;
 
-    private static void setCollidableIfPossible(Entity entity) {
+    private static void setCollidableIfPossible(Entity entity, boolean collidable) {
         try {
             Method setCollidable = Entity.class.getMethod("setCollidable", boolean.class);
-            setCollidable.invoke(entity, false);
+            setCollidable.invoke(entity, collidable);
         } catch (Exception e) {
             try {
                 Method getHandle = entity.getClass().getMethod("getHandle");
                 Object nmsEntity = getHandle.invoke(entity);
                 Method setCollidable = nmsEntity.getClass().getMethod("setCollidable", boolean.class);
-                setCollidable.invoke(nmsEntity, false);
+                setCollidable.invoke(nmsEntity, collidable);
             } catch (Exception e2) {
                 if (!collidableWarning) {
                     collidableWarning = true;
@@ -43,14 +43,14 @@ public class NMSHandlerImpl implements NMSHandler {
     }
 
     @Override
-    public Boat spawnBoat(Location location) {
+    public Boat spawnBoat(Location location, boolean collidable) {
         Boat boat = (Boat) location.getWorld().spawnEntity(location, boatType);
-        setCollidableIfPossible(boat);
+        setCollidableIfPossible(boat, collidable);
         return boat;
     }
 
     @Override
-    public ChestBoat spawnChestBoat(Location location) {
+    public ChestBoat spawnChestBoat(Location location, boolean collidable) {
         EntityType chestType = switch (this.boatType) {
             case OAK_BOAT -> EntityType.OAK_CHEST_BOAT;
             case SPRUCE_BOAT -> EntityType.SPRUCE_CHEST_BOAT;
@@ -64,7 +64,7 @@ public class NMSHandlerImpl implements NMSHandler {
             default -> EntityType.OAK_CHEST_BOAT;
         };
         Boat boat = (Boat) location.getWorld().spawnEntity(location, chestType);
-        setCollidableIfPossible(boat);
+        setCollidableIfPossible(boat, collidable);
         return (ChestBoat) boat;
     }
 }

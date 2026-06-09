@@ -1,21 +1,21 @@
 package dev.EfraGroup.formulaRacing;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Hologram.HologramManager;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import eu.decentsoftware.holograms.api.DHAPI;
 import eu.decentsoftware.holograms.api.holograms.Hologram;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public class TrackLeaderboard { // Removido o 'abstract'
+public class TrackLeaderboard {
     private final String trackName;
     private Location location;
     private final DatabaseManager mySQLManager;
@@ -61,22 +61,20 @@ public class TrackLeaderboard { // Removido o 'abstract'
         this.mySQLManager.saveHologramLocation(this.trackName, newLocation);
 
         SchedulerHelper.runTask(this.plugin, () -> {
-            if (!Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
-                return;
-            }
-            try {
-                holograms.forEach((type, holo) -> {
-                    if (holo != null) {
-                        double xOffset = type.equals("bedrock") ? 3.0 : 0.0;
-                        Location holoLoc = newLocation.clone().add(xOffset, 0.5, 0.0);
-                        holo.setLocation(holoLoc);
-                    }
-                });
-            } catch (Exception e) {
-                // Silently fail if hologram is invalid
+            if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
+                try {
+                    holograms.forEach((type, holo) -> {
+                        if (holo != null) {
+                            double xOffset = type.equals("bedrock") ? 3.0 : 0.0;
+                            Location holoLoc = newLocation.clone().add(xOffset, 0.5, 0.0);
+                            holo.setLocation(holoLoc);
+                        }
+                    });
+                } catch (Exception ignored) {}
             }
         });
     }
+
     private void processAndShow(List<DatabaseManager.PlayerTime> leaderboard, String type) {
         int totalCheckpoints = this.mySQLManager.getCheckpointCount(this.trackName);
 
@@ -99,17 +97,10 @@ public class TrackLeaderboard { // Removido o 'abstract'
         List<String> finalLines = new ArrayList<>();
 
         for (String configLine : configLines) {
-            // 1. Substitui o nome do mapa
             String processedLine = configLine.replace("{mapname}", this.trackName);
-
-            // 2. CONVERSÃO DE ÍCONES: Troca $java$ por :java: e $bedrock$ por :bedrock:
-            // Isso permite que o DH entenda os itens/emojis
             processedLine = processedLine.replace("$java$", ":java:").replace("$bedrock$", ":bedrock:");
-
-            // 3. Traduz cores do Bukkit (& para §)
             String line = ChatColor.translateAlternateColorCodes('&', processedLine);
 
-            // 4. TRAVA DE SEGURANÇA: Só processa jogadores em linhas que contém placeholders de nome
             if (line.contains("{name")) {
                 for (int j = 1; j <= 10; ++j) {
                     String nameKey = "{name" + j + "}";
@@ -132,27 +123,29 @@ public class TrackLeaderboard { // Removido o 'abstract'
             finalLines.add(line);
         }
 
-        // Debug para ver se o título converteu o $ corretamente
-
         SchedulerHelper.runTask(this.plugin, () -> {
-            if (!Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
-                return;
-            }
-            try {
-                String safeTrackName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
-                String holoName = "lb_" + type + "_" + safeTrackName;
+            String safeTrackName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
+            double xOffset = type.equals("bedrock") ? 4.0 : 0.0;
+            Location holoLoc = this.location.clone().add(xOffset, 0.5, 0.0);
 
-                double xOffset = type.equals("bedrock") ? 4.0 : 0.0;
-                Location holoLoc = this.location.clone().add(xOffset, 0.5, 0.0);
-
-                Hologram holo = holograms.get(type);
-                if (holo == null) {
-                    holo = DHAPI.createHologram(holoName, holoLoc, false, finalLines);
+            if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
+                try {
+                    String holoName = "lb_" + type + "_" + safeTrackName;
+                    Hologram holo = DHAPI.getHologram(holoName);
+                    if (holo == null) {
+                        holo = DHAPI.createHologram(holoName, holoLoc, false, finalLines);
+                    } else {
+                        DHAPI.setHologramLines(holo, finalLines);
+                        holo.setLocation(holoLoc);
+                    }
                     holograms.put(type, holo);
-                } else {
-                    DHAPI.setHologramLines(holo, finalLines);
+                } catch (Exception ignored) {}
+            } else {
+                HologramManager hm = FormulaRacing.getInstance().getHologramManager();
+                if (hm != null) {
+                    String vanillaName = "lb_" + type + "_" + safeTrackName;
+                    hm.createHologram(vanillaName, holoLoc, finalLines);
                 }
-            } catch (Exception ignored) {
             }
         });
     }
@@ -160,8 +153,32 @@ public class TrackLeaderboard { // Removido o 'abstract'
     public synchronized void removeHologram() {
         this.cancelUpdateTask();
         SchedulerHelper.runTask(this.plugin, () -> {
-            holograms.values().forEach(Hologram::delete);
+            holograms.values().forEach(holo -> {
+                if (holo != null) {
+                    try { holo.delete(); } catch (Exception ignored) {}
+                }
+            });
             holograms.clear();
+            if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
+                for (String type : new String[]{"java", "bedrock"}) {
+                    String safeName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
+                    String holoName = "lb_" + type + "_" + safeName;
+                    try {
+                        Hologram orphan = DHAPI.getHologram(holoName);
+                        if (orphan != null) {
+                            orphan.delete();
+                        }
+                    } catch (Exception ignored) {}
+                }
+            } else {
+                HologramManager hm = FormulaRacing.getInstance().getHologramManager();
+                if (hm != null) {
+                    for (String type : new String[]{"java", "bedrock"}) {
+                        String safeName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
+                        hm.deleteHologram("lb_" + type + "_" + safeName);
+                    }
+                }
+            }
         });
     }
 

@@ -99,7 +99,7 @@ public class RoundCommand extends BaseCommand {
     }
 
     @Subcommand("create|new")
-    @CommandCompletion("PRACTICE|QUALIFICATION|FINAL @event")
+    @CommandCompletion("PRACTICE|QUALIFICATION|ELIMINATION|FINAL @event")
     @CommandPermission("formularacing.event.admin")
     @Description("Cria um novo round no evento")
     public void onCreate(

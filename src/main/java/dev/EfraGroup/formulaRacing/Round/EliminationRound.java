@@ -20,6 +20,8 @@ public class EliminationRound extends Rounds {
         heat.setCollisionMode(CollisionMode.HIGH);
         heat.setStartDelay(5);
         heat.setTotalLaps(999); // Unlimited laps for elimination
+        heat.setEliminationIntervalSeconds(this.eliminationIntervalSeconds);
+        heat.setMinimumDrivers(this.minimumDrivers);
         this.heats.put(heatNumber, heat);
         return heat;
     }

@@ -78,6 +78,8 @@ public class Heats {
     private boolean ErsEnabled = false;
     private boolean gridReversed = false;
     private Map<Integer, Integer> originalPositions = new HashMap<>();
+    private int eliminationIntervalSeconds = 30;
+    private int minimumDrivers = 2;
 
     public Heats(FormulaRacing plugin, int id, Rounds round, int heatNumber) {
         this.plugin = plugin;
@@ -172,7 +174,9 @@ public class Heats {
                 this.deltaghosting,
                 this.pushtopass,
                 this.pushtopasspower,
-                this.realistc
+                this.realistc,
+                this.eliminationIntervalSeconds,
+                this.minimumDrivers
             );
         this.configDirty = false;
     }
@@ -249,6 +253,24 @@ public class Heats {
 
     public void setDrsEnabled(boolean drsEnabled) {
         this.drsEnabled = drsEnabled;
+        this.markConfigDirty();
+    }
+
+    public int getEliminationIntervalSeconds() {
+        return eliminationIntervalSeconds;
+    }
+
+    public void setEliminationIntervalSeconds(int seconds) {
+        this.eliminationIntervalSeconds = seconds;
+        this.markConfigDirty();
+    }
+
+    public int getMinimumDrivers() {
+        return minimumDrivers;
+    }
+
+    public void setMinimumDrivers(int minimum) {
+        this.minimumDrivers = minimum;
         this.markConfigDirty();
     }
 
@@ -606,7 +628,9 @@ public class Heats {
                         this.deltaghosting,
                         this.pushtopass,
                         this.pushtopasspower,
-                        this.realistc
+                        this.realistc,
+                        this.eliminationIntervalSeconds,
+                        this.minimumDrivers
                     );
                 this.configDirty = false;
             }
@@ -1227,7 +1251,8 @@ public class Heats {
                     this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, this.trackNameWS);
                     this.applyCollisionModeToPlayer(player);
                 }
-                this.plugin.getAPI().spawnBoat(player, false, true, false);
+                boolean collidable = this.collisionMode != CollisionMode.DISABLED;
+                this.plugin.getAPI().spawnBoat(player, false, true, false, collidable);
             }
         }, 10L);
     }
@@ -1306,8 +1331,13 @@ public class Heats {
                     " no Heat " +
                     this.id
             );
-            this.plugin.getRaceScoreboardManager().addPlayer(player, this);
-            this.plugin.getRaceActionBarManager().addPlayer(player, this);
+
+            // Só adiciona scoreboard se o heat já estiver carregado ou em andamento
+            if (this.heatState != HeatState.IDLE && this.heatState != HeatState.SETUP) {
+                this.plugin.getRaceScoreboardManager().addPlayer(player, this);
+                this.plugin.getRaceActionBarManager().addPlayer(player, this);
+            }
+
             this.stopTimeTrialTimer(player);
             if (this.plugin.getPacketSender() != null) {
                 this.plugin.getPacketSender().applyBoatUtilsToPlayer(
@@ -1363,11 +1393,13 @@ public class Heats {
                             );
                         if (spawnLoc != null) {
                             SchedulerHelper.teleportAsync(this.plugin, player, spawnLoc);
+                            boolean collidable = this.collisionMode != CollisionMode.DISABLED;
                             this.plugin.getAPI().spawnBoat(
                                 player,
                                 false,
                                 false,
-                                false
+                                false,
+                                collidable
                             );
                             this.plugin.getLonelyController().updatePlayersVisibility(
                                 player

@@ -35,7 +35,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
-import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.Bukkit;
@@ -233,11 +232,13 @@ public class EventsDatabaseManager {
         double ghostingdelta,
         boolean pushtopass,
         double pushtopasspower,
-        boolean realistc
+        boolean realistc,
+        int eliminationIntervalSeconds,
+        int minimumDrivers
     ) {
         CompletableFuture<Integer> future = new CompletableFuture();
         String sql =
-            "INSERT INTO fr_heats (roundId, heatNumber, state, totalLaps, totalPitstops, timeLimit, startDelay, maxDrivers, lonely, canReset, lapReset, drs, driverswap, colisao, drsdowntime, drsdownpower, reversegrid, ghostingdelta, pushtopass, pushtopasspower, realistc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            "INSERT INTO fr_heats (roundId, heatNumber, state, totalLaps, totalPitstops, timeLimit, startDelay, maxDrivers, lonely, canReset, lapReset, drs, driverswap, colisao, drsdowntime, drsdownpower, reversegrid, ghostingdelta, pushtopass, pushtopasspower, realistc, eliminationInterval, minimumDrivers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 Connection conn = this.databaseManager.getOrConnect();
@@ -264,6 +265,8 @@ public class EventsDatabaseManager {
                     stmt.setInt(19, pushtopass ? 1 : 0);
                     stmt.setDouble(20, pushtopasspower);
                     stmt.setInt(21, realistc ? 1 : 0);
+                    stmt.setInt(22, eliminationIntervalSeconds);
+                    stmt.setInt(23, minimumDrivers);
                     stmt.executeUpdate();
 
                     try (ResultSet rs = stmt.getGeneratedKeys()) {
@@ -1576,13 +1579,15 @@ public class EventsDatabaseManager {
         int deltaGhosting,
         boolean pushToPass,
         double pushToPassPower,
-        boolean realistic
+        boolean realistic,
+        int eliminationIntervalSeconds,
+        int minimumDrivers
     ) {
         String sql =
             "UPDATE fr_heats SET totalLaps = ?, totalPitstops = ?, timeLimit = ?, startDelay = ?, " +
             "maxDrivers = ?, lonely = ?, canReset = ?, lapReset = ?, colisao = ?, drs = ?, " +
             "driverswap = ?, drsdowntime = ?, drsdownpower = ?, reversegrid = ?, ghostingdelta = ?, " +
-            "pushtopass = ?, pushtopasspower = ?, realistc = ? WHERE id = ?";
+            "pushtopass = ?, pushtopasspower = ?, realistc = ?, eliminationInterval = ?, minimumDrivers = ? WHERE id = ?";
         this.executeAsync(sql, "updateHeatFullConfig", stmt -> {
             try {
                 if (totalLaps != null) {
@@ -1623,7 +1628,9 @@ public class EventsDatabaseManager {
                 stmt.setInt(16, pushToPass ? 1 : 0);
                 stmt.setDouble(17, pushToPassPower);
                 stmt.setInt(18, realistic ? 1 : 0);
-                stmt.setInt(19, heatId);
+                stmt.setInt(19, eliminationIntervalSeconds);
+                stmt.setInt(20, minimumDrivers);
+                stmt.setInt(21, heatId);
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
@@ -1720,6 +1727,12 @@ public class EventsDatabaseManager {
         } catch (SQLException ignored) {}
         try {
             heat.setrealistc(rs.getInt("realistc") == 1);
+        } catch (SQLException ignored) {}
+        try {
+            heat.setEliminationIntervalSeconds(rs.getInt("eliminationInterval"));
+        } catch (SQLException ignored) {}
+        try {
+            heat.setMinimumDrivers(rs.getInt("minimumDrivers"));
         } catch (SQLException ignored) {}
 
         for (Driver driver : this.loadDriversByHeatId(heat.getId())) {

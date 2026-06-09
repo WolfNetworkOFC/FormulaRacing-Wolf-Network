@@ -619,6 +619,29 @@ public class HeatCommand extends BaseCommand {
             player.spigot().sendMessage(configRow2);
             player.spigot().sendMessage(configRow3);
             player.spigot().sendMessage(configRow4);
+            if (heat.getRound() != null && heat.getRound().getType() == RoundType.ELIMINATION) {
+                TextComponent elimRow = new TextComponent("  ");
+                String elimIntervalStr = heat.getEliminationIntervalSeconds() + "s";
+                elimRow.addExtra(
+                    this.formattedSetting(
+                        "Elim Intervalo",
+                        elimIntervalStr,
+                        "/heat set eliminterval " + heat.getName() + " ",
+                        isAdmin
+                    )
+                );
+                elimRow.addExtra(new TextComponent(String.valueOf(ChatColor.DARK_GRAY) + " | "));
+                String minDriversStr = String.valueOf(heat.getMinimumDrivers());
+                elimRow.addExtra(
+                    this.formattedSetting(
+                        "Min Pilotos",
+                        minDriversStr,
+                        "/heat set mindrivers " + heat.getName() + " ",
+                        isAdmin
+                    )
+                );
+                player.spigot().sendMessage(elimRow);
+            }
             player.sendMessage("");
             List<Driver> displayDrivers;
             String tableTitle;
@@ -1892,6 +1915,52 @@ public class HeatCommand extends BaseCommand {
                 " definido para " +
                 max
         );
+    }
+
+    @Subcommand("set eliminterval")
+    @CommandCompletion("@heat <seconds>")
+    @CommandPermission("formularacing.event.admin")
+    @Description("Define o intervalo de eliminação em segundos (apenas heats de eliminação)")
+    public void onSetElimInterval(Player player, Heats heat, int seconds) {
+        heat = this.resolveHeat(player, heat);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+        if (heat.getRound() == null || heat.getRound().getType() != RoundType.ELIMINATION) {
+            player.sendMessage(ChatColor.RED + "✗ Esta configuração só é válida para heats de eliminação!");
+            return;
+        }
+        if (seconds < 5) {
+            player.sendMessage(ChatColor.RED + "✗ O intervalo mínimo é de 5 segundos.");
+            return;
+        }
+        heat.setEliminationIntervalSeconds(seconds);
+        this.eventManager.getDatabaseManager().heatSet(heat.getId(), "eliminationInterval", String.valueOf(seconds));
+        player.sendMessage(ChatColor.GREEN + "✓ Intervalo de eliminação do " + ChatColor.WHITE + heat.getName() + ChatColor.GREEN + " definido para " + ChatColor.WHITE + seconds + "s");
+    }
+
+    @Subcommand("set mindrivers")
+    @CommandCompletion("@heat <minimum>")
+    @CommandPermission("formularacing.event.admin")
+    @Description("Define o número mínimo de pilotos antes de encerrar a eliminação")
+    public void onSetMinDrivers(Player player, Heats heat, int minimum) {
+        heat = this.resolveHeat(player, heat);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+        if (heat.getRound() == null || heat.getRound().getType() != RoundType.ELIMINATION) {
+            player.sendMessage(ChatColor.RED + "✗ Esta configuração só é válida para heats de eliminação!");
+            return;
+        }
+        if (minimum < 1) {
+            player.sendMessage(ChatColor.RED + "✗ O mínimo de pilotos deve ser pelo menos 1.");
+            return;
+        }
+        heat.setMinimumDrivers(minimum);
+        this.eventManager.getDatabaseManager().heatSet(heat.getId(), "minimumDrivers", String.valueOf(minimum));
+        player.sendMessage(ChatColor.GREEN + "✓ Mínimo de pilotos do " + ChatColor.WHITE + heat.getName() + ChatColor.GREEN + " definido para " + ChatColor.WHITE + minimum);
     }
 
     @Subcommand("set lonely")

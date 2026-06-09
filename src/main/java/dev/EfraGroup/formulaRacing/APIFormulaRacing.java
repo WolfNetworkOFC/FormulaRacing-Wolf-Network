@@ -65,16 +65,24 @@ public class APIFormulaRacing {
     }
 
     public void spawnBoat(Player player, boolean trail, boolean locked, boolean checkground) {
+        this.spawnBoat(player, trail, locked, checkground, false);
+    }
+
+    public void spawnBoat(Player player, boolean trail, boolean locked, boolean checkground, boolean collidable) {
         Location loc = player.getLocation().clone();
-        this.spawnBoatAt(player, loc, trail, locked, checkground);
+        this.spawnBoatAt(player, loc, trail, locked, checkground, collidable);
     }
 
     public void spawnBoatAt(Player player, Location location, boolean trail, boolean locked, boolean checkground) {
-        Location loc = location.clone();
-        SchedulerHelper.runTaskAt(this.plugin, loc, () -> this.spawnBoatNow(player, loc, trail, locked, checkground));
+        this.spawnBoatAt(player, location, trail, locked, checkground, false);
     }
 
-    private void spawnBoatNow(Player player, Location loc, boolean trail, boolean locked, boolean checkground) {
+    public void spawnBoatAt(Player player, Location location, boolean trail, boolean locked, boolean checkground, boolean collidable) {
+        Location loc = location.clone();
+        SchedulerHelper.runTaskAt(this.plugin, loc, () -> this.spawnBoatNow(player, loc, trail, locked, checkground, collidable));
+    }
+
+    private void spawnBoatNow(Player player, Location loc, boolean trail, boolean locked, boolean checkground, boolean collidable) {
         UUID uuid = player.getUniqueId();
         boolean recovered = this.recoverPlayerBoatState(player);
         if (checkground && !player.isOnGround() && !recovered) {
@@ -86,7 +94,7 @@ public class APIFormulaRacing {
             try {
                 if (this.nmsHandler != null) {
                     this.nmsHandler.setBoatType(boatType.name());
-                    boat = this.nmsHandler.spawnBoat(loc);
+                    boat = this.nmsHandler.spawnBoat(loc, collidable);
                 } else {
                     boat = (Boat)loc.getWorld().spawnEntity(loc, boatType);
                 }
@@ -137,19 +145,23 @@ public class APIFormulaRacing {
                 player.setMetadata("fr_resetting", new FixedMetadataValue(this.plugin, true));
             }
 
-            try {
-                if (boat.getPassengers().contains(player)) {
-                    boat.removePassenger(player);
-                }
+            player.leaveVehicle();
 
-                player.leaveVehicle();
-                this.deleteBoat(boat);
-                recovered = true;
-            } finally {
-                if (temporaryMetadata) {
-                    player.removeMetadata("fr_resetting", this.plugin);
+            boolean tempMeta = temporaryMetadata;
+            Player finalPlayer = player;
+            SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
+                if (boat.getPassengers().contains(finalPlayer)) {
+                    boat.removePassenger(finalPlayer);
                 }
-            }
+                deleteBoat(boat);
+                if (tempMeta) {
+                    SchedulerHelper.runTaskFor(this.plugin, finalPlayer, () -> {
+                        finalPlayer.removeMetadata("fr_resetting", this.plugin);
+                    });
+                }
+            });
+
+            recovered = true;
         }
         return recovered;
     }
@@ -168,31 +180,36 @@ public class APIFormulaRacing {
     }
 
     public void deleteBoat(Entity boat) {
-        if (boat instanceof Boat) {
-            for (ArmorStand as : lockedBoats.values()) {
-                if (as.getPassengers().contains(boat)) {
-                    lockedBoats.values().remove(as);
-                    SchedulerHelper.runTaskFor(this.plugin, as, () -> as.remove());
-                }
-            }
-            SchedulerHelper.runTaskFor(this.plugin, boat, () -> boat.remove());
-        }
+        if (!(boat instanceof Boat)) return;
 
+        SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
+            Entity vehicle = boat.getVehicle();
+            if (vehicle instanceof ArmorStand as) {
+                lockedBoats.values().remove(as);
+                SchedulerHelper.runTaskFor(this.plugin, as, () -> {
+                    if (as.isValid()) as.remove();
+                });
+            }
+            if (boat.isValid()) {
+                boat.remove();
+            }
+        });
     }
 
     public void queueDeleteBoat(Entity boat) {
-        if (boat instanceof Boat) {
-            for (ArmorStand as : lockedBoats.values()) {
-                if (as.getPassengers().contains(boat)) {
-                    lockedBoats.values().remove(as);
-                    SchedulerHelper.runTaskFor(this.plugin, as, () -> as.remove());
-                }
+        if (!(boat instanceof Boat)) return;
+
+        SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
+            Entity vehicle = boat.getVehicle();
+            if (vehicle instanceof ArmorStand as) {
+                lockedBoats.values().remove(as);
+                SchedulerHelper.runTaskFor(this.plugin, as, () -> {
+                    if (as.isValid()) as.remove();
+                });
             }
-            SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
-                if (boat.isValid()) {
-                    boat.remove();
-                }
-            });
-        }
+            if (boat.isValid()) {
+                boat.remove();
+            }
+        });
     }
 }

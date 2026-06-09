@@ -71,6 +71,7 @@ import dev.EfraGroup.formulaRacing.Api.ApiManager;
 import dev.EfraGroup.formulaRacing.Collisionless.NMSHandlerImpl;
 import dev.EfraGroup.formulaRacing.Controllers.LeagueManager;
 import dev.EfraGroup.formulaRacing.Heat.GimmickManager;
+import dev.EfraGroup.formulaRacing.Hologram.HologramManager;
 import dev.EfraGroup.formulaRacing.Visuals.TrackVisualizer;
 import dev.EfraGroup.formulaRacing.Weather.WeatherManager;
 import java.io.File;
@@ -102,7 +103,6 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private static FormulaRacing instance;
     private final Map<UUID, String> lastTimeTrialTrack = new HashMap();
     private final Map<UUID, String> lastDuelTrack = new HashMap();
-    private final Map<String, TrackLeaderboard> leaderboards = new HashMap();
     private final Map<UUID, Boolean> lastDuelLonelyStatus = new HashMap();
     private final Map<String, YamlConfiguration> langConfigCache = new ConcurrentHashMap();
     private static final Map<UUID, Boolean> playersWithMod = new HashMap();
@@ -158,6 +158,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private LeagueManager leagueManager;
     private WeatherManager weatherManager;
     private LightningRodListener lightningRodListener;
+    private HologramManager hologramManager;
 
     public static FormulaRacing getInstance() {
         return instance;
@@ -253,6 +254,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return this.weatherManager;
     }
 
+    public HologramManager getHologramManager() {
+        return hologramManager;
+    }
+
     public Map<String, TrackLeaderboard> getTrackLeaderboards() {
         return this.trackLeaderboards;
     }
@@ -268,6 +273,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.driverLookup = new DriverLookup();
             this.dm = new DatabaseManager(this, this.fileManager);
             this.dm.migrateNullPlayerColors();
+            this.hologramManager = new HologramManager(this);
             this.translationUtil = new TranslationUtil(this, this.dm);
             this.tu = new TimeUtils();
             this.worldEditSelect = new WorldEditSelect();
@@ -388,6 +394,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.registerListeners();
             this.registerCommands();
             this.registerPlaceholders();
+            HologramManager.removeAllHologramStands();
             this.loadLeaderboards();
             this.startLeaderboardUpdater();
             SchedulerHelper.runAsync(this, () ->
@@ -432,8 +439,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         if (this.guiManager != null) {
             this.guiManager.closeAll();
         }
-        this.leaderboards.values().forEach(TrackLeaderboard::removeHologram);
-        this.leaderboards.clear();
+        this.trackLeaderboards.values().forEach(TrackLeaderboard::removeHologram);
+        this.trackLeaderboards.clear();
+        HologramManager.removeAllHologramStands();
         if (this.dailyRaceManager != null) {
             this.dailyRaceManager.stop();
         }
@@ -828,7 +836,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 () -> {
                     // Só processa se houver jogadores online para economizar recursos do banco
                     if (!Bukkit.getOnlinePlayers().isEmpty()) {
-                        this.leaderboards.values().forEach(leaderboard -> {
+                        this.trackLeaderboards.values().forEach(leaderboard -> {
                             // Atualiza ambos os hologramas para cada pista registrada
                             leaderboard.updateJavaLeaderboard();
                             leaderboard.updateBedrockLeaderboard();
@@ -840,15 +848,11 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         );
     }
 
-    // Agora você só precisa de UM mapa, pois a classe gerencia ambos (Java e Bedrock)
     private final Map<String, TrackLeaderboard> trackLeaderboards = new HashMap<>();
 
     public TrackLeaderboard getOrCreateLeaderboard(String trackName, Location defaultLocation) {
         return trackLeaderboards.computeIfAbsent(trackName, name -> {
-            TrackLeaderboard lb = new TrackLeaderboard(this, name, defaultLocation, this.getDatabaseManager());
-            // Inicia o updater automático assim que a pista é carregada
-            lb.startAutoUpdate();
-            return lb;
+            return new TrackLeaderboard(this, name, defaultLocation, this.getDatabaseManager());
         });
     }
 

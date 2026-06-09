@@ -8,6 +8,7 @@ package dev.EfraGroup.formulaRacing.Event;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import dev.EfraGroup.formulaRacing.Round.EliminationRound;
 import dev.EfraGroup.formulaRacing.Round.PracticeRound;
 import dev.EfraGroup.formulaRacing.Round.QualificationRound;
 import dev.EfraGroup.formulaRacing.Round.RaceRound;
@@ -46,6 +47,9 @@ public class EventSchedule {
                     break;
                 case QUALIFICATION:
                     round = new QualificationRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
+                case ELIMINATION:
+                    round = new EliminationRound(this.plugin, 0, this.event, roundIndex, roundType);
                     break;
                 case FINAL:
                 default:
