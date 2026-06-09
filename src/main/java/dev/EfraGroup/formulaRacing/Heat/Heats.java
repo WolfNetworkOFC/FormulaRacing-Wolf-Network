@@ -1014,7 +1014,7 @@ public class Heats {
 
         // Volta para estado inicial
         if (this.heatState != HeatState.SETUP) {
-            this.setHeatState(HeatState.SETUP);
+            this.setHeatStateForLoad(HeatState.SETUP);
         }
         this.plugin.getDebugManager().logRaceSystem(
                 "✓ Heat " + this.id + " resetado para estado inicial."
