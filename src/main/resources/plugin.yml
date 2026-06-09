@@ -126,7 +126,13 @@ commands:
     usage: /ai <record|line|add|remove|difficulty|list|info>
     aliases: [opponent]
     permission: formularacing.admin
+  togglerods:
+    description: Alterna a visibilidade dos ratos de lightning
+    usage: /togglerods [toggle|t|global|admin|status]
 permissions:
   formularacing.admin:
     description: Permissao para comandos administrativos do FormulaRacing
     default: op
+  formularacing.spectator:
+    description: Permissao para comandos de espectador
+    default: true

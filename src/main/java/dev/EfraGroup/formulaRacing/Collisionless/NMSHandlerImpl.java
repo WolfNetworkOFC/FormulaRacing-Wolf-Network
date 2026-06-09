@@ -19,9 +19,16 @@ public class NMSHandlerImpl implements NMSHandler {
             Method setCollidable = Entity.class.getMethod("setCollidable", boolean.class);
             setCollidable.invoke(entity, false);
         } catch (Exception e) {
-            if (!collidableWarning) {
-                collidableWarning = true;
-                entity.getServer().getLogger().warning("[FormulaRacing] setCollidable not available in this server version");
+            try {
+                Method getHandle = entity.getClass().getMethod("getHandle");
+                Object nmsEntity = getHandle.invoke(entity);
+                Method setCollidable = nmsEntity.getClass().getMethod("setCollidable", boolean.class);
+                setCollidable.invoke(nmsEntity, false);
+            } catch (Exception e2) {
+                if (!collidableWarning) {
+                    collidableWarning = true;
+                    entity.getServer().getLogger().warning("[FormulaRacing] setCollidable not available");
+                }
             }
         }
     }

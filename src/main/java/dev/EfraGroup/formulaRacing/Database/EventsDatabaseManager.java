@@ -731,7 +731,7 @@ public class EventsDatabaseManager {
                 );
                 event.setUuid(UUID.randomUUID());
                 event.setTrackNameWS((String) data.get("trackNameWS"));
-                event.setState(EventState.valueOf((String) data.get("state")));
+                event.setStateDirect(EventState.valueOf((String) data.get("state")));
                 event.setOpenSign((Integer) data.get("openSign") == 1);
                 long creationTimeSec = (Long) data.get("creationTime");
                 if (creationTimeSec > 0L) {
@@ -965,7 +965,7 @@ public class EventsDatabaseManager {
         );
         event.setUuid(UUID.randomUUID());
         event.setTrackNameWS(trackNameWS);
-        event.setState(EventState.valueOf(stateStr));
+        event.setStateDirect(EventState.valueOf(stateStr));
         event.setOpenSign(openSignInt == 1);
         long creationTimeSec = rs.getLong("creationTime");
         if (creationTimeSec > 0L) {

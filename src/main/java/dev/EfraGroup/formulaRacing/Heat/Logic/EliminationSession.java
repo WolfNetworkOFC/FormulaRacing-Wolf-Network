@@ -32,6 +32,8 @@ public class EliminationSession implements SessionLogic {
         heat.setHeatState(HeatState.RACING);
         heat.startOfflineMonitoring();
 
+        heat.getGridManager().unfreezePlayers();
+
         this.secondsUntilNextElimination = eliminationIntervalSeconds;
         this.heatFinished = false;
 

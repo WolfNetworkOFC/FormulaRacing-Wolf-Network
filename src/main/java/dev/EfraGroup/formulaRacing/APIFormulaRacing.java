@@ -122,38 +122,36 @@ public class APIFormulaRacing {
     }
 
     public boolean recoverPlayerBoatState(Player player) {
-        SchedulerHelper.runTaskFor(this.plugin, player, p -> {
-            boolean recovered = false;
-            UUID uuid = p.getUniqueId();
-            ArmorStand lockedAnchor = (ArmorStand)lockedBoats.get(uuid);
-            if (lockedAnchor != null) {
+        boolean recovered = false;
+        UUID uuid = player.getUniqueId();
+        ArmorStand lockedAnchor = (ArmorStand)lockedBoats.get(uuid);
+        if (lockedAnchor != null) {
+            recovered = true;
+        }
+
+        this.releaseBoat(player);
+        Entity vehicle = player.getVehicle();
+        if (vehicle instanceof Boat boat) {
+            boolean temporaryMetadata = !player.hasMetadata("fr_resetting");
+            if (temporaryMetadata) {
+                player.setMetadata("fr_resetting", new FixedMetadataValue(this.plugin, true));
+            }
+
+            try {
+                if (boat.getPassengers().contains(player)) {
+                    boat.removePassenger(player);
+                }
+
+                player.leaveVehicle();
+                this.deleteBoat(boat);
                 recovered = true;
-            }
-
-            this.releaseBoat(player);
-            Entity vehicle = player.getVehicle();
-            if (vehicle instanceof Boat boat) {
-                boolean temporaryMetadata = !player.hasMetadata("fr_resetting");
+            } finally {
                 if (temporaryMetadata) {
-                    player.setMetadata("fr_resetting", new FixedMetadataValue(this.plugin, true));
-                }
-
-                try {
-                    if (boat.getPassengers().contains(player)) {
-                        boat.removePassenger(player);
-                    }
-
-                    player.leaveVehicle();
-                    this.deleteBoat(boat);
-                    recovered = true;
-                } finally {
-                    if (temporaryMetadata) {
-                        player.removeMetadata("fr_resetting", this.plugin);
-                    }
+                    player.removeMetadata("fr_resetting", this.plugin);
                 }
             }
-        }, 1L);
-        return true;
+        }
+        return recovered;
     }
 
     public void respawnBoat(Player player, boolean trail, boolean locked, boolean checkground) {

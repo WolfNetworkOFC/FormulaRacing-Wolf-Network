@@ -742,21 +742,25 @@ public class RaceEventManager {
         if (eventOpt.isPresent()) {
             Events event = (Events) eventOpt.get();
 
-            for (Rounds round : event.getEventSchedule().getRounds().values()) {
-                for (Heats heat : round.getHeats().values()) {
-                    if (heat.isPlayerInActiveHeat(playerUUID)) {
-                        return Optional.of(heat);
+            if (event.isSubscriber(playerUUID) || event.isReserve(playerUUID)) {
+                for (Rounds round : event.getEventSchedule().getRounds().values()) {
+                    for (Heats heat : round.getHeats().values()) {
+                        if (heat.isPlayerInActiveHeat(playerUUID)) {
+                            return Optional.of(heat);
+                        }
                     }
                 }
             }
         }
 
         for (Events e : this.activeEvents.values()) {
-            for (Rounds round : e.getEventSchedule().getRounds().values()) {
-                for (Heats heat : round.getHeats().values()) {
-                    if (heat.isPlayerInActiveHeat(playerUUID)) {
-                        this.playerActiveEvent.put(playerUUID, e);
-                        return Optional.of(heat);
+            if (e.isSubscriber(playerUUID) || e.isReserve(playerUUID)) {
+                for (Rounds round : e.getEventSchedule().getRounds().values()) {
+                    for (Heats heat : round.getHeats().values()) {
+                        if (heat.isPlayerInActiveHeat(playerUUID)) {
+                            this.playerActiveEvent.put(playerUUID, e);
+                            return Optional.of(heat);
+                        }
                     }
                 }
             }

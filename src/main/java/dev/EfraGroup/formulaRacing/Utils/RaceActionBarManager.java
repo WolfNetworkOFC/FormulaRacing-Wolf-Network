@@ -114,6 +114,14 @@ public class RaceActionBarManager {
 
     private boolean shouldSkipUpdate(UUID playerId, HeatState state, long now) {
         if (this.isDynamicState(state)) {
+            if (state == HeatState.LOADED || state == HeatState.STARTING) {
+                Long lastUpdate = this.lastStaticUpdateAt.get(playerId);
+                if (lastUpdate != null && now - lastUpdate < this.staticUpdateIntervalMs * 3L) {
+                    return true;
+                }
+                this.lastStaticUpdateAt.put(playerId, now);
+                return false;
+            }
             this.lastStaticUpdateAt.remove(playerId);
             return false;
         }
@@ -126,7 +134,7 @@ public class RaceActionBarManager {
     }
 
     private boolean isDynamicState(HeatState state) {
-        return state == HeatState.PRACTICE || state == HeatState.QUALIFYING || state == HeatState.RACING;
+        return state == HeatState.PRACTICE || state == HeatState.QUALIFYING || state == HeatState.RACING || state == HeatState.LOADED || state == HeatState.STARTING;
     }
 
     public void addPlayer(Player player, Heats heat) {
@@ -264,7 +272,7 @@ public class RaceActionBarManager {
             case PRACTICE -> this.buildPracticeMessage(heat, driver, viewer);
             case QUALIFYING -> this.buildQualifyingMessage(heat, driver, viewer);
             case LOADED -> this.buildLoadedMessage(heat, driver, viewer);
-            case STARTING -> this.plugin.getTranslationUtil().getTranslated(viewer, "actionbar_lights_out_visual", new String[0]);
+            case STARTING -> this.buildRacingMessage(heat, driver, viewer);
             case RACING -> this.buildRacingMessage(heat, driver, viewer);
             case FINISHED -> this.buildFinishedMessage(driver, viewer);
         };

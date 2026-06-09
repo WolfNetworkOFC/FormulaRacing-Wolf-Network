@@ -59,7 +59,7 @@ public class QuickRaceManager {
         this.eventsDb = new EventsDatabaseManager(database, plugin);
     }
 
-    public boolean createQuickRace(Player creator, String trackName, int laps, int pits) {
+    public synchronized boolean createQuickRace(Player creator, String trackName, int laps, int pits) {
         this.cleanupFinishedQuickRaces();
 
         // 1. Limpeza de estados antigos
@@ -170,7 +170,7 @@ public class QuickRaceManager {
         return true;
     }
 
-    public boolean createDuelRace(Player p1, Player p2, String trackName, int laps, int pits) {
+    public synchronized boolean createDuelRace(Player p1, Player p2, String trackName, int laps, int pits) {
         cleanupFinishedQuickRaces();
 
         if (currentQuickRace != null) {
@@ -704,6 +704,24 @@ public class QuickRaceManager {
 
     public boolean isPlayerActivelyRacing(UUID playerUUID) {
         return this.currentHeat == null ? false : this.currentHeat.isPlayerActivelyRacing(playerUUID);
+    }
+
+    public void shutdown() {
+        if (this.currentHeat != null) {
+            HeatState state = this.currentHeat.getHeatState();
+            if (state == HeatState.LOADED || state == HeatState.STARTING || state == HeatState.RACING) {
+                this.currentHeat.resetHeat();
+            }
+        }
+        this.stopLobbyTimer();
+        this.stopCompletionMonitor();
+        if (this.currentQuickRace != null) {
+            this.plugin.getRaceEventManager().unloadEvent(this.currentQuickRace.getId());
+            this.eventsDb.deleteEvent(this.currentQuickRace.getId());
+        }
+        this.currentQuickRace = null;
+        this.currentRound = null;
+        this.currentHeat = null;
     }
 
     public Optional<Events> getCurrentQuickRace() {

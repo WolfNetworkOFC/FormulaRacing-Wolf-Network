@@ -343,6 +343,10 @@ public class Events {
 
     }
 
+    public void setStateDirect(EventState state) {
+        this.state = state;
+    }
+
     public boolean isOpenSign() {
         return this.openSign;
     }

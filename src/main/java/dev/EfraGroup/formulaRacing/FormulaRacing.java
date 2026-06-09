@@ -52,6 +52,7 @@ import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
 import dev.EfraGroup.formulaRacing.Utils.RaceActionBarManager;
+import dev.EfraGroup.formulaRacing.Utils.LightningRodListener;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardService;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardDuelsTimeUtils;
@@ -156,6 +157,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private GimmickManager gimmickManager;
     private LeagueManager leagueManager;
     private WeatherManager weatherManager;
+    private LightningRodListener lightningRodListener;
 
     public static FormulaRacing getInstance() {
         return instance;
@@ -461,6 +463,35 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.aiOpponentManager.clearAll();
         }
 
+        if (this.quickRaceManager != null) {
+            this.quickRaceManager.shutdown();
+        }
+
+        if (this.raceEventManager != null) {
+            for (Events event : this.raceEventManager.getActiveEvents()) {
+                if (event.getDisplayName().startsWith("QuickRace_")) {
+                    this.raceEventManager.unloadEvent(event.getId());
+                } else {
+                    dev.EfraGroup.formulaRacing.Event.EventSchedule schedule = event.getEventSchedule();
+                    if (schedule != null) {
+                        for (dev.EfraGroup.formulaRacing.Round.Rounds round : schedule.getRoundsCollection()) {
+                            for (dev.EfraGroup.formulaRacing.Heat.Heats heat : round.getHeatsCollection()) {
+                                dev.EfraGroup.formulaRacing.Heat.HeatState state = heat.getHeatState();
+                                if (state == dev.EfraGroup.formulaRacing.Heat.HeatState.LOADED || state == dev.EfraGroup.formulaRacing.Heat.HeatState.STARTING || state == dev.EfraGroup.formulaRacing.Heat.HeatState.RACING) {
+                                    heat.resetHeat();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            this.raceEventManager.shutdown();
+        }
+
+        if (this.lightningRodListener != null) {
+            this.lightningRodListener.shutdown();
+        }
+
         try {
             if (this.dm != null) {
                 this.dm.deleteAllParties();
@@ -534,6 +565,11 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             new AIRacingLineRecorderListener(this),
             this
         );
+        this.lightningRodListener = new LightningRodListener(this);
+        Bukkit.getPluginManager().registerEvents(
+            this.lightningRodListener,
+            this
+        );
     }
 
     private void registerPlaceholders() {
@@ -603,6 +639,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.commandManager.registerCommand(new GhostCommand(this));
             this.commandManager.registerCommand(new UnghostCommand(this));
             this.commandManager.registerCommand(new AICommand(this));
+            this.commandManager.registerCommand(new ToggleRodsCommand(this));
         } catch (Exception e) {
             if (this.debugManager != null) {
                 this.debugManager.logRaceSystem(
@@ -1513,10 +1550,14 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                             .stream()
                             .flatMap(r -> {
                                 // 'r' já é final por ser parâmetro da lambda, mas o prefixo depende dele
-                                String typePrefix =
-                                    r.getType() == RoundType.QUALIFICATION
-                                        ? "Q"
-                                        : "F";
+                                String typePrefix;
+                                switch (r.getType()) {
+                                    case QUALIFICATION -> typePrefix = "Q";
+                                    case FINAL -> typePrefix = "F";
+                                    case ELIMINATION -> typePrefix = "E";
+                                    case PRACTICE -> typePrefix = "P";
+                                    default -> typePrefix = "H";
+                                }
                                 return r
                                     .getHeats()
                                     .values()
@@ -1541,11 +1582,14 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                           .values()
                           .stream()
                           .map(h -> {
-                              String typePrefix =
-                                  finalRound.getType() ==
-                                  RoundType.QUALIFICATION
-                                      ? "Q"
-                                      : "F";
+                               String typePrefix;
+                               switch (finalRound.getType()) {
+                                   case QUALIFICATION -> typePrefix = "Q";
+                                   case FINAL -> typePrefix = "F";
+                                   case ELIMINATION -> typePrefix = "E";
+                                   case PRACTICE -> typePrefix = "P";
+                                   default -> typePrefix = "H";
+                               }
                               return (
                                   "R" +
                                   finalRound.getRoundIndex() +

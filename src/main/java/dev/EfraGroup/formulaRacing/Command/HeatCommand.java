@@ -132,14 +132,18 @@ public class HeatCommand extends BaseCommand {
     private Integer resolveHeatIdFromCode(String code, Events event) {
         if (event == null) {
             return null;
-        } else if (!code.matches("(?i)R\\d+[QFH]\\d+")) {
+        } else if (!code.matches("(?i)R\\d+[QFEHP]\\d+")) {
             return null;
         } else {
             try {
                 String upper = code.toUpperCase();
                 String separator = upper.contains("Q")
                     ? "Q"
-                    : (upper.contains("F") ? "F" : "H");
+                    : (upper.contains("F")
+                        ? "F"
+                        : (upper.contains("E")
+                            ? "E"
+                            : (upper.contains("H") ? "H" : "P")));
                 String[] parts = upper.split(separator);
                 int roundIdx = Integer.parseInt(parts[0].substring(1)) - 1;
                 int heatNum = Integer.parseInt(parts[1]);
@@ -282,11 +286,13 @@ public class HeatCommand extends BaseCommand {
 
         String ref = roundOrHeatRef.toUpperCase();
 
-        if (ref.matches("R\\d+[QFH]\\d+")) {
+        if (ref.matches("R\\d+[QFEHP]\\d+")) {
             int qPos = ref.indexOf('Q');
             int hPos = ref.indexOf('H');
             int fPos = ref.indexOf('F');
-            int splitPos = qPos >= 0 ? qPos : (hPos >= 0 ? hPos : fPos);
+            int ePos = ref.indexOf('E');
+            int pPos = ref.indexOf('P');
+            int splitPos = qPos >= 0 ? qPos : (hPos >= 0 ? hPos : (fPos >= 0 ? fPos : (ePos >= 0 ? ePos : pPos)));
             if (splitPos > 1) {
                 ref = ref.substring(0, splitPos);
             }
@@ -366,7 +372,7 @@ public class HeatCommand extends BaseCommand {
                     ClickableMessageUtil.getButton(
                         "CARREGAR",
                         ChatColor.YELLOW,
-                        "/heat load " + heat.getId(),
+                        "/heat load " + heat.getName(),
                         "Carregar Grid e Pista",
                         Action.RUN_COMMAND
                     )
@@ -376,9 +382,9 @@ public class HeatCommand extends BaseCommand {
                     ClickableMessageUtil.getButton(
                         "INICIAR",
                         ChatColor.GREEN,
-                        "/heat start " + heat.getId(),
+                        "/heat start " + heat.getName(),
                         "Iniciar Contagem",
-                        Action.SUGGEST_COMMAND
+                        Action.RUN_COMMAND
                     )
                 );
                 controls.addExtra(new TextComponent(" "));
@@ -386,9 +392,9 @@ public class HeatCommand extends BaseCommand {
                     ClickableMessageUtil.getButton(
                         "FINALIZAR",
                         ChatColor.RED,
-                        "/heat finish " + heat.getId(),
+                        "/heat finish " + heat.getName(),
                         "Forçar Finalização",
-                        Action.SUGGEST_COMMAND
+                        Action.RUN_COMMAND
                     )
                 );
                 controls.addExtra(new TextComponent(" "));
@@ -396,9 +402,9 @@ public class HeatCommand extends BaseCommand {
                     ClickableMessageUtil.getButton(
                         "RESET",
                         ChatColor.GRAY,
-                        "/heat reset " + heat.getId(),
+                        "/heat reset " + heat.getName(),
                         "Resetar Heat",
-                        Action.SUGGEST_COMMAND
+                        Action.RUN_COMMAND
                     )
                 );
                 player.spigot().sendMessage(controls);
@@ -424,7 +430,7 @@ public class HeatCommand extends BaseCommand {
             player.spigot().sendMessage(trackRow);
             TextComponent configRow = new TextComponent("  ");
             var10003 = String.valueOf(heat.getTotalLaps());
-            int var10004 = heat.getId();
+            String var10004 = heat.getName();
             configRow.addExtra(
                 this.formattedSetting(
                     "Voltas",
@@ -436,7 +442,7 @@ public class HeatCommand extends BaseCommand {
             var10003 = String.valueOf(ChatColor.DARK_GRAY);
             configRow.addExtra(new TextComponent(var10003 + " | "));
             var10003 = String.valueOf(heat.getTotalPits());
-            var10004 = heat.getId();
+            var10004 = heat.getName();
             configRow.addExtra(
                 this.formattedSetting(
                     "Pits",
@@ -449,7 +455,7 @@ public class HeatCommand extends BaseCommand {
             configRow.addExtra(new TextComponent(var10003 + " | "));
             Integer var30 = heat.getTimeLimit();
             String var31 = var30 + "s";
-            var10004 = heat.getId();
+            var10004 = heat.getName();
             configRow.addExtra(
                 this.formattedSetting(
                     "Tempo",
@@ -462,7 +468,7 @@ public class HeatCommand extends BaseCommand {
             configRow.addExtra(new TextComponent(var31 + " | "));
             Integer var33 = heat.getStartDelay();
             String var34 = var33 + "s";
-            var10004 = heat.getId();
+            var10004 = heat.getName();
             configRow.addExtra(
                 this.formattedSetting(
                     "Delay",
@@ -474,7 +480,7 @@ public class HeatCommand extends BaseCommand {
             player.spigot().sendMessage(configRow);
             TextComponent configRow2 = new TextComponent("  ");
             var34 = heat.getCollisionMode().name();
-            var10004 = heat.getId();
+            var10004 = heat.getName();
             configRow2.addExtra(
                 this.formattedSetting(
                     "Colisão",
@@ -486,7 +492,7 @@ public class HeatCommand extends BaseCommand {
             var34 = String.valueOf(ChatColor.DARK_GRAY);
             configRow2.addExtra(new TextComponent(var34 + " | "));
             var34 = String.valueOf(heat.getMaxDrivers());
-            var10004 = heat.getId();
+            var10004 = heat.getName();
             configRow2.addExtra(
                 this.formattedSetting(
                     "Max Pilotos",
@@ -497,7 +503,7 @@ public class HeatCommand extends BaseCommand {
             );
             TextComponent configRow3 = new TextComponent("  ");
             var34 = heat.isDrsEnabled() ? "ON" : "OFF";
-            var10004 = heat.getId();
+            var10004 = heat.getName();
             configRow3.addExtra(
                 this.formattedSetting(
                     "DRS",
@@ -509,7 +515,7 @@ public class HeatCommand extends BaseCommand {
             var34 = String.valueOf(ChatColor.DARK_GRAY);
             configRow3.addExtra(new TextComponent(var34 + " | "));
             var34 = heat.isPushtopass() ? "ON" : "OFF";
-            var10004 = heat.getId();
+            var10004 = heat.getName();
             configRow3.addExtra(
                 this.formattedSetting(
                     "P2P",
@@ -522,7 +528,7 @@ public class HeatCommand extends BaseCommand {
             configRow3.addExtra(new TextComponent(var34 + " | "));
             int var42 = heat.getDeltaGhosting();
             String var43 = var42 + "s";
-            var10004 = heat.getId();
+            var10004 = heat.getName();
             configRow3.addExtra(
                 this.formattedSetting(
                     "Ghost",
@@ -534,7 +540,7 @@ public class HeatCommand extends BaseCommand {
             var43 = String.valueOf(ChatColor.DARK_GRAY);
             configRow3.addExtra(new TextComponent(var43 + " | "));
             var43 = heat.getrealistc() ? "ON" : "OFF";
-            var10004 = heat.getId();
+            var10004 = heat.getName();
             configRow3.addExtra(
                 this.formattedSetting(
                     "Realista",
@@ -543,35 +549,55 @@ public class HeatCommand extends BaseCommand {
                     isAdmin
                 )
             );
+            var43 = String.valueOf(ChatColor.DARK_GRAY);
+            configRow3.addExtra(new TextComponent(var43 + " | "));
+            var43 = heat.isErsEnabled() ? "ON" : "OFF";
+            configRow3.addExtra(
+                this.formattedSetting(
+                    "ERS",
+                    var43,
+                    "/heat set ers " + heat.getName() + " ",
+                    isAdmin
+                )
+            );
             TextComponent configRow4 = new TextComponent("  ");
-            double var46 = heat.getpushtopasspower();
-            String var47 = var46 + "x";
-            var10004 = heat.getId();
-            configRow4.addExtra(
-                this.formattedSetting(
-                    "P2P Pwr",
-                    var47,
-                    "/heat set p2ppower " + var10004 + " ",
-                    isAdmin
-                )
-            );
-            var47 = String.valueOf(ChatColor.DARK_GRAY);
-            configRow4.addExtra(new TextComponent(var47 + " | "));
-            double var49 = heat.getDrsdownpower();
-            String var50 = var49 + "x";
-            var10004 = heat.getId();
-            configRow4.addExtra(
-                this.formattedSetting(
-                    "DRS Pwr",
-                    var50,
-                    "/heat set drspower " + var10004 + " ",
-                    isAdmin
-                )
-            );
-            var50 = String.valueOf(ChatColor.DARK_GRAY);
-            configRow4.addExtra(new TextComponent(var50 + " | "));
+            boolean hasP2P = heat.isPushtopass();
+            boolean hasDRS = heat.isDrsEnabled();
+            String var50;
+            if (hasP2P) {
+                double var46 = heat.getpushtopasspower();
+                String var47 = var46 + "x";
+                var10004 = heat.getName();
+                configRow4.addExtra(
+                    this.formattedSetting(
+                        "P2P Pwr",
+                        var47,
+                        "/heat set p2ppower " + var10004 + " ",
+                        isAdmin
+                    )
+                );
+            }
+            if (hasDRS) {
+                var34 = String.valueOf(ChatColor.DARK_GRAY);
+                configRow4.addExtra(new TextComponent(var34 + " | "));
+                double var49 = heat.getDrsdownpower();
+                var50 = var49 + "x";
+                var10004 = heat.getName();
+                configRow4.addExtra(
+                    this.formattedSetting(
+                        "DRS Pwr",
+                        var50,
+                        "/heat set drspower " + var10004 + " ",
+                        isAdmin
+                    )
+                );
+            }
+            if (hasP2P || hasDRS) {
+                var50 = String.valueOf(ChatColor.DARK_GRAY);
+                configRow4.addExtra(new TextComponent(var50 + " | "));
+            }
             var50 = heat.getDriverSwap() ? "ON" : "OFF";
-            var10004 = heat.getId();
+            var10004 = heat.getName();
             configRow4.addExtra(
                 this.formattedSetting(
                     "Swap",
@@ -586,7 +612,7 @@ public class HeatCommand extends BaseCommand {
                 this.formattedSetting(
                     "Grid Rev",
                     heat.getreversegrid() ? "ON" : "OFF",
-                    "/heat set reversegrid " + heat.getId() + " ",
+                    "/heat set reversegrid " + heat.getName() + " ",
                     isAdmin
                 )
             );
@@ -709,7 +735,7 @@ public class HeatCommand extends BaseCommand {
                                 "✖",
                                 ChatColor.RED,
                                 "/heat removedriver " +
-                                    heat.getId() +
+                                    heat.getName() +
                                     " " +
                                     playerName,
                                 "Remover piloto",
@@ -722,7 +748,7 @@ public class HeatCommand extends BaseCommand {
                                 "↕",
                                 ChatColor.YELLOW,
                                 "/heat set driverposition " +
-                                    heat.getId() +
+                                    heat.getName() +
                                     " " +
                                     playerName +
                                     " ",
@@ -743,7 +769,7 @@ public class HeatCommand extends BaseCommand {
                     ClickableMessageUtil.getButton(
                         "Piloto",
                         ChatColor.GREEN,
-                        "/heat adddriver " + heat.getId() + " ",
+                        "/heat adddriver " + heat.getName() + " ",
                         "Adicionar piloto",
                         Action.SUGGEST_COMMAND
                     )
@@ -753,7 +779,7 @@ public class HeatCommand extends BaseCommand {
                     ClickableMessageUtil.getButton(
                         "Equipe",
                         ChatColor.AQUA,
-                        "/heat addteam " + heat.getId() + " ",
+                        "/heat addteam " + heat.getName() + " ",
                         "Adicionar equipe",
                         Action.SUGGEST_COMMAND
                     )
@@ -1479,11 +1505,11 @@ public class HeatCommand extends BaseCommand {
         String source
     ) {
         // Tenta formato R1Q1, R1F1, etc.
-        if (source.toUpperCase().matches("R\\d+[QFH]\\d+")) {
+        if (source.toUpperCase().matches("R\\d+[QFEHP]\\d+")) {
             try {
                 String separator = source
                     .toUpperCase()
-                    .replaceAll("[^QFH]", "");
+                    .replaceAll("[^QFEHP]", "");
                 String[] parts = source.toUpperCase().split(separator);
                 int roundIdx = Integer.parseInt(parts[0].substring(1)) - 1; // Índices costumam ser 0-based
                 int heatIdx = Integer.parseInt(parts[1]) - 1;

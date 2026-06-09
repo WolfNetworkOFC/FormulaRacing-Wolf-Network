@@ -1532,13 +1532,23 @@ public class Heats {
     }
 
     public boolean isPlayerInActiveHeat(UUID playerUUID) {
-        return (
-            (this.heatState == HeatState.RACING ||
-                this.heatState == HeatState.STARTING ||
-                this.heatState == HeatState.LOADED ||
-                this.heatState == HeatState.PRACTICE) &&
-            this.drivers.containsKey(playerUUID)
-        );
+        if (this.drivers.containsKey(playerUUID)) {
+            return (
+                (this.heatState == HeatState.RACING ||
+                    this.heatState == HeatState.STARTING ||
+                    this.heatState == HeatState.LOADED ||
+                    this.heatState == HeatState.PRACTICE)
+            );
+        }
+        
+        if (this.round != null && this.round.getEvent() != null) {
+            Events event = this.round.getEvent();
+            if (event.isSubscriber(playerUUID) || event.isReserve(playerUUID)) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     public boolean isPlayerActivelyRacing(UUID playerUUID) {
