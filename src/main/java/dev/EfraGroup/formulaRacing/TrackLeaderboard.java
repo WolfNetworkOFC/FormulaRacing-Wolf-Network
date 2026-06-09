@@ -123,12 +123,12 @@ public class TrackLeaderboard {
             finalLines.add(line);
         }
 
-        SchedulerHelper.runTask(this.plugin, () -> {
-            String safeTrackName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
-            double xOffset = type.equals("bedrock") ? 4.0 : 0.0;
-            Location holoLoc = this.location.clone().add(xOffset, 0.5, 0.0);
+        String safeTrackName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
+        double xOffset = type.equals("bedrock") ? 4.0 : 0.0;
+        Location holoLoc = this.location.clone().add(xOffset, 0.5, 0.0);
 
-            if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
+        if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
+            SchedulerHelper.runTask(this.plugin, () -> {
                 try {
                     String holoName = "lb_" + type + "_" + safeTrackName;
                     Hologram holo = DHAPI.getHologram(holoName);
@@ -140,14 +140,13 @@ public class TrackLeaderboard {
                     }
                     holograms.put(type, holo);
                 } catch (Exception ignored) {}
-            } else {
-                HologramManager hm = FormulaRacing.getInstance().getHologramManager();
-                if (hm != null) {
-                    String vanillaName = "lb_" + type + "_" + safeTrackName;
-                    hm.createHologram(vanillaName, holoLoc, finalLines);
-                }
-            }
-        });
+            });
+        } else {
+            SchedulerHelper.runTaskAt(this.plugin, holoLoc, () -> {
+                if (holoLoc.getWorld() == null) return;
+                FormulaRacing.getInstance().getHologramManager().createHologramSync(safeTrackName + "_" + type, holoLoc, finalLines);
+            });
+        }
     }
 
     public synchronized void removeHologram() {

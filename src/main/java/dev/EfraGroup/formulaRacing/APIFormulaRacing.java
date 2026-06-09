@@ -1,14 +1,7 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by Fernflower decompiler)
-//
-
 package dev.EfraGroup.formulaRacing;
 
 import dev.EfraGroup.formulaRacing.Cosmetics.BoatTrailManager;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
@@ -38,30 +31,27 @@ public class APIFormulaRacing {
 
     public EntityType getPlayerBoatType(UUID uuid) {
         int boatId = this.databaseManager.getPlayerBoatType(uuid);
-        EntityType var10000;
-        switch (boatId) {
-            case 1 -> var10000 = EntityType.OAK_BOAT;
-            case 2 -> var10000 = EntityType.BIRCH_BOAT;
-            case 3 -> var10000 = EntityType.SPRUCE_BOAT;
-            case 4 -> var10000 = EntityType.JUNGLE_BOAT;
-            case 5 -> var10000 = EntityType.ACACIA_BOAT;
-            case 6 -> var10000 = EntityType.DARK_OAK_BOAT;
-            case 7 -> var10000 = EntityType.MANGROVE_BOAT;
-            case 8 -> var10000 = EntityType.CHERRY_BOAT;
-            case 9 -> var10000 = EntityType.BAMBOO_RAFT;
-            case 10 -> var10000 = EntityType.OAK_CHEST_BOAT;
-            case 11 -> var10000 = EntityType.BIRCH_CHEST_BOAT;
-            case 12 -> var10000 = EntityType.SPRUCE_CHEST_BOAT;
-            case 13 -> var10000 = EntityType.JUNGLE_CHEST_BOAT;
-            case 14 -> var10000 = EntityType.ACACIA_CHEST_BOAT;
-            case 15 -> var10000 = EntityType.DARK_OAK_CHEST_BOAT;
-            case 16 -> var10000 = EntityType.MANGROVE_CHEST_BOAT;
-            case 17 -> var10000 = EntityType.CHERRY_CHEST_BOAT;
-            case 18 -> var10000 = EntityType.BAMBOO_CHEST_RAFT;
-            default -> var10000 = EntityType.OAK_BOAT;
-        }
-
-        return var10000;
+        return switch (boatId) {
+            case 1 -> EntityType.OAK_BOAT;
+            case 2 -> EntityType.BIRCH_BOAT;
+            case 3 -> EntityType.SPRUCE_BOAT;
+            case 4 -> EntityType.JUNGLE_BOAT;
+            case 5 -> EntityType.ACACIA_BOAT;
+            case 6 -> EntityType.DARK_OAK_BOAT;
+            case 7 -> EntityType.MANGROVE_BOAT;
+            case 8 -> EntityType.CHERRY_BOAT;
+            case 9 -> EntityType.BAMBOO_RAFT;
+            case 10 -> EntityType.OAK_CHEST_BOAT;
+            case 11 -> EntityType.BIRCH_CHEST_BOAT;
+            case 12 -> EntityType.SPRUCE_CHEST_BOAT;
+            case 13 -> EntityType.JUNGLE_CHEST_BOAT;
+            case 14 -> EntityType.ACACIA_CHEST_BOAT;
+            case 15 -> EntityType.DARK_OAK_CHEST_BOAT;
+            case 16 -> EntityType.MANGROVE_CHEST_BOAT;
+            case 17 -> EntityType.CHERRY_CHEST_BOAT;
+            case 18 -> EntityType.BAMBOO_CHEST_RAFT;
+            default -> EntityType.OAK_BOAT;
+        };
     }
 
     public void spawnBoat(Player player, boolean trail, boolean locked, boolean checkground) {

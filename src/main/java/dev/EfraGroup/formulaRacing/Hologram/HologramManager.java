@@ -30,35 +30,47 @@ public class HologramManager {
 
     public void createHologram(String name, Location loc, List<String> lines) {
         SchedulerHelper.runTaskAt(plugin, loc, () -> {
-            // Delete existing hologram directly (we're already on the region thread)
-            List<Entity> existing = holograms.remove(name);
-            hologramLocations.remove(name);
-            if (existing != null) {
-                for (Entity entity : existing) {
-                    if (entity != null && entity.isValid()) {
-                        entity.remove();
-                    }
+            createHologramSync(name, loc, lines);
+        });
+    }
+
+    public void createHologramSync(String name, Location loc, List<String> lines) {
+        if (loc.getWorld() == null) return;
+
+        // Remove ALL armor stands at this location tagged as FR holograms (covers orphans from crashes)
+        for (Entity entity : loc.getWorld().getNearbyEntities(loc, 0.5, 5.0, 0.5,
+                e -> e instanceof ArmorStand && e.getPersistentDataContainer().has(HOLO_TAG, PersistentDataType.BYTE))) {
+            try {
+                entity.remove();
+            } catch (Exception ignored) {}
+        }
+
+        // Also remove from map tracking
+        List<Entity> existing = holograms.remove(name);
+        hologramLocations.remove(name);
+        if (existing != null) {
+            for (Entity entity : existing) {
+                if (entity != null && entity.isValid()) {
+                    try { entity.remove(); } catch (Exception ignored) {}
                 }
             }
+        }
 
-            if (loc.getWorld() == null) return;
-
-            List<Entity> stands = new ArrayList<>();
-            for (int i = 0; i < lines.size(); i++) {
-                Location standLoc = loc.clone().add(0, (lines.size() - 1 - i) * LINE_SPACING, 0);
-                ArmorStand stand = (ArmorStand) loc.getWorld().spawnEntity(standLoc, EntityType.ARMOR_STAND);
-                stand.setVisible(false);
-                stand.setMarker(true);
-                stand.setGravity(false);
-                stand.setInvulnerable(true);
-                stand.setCustomNameVisible(true);
-                stand.setCustomName(lines.get(i));
-                stand.getPersistentDataContainer().set(HOLO_TAG, PersistentDataType.BYTE, (byte) 1);
-                stands.add(stand);
-            }
-            holograms.put(name, stands);
-            hologramLocations.put(name, loc.clone());
-        });
+        List<Entity> stands = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) {
+            Location standLoc = loc.clone().add(0, (lines.size() - 1 - i) * LINE_SPACING, 0);
+            ArmorStand stand = (ArmorStand) loc.getWorld().spawnEntity(standLoc, EntityType.ARMOR_STAND);
+            stand.setVisible(false);
+            stand.setMarker(true);
+            stand.setGravity(false);
+            stand.setInvulnerable(true);
+            stand.setCustomNameVisible(true);
+            stand.setCustomName(lines.get(i));
+            stand.getPersistentDataContainer().set(HOLO_TAG, PersistentDataType.BYTE, (byte) 1);
+            stands.add(stand);
+        }
+        holograms.put(name, stands);
+        hologramLocations.put(name, loc.clone());
     }
 
     public void updateHologram(String name, List<String> lines) {
