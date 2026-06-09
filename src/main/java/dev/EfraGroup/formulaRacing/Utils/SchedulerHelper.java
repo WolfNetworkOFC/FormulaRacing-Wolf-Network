@@ -20,6 +20,11 @@ public final class SchedulerHelper {
     private static final GlobalRegionScheduler GLOBAL = Bukkit.getGlobalRegionScheduler();
     private static final RegionScheduler REGION = Bukkit.getRegionScheduler();
     private static final AsyncScheduler ASYNC = Bukkit.getAsyncScheduler();
+    private static Plugin staticPlugin;
+
+    public static void init(Plugin plugin) {
+        staticPlugin = plugin;
+    }
 
     private SchedulerHelper() {}
 
@@ -76,6 +81,18 @@ public final class SchedulerHelper {
         entity.getScheduler().execute(plugin, task, null, 1L);
     }
 
+    public static void runTaskFor(Plugin plugin, Entity entity, Consumer<Entity> task) {
+        entity.getScheduler().execute(plugin, () -> task.accept(entity), null, 1L);
+    }
+
+    public static void runTaskFor(Plugin plugin, Entity entity, Consumer<Entity> task, long delayTicks) {
+        entity.getScheduler().execute(plugin, () -> task.accept(entity), null, delayTicks);
+    }
+
+    public static void runTaskFor(Plugin plugin, Entity entity, Runnable task, long delayTicks) {
+        entity.getScheduler().execute(plugin, task, null, delayTicks);
+    }
+
     public static void runTaskTimerFor(Plugin plugin, Entity entity, Consumer<ScheduledTask> task, long delayTicks, long periodTicks) {
         entity.getScheduler().runAtFixedRate(plugin, task, null, Math.max(1, delayTicks), Math.max(1, periodTicks));
     }
@@ -105,23 +122,46 @@ public final class SchedulerHelper {
         ASYNC.runAtFixedRate(plugin, t -> task.run(), delayTicks * 50L, periodTicks * 50L, TimeUnit.MILLISECONDS);
     }
 
-    public static CompletableFuture<Boolean> teleport(Entity entity, Location destination) {
-        if (entity instanceof Player player) {
-            Entity vehicle = player.getVehicle();
-            if (vehicle != null) {
-                vehicle.removePassenger(player);
+public static void teleportNextTick(Plugin plugin, Entity entity, Location destination) {
+        runTaskFor(plugin, entity, e -> {
+            if (e instanceof Player player) {
+                Entity vehicle = player.getVehicle();
+                if (vehicle != null) {
+                    vehicle.removePassenger(player);
+                }
             }
-        }
-        return entity.teleportAsync(destination);
+            e.teleport(destination);
+        });
     }
 
-    public static void teleportNextTick(Plugin plugin, Entity entity, Location destination) {
-        runTaskFor(plugin, entity, () -> teleport(entity, destination));
+    public static void teleport(Plugin plugin, Player player, Location destination) {
+        teleportNextTick(plugin, player, destination);
+    }
+
+    public static CompletableFuture<Boolean> teleport(Player player, Location destination) {
+        if (player == null) return CompletableFuture.completedFuture(false);
+        return player.teleportAsync(destination);
+    }
+
+    public static void teleport(Entity entity, Location destination) {
+        if (entity == null || staticPlugin == null) return;
+        entity.getScheduler().execute(staticPlugin, () -> entity.teleport(destination), null, 1L);
+    }
+
+    public static CompletableFuture<Boolean> teleportAsync(Plugin plugin, Entity entity, Location destination) {
+        runTaskFor(plugin, entity, e -> {
+            if (e instanceof Player player) {
+                Entity vehicle = player.getVehicle();
+                if (vehicle != null) {
+                    vehicle.removePassenger(player);
+                }
+            }
+        });
+        return entity.teleportAsync(destination);
     }
 
     public static void cancelAllTasks(Plugin plugin) {
         GLOBAL.cancelTasks(plugin);
-        REGION.cancelTasks(plugin);
         ASYNC.cancelTasks(plugin);
     }
 

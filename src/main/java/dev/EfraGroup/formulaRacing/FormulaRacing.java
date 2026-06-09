@@ -255,6 +255,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     public void onEnable() {
         instance = this;
         FRThemeDefaults.load(this);
+        SchedulerHelper.init(this);
         try {
             this.fileManager = new FileManager(this);
             this.timeTrialController = new TimeTrialController(this);
@@ -1134,7 +1135,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 Events event = null;
                 Rounds round = null;
                 String heatArg = null;
-                if (arg1.toUpperCase().matches("R\\d+[QFH]\\d+")) {
+                if (arg1.toUpperCase().matches("R\\d+[QFEH]\\d+")) {
                     this.getLogger().info(
                         "[HEAT RESOLVER DEBUG] Tentando resolver código de heat: " +
                             arg1

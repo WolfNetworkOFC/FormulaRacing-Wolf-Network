@@ -264,7 +264,7 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                                 if (startEndRegion != null) {
                                     Location finalFrom = previous.clone();
                                     Location finalTo = current.clone();
-                                    SchedulerHelper.runTaskFor(this.plugin, player, p -> this.handleRegion(p, startEndRegion, finalFrom, finalTo));
+                                    SchedulerHelper.runTaskFor(this.plugin, player, () -> this.handleRegion(player, startEndRegion, finalFrom, finalTo));
                                 }
 
                             // Lógica de checkpoints e duelos

@@ -486,7 +486,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
 
     private void releasePlayers(Player p1, Player p2) {
         for(Player p : Arrays.asList(p1, p2)) {
-            p.getScheduler().execute(this.plugin, player -> {
+            SchedulerHelper.runTaskFor(this.plugin, p, player -> {
                 Entity var6 = player.getVehicle();
                 if (var6 instanceof Boat boat) {
                     Entity var7 = boat.getVehicle();
@@ -494,13 +494,13 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                         stand.remove();
                     }
                 }
-            }, null, 1L);
+            });
         }
 
     }
 
     private void setupPlayerInGrid(Player player, Location baseLoc) {
-        SchedulerHelper.teleport(player, baseLoc);
+        SchedulerHelper.teleportAsync(this.plugin, player, baseLoc);
         Location asLoc = baseLoc.clone().add((double)0.0F, (double)1.0F, (double)0.0F);
         ArmorStand stand = (ArmorStand)baseLoc.getWorld().spawnEntity(asLoc, EntityType.ARMOR_STAND);
         stand.setVisible(false);
@@ -649,52 +649,53 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                             // Capturamos newLap como final para o uso em lambdas aninhados
                             final int finalNewLap = newLap;
 
-                            SchedulerHelper.runTaskFor(this.plugin, player, p -> {
-                                this.ttda.pauseLapTimer(p);
-                                this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Timer pausado para " + p.getName());
+                            SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                                this.ttda.pauseLapTimer(player);
+                                this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Timer pausado para " + player.getName());
 
-                                playersBeingLapReset.add(p.getUniqueId());
+                                playersBeingLapReset.add(player.getUniqueId());
 
                                 Boat.Type boatWoodType = Boat.Type.OAK;
 
-                                if (p.getVehicle() instanceof Boat) {
-                                    Boat oldBoat = (Boat) p.getVehicle();
+                                if (player.getVehicle() instanceof Boat) {
+                                    Boat oldBoat = (Boat) player.getVehicle();
                                     boatWoodType = oldBoat.getBoatType();
                                     oldBoat.eject();
                                     oldBoat.remove();
-                                    this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Removeu barco antigo de " + p.getName());
+                                    this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Removeu barco antigo de " + player.getName());
                                 }
 
-                                boolean teleported = SchedulerHelper.teleport(p, spawnLoc).join();
                                 state.setNeedsLapTimerReset(true);
 
-                                if (teleported) {
-                                    final Boat.Type finalWoodType = boatWoodType;
+                                final Boat.Type finalWoodType = boatWoodType;
 
-                                    SchedulerHelper.runTaskFor(this.plugin, player, pl -> {
-                                        Location boatLoc = spawnLoc.clone().add(0, 0.5, 0);
+                                SchedulerHelper.teleportAsync(this.plugin, player, spawnLoc).thenAccept(success -> {
+                                    if (Boolean.TRUE.equals(success)) {
+                                        SchedulerHelper.runTaskFor(this.plugin, player, pl -> {
+                                            Location boatLoc = spawnLoc.clone().add(0, 0.5, 0);
 
-                                        Boat newBoat = (Boat) spawnLoc.getWorld().spawnEntity(boatLoc, EntityType.OAK_BOAT);
-                                        newBoat.setBoatType(finalWoodType);
-                                        newBoat.addPassenger(pl);
+                                            Boat newBoat = (Boat) spawnLoc.getWorld().spawnEntity(boatLoc, EntityType.OAK_BOAT);
+                                            newBoat.setBoatType(finalWoodType);
+                                            newBoat.addPassenger(pl);
 
-                                        plugin.getDebugManager().logDuelSystem("[LAP RESET] Spawnou novo barco (" + finalWoodType + ") para " +
-                                                pl.getName() + " na volta " + finalNewLap);
+                                            plugin.getDebugManager().logDuelSystem("[LAP RESET] Spawnou novo barco (" + finalWoodType + ") para " +
+                                                    pl.getName() + " na volta " + finalNewLap);
 
-                                        if (duelState.isLonely()) {
-                                            plugin.getLonelyController().updatePlayersVisibility(pl);
-                                        }
+                                            if (duelState.isLonely()) {
+                                                plugin.getLonelyController().updatePlayersVisibility((Player) pl);
+                                            }
 
-                                        SchedulerHelper.runTaskLater(plugin, p -> {
-                                            playersBeingLapReset.remove(p.getUniqueId());
+                                            SchedulerHelper.runTaskFor(plugin, pl, e -> {
+                                                playersBeingLapReset.remove(e.getUniqueId());
                                             plugin.getDebugManager().logDuelSystem("[LAP RESET] Proteção de ejeção removida.");
-                                        }, 3L, pl);
+                                        }, 3L);
                                     }, 2L);
                                 } else {
-                                    SchedulerHelper.runTaskLater(this.plugin, pl ->
-                                            playersBeingLapReset.remove(pl.getUniqueId()), 3L);
+                                    SchedulerHelper.runTaskFor(this.plugin, player, e ->
+                                            playersBeingLapReset.remove(e.getUniqueId()), 3L);
                                 }
                             });
+                        });
 
                             String langCode4 = this.dm.getPlayerLanguage(player.getUniqueId());
                                 TitleHelper.sendThemedTitle(player, "",

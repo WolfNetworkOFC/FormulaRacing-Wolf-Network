@@ -20,10 +20,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.vehicle.VehicleEnterEvent;
 import org.bukkit.event.vehicle.VehicleExitEvent;
-import org.bukkit.scoreboard.Scoreboard;
-import org.bukkit.scoreboard.Team;
-import org.bukkit.scoreboard.Team.Option;
-import org.bukkit.scoreboard.Team.OptionStatus;
+
 
 import java.util.Map;
 import java.util.Optional;
@@ -423,35 +420,6 @@ public class LonelyController implements Listener {
     // -------------------------------------------------------------------------
 
     private void setVanillaCollision(Player player, boolean preventCollision) {
-        if (player == null) {
-            plugin.getLogger().warning("[FormulaRacing] setVanillaCollision called with null player");
-            return;
-        }
-        player.getScheduler().execute(plugin, p -> {
-            try {
-                Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
-                Team team = scoreboard.getTeam("fr_nocol");
-                if (team == null) {
-                    team = scoreboard.registerNewTeam("fr_nocol");
-                    if (team == null) {
-                        plugin.getLogger().warning("[FormulaRacing] Failed to create 'fr_nocol' team");
-                        return;
-                    }
-                    team.setOption(Option.COLLISION_RULE, OptionStatus.NEVER);
-                    team.setCanSeeFriendlyInvisibles(false);
-                    plugin.getDebugManager().logPacketHandling("[FormulaRacing] Time 'fr_nocol' criado no MainScoreboard.");
-                }
-                if (preventCollision) {
-                    if (!team.hasEntry(p.getName())) team.addEntry(p.getName());
-                } else {
-                    if (team.hasEntry(p.getName())) team.removeEntry(p.getName());
-                }
-            } catch (Exception e) {
-                String msg = e.getMessage();
-                if (msg == null) msg = e.getClass().getSimpleName() + ": " + e.getLocalizedMessage();
-                plugin.getLogger().warning("[FormulaRacing] Failed to set collision for " + p.getName() + ": " + msg);
-            }
-        }, null, 1L);
     }
 
     // -------------------------------------------------------------------------

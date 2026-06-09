@@ -58,16 +58,11 @@ private void startBoatCleaner() {
             for(World world : Bukkit.getWorlds()) {
                 for(Boat boat : world.getEntitiesByClass(Boat.class)) {
                     if (!boat.isValid()) continue;
-                    boat.getScheduler().execute(this.plugin, b -> {
+                    SchedulerHelper.runTaskFor(this.plugin, boat, b -> {
                         if (b.isValid() && b.getPassengers().isEmpty()) {
                             this.api.queueDeleteBoat(b);
                         }
-                    }, null, 1L);
-                }
-            }
-        }, 1200L, 6000L);
-    }
-                    }, null, 1L);
+                    });
                 }
             }
         }, 1200L, 6000L);

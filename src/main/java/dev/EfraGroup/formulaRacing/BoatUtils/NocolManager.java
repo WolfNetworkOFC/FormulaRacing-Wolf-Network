@@ -1,6 +1,7 @@
 package dev.EfraGroup.formulaRacing.BoatUtils;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.entity.Boat;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -22,12 +23,12 @@ public class NocolManager {
             return;
         }
         sendNocolPacket(player, shouldCollide);
-        player.getScheduler().execute(FormulaRacing.getInstance(), p -> {
+        SchedulerHelper.runTaskFor(FormulaRacing.getInstance(), player, p -> {
             Entity vehicle = p.getVehicle();
             if (vehicle instanceof Boat) {
                 sendNocolPacket(vehicle, shouldCollide);
             }
-        }, null, 1L);
+        });
     }
 
     private static void sendNocolPacket(Player player, boolean shouldCollide) {

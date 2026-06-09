@@ -14,6 +14,7 @@ import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Participant.Subscriber;
+import dev.EfraGroup.formulaRacing.Round.EliminationRound;
 import dev.EfraGroup.formulaRacing.Round.PracticeRound;
 import dev.EfraGroup.formulaRacing.Round.QualificationRound;
 import dev.EfraGroup.formulaRacing.Round.RaceRound;
@@ -1366,6 +1367,9 @@ public class EventsDatabaseManager {
             }
             case QUALIFICATION -> {
                 return new QualificationRound(plugin, id, event, index, type);
+            }
+            case ELIMINATION -> {
+                return new EliminationRound(plugin, id, event, index, type);
             }
             case FINAL -> {
                 return new RaceRound(plugin, id, event, index, type);

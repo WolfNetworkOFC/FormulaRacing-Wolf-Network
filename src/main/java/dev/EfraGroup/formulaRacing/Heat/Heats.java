@@ -435,7 +435,7 @@ public class Heats {
                         Player player = Bukkit.getPlayer(driver.getUuid());
                         if (player != null && player.isOnline()) {
                             this.plugin.getAPI().recoverPlayerBoatState(player);
-                            SchedulerHelper.teleport(player, spawnLoc);
+                            SchedulerHelper.teleportAsync(this.plugin, player, spawnLoc);
                             this.spawnQualiDriver(player, driver);
                         }
                     }
@@ -450,7 +450,7 @@ public class Heats {
                             if (gridIndex >= 0 && gridIndex < qualiGridPositions.size()) {
                                 Location qualiLoc = qualiGridPositions.get(gridIndex);
                                 this.plugin.getAPI().recoverPlayerBoatState(player);
-                                SchedulerHelper.teleport(player, qualiLoc);
+                                SchedulerHelper.teleportAsync(this.plugin, player, qualiLoc);
                                 this.spawnQualiDriver(player, driver);
                             } else {
                                 player.sendMessage("§cPosição inválida no qualigrid.");
@@ -825,7 +825,7 @@ public class Heats {
                             Player p = Bukkit.getPlayer(d.getUuid());
                             if (p != null && p.isOnline()) {
                                 this.plugin.getAPI().recoverPlayerBoatState(p);
-                                SchedulerHelper.teleport(p, targetLoc);
+                                SchedulerHelper.teleportAsync(this.plugin, p, targetLoc);
                             }
                         }
                     }
@@ -1362,7 +1362,7 @@ public class Heats {
                                 this.trackNameWS
                             );
                         if (spawnLoc != null) {
-                            SchedulerHelper.teleport(player, spawnLoc);
+                            SchedulerHelper.teleportAsync(this.plugin, player, spawnLoc);
                             this.plugin.getAPI().spawnBoat(
                                 player,
                                 false,
@@ -1421,7 +1421,7 @@ public class Heats {
                 this.trackNameWS
             );
             if (spawnLoc != null) {
-                SchedulerHelper.teleport(player, spawnLoc);
+                SchedulerHelper.teleportAsync(this.plugin, player, spawnLoc);
             }
         }
     }
@@ -1601,6 +1601,7 @@ public class Heats {
                 case PRACTICE -> var10000 = "P";
                 case QUALIFICATION -> var10000 = "Q";
                 case FINAL -> var10000 = "F";
+                case ELIMINATION -> var10000 = "E";
                 default -> throw new MatchException(
                     (String) null,
                     (Throwable) null

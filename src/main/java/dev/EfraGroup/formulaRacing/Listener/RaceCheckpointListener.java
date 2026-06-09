@@ -417,28 +417,15 @@ public class RaceCheckpointListener implements Listener {
             return;
         }
         final Location finalTargetLoc = targetLoc;
-        SchedulerHelper.runTaskLater(
-            this.plugin,
-            () -> {
-                if (player.isOnline()) {
-                    this.plugin.getAPI().recoverPlayerBoatState(player);
-                    SchedulerHelper.teleport(player, finalTargetLoc);
-                    player.playSound(
-                        finalTargetLoc,
-                        Sound.ENTITY_ENDERMAN_TELEPORT,
-                        1.0F,
-                        1.0F
-                    );
-                    this.plugin.getAPI().spawnBoat(
-                        player,
-                        false,
-                        false,
-                        false
-                    );
-                }
-            },
-            1L
-        );
+        final Player finalPlayer = player;
+        SchedulerHelper.runTaskFor(plugin, player, () -> {
+            if (finalPlayer.isOnline()) {
+                this.plugin.getAPI().recoverPlayerBoatState(finalPlayer);
+                SchedulerHelper.teleport(plugin, finalPlayer, finalTargetLoc);
+                finalPlayer.playSound(finalTargetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
+                this.plugin.getAPI().spawnBoat(finalPlayer, false, false, false);
+            }
+        }, 1L);
         this.plugin.sendMessage(
             player,
             "race_checkpoint_missed",
@@ -968,12 +955,7 @@ public class RaceCheckpointListener implements Listener {
                 );
                 if (finishPosLoc != null) {
                     SchedulerHelper.teleport(player, finishPosLoc);
-                    player.playSound(
-                        player.getLocation(),
-                        Sound.ENTITY_PLAYER_LEVELUP,
-                        1.0F,
-                        1.0F
-                    );
+                    player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0F, 1.0F);
                     String title = "§6§l" + driver.getPosition() + "º LUGAR!";
                     TitleHelper.sendThemedTitle(
                         player,
