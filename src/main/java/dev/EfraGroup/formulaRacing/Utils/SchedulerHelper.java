@@ -10,7 +10,6 @@ import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitTask;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -25,34 +24,52 @@ public final class SchedulerHelper {
     private SchedulerHelper() {}
 
     public static void runTask(Plugin plugin, Runnable task) {
-        Bukkit.getScheduler().runTask(plugin, task);
+        GLOBAL.execute(plugin, task);
     }
 
     public static ScheduledTask runTaskLater(Plugin plugin, Runnable task, long delayTicks) {
-        BukkitTask bukkitTask = Bukkit.getScheduler().runTaskLater(plugin, task, Math.max(1, delayTicks));
-        return new ScheduledTaskWrapper(bukkitTask);
+        return GLOBAL.runDelayed(plugin, scheduledTask -> GLOBAL.execute(plugin, task), Math.max(1, delayTicks));
     }
 
     public static ScheduledTask runTaskTimer(Plugin plugin, Runnable task, long delayTicks, long periodTicks) {
-        BukkitTask bukkitTask = Bukkit.getScheduler().runTaskTimer(plugin, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
-        return new ScheduledTaskWrapper(bukkitTask);
+        return GLOBAL.runAtFixedRate(plugin, scheduledTask -> GLOBAL.execute(plugin, task), Math.max(1, delayTicks), Math.max(1, periodTicks));
     }
 
     public static ScheduledTask runTaskTimer(Plugin plugin, Runnable task) {
         return runTaskTimer(plugin, task, 1L, 1L);
     }
 
+    public static ScheduledTask runTaskTimer(Plugin plugin, Consumer<ScheduledTask> task, long delayTicks, long periodTicks) {
+        return GLOBAL.runAtFixedRate(plugin, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
+    }
+
+    public static ScheduledTask runTaskTimer(Plugin plugin, Consumer<ScheduledTask> task) {
+        return runTaskTimer(plugin, task, 1L, 1L);
+    }
+
     public static void runTaskAt(Plugin plugin, Location location, Runnable task) {
-        REGION.execute(plugin, location, task);
+        World world = location.getWorld();
+        if (world == null) {
+            GLOBAL.execute(plugin, task);
+            return;
+        }
+        REGION.execute(plugin, world, location.getBlockX() >> 4, location.getBlockZ() >> 4, task);
     }
 
     public static void runTaskAt(Plugin plugin, World world, int chunkX, int chunkZ, Runnable task) {
         REGION.execute(plugin, world, chunkX, chunkZ, task);
     }
 
+    public static ScheduledTask runTaskTimerAt(Plugin plugin, World world, int chunkX, int chunkZ, Consumer<ScheduledTask> task, long delayTicks, long periodTicks) {
+        return REGION.runAtFixedRate(plugin, world, chunkX, chunkZ, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
+    }
+
     public static ScheduledTask runTaskTimerAt(Plugin plugin, Location location, Consumer<ScheduledTask> task, long delayTicks, long periodTicks) {
-        ScheduledTask scheduledTask = REGION.runAtFixedRate(plugin, location, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
-        return scheduledTask;
+        World world = location.getWorld();
+        if (world == null) {
+            return GLOBAL.runAtFixedRate(plugin, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
+        }
+        return REGION.runAtFixedRate(plugin, world, location.getBlockX() >> 4, location.getBlockZ() >> 4, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
     }
 
     public static void runTaskFor(Plugin plugin, Entity entity, Runnable task) {
@@ -104,27 +121,10 @@ public final class SchedulerHelper {
 
     public static void cancelAllTasks(Plugin plugin) {
         GLOBAL.cancelTasks(plugin);
+        REGION.cancelTasks(plugin);
         ASYNC.cancelTasks(plugin);
     }
 
     public static void shutdownAsyncPool() {
-    }
-
-    private static class ScheduledTaskWrapper implements ScheduledTask {
-        private final BukkitTask bukkitTask;
-        
-        ScheduledTaskWrapper(BukkitTask task) {
-            this.bukkitTask = task;
-        }
-        
-        @Override
-        public boolean isCancelled() {
-            return bukkitTask.isCancelled();
-        }
-        
-        @Override
-        public void cancel() {
-            bukkitTask.cancel();
-        }
     }
 }

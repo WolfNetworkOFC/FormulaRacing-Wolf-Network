@@ -260,12 +260,12 @@ public class RegionListener implements Listener {
                             }
 
                             // Checar se cruzou região START/END
-                            DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, current, worldRegions);
-                            if (startEndRegion != null) {
-                                Location finalFrom = previous.clone();
-                                Location finalTo = current.clone();
-                                SchedulerHelper.runTask(this.plugin, () -> this.handleRegion(player, startEndRegion, finalFrom, finalTo));
-                            }
+DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, current, worldRegions);
+                                if (startEndRegion != null) {
+                                    Location finalFrom = previous.clone();
+                                    Location finalTo = current.clone();
+                                    SchedulerHelper.runTaskFor(this.plugin, player, p -> this.handleRegion(p, startEndRegion, finalFrom, finalTo));
+                                }
 
                             // Lógica de checkpoints e duelos
                             String activeTrack = this.timerUtils.getActiveTrack(player);
@@ -853,7 +853,7 @@ public class RegionListener implements Listener {
 
 
     private void startRegionChecker() {
-        SchedulerHelper.runTaskTimer(this.plugin, (scheduledTask) -> {
+        SchedulerHelper.runTaskTimer(this.plugin, scheduledTask -> {
             if (regions.isEmpty()) return;
 
             for (Player player : Bukkit.getOnlinePlayers()) {

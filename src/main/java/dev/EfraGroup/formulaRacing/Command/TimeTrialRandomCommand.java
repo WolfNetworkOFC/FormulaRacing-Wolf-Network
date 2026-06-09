@@ -10,6 +10,7 @@ import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.PacketSender;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardTimeTrialUtils;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import org.bukkit.Location;
 import org.bukkit.Sound;
@@ -95,12 +96,15 @@ public class TimeTrialRandomCommand extends BaseCommand {
         api.recoverPlayerBoatState(player);
 
         // Teleporte e Mensagens
-        SchedulerHelper.teleport(player, loc);
+        SchedulerHelper.teleport(player, loc).thenAccept(success -> {
+            if (Boolean.TRUE.equals(success)) {
+                api.spawnBoatAt(player, loc, false, false, false);
+            }
+        });
         String langCode = mysql.getPlayerLanguage(player.getUniqueId());
         player.sendMessage(plugin.getTranslation("timetrial_teleport", langCode, "{track}", trackName));
 
         // Spawn do novo barco e persistência
-        api.spawnBoat(player, false, false, false);
         plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);
     }
 }

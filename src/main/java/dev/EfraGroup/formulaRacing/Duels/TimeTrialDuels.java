@@ -115,7 +115,7 @@ public class TimeTrialDuels implements Listener {
             String modeStr = isTimeTrialMode ? "TIME TRIAL" : "CORRIDA";
             this.plugin.getDebugManager().logDuelSystem("[SETUP] Modo de duelo: " + modeStr);
             int[] duelIdHolder = new int[]{-1};
-            SchedulerHelper.runTask(this.plugin, () -> {
+SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                 this.dm.createDuel(p1, participants, trackNameWS, laps, timeLimit, lonely);
                 int duelId = this.dm.getActiveDuelId(p1.getUniqueId());
                 duelIdHolder[0] = duelId;
@@ -157,18 +157,7 @@ public class TimeTrialDuels implements Listener {
                         this.scoreboardDuelsUtils.applyDuelBoard(p1, duelId, laps, trackName);
                         this.scoreboardDuelsUtils.applyDuelBoard(p2, duelId, laps, trackName);
                         this.plugin.getLonelyController().updatePlayersVisibility(p1);
-                        this.plugin.getLonelyController().updatePlayersVisibility(p2);
-                        if (lonely) {
-                            String lang1 = this.dm.getPlayerLanguage(p1.getUniqueId());
-                            String lang2 = this.dm.getPlayerLanguage(p2.getUniqueId());
-                            p1.sendMessage(this.plugin.getDirectTranslation("duel_lonely_enabled", lang1));
-                            p2.sendMessage(this.plugin.getDirectTranslation("duel_lonely_enabled", lang2));
-                        }
-
-                        this.setupPlayerInGrid(p1, spawnLoc.clone());
-                        this.setupPlayerInGrid(p2, spawnLoc.clone());
-                        this.startFullCountdownSequence(p1, p2, duelId, timeLimit);
-                    }, 5L);
+                    }, 1L);
                 }
             });
         }
@@ -497,13 +486,15 @@ public class TimeTrialDuels implements Listener {
 
     private void releasePlayers(Player p1, Player p2) {
         for(Player p : Arrays.asList(p1, p2)) {
-            Entity var6 = p.getVehicle();
-            if (var6 instanceof Boat boat) {
-                Entity var7 = boat.getVehicle();
-                if (var7 instanceof ArmorStand stand) {
-                    stand.remove();
+            p.getScheduler().execute(this.plugin, player -> {
+                Entity var6 = player.getVehicle();
+                if (var6 instanceof Boat boat) {
+                    Entity var7 = boat.getVehicle();
+                    if (var7 instanceof ArmorStand stand) {
+                        stand.remove();
+                    }
                 }
-            }
+            }, null, 1L);
         }
 
     }
@@ -658,55 +649,50 @@ public class TimeTrialDuels implements Listener {
                             // Capturamos newLap como final para o uso em lambdas aninhados
                             final int finalNewLap = newLap;
 
-                            SchedulerHelper.runTask(this.plugin, () -> {
-                                this.ttda.pauseLapTimer(player);
-                                this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Timer pausado para " + player.getName());
+                            SchedulerHelper.runTaskFor(this.plugin, player, p -> {
+                                this.ttda.pauseLapTimer(p);
+                                this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Timer pausado para " + p.getName());
 
-                                playersBeingLapReset.add(player.getUniqueId());
+                                playersBeingLapReset.add(p.getUniqueId());
 
-                                // Variável para armazenar o tipo de madeira do barco
                                 Boat.Type boatWoodType = Boat.Type.OAK;
 
-                                if (player.getVehicle() instanceof Boat) {
-                                    Boat oldBoat = (Boat) player.getVehicle();
+                                if (p.getVehicle() instanceof Boat) {
+                                    Boat oldBoat = (Boat) p.getVehicle();
                                     boatWoodType = oldBoat.getBoatType();
                                     oldBoat.eject();
                                     oldBoat.remove();
-                                    this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Removeu barco antigo de " + player.getName());
+                                    this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Removeu barco antigo de " + p.getName());
                                 }
 
-                                boolean teleported = SchedulerHelper.teleport(player, spawnLoc);
+                                boolean teleported = SchedulerHelper.teleport(p, spawnLoc).join();
                                 state.setNeedsLapTimerReset(true);
 
                                 if (teleported) {
-                                    // Capturamos o tipo de madeira como final
                                     final Boat.Type finalWoodType = boatWoodType;
 
-                                    SchedulerHelper.runTaskLater(this.plugin, () -> {
-                                        // Clone para segurança e leve ajuste de altura para não bugar no bloco
+                                    SchedulerHelper.runTaskFor(this.plugin, player, pl -> {
                                         Location boatLoc = spawnLoc.clone().add(0, 0.5, 0);
 
-                                        // Spawn da entidade BOAT padrão
                                         Boat newBoat = (Boat) spawnLoc.getWorld().spawnEntity(boatLoc, EntityType.OAK_BOAT);
-                                        newBoat.setBoatType(finalWoodType); // Define o tipo de madeira (OAK, BIRCH, etc)
-                                        newBoat.addPassenger(player);
+                                        newBoat.setBoatType(finalWoodType);
+                                        newBoat.addPassenger(pl);
 
                                         plugin.getDebugManager().logDuelSystem("[LAP RESET] Spawnou novo barco (" + finalWoodType + ") para " +
-                                                player.getName() + " na volta " + finalNewLap);
+                                                pl.getName() + " na volta " + finalNewLap);
 
                                         if (duelState.isLonely()) {
-                                            plugin.getLonelyController().updatePlayersVisibility(player);
+                                            plugin.getLonelyController().updatePlayersVisibility(pl);
                                         }
 
-                                        // Remove a proteção de ejeção após estabilizar
-                                        SchedulerHelper.runTaskLater(plugin, () -> {
-                                            playersBeingLapReset.remove(player.getUniqueId());
+                                        SchedulerHelper.runTaskLater(plugin, p -> {
+                                            playersBeingLapReset.remove(p.getUniqueId());
                                             plugin.getDebugManager().logDuelSystem("[LAP RESET] Proteção de ejeção removida.");
-                                        }, 3L);
+                                        }, 3L, pl);
                                     }, 2L);
                                 } else {
-                                    SchedulerHelper.runTaskLater(this.plugin, () ->
-                                            playersBeingLapReset.remove(player.getUniqueId()), 3L);
+                                    SchedulerHelper.runTaskLater(this.plugin, pl ->
+                                            playersBeingLapReset.remove(pl.getUniqueId()), 3L);
                                 }
                             });
 

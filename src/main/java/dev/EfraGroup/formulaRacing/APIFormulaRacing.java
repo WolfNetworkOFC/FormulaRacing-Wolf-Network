@@ -64,7 +64,16 @@ public class APIFormulaRacing {
     }
 
     public void spawnBoat(Player player, boolean trail, boolean locked, boolean checkground) {
-        Location loc = player.getLocation();
+        Location loc = player.getLocation().clone();
+        this.spawnBoatAt(player, loc, trail, locked, checkground);
+    }
+
+    public void spawnBoatAt(Player player, Location location, boolean trail, boolean locked, boolean checkground) {
+        Location loc = location.clone();
+        SchedulerHelper.runTaskAt(this.plugin, loc, () -> this.spawnBoatNow(player, loc, trail, locked, checkground));
+    }
+
+    private void spawnBoatNow(Player player, Location loc, boolean trail, boolean locked, boolean checkground) {
         UUID uuid = player.getUniqueId();
         boolean recovered = this.recoverPlayerBoatState(player);
         if (checkground && !player.isOnGround() && !recovered) {
@@ -108,7 +117,7 @@ public class APIFormulaRacing {
     }
 
     public void queueSpawnBoat(Player player, boolean trail, boolean locked, boolean checkground) {
-        Bukkit.getScheduler().runTask(this.plugin, () -> this.spawnBoat(player, trail, locked, checkground));
+        this.spawnBoat(player, trail, locked, checkground);
     }
 
     public boolean recoverPlayerBoatState(Player player) {
@@ -175,15 +184,17 @@ public class APIFormulaRacing {
 
     public void queueDeleteBoat(Entity boat) {
         if (boat instanceof Boat) {
-            lockedBoats.values().removeIf((as) -> {
-                if (as.getPassengers().contains(boat)) {
-                    as.remove();
-                    return true;
-                } else {
-                    return false;
-                }
-            });
-            SchedulerHelper.runTask(this.plugin, () -> {
+            boat.getScheduler().execute(this.plugin, b -> {
+                lockedBoats.values().removeIf((as) -> {
+                    if (as.getPassengers().contains(b)) {
+                        as.remove();
+                        return true;
+                    } else {
+                        return false;
+                    }
+                });
+            }, null, 1L);
+            SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
                 if (boat.isValid()) {
                     boat.remove();
                 }

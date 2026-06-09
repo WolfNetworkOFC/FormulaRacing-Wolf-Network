@@ -143,7 +143,6 @@ import dev.EfraGroup.formulaRacing.PacketSender;
 
                     this.timerUtils.stopTimer(player);
                     this.timeTrialController.endSession(player);
-                    SchedulerHelper.teleport(player, loc);
                     this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);
                     this.plugin.getDebugManager().logTimeTrialSystem("[TT] Starting track '" + trackName + "' for player " + player.getName());
                     this.plugin.sendMessage(player, "timetrial_teleport", new String[]{"{track}", trackName});
@@ -155,7 +154,11 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                         e.printStackTrace();
                     }
 
-                    this.api.spawnBoat(player, false, false, false);
+                    SchedulerHelper.teleport(player, loc).thenAccept(success -> {
+                        if (Boolean.TRUE.equals(success)) {
+                            this.api.spawnBoatAt(player, loc, false, false, false);
+                        }
+                    });
                 }
             }
         }
@@ -323,8 +326,11 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                             }
 
                             this.api.recoverPlayerBoatState(player);
-                            SchedulerHelper.teleport(player, spawn);
-                            this.api.spawnBoat(player, false, false, false);
+                            SchedulerHelper.teleport(player, spawn).thenAccept(success -> {
+                                if (Boolean.TRUE.equals(success)) {
+                                    this.api.spawnBoatAt(player, spawn, false, false, false);
+                                }
+                            });
                             if (activeHeat == null) {
                                 String owner = null;
                                 if (trackName != null) {

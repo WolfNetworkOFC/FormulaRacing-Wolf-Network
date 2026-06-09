@@ -23,7 +23,6 @@ import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class TrackVisualizer {
     private final FormulaRacing plugin;

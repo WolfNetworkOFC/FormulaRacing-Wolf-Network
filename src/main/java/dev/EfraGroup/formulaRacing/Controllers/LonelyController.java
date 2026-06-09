@@ -377,8 +377,8 @@ public class LonelyController implements Listener {
 
     private void showPlayer(Player viewer, Player target) {
         SchedulerHelper.runTaskFor(plugin, viewer, () -> viewer.showPlayer(plugin, target));
-        SchedulerHelper.runTaskFor(plugin, target, () -> {
-            Entity vehicle = target.getVehicle();
+        SchedulerHelper.runTaskFor(plugin, target, t -> {
+            Entity vehicle = t.getVehicle();
             if (vehicle != null) {
                 viewer.showEntity(plugin, vehicle);
                 if (plugin.getConfig().getBoolean("FrostHexAddOn", false)) {
@@ -392,8 +392,8 @@ public class LonelyController implements Listener {
 
     private void hidePlayer(Player viewer, Player target) {
         SchedulerHelper.runTaskFor(plugin, viewer, () -> viewer.hidePlayer(plugin, target));
-        SchedulerHelper.runTaskFor(plugin, target, () -> {
-            Entity vehicle = target.getVehicle();
+        SchedulerHelper.runTaskFor(plugin, target, t -> {
+            Entity vehicle = t.getVehicle();
             if (vehicle != null) {
                 viewer.hideEntity(plugin, vehicle);
                 if (plugin.getConfig().getBoolean("FrostHexAddOn", false)) {
@@ -423,25 +423,35 @@ public class LonelyController implements Listener {
     // -------------------------------------------------------------------------
 
     private void setVanillaCollision(Player player, boolean preventCollision) {
-        SchedulerHelper.runTask(plugin, () -> {
+        if (player == null) {
+            plugin.getLogger().warning("[FormulaRacing] setVanillaCollision called with null player");
+            return;
+        }
+        player.getScheduler().execute(plugin, p -> {
             try {
                 Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
                 Team team = scoreboard.getTeam("fr_nocol");
                 if (team == null) {
                     team = scoreboard.registerNewTeam("fr_nocol");
+                    if (team == null) {
+                        plugin.getLogger().warning("[FormulaRacing] Failed to create 'fr_nocol' team");
+                        return;
+                    }
                     team.setOption(Option.COLLISION_RULE, OptionStatus.NEVER);
                     team.setCanSeeFriendlyInvisibles(false);
                     plugin.getDebugManager().logPacketHandling("[FormulaRacing] Time 'fr_nocol' criado no MainScoreboard.");
                 }
                 if (preventCollision) {
-                    if (!team.hasEntry(player.getName())) team.addEntry(player.getName());
+                    if (!team.hasEntry(p.getName())) team.addEntry(p.getName());
                 } else {
-                    if (team.hasEntry(player.getName())) team.removeEntry(player.getName());
+                    if (team.hasEntry(p.getName())) team.removeEntry(p.getName());
                 }
             } catch (Exception e) {
-                plugin.getLogger().warning("[FormulaRacing] Failed to set collision for " + player.getName() + ": " + e.getMessage());
+                String msg = e.getMessage();
+                if (msg == null) msg = e.getClass().getSimpleName() + ": " + e.getLocalizedMessage();
+                plugin.getLogger().warning("[FormulaRacing] Failed to set collision for " + p.getName() + ": " + msg);
             }
-        });
+        }, null, 1L);
     }
 
     // -------------------------------------------------------------------------

@@ -53,23 +53,23 @@ public class FormulaRacingListener implements Listener {
         this.startBoatCleaner();
     }
 
-    private void startBoatCleaner() {
+private void startBoatCleaner() {
         SchedulerHelper.runTaskTimer(this.plugin, () -> {
-            int removedCount = 0;
-
             for(World world : Bukkit.getWorlds()) {
                 for(Boat boat : world.getEntitiesByClass(Boat.class)) {
-                    if (boat.getPassengers().isEmpty()) {
-                        this.api.queueDeleteBoat(boat);
-                        ++removedCount;
-                    }
+                    if (!boat.isValid()) continue;
+                    boat.getScheduler().execute(this.plugin, b -> {
+                        if (b.isValid() && b.getPassengers().isEmpty()) {
+                            this.api.queueDeleteBoat(b);
+                        }
+                    }, null, 1L);
                 }
             }
-
-            if (removedCount > 0) {
-                this.plugin.getDebugManager().logRaceSystem("[FormulaRacing] Limpeza: " + removedCount + " barcos abandonados foram removidos.");
+        }, 1200L, 6000L);
+    }
+                    }, null, 1L);
+                }
             }
-
         }, 1200L, 6000L);
     }
 
