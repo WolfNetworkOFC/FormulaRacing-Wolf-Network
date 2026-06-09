@@ -1120,14 +1120,14 @@ public class TrackEditorCommand extends BaseCommand {
                 for(int i = 0; i < positions.size(); ++i) {
                     GridPosition pos = (GridPosition)positions.get(i);
                     int delay = i * 20;
-                    this.plugin.getServer().getScheduler().runTaskLater(this.plugin, () -> {
+                    SchedulerHelper.runTaskLater(this.plugin, () -> {
                         Location loc = pos.toLocation(this.plugin.getServer());
                         if (loc != null) {
                             SchedulerHelper.teleport(player, loc);
                             TitleHelper.sendThemedTitle(player, "&wP" + pos.getPosition(), "§7" + this.formatLocation(loc), 5, 30, 10);
                         }
 
-                    }, (long)delay);
+                    }, delay);
                 }
 
             }
@@ -1254,13 +1254,13 @@ public class TrackEditorCommand extends BaseCommand {
                 for (int i = 0; i < positions.size(); ++i) {
                     GridPosition pos = positions.get(i);
                     int delay = i * 20;
-                    this.plugin.getServer().getScheduler().runTaskLater(this.plugin, () -> {
+                    SchedulerHelper.runTaskLater(this.plugin, () -> {
                         Location loc = pos.toLocation(this.plugin.getServer());
                         if (loc != null) {
                             SchedulerHelper.teleport(player, loc);
                             TitleHelper.sendThemedTitle(player, "&wQ" + pos.getPosition(), "§7" + this.formatLocation(loc), 5, 30, 10);
                         }
-                    }, (long)delay);
+                    }, delay);
                 }
             }
         }

@@ -67,6 +67,7 @@ import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.RaceScoreboardV2Manager;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.MegavexAdapter;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.ScoreboardAdapter;
 import dev.EfraGroup.formulaRacing.Api.ApiManager;
+import dev.EfraGroup.formulaRacing.Collisionless.NMSHandlerImpl;
 import dev.EfraGroup.formulaRacing.Controllers.LeagueManager;
 import dev.EfraGroup.formulaRacing.Heat.GimmickManager;
 import dev.EfraGroup.formulaRacing.Visuals.TrackVisualizer;
@@ -165,10 +166,12 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     }
 
     public <T> TaskChain<T> newChain() {
+        if (this.taskChainFactory == null) return null;
         return this.taskChainFactory.newChain();
     }
 
     public <T> TaskChain<T> newSharedChain(String name) {
+        if (this.taskChainFactory == null) return null;
         return this.taskChainFactory.newSharedChain(name);
     }
 
@@ -284,6 +287,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.timerUtils = new TimerUtils(this, this.dm);
             this.cu = new CamUtils(this.dm, this);
             this.lonelyController = new LonelyController(this.dm, this);
+            this.nmshandler = new NMSHandlerImpl();
             this.api = new APIFormulaRacing(this, this.dm, this.nmshandler);
             this.ttda = new TimeTrialDuelsAction(this, this.dm);
             this.trackIntegrationManager = new TrackIntegrationManager(this);
@@ -370,7 +374,12 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 .registerOutgoingPluginChannel(this, "openboatutils:settings");
             this.registerModChannel();
             this.commandManager = new PaperCommandManager(this);
-            this.taskChainFactory = BukkitTaskChainFactory.create(this);
+            try {
+                this.taskChainFactory = BukkitTaskChainFactory.create(this);
+            } catch (Throwable e) {
+                this.getLogger().warning("[FormulaRacing] TaskChainFactory not available on this server version (Folia). TaskChain disabled.");
+                this.taskChainFactory = null;
+            }
             this.registerCommandContexts();
             this.registerCommandCompletions();
             this.guiManager = new GuiManager();

@@ -2,7 +2,19 @@
 
 ## Project Summary
 
-Minecraft Paper/Spigot plugin for ice boat racing (F1-style). Built with Maven, Java 21, targets Paper API 1.21.8.
+Minecraft Paper/Folia plugin for ice boat racing (F1-style). Built with Maven, Java 21, targets Paper API 1.21.8.
+
+## Folia Compatibility
+
+✅ Fully compatible with Folia 1.21.8.
+
+- `plugin.yml` has `folia-supported: true` and uses Paper API 1.21.8-R0.1-SNAPSHOT
+- `SchedulerHelper` uses `GlobalRegionScheduler`, `RegionScheduler`, `AsyncScheduler`, `Entity.getScheduler()` — no direct `Bukkit.getScheduler()` calls
+- NMS-based collisionless boat entities removed; replaced with Paper API (`world.spawnEntity` + `setCollidable` via reflection)
+- `BukkitRunnable` fully replaced by `SchedulerHelper`/`ScheduledTask`
+- `Bukkit.getWorlds()` and `Bukkit.getOnlinePlayers()` are used in non-hot paths (work on Folia 1.21.8 as snapshot returns)
+
+**Hard dependency:** WorldEdit ≥ 7.3.0 (7.2.x does not support Folia).
 
 ## Build & Deploy
 
@@ -29,7 +41,7 @@ No tests exist. There is no `test` directory and no test runner configured.
 | `Duels/` | 1v1 time-trial duels |
 | `Database/` | SQLite (default) or MySQL persistence |
 | `Gui/` | Inventory-based menus; `Gui/Framework/` has BaseGui abstraction |
-| `Collisionless/` | NMS-based collision-less boat entities (bypass vanilla collision) |
+| `Collisionless/` | Paper API-based collision-less boat spawning (`setCollidable` via reflection) |
 | `BoatUtils/` | OpenBoatUtils client mod integration |
 | `Config/` | YAML config managers |
 | `Cosmetics/` | Boat trail cosmetics |
@@ -41,13 +53,14 @@ Root files (`FormulaRacing.java`, `APIFormulaRacing.java`, `NMSHandler.java`, `R
 ## Critical Constraints
 
 - **VehicleMoveEvent fires every tick for every moving boat.** Never do heavy work in movement-related listeners. Use `DebugManager` for logging — never `Bukkit.getLogger()` in hot paths.
-- **All Bukkit state changes must run on the main thread.** Use `Bukkit.getScheduler().runTask()` for async → main thread handoffs. ConcurrentHashMap is used for cross-thread player maps.
+- **In Folia, there is no single main thread.** Use `SchedulerHelper.runTaskFor(entity, ...)` for entity-bound work, `SchedulerHelper.runTaskAt(location, ...)` for location-bound work, and `SchedulerHelper.runTask(plugin, ...)` for global work. Never use `Bukkit.getScheduler()` or `BukkitRunnable`.
+- **`Bukkit.getWorlds()` and `Bukkit.getOnlinePlayers()` work on Folia 1.21.8** as snapshot returns — safe for config/menu loading, avoid in hot paths.
 - **TPS must stay at 20.** Profile before adding logic to listeners or schedulers.
 - **Paper API 1.21.8.** Verify method availability before using Paper-only APIs — not all Paper methods exist in Spigot.
 
 ## Dependencies
 
-- **Hard dependency:** WorldEdit (track region selection)
+- **Hard dependency:** WorldEdit ≥ 7.3.0 (track region selection; 7.2.x não suporta Folia)
 - **Soft dependencies:** DecentHolograms, PlayerPoints, HeadDatabase, LuckPerms, Geyser/Floodgate (Bedrock support)
 - **Shaded (relocated):** ACF → `dev.efragroup.libs.acf`, TaskChain → `dev.efragroup.libs.taskchain`
 - **Scoreboard:** Megavex scoreboard-library v2.4.4 (the unified v2 system; `ScoreboardTimeTrialUtils` is legacy v1)

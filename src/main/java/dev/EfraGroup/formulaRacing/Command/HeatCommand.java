@@ -25,6 +25,7 @@ import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.ApiUtilities;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -2016,9 +2017,7 @@ public class HeatCommand extends BaseCommand {
                 null
             )
             .thenAccept(result -> {
-                this.plugin.getServer()
-                    .getScheduler()
-                    .runTask(this.plugin, () -> {
+                SchedulerHelper.runTask(this.plugin, () -> {
                         if (
                             result.getStatus() ==
                             HeatDriverCommandService.DriverMutationStatus.SUCCESS
@@ -2051,9 +2050,7 @@ public class HeatCommand extends BaseCommand {
                     });
             })
             .exceptionally(exception -> {
-                this.plugin.getServer()
-                    .getScheduler()
-                    .runTask(this.plugin, () ->
+                SchedulerHelper.runTask(this.plugin, () ->
                         player.sendMessage(
                             ChatColor.RED +
                                 "✗ Falha inesperada ao adicionar piloto."
@@ -2098,9 +2095,7 @@ public class HeatCommand extends BaseCommand {
                 targetPosition
             )
             .thenAccept(result -> {
-                this.plugin.getServer()
-                    .getScheduler()
-                    .runTask(this.plugin, () -> {
+                SchedulerHelper.runTask(this.plugin, () -> {
                         if (
                             result.getStatus() ==
                             HeatDriverCommandService.DriverMutationStatus.SUCCESS
@@ -2133,9 +2128,7 @@ public class HeatCommand extends BaseCommand {
                     });
             })
             .exceptionally(exception -> {
-                this.plugin.getServer()
-                    .getScheduler()
-                    .runTask(this.plugin, () ->
+                SchedulerHelper.runTask(this.plugin, () ->
                         player.sendMessage(
                             ChatColor.RED +
                                 "✗ Falha inesperada ao adicionar piloto."
@@ -2173,9 +2166,7 @@ public class HeatCommand extends BaseCommand {
                 resolvedTargetName
             )
             .thenAccept(result -> {
-                this.plugin.getServer()
-                    .getScheduler()
-                    .runTask(this.plugin, () -> {
+                SchedulerHelper.runTask(this.plugin, () -> {
                         if (
                             result.getStatus() ==
                             HeatDriverCommandService.DriverMutationStatus.SUCCESS
@@ -2206,9 +2197,7 @@ public class HeatCommand extends BaseCommand {
                     });
             })
             .exceptionally(exception -> {
-                this.plugin.getServer()
-                    .getScheduler()
-                    .runTask(this.plugin, () ->
+                SchedulerHelper.runTask(this.plugin, () ->
                         player.sendMessage(
                             ChatColor.RED +
                                 "✗ Falha inesperada ao remover piloto."

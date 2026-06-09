@@ -7,6 +7,7 @@ package dev.EfraGroup.formulaRacing.Event;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Round.PracticeRound;
 import dev.EfraGroup.formulaRacing.Round.QualificationRound;
 import dev.EfraGroup.formulaRacing.Round.RaceRound;
@@ -166,12 +167,12 @@ public class EventSchedule {
         } else {
             this.plugin.getDebugManager().logEventSystem("Agendando próximo round em " + delaySeconds + " segundos...");
             this.event.getAnnouncements().broadcastToEvent(this.event, "event_intermission_next_round", new String[]{"{time}", String.valueOf(delaySeconds)});
-            this.plugin.getServer().getScheduler().runTaskLater(this.plugin, () -> {
+            SchedulerHelper.runTaskLater(this.plugin, () -> {
                 if (this.activeEventsContains(this.event.getId())) {
                     this.nextRound();
                 }
 
-            }, (long)delaySeconds * 20L);
+            }, delaySeconds * 20L);
         }
     }
 

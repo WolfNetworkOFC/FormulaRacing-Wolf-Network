@@ -159,10 +159,11 @@ public class HotPotatoSession implements SessionLogic {
 
         Player player = Bukkit.getPlayer(uuid);
         if (player != null && player.isOnline()) {
-            // Efeito de explosão
-            player.getWorld().createExplosion(player.getLocation(), 0f, false, false);
-            player.getWorld().spawnParticle(Particle.EXPLOSION, player.getLocation().add(0, 1, 0), 5, 0.5, 0.5, 0.5, 0.1);
-            player.playSound(player.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 2.0f, 1.0f);
+            SchedulerHelper.runTaskFor(heat.getPlugin(), player, () -> {
+                player.getWorld().createExplosion(player.getLocation(), 0f, false, false);
+                player.getWorld().spawnParticle(Particle.EXPLOSION, player.getLocation().add(0, 1, 0), 5, 0.5, 0.5, 0.5, 0.1);
+                player.playSound(player.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 2.0f, 1.0f);
+            });
         }
 
         // Marca como DNF

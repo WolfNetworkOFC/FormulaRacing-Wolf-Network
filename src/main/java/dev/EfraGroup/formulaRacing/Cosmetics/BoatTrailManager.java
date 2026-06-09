@@ -6,7 +6,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Boat;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
+
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Transformation;

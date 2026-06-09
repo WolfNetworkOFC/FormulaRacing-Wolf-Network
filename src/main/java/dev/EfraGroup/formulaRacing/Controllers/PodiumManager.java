@@ -29,7 +29,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.projectiles.ProjectileSource;
-import org.bukkit.scheduler.BukkitRunnable;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class PodiumManager implements Listener {
@@ -102,7 +101,8 @@ public class PodiumManager implements Listener {
         this.teleportAudienceAndPrepare(session);
 
         long periodTicks = Math.max(1L, this.config().getLong(CONFIG_ROOT + ".reveal-interval-ticks", 50L));
-        session.revealTask = SchedulerHelper.runTaskTimer(this.plugin, new PodiumRunnable(session), periodTicks, periodTicks);
+        PodiumCeremonySession finalSession = session;
+        session.revealTask = SchedulerHelper.runTaskTimer(this.plugin, () -> podiumTick(finalSession), periodTicks, periodTicks);
     }
 
     public boolean setLocation(String key, Location location) {
@@ -369,41 +369,32 @@ public class PodiumManager implements Listener {
         return this.plugin.getFileManager().getConfig();
     }
 
-    private final class PodiumRunnable extends BukkitRunnable {
-        private final PodiumCeremonySession session;
+    private void podiumTick(PodiumCeremonySession session) {
+        synchronized (PodiumManager.this) {
+            if (activeSession != session) {
+                if (session.revealTask != null) session.revealTask.cancel();
+                return;
+            }
 
-        private PodiumRunnable(PodiumCeremonySession session) {
-            this.session = session;
-        }
-
-        @Override
-        public void run() {
-            synchronized (PodiumManager.this) {
-                if (activeSession != this.session) {
-                    this.cancel();
+            try {
+                int currentPosition = session.currentRevealPosition.getAndDecrement();
+                if (currentPosition <= 0) {
+                    finishCeremonyWithDelay(session);
+                    if (session.revealTask != null) session.revealTask.cancel();
                     return;
                 }
 
-                try {
-                    int currentPosition = this.session.currentRevealPosition.getAndDecrement();
-                    if (currentPosition <= 0) {
-                        finishCeremonyWithDelay(this.session);
-                        this.cancel();
-                        return;
-                    }
-
-                    int driverIndex = currentPosition - 1;
-                    if (driverIndex >= this.session.results.size()) {
-                        return;
-                    }
-
-                    Driver driver = this.session.results.get(driverIndex);
-                    revealPosition(this.session, currentPosition, driver);
-                } catch (Exception ex) {
-                    plugin.getDebugManager().logRaceSystem("Erro na cerimonia de podio: " + ex.getMessage());
-                    completeAndCleanup(this.session);
-                    this.cancel();
+                int driverIndex = currentPosition - 1;
+                if (driverIndex >= session.results.size()) {
+                    return;
                 }
+
+                Driver driver = session.results.get(driverIndex);
+                revealPosition(session, currentPosition, driver);
+            } catch (Exception ex) {
+                plugin.getDebugManager().logRaceSystem("Erro na cerimonia de podio: " + ex.getMessage());
+                completeAndCleanup(session);
+                if (session.revealTask != null) session.revealTask.cancel();
             }
         }
     }

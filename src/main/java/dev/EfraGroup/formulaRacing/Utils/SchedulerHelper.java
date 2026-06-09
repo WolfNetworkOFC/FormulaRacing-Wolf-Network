@@ -33,11 +33,11 @@ public final class SchedulerHelper {
     }
 
     public static ScheduledTask runTaskLater(Plugin plugin, Runnable task, long delayTicks) {
-        return GLOBAL.runDelayed(plugin, scheduledTask -> GLOBAL.execute(plugin, task), Math.max(1, delayTicks));
+        return GLOBAL.runDelayed(plugin, scheduledTask -> task.run(), Math.max(1, delayTicks));
     }
 
     public static ScheduledTask runTaskTimer(Plugin plugin, Runnable task, long delayTicks, long periodTicks) {
-        return GLOBAL.runAtFixedRate(plugin, scheduledTask -> GLOBAL.execute(plugin, task), Math.max(1, delayTicks), Math.max(1, periodTicks));
+        return GLOBAL.runAtFixedRate(plugin, scheduledTask -> task.run(), Math.max(1, delayTicks), Math.max(1, periodTicks));
     }
 
     public static ScheduledTask runTaskTimer(Plugin plugin, Runnable task) {

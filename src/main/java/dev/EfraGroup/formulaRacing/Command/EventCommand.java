@@ -253,9 +253,7 @@ public class EventCommand extends BaseCommand {
             finalLaps,
             pits
         ).thenAccept(event -> {
-            this.plugin.getServer()
-                .getScheduler()
-                .runTask(this.plugin, () -> {
+            SchedulerHelper.runTask(this.plugin, () -> {
                     if (event != null) {
                         this.plugin.sendMessage(
                             player,
