@@ -154,6 +154,7 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                         e.printStackTrace();
                     }
 
+                    this.api.recoverPlayerBoatState(player);
                     SchedulerHelper.teleport(player, loc).thenAccept(success -> {
                         if (Boolean.TRUE.equals(success)) {
                             this.api.spawnBoatAt(player, loc, false, false, false);

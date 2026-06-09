@@ -130,7 +130,7 @@ public class APIFormulaRacing {
 
         this.releaseBoat(player);
         Entity vehicle = player.getVehicle();
-        if (vehicle instanceof Boat boat) {
+        if (vehicle != null) {
             boolean temporaryMetadata = !player.hasMetadata("fr_resetting");
             if (temporaryMetadata) {
                 player.setMetadata("fr_resetting", new FixedMetadataValue(this.plugin, true));
@@ -138,19 +138,23 @@ public class APIFormulaRacing {
 
             player.leaveVehicle();
 
-            boolean tempMeta = temporaryMetadata;
-            Player finalPlayer = player;
-            SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
-                if (boat.getPassengers().contains(finalPlayer)) {
-                    boat.removePassenger(finalPlayer);
-                }
-                deleteBoat(boat);
-                if (tempMeta) {
-                    SchedulerHelper.runTaskFor(this.plugin, finalPlayer, () -> {
-                        finalPlayer.removeMetadata("fr_resetting", this.plugin);
-                    });
-                }
-            });
+            if (vehicle instanceof Boat boat) {
+                boolean tempMeta = temporaryMetadata;
+                Player finalPlayer = player;
+                SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
+                    if (boat.getPassengers().contains(finalPlayer)) {
+                        boat.removePassenger(finalPlayer);
+                    }
+                    deleteBoat(boat);
+                    if (tempMeta) {
+                        SchedulerHelper.runTaskFor(this.plugin, finalPlayer, () -> {
+                            finalPlayer.removeMetadata("fr_resetting", this.plugin);
+                        });
+                    }
+                });
+            } else if (temporaryMetadata) {
+                player.removeMetadata("fr_resetting", this.plugin);
+            }
 
             recovered = true;
         }
