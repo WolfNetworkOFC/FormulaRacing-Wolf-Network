@@ -41,8 +41,17 @@ public class EliminationSession implements SessionLogic {
             "[ELIMINATION] Sessão de eliminação iniciada para Heat " + heat.getId()
         );
 
+        plugin.getDebugManager().logRaceSystem(
+            "[ELIMINATION] Agendando timer de eliminação (" + eliminationIntervalSeconds + "s) e countdown de titles..."
+        );
+
         startEliminationTimer(heat);
         startCountdownTask(heat);
+
+        plugin.getDebugManager().logRaceSystem(
+            "[ELIMINATION] Timers agendados. heatState=" + heat.getHeatState() +
+            " heatFinished=" + heatFinished + " drivers=" + heat.getDrivers().size()
+        );
     }
 
     private void startEliminationTimer(Heats heat) {
@@ -52,6 +61,10 @@ public class EliminationSession implements SessionLogic {
         long intervalTicks = eliminationIntervalSeconds * 20L;
 
         eliminationTask = SchedulerHelper.runTaskTimer(plugin, () -> {
+            heat.getPlugin().getDebugManager().logRaceSystem(
+                "[ELIMINATION] Timer tick: state=" + heat.getHeatState() + " finished=" + heatFinished
+            );
+
             if (heat.getHeatState() != HeatState.RACING || heatFinished) {
                 stopEliminationTimer();
                 return;
@@ -105,6 +118,9 @@ public class EliminationSession implements SessionLogic {
 
         countdownTask = SchedulerHelper.runTaskTimer(heat.getPlugin(), () -> {
             if (heat.getHeatState() != HeatState.RACING || heatFinished) {
+                heat.getPlugin().getDebugManager().logRaceSystem(
+                    "[ELIMINATION] Countdown task parando: state=" + heat.getHeatState() + " finished=" + heatFinished
+                );
                 stopCountdownTask();
                 return;
             }
@@ -117,6 +133,10 @@ public class EliminationSession implements SessionLogic {
             sendStatusTitles(heat);
 
         }, 20L, 20L); // A cada 1 segundo
+
+        heat.getPlugin().getDebugManager().logRaceSystem(
+            "[ELIMINATION] Countdown task agendada (20 ticks delay, 20 ticks period)"
+        );
     }
 
     /**
@@ -127,6 +147,10 @@ public class EliminationSession implements SessionLogic {
     private void sendStatusTitles(Heats heat) {
         List<Driver> activeDrivers = getActiveDrivers(heat);
         int totalActive = activeDrivers.size();
+
+        heat.getPlugin().getDebugManager().logRaceSystem(
+            "[ELIMINATION] sendStatusTitles: " + totalActive + " drivers ativos"
+        );
 
         if (totalActive == 0) return;
 
