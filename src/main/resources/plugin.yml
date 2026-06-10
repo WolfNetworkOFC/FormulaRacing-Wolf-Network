@@ -136,3 +136,24 @@ permissions:
   formularacing.spectator:
     description: Permissao para comandos de espectador
     default: true
+  cameras.edit:
+    description: Permite usar /cam edit
+    default: op
+  cameras.set:
+    description: Permite usar /cam set
+    default: op
+  cameras.view:
+    description: Permite usar /cam view
+    default: true
+  cameras.follow:
+    description: Permite usar /cam follow
+    default: true
+  cameras.stopfollow:
+    description: Permite usar /cam stopfollow
+    default: true
+  cameras.list:
+    description: Permite usar /cam list
+    default: true
+  cameras.menu:
+    description: Permite usar /cam menu
+    default: true

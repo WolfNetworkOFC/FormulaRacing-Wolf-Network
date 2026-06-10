@@ -15,6 +15,7 @@ import dev.EfraGroup.formulaRacing.Controllers.DailyRaceManager;
 import dev.EfraGroup.formulaRacing.Controllers.HotbarController;
 import dev.EfraGroup.formulaRacing.Controllers.LonelyController;
 import dev.EfraGroup.formulaRacing.Controllers.PodiumManager;
+import dev.EfraGroup.formulaRacing.Controllers.PartyRaceManager;
 import dev.EfraGroup.formulaRacing.Controllers.QuickRaceManager;
 import dev.EfraGroup.formulaRacing.Controllers.RaceEventManager;
 import dev.EfraGroup.formulaRacing.Controllers.RaceVoteManager;
@@ -33,7 +34,6 @@ import dev.EfraGroup.formulaRacing.Heat.Logic.ERSManager;
 import dev.EfraGroup.formulaRacing.Heat.Logic.PTPManager;
 import dev.EfraGroup.formulaRacing.Heat.Logic.RaceSession;
 import dev.EfraGroup.formulaRacing.Heat.PitStopManager;
-import dev.EfraGroup.formulaRacing.Listener.CamListener;
 import dev.EfraGroup.formulaRacing.Listener.DuelProtectionListener;
 import dev.EfraGroup.formulaRacing.Listener.FormulaRacingListener;
 import dev.EfraGroup.formulaRacing.Listener.HotbarListener;
@@ -47,7 +47,8 @@ import dev.EfraGroup.formulaRacing.Participant.DriverLookup;
 import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.TimeTrial.TimeTrialController;
-import dev.EfraGroup.formulaRacing.Utils.CamUtils;
+import dev.EfraGroup.formulaRacing.TVCamera.TVCameraController;
+import dev.EfraGroup.formulaRacing.TVCamera.TVCameraListener;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
@@ -118,7 +119,8 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private TimeUtils tu;
     private NMSHandler nmshandler;
     private APIFormulaRacing api;
-    private CamUtils cu;
+    private TVCameraController tvCameraController;
+    private TVCameraListener tvCameraListener;
     private DiscordUtils dcu;
     private TimeTrialDuelsAction ttda;
     private TimeTrialDuels ttd;
@@ -130,6 +132,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private PitStopConfigManager pitStopConfigManager;
     private SpectatorManager spectatorManager;
     private QuickRaceManager quickRaceManager;
+    private PartyRaceManager partyRaceManager;
     private RaceVoteManager raceVoteManager;
     private DrsManager drsManager;
     private PTPManager ptpManager;
@@ -178,8 +181,8 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return this.taskChainFactory.newSharedChain(name);
     }
 
-    public CamUtils getCamUtils() {
-        return this.cu;
+    public TVCameraController getTVCameraController() {
+        return this.tvCameraController;
     }
 
     public WorldEditSelect getWorldEditSelect() {
@@ -293,7 +296,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             );
             this.packetSender = new PacketSender(this.dm, this);
             this.timerUtils = new TimerUtils(this, this.dm);
-            this.cu = new CamUtils(this.dm, this);
+            this.tvCameraController = new TVCameraController(this, this.dm);
+            this.tvCameraController.loadCameras();
+            this.tvCameraListener = new TVCameraListener(this, this.tvCameraController);
             this.lonelyController = new LonelyController(this.dm, this);
             this.nmshandler = new NMSHandlerImpl();
             this.api = new APIFormulaRacing(this, this.dm, this.nmshandler);
@@ -321,6 +326,11 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.trackVisualizer = new TrackVisualizer(this);
             this.eventAnnouncements = new EventAnnouncements(this);
             this.quickRaceManager = new QuickRaceManager(
+                this,
+                this.raceEventManager,
+                this.dm
+            );
+            this.partyRaceManager = new PartyRaceManager(
                 this,
                 this.raceEventManager,
                 this.dm
@@ -541,7 +551,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(this, this);
         Bukkit.getPluginManager().registerEvents(this.rcl, this);
         Bukkit.getPluginManager().registerEvents(
-            new CamListener(this, this.cu),
+            this.tvCameraListener,
             this
         );
         Bukkit.getPluginManager().registerEvents(this.lonelyController, this);
@@ -608,7 +618,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.commandManager.registerCommand(new BoatCommand(api));
             this.commandManager.registerCommand(new LonelyCommand(this));
             this.commandManager.registerCommand(
-                new CamCommand(this, getDatabaseManager(), getCamUtils())
+                new CamCommand(this, this.tvCameraController, this.tvCameraListener)
             );
             this.commandManager.registerCommand(new EventCommand(this));
             this.commandManager.registerCommand(new RoundCommand(this));
@@ -1003,6 +1013,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return this.quickRaceManager;
     }
 
+    public PartyRaceManager getPartyRaceManager() {
+        return this.partyRaceManager;
+    }
+
     public RaceActionBarManager getRaceActionBarManager() {
         return this.raceActionBarManager;
     }
@@ -1362,6 +1376,31 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                     .filter(trackName -> this.dm.isTrackOpen(trackName))
                     .map(t -> t.replace(" ", ""))
                     .toList()
+        );
+        this.commandManager.getCommandCompletions().registerCompletion(
+            "partyMembers",
+            c -> {
+                if (!(c.getSender() instanceof Player player)) return List.of();
+                try {
+                    if (!dm.hasParty(player.getUniqueId())) return List.of();
+                    UUID owner = dm.getOwner(player.getUniqueId());
+                    String raw = dm.getMembers(owner);
+                    return Arrays.stream(raw.split(","))
+                            .filter(s -> !s.isEmpty())
+                            .map(s -> {
+                                try {
+                                    Player p = Bukkit.getPlayer(UUID.fromString(s));
+                                    return p != null ? p.getName() : "offline";
+                                } catch (IllegalArgumentException e) {
+                                    return null;
+                                }
+                            })
+                            .filter(n -> n != null && !n.equals("offline"))
+                            .toList();
+                } catch (SQLException e) {
+                    return List.of();
+                }
+            }
         );
         this.commandManager.getCommandCompletions().registerCompletion(
             "boatutils_settings",

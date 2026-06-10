@@ -266,6 +266,14 @@ public class DatabaseManager {
                     yaw REAL NOT NULL, pitch REAL NOT NULL
                 )"""
             );
+            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN cam_index INTEGER DEFAULT NULL"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN min_x REAL DEFAULT NULL"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN min_y REAL DEFAULT NULL"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN min_z REAL DEFAULT NULL"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN max_x REAL DEFAULT NULL"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN max_y REAL DEFAULT NULL"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN max_z REAL DEFAULT NULL"); } catch (SQLException ignored) {}
+            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN label TEXT DEFAULT NULL"); } catch (SQLException ignored) {}
             stmt.executeUpdate("UPDATE fr_player_times SET plataforma = 'JAVA' WHERE plataforma = 'Java'");
             stmt.executeUpdate(
                 """

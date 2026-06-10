@@ -6,6 +6,7 @@
 package dev.EfraGroup.formulaRacing.Command;
 
 import dev.EfraGroup.formulaRacing.Command.Help.CommandHelpService;
+import dev.EfraGroup.formulaRacing.Controllers.PartyRaceManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import co.aikar.commands.BaseCommand;
@@ -14,12 +15,15 @@ import co.aikar.commands.annotation.CommandAlias;
 import co.aikar.commands.annotation.CommandCompletion;
 import co.aikar.commands.annotation.Default;
 import co.aikar.commands.annotation.Description;
+import co.aikar.commands.annotation.Flags;
 import co.aikar.commands.annotation.Subcommand;
+import co.aikar.commands.annotation.Syntax;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.HoverEvent;
@@ -309,6 +313,67 @@ public class PartyCommand extends BaseCommand {
             player.sendMessage("§cErro ao buscar informações da party.");
         }
 
+    }
+
+    @Subcommand("race")
+    @Description("Inicia uma corrida privada para a party")
+    @Syntax("<track> [laps] [pits]")
+    @CommandCompletion("@tracks")
+    public void onRace(Player player, String trackName, @Flags("default:3") int laps, @Flags("default:0") int pits) {
+        PartyRaceManager prm = plugin.getPartyRaceManager();
+        if (prm == null) {
+            player.sendMessage("§cParty races não estão disponíveis.");
+            return;
+        }
+        prm.createPartyRace(player, trackName, laps, pits);
+    }
+
+    @Subcommand("promote")
+    @Description("Transfere a liderança da party para outro membro")
+    @CommandCompletion("@partyMembers")
+    public void onPromote(Player player, @Flags("other") Player target) {
+        try {
+            if (!dm.hasParty(player.getUniqueId())) {
+                player.sendMessage("§cVocê não tem uma party.");
+                return;
+            }
+
+            UUID owner = dm.getOwner(player.getUniqueId());
+            if (!owner.equals(player.getUniqueId())) {
+                player.sendMessage("§cApenas o líder pode promover outro membro.");
+                return;
+            }
+
+            if (target.getUniqueId().equals(owner)) {
+                player.sendMessage("§cVocê já é o líder da party.");
+                return;
+            }
+
+            String membersRaw = dm.getMembers(owner);
+            boolean isMember = Arrays.stream(membersRaw.split(","))
+                    .anyMatch(s -> !s.isEmpty() && UUID.fromString(s).equals(target.getUniqueId()));
+            if (!isMember) {
+                player.sendMessage("§cEsse jogador não está na sua party.");
+                return;
+            }
+
+            dm.removeMember(owner, target.getUniqueId());
+            dm.createParty(target.getUniqueId());
+            String remainingMembers = Arrays.stream(membersRaw.split(","))
+                    .filter(s -> !s.isEmpty())
+                    .filter(s -> !UUID.fromString(s).equals(target.getUniqueId()))
+                    .collect(Collectors.joining(","));
+            if (!remainingMembers.isEmpty()) {
+                for (String s : remainingMembers.split(",")) {
+                    if (!s.isEmpty()) dm.addMember(target.getUniqueId(), UUID.fromString(s));
+                }
+            }
+
+            player.sendMessage("§e" + target.getName() + " §aé o novo líder da party.");
+            target.sendMessage("§aVocê agora é o líder da party.");
+        } catch (SQLException e) {
+            player.sendMessage("§cErro ao promover jogador.");
+        }
     }
 
     private void sendHelp(Player player) {
