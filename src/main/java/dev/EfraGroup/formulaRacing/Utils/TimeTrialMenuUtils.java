@@ -174,14 +174,14 @@ import org.bukkit.inventory.meta.ItemMeta;
              }
              this.lastClickTime.put(uuid, now);
          }
-         player.closeInventory();
-          SchedulerHelper.runTaskLater(this.plugin, () -> {
-              try {
-                  this.processTeleport(player, trackName);
-              } catch (Exception e) {
-                  this.plugin.getDebugManager().logGuiSystem("[ERROR] Error processing teleport: " + e.getMessage());
-              }
-          }, 1L);
+          player.closeInventory();
+           SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+               try {
+                   this.processTeleport(player, trackName);
+               } catch (Exception e) {
+                   this.plugin.getDebugManager().logGuiSystem("[ERROR] Error processing teleport: " + e.getMessage());
+               }
+           });
      }
 
      private void processTeleport(Player player, String trackName) {

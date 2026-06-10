@@ -80,7 +80,10 @@ public class GridManager {
                         Player player = this.plugin.getServer().getPlayer(driver.getUuid());
                         if (player != null && player.isOnline()) {
                             Location gridLoc = (Location)this.gridPositions.get(gridPosition);
-                            this.plugin.getAPI().recoverPlayerBoatState(player);
+
+                            SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                                this.plugin.getAPI().recoverPlayerBoatState(player);
+                            });
 
                             SchedulerHelper.runTaskLater(this.plugin, () -> {
                                 if (player.isOnline()) {
@@ -92,7 +95,7 @@ public class GridManager {
                                     var10000.logRaceSystem("Piloto " + var10001 + " teleportado para P" + (gridPosition + 1));
                                 }
 
-                            }, 1L);
+                            }, 2L);
                             ++teleported;
                         } else {
                             this.plugin.getDebugManager().logRaceSystem("Piloto offline não pode ser teleportado: " + String.valueOf(driver.getUuid()));
@@ -143,7 +146,10 @@ public class GridManager {
                 Player player = this.plugin.getServer().getPlayer(driver.getUuid());
                 if (player != null && player.isOnline()) {
                     Location gridLoc = (Location)this.gridPositions.get(gridPosition);
-                    this.plugin.getAPI().recoverPlayerBoatState(player);
+
+                    SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                        this.plugin.getAPI().recoverPlayerBoatState(player);
+                    });
 
                     SchedulerHelper.runTaskLater(this.plugin, () -> {
                         if (player.isOnline()) {
@@ -160,7 +166,7 @@ public class GridManager {
                             var10000.logRaceSystem("Piloto " + var10001 + " teleportado para P" + (gridPosition + 1));
                         }
 
-                    }, 1L);
+                    }, 2L);
                     return true;
                 } else {
                     return false;

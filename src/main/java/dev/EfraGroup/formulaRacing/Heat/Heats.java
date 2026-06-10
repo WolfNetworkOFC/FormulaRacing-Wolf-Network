@@ -80,6 +80,7 @@ public class Heats {
     private Map<Integer, Integer> originalPositions = new HashMap<>();
     private int eliminationIntervalSeconds = 30;
     private int minimumDrivers = 2;
+    private boolean elimination = false;
 
     public Heats(FormulaRacing plugin, int id, Rounds round, int heatNumber) {
         this.plugin = plugin;
@@ -274,6 +275,14 @@ public class Heats {
         this.markConfigDirty();
     }
 
+    public boolean isElimination() {
+        return this.elimination;
+    }
+
+    public void setElimination(boolean elimination) {
+        this.elimination = elimination;
+    }
+
     public List<Driver> getLivePositions() {
         return this.livePositions;
     }
@@ -456,7 +465,9 @@ public class Heats {
                     for (Driver driver : this.drivers.values()) {
                         Player player = Bukkit.getPlayer(driver.getUuid());
                         if (player != null && player.isOnline()) {
-                            this.plugin.getAPI().recoverPlayerBoatState(player);
+                            SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                                this.plugin.getAPI().recoverPlayerBoatState(player);
+                            });
                             SchedulerHelper.teleportAsync(this.plugin, player, spawnLoc);
                             this.spawnQualiDriver(player, driver);
                         }
@@ -471,7 +482,9 @@ public class Heats {
                             int gridIndex = driver.getStartPosition() - 1;
                             if (gridIndex >= 0 && gridIndex < qualiGridPositions.size()) {
                                 Location qualiLoc = qualiGridPositions.get(gridIndex);
-                                this.plugin.getAPI().recoverPlayerBoatState(player);
+                                SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                                    this.plugin.getAPI().recoverPlayerBoatState(player);
+                                });
                                 SchedulerHelper.teleportAsync(this.plugin, player, qualiLoc);
                                 this.spawnQualiDriver(player, driver);
                             } else {
@@ -844,12 +857,15 @@ public class Heats {
                 }
 
                 if (targetLoc != null) {
+                    Location finalTargetLoc = targetLoc;
                     for (Driver d : this.drivers.values()) {
                         if (!d.isFinished()) {
                             Player p = Bukkit.getPlayer(d.getUuid());
                             if (p != null && p.isOnline()) {
-                                this.plugin.getAPI().recoverPlayerBoatState(p);
-                                SchedulerHelper.teleportAsync(this.plugin, p, targetLoc);
+                                SchedulerHelper.runTaskFor(this.plugin, p, () -> {
+                                    this.plugin.getAPI().recoverPlayerBoatState(p);
+                                    SchedulerHelper.teleportAsync(this.plugin, p, finalTargetLoc);
+                                });
                             }
                         }
                     }
@@ -860,7 +876,9 @@ public class Heats {
 
     private void displayFinalStandings() {
         List<Driver> results = new ArrayList(this.drivers.values());
-        if (
+        if (this.isElimination()) {
+            results.sort((d1, d2) -> Long.compare(d2.getTotalTime(), d1.getTotalTime()));
+        } else if (
             this.previousState != HeatState.QUALIFYING &&
             this.previousState != HeatState.PRACTICE
         ) {
@@ -1432,30 +1450,32 @@ public class Heats {
         var10000.logRaceSystem(
             "Processando saída de " + var10001 + " do Heat " + this.id
         );
-        this.plugin.getLonelyController().clearGhost(player.getUniqueId());
-        this.plugin.getRaceScoreboardManager().removePlayer(player);
-        this.plugin.getRaceActionBarManager().removePlayer(player);
-        this.plugin.getAPI().recoverPlayerBoatState(player);
-        if (this.plugin.getPacketSender() != null) {
-            boolean dbLonely =
-                this.plugin.getDatabaseManager().getLonelyModePlayer(
-                    player.getUniqueId()
-                );
-            this.plugin.getLonelyController().setLonelyMode(player, dbLonely);
-        }
-
-        if (
-            this.heatState != HeatState.IDLE &&
-            this.heatState != HeatState.SETUP &&
-            this.heatState != HeatState.FINISHED
-        ) {
-            Location spawnLoc = this.plugin.getDatabaseManager().getTrackSpawn(
-                this.trackNameWS
-            );
-            if (spawnLoc != null) {
-                SchedulerHelper.teleportAsync(this.plugin, player, spawnLoc);
+        SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+            this.plugin.getLonelyController().clearGhost(player.getUniqueId());
+            this.plugin.getRaceScoreboardManager().removePlayer(player);
+            this.plugin.getRaceActionBarManager().removePlayer(player);
+            this.plugin.getAPI().recoverPlayerBoatState(player);
+            if (this.plugin.getPacketSender() != null) {
+                boolean dbLonely =
+                    this.plugin.getDatabaseManager().getLonelyModePlayer(
+                        player.getUniqueId()
+                    );
+                this.plugin.getLonelyController().setLonelyMode(player, dbLonely);
             }
-        }
+
+            if (
+                this.heatState != HeatState.IDLE &&
+                this.heatState != HeatState.SETUP &&
+                this.heatState != HeatState.FINISHED
+            ) {
+                Location spawnLoc = this.plugin.getDatabaseManager().getTrackSpawn(
+                    this.trackNameWS
+                );
+                if (spawnLoc != null) {
+                    SchedulerHelper.teleportAsync(this.plugin, player, spawnLoc);
+                }
+            }
+        });
     }
 
     public int getFinishedCount() {
@@ -1466,7 +1486,15 @@ public class Heats {
     }
 
     public void updateLivePositions() {
-        if (
+        if (this.isElimination()) {
+            List<Driver> sorted = this.drivers.values().stream()
+                .sorted((d1, d2) -> Long.compare(d2.getTotalTime(), d1.getTotalTime()))
+                .toList();
+            this.livePositions = new ArrayList(sorted);
+            for (int i = 0; i < sorted.size(); ++i) {
+                sorted.get(i).setPosition(i + 1);
+            }
+        } else if (
             this.heatState != HeatState.QUALIFYING &&
             this.heatState != HeatState.PRACTICE
         ) {

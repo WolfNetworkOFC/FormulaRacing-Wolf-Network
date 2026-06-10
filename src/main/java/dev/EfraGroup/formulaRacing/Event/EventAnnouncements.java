@@ -261,7 +261,11 @@ public class EventAnnouncements {
         for(Driver d : results) {
             String name = Bukkit.getOfflinePlayer(d.getUuid()).getName();
             String info = "";
-            if (previousState != HeatState.QUALIFYING && previousState != HeatState.PRACTICE) {
+            if (heat.isElimination()) {
+                info = d.getEndTime() != null && d.getStartTime() != null
+                    ? this.formatTime(d.getEndTime() - d.getStartTime())
+                    : (d.getStartTime() != null ? this.formatTime(System.currentTimeMillis() - d.getStartTime()) : "---");
+            } else if (previousState != HeatState.QUALIFYING && previousState != HeatState.PRACTICE) {
                 if (d.getLapCount() < heat.getTotalLaps()) {
                     int var10000 = d.getLapCount();
                     info = "(" + var10000 + "/" + heat.getTotalLaps() + ")";

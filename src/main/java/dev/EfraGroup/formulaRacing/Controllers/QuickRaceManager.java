@@ -490,19 +490,21 @@ public class QuickRaceManager {
                 for(UUID uuid : this.currentHeat.getDrivers().keySet()) {
                     Player p = this.plugin.getServer().getPlayer(uuid);
                     if (p != null && p.isOnline()) {
-                        this.plugin.getAPI().recoverPlayerBoatState(p);
-                        p.removePotionEffect(PotionEffectType.SLOWNESS);
-                        p.removePotionEffect(PotionEffectType.JUMP_BOOST);
-                        if (this.plugin.getPacketSender() != null) {
-                            this.plugin.getPacketSender().resetBoatUtilsToVanilla(p);
-                        }
+                        SchedulerHelper.runTaskFor(this.plugin, p, () -> {
+                            this.plugin.getAPI().recoverPlayerBoatState(p);
+                            p.removePotionEffect(PotionEffectType.SLOWNESS);
+                            p.removePotionEffect(PotionEffectType.JUMP_BOOST);
+                            if (this.plugin.getPacketSender() != null) {
+                                this.plugin.getPacketSender().resetBoatUtilsToVanilla(p);
+                            }
 
-                        Location respawnLoc = p.getRespawnLocation();
-                        if (respawnLoc == null) {
-                            respawnLoc = ((World)this.plugin.getServer().getWorlds().get(0)).getSpawnLocation();
-                        }
+                            Location respawnLoc = p.getRespawnLocation();
+                            if (respawnLoc == null) {
+                                respawnLoc = ((World)this.plugin.getServer().getWorlds().get(0)).getSpawnLocation();
+                            }
 
-                        SchedulerHelper.teleport(p, respawnLoc);
+                            SchedulerHelper.teleport(p, respawnLoc);
+                        });
                     }
                 }
 
