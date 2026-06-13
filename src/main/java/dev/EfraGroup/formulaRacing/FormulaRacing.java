@@ -404,7 +404,6 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.registerListeners();
             this.registerCommands();
             this.registerPlaceholders();
-            HologramManager.removeAllHologramStands();
             this.loadLeaderboards();
             this.startLeaderboardUpdater();
             SchedulerHelper.runAsync(this, () ->

@@ -708,8 +708,11 @@ public class DailyRaceManager {
 
         for(Events event : this.plugin.getRaceEventManager().getActiveEvents()) {
             if ((dailyId == null || event.getId() != dailyId) && event.getState() == EventState.RUNNING) {
-                String track = event.getTrackNameWS();
                 String eventName = event.getDisplayName();
+                if (eventName.startsWith("QuickRace_") || eventName.startsWith("PartyRace_") || eventName.startsWith("DuelRace_")) {
+                    continue;
+                }
+                String track = event.getTrackNameWS();
                 String lang = this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
                 player.sendMessage("");
                 String var10001 = String.valueOf(ChatColor.GOLD);
