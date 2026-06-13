@@ -64,6 +64,7 @@ import dev.EfraGroup.formulaRacing.Utils.TimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.TranslationUtil;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
+import org.bukkit.entity.Boat;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.ScoreboardOwnershipCoordinator;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.RaceScoreboardV2Manager;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.MegavexAdapter;
@@ -483,6 +484,15 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         if (this.quickRaceManager != null) {
             this.quickRaceManager.shutdown();
         }
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            Entity vehicle = player.getVehicle();
+            if (vehicle instanceof Boat) {
+                player.leaveVehicle();
+                vehicle.remove();
+            }
+        }
+        this.lockedBoats.clear();
 
         if (this.raceEventManager != null) {
             for (Events event : this.raceEventManager.getActiveEvents()) {
