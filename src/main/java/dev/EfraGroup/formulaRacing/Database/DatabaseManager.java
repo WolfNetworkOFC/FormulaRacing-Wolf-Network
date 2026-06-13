@@ -2010,6 +2010,7 @@ public class DatabaseManager {
                 }
 
                 conn.commit();
+                clearCheckpointsCache(trackNameWS);
                 return true;
             } catch (SQLException ex) {
                 conn.rollback();
@@ -2079,6 +2080,7 @@ public class DatabaseManager {
                 }
 
                 conn.commit();
+                clearCheckpointsCache(trackNameWS);
                 return true;
             } catch (SQLException ex) {
                 conn.rollback();
