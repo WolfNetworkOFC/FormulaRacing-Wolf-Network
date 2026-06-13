@@ -388,7 +388,12 @@ public class QuickRaceManager {
                 this.plugin.getAPI().recoverPlayerBoatState(player);
                 this.currentHeat.removeDriver(player.getUniqueId());
 
-                Location respawn = player.getRespawnLocation();
+                Location respawn;
+                try {
+                    respawn = player.getRespawnLocation();
+                } catch (IllegalStateException e) {
+                    respawn = null;
+                }
                 if (respawn == null) {
                     respawn = player.getWorld().getSpawnLocation();
                 }

@@ -7995,8 +7995,9 @@ public class DatabaseManager {
         String trackNameWS = trackName.replaceAll("\\s+", "");
         String sql =
             "INSERT INTO fr_pit_stops (trackNameWS, " +
+            "minX, minY, minZ, maxX, maxY, maxZ, " +
             "exitMinX, exitMinY, exitMinZ, exitMaxX, exitMaxY, exitMaxZ, world) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
             "ON CONFLICT(trackNameWS) DO UPDATE SET " +
             "exitMinX=excluded.exitMinX, exitMinY=excluded.exitMinY, exitMinZ=excluded.exitMinZ, " +
             "exitMaxX=excluded.exitMaxX, exitMaxY=excluded.exitMaxY, exitMaxZ=excluded.exitMaxZ";
@@ -8010,7 +8011,13 @@ public class DatabaseManager {
                 ps.setDouble(5, max.getX());
                 ps.setDouble(6, max.getY());
                 ps.setDouble(7, max.getZ());
-                ps.setString(8, min.getWorld().getName());
+                ps.setDouble(8, min.getX());
+                ps.setDouble(9, min.getY());
+                ps.setDouble(10, min.getZ());
+                ps.setDouble(11, max.getX());
+                ps.setDouble(12, max.getY());
+                ps.setDouble(13, max.getZ());
+                ps.setString(14, min.getWorld().getName());
                 return ps.executeUpdate() > 0;
             }
         } catch (SQLException e) {
@@ -8031,8 +8038,9 @@ public class DatabaseManager {
         String trackNameWS = trackName.replaceAll("\\s+", "");
         String sql =
             "INSERT INTO fr_pit_stops (trackNameWS, " +
+            "minX, minY, minZ, maxX, maxY, maxZ, " +
             "areaMinX, areaMinY, areaMinZ, areaMaxX, areaMaxY, areaMaxZ, world) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
             "ON CONFLICT(trackNameWS) DO UPDATE SET " +
             "areaMinX=excluded.areaMinX, areaMinY=excluded.areaMinY, areaMinZ=excluded.areaMinZ, " +
             "areaMaxX=excluded.areaMaxX, areaMaxY=excluded.areaMaxY, areaMaxZ=excluded.areaMaxZ";
@@ -8046,7 +8054,13 @@ public class DatabaseManager {
                 ps.setDouble(5, max.getX());
                 ps.setDouble(6, max.getY());
                 ps.setDouble(7, max.getZ());
-                ps.setString(8, min.getWorld().getName());
+                ps.setDouble(8, min.getX());
+                ps.setDouble(9, min.getY());
+                ps.setDouble(10, min.getZ());
+                ps.setDouble(11, max.getX());
+                ps.setDouble(12, max.getY());
+                ps.setDouble(13, max.getZ());
+                ps.setString(14, min.getWorld().getName());
                 return ps.executeUpdate() > 0;
             }
         } catch (SQLException e) {
