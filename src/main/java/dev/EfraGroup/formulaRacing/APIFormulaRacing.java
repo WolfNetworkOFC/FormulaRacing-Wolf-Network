@@ -207,4 +207,15 @@ public class APIFormulaRacing {
             }
         });
     }
+
+    public void clearAllBoats() {
+        for (Player player : this.plugin.getOnlinePlayers()) {
+            Entity vehicle = player.getVehicle();
+            if (vehicle instanceof Boat) {
+                player.leaveVehicle();
+                vehicle.remove();
+            }
+        }
+        lockedBoats.clear();
+    }
 }

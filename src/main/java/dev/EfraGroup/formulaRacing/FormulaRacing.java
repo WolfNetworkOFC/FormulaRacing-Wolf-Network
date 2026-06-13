@@ -485,14 +485,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.quickRaceManager.shutdown();
         }
 
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            Entity vehicle = player.getVehicle();
-            if (vehicle instanceof Boat) {
-                player.leaveVehicle();
-                vehicle.remove();
-            }
+        if (this.api != null) {
+            this.api.clearAllBoats();
         }
-        this.lockedBoats.clear();
 
         if (this.raceEventManager != null) {
             for (Events event : this.raceEventManager.getActiveEvents()) {
