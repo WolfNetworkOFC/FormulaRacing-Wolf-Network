@@ -64,7 +64,6 @@ import dev.EfraGroup.formulaRacing.Utils.TimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.TranslationUtil;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
-import org.bukkit.entity.Boat;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.ScoreboardOwnershipCoordinator;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.RaceScoreboardV2Manager;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.MegavexAdapter;
