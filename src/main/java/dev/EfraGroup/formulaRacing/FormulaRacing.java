@@ -858,6 +858,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     }
 
     private final Map<String, TrackLeaderboard> trackLeaderboards = new HashMap<>();
+    private boolean leaderboardsLoaded = false;
 
     public TrackLeaderboard getOrCreateLeaderboard(String trackName, Location defaultLocation) {
         return trackLeaderboards.computeIfAbsent(trackName, name -> {
@@ -866,6 +867,11 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     }
 
     private void loadLeaderboards() {
+        if (this.leaderboardsLoaded) {
+            return;
+        }
+        this.leaderboardsLoaded = true;
+        
         if (this.debugManager != null) {
             this.debugManager.logDatabaseOperations("[FormulaRacing] Carregando leaderboards...");
         }

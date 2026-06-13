@@ -174,7 +174,7 @@ public class TrackLeaderboard {
                 if (hm != null) {
                     for (String type : new String[]{"java", "bedrock"}) {
                         String safeName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
-                        hm.deleteHologram("lb_" + type + "_" + safeName);
+                        hm.deleteHologram(safeName + "_" + type);
                     }
                 }
             }

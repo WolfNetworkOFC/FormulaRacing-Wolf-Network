@@ -667,44 +667,54 @@ public class DailyRaceManager {
                 String track = event.getTrackNameWS();
                 String eventName = event.getDisplayName();
                 String lang = this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
+
+                player.sendMessage("");
+                String box = ChatColor.GOLD + "" + ChatColor.BOLD + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+                player.sendMessage(box);
+
                 if (this.phase == DailyRaceManager.Phase.PRACTICE) {
-                    player.sendMessage("");
-                    String var10001 = String.valueOf(ChatColor.GOLD);
-                    player.sendMessage(var10001 + String.valueOf(ChatColor.BOLD) + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                    var10001 = String.valueOf(ChatColor.YELLOW);
-                    player.sendMessage(var10001 + this.plugin.getTranslation("daily_msg_header", lang, new String[0]));
-                    var10001 = String.valueOf(ChatColor.GRAY);
-                    player.sendMessage(var10001 + this.plugin.getTranslation("daily_msg_track", lang, new String[]{"{track}", track}));
-                    this.plugin.sendMessage(player, "daily_signup_track", new String[]{"{track}", track});
-                    this.plugin.sendMessage(player, "daily_msg_phase", new String[]{"{phase}", "Treino Livre"});
+                    player.sendMessage(this.plugin.getTranslation("daily_msg_header", lang));
+                    player.sendMessage(this.plugin.getTranslation("daily_msg_track", lang, "{track}", track));
+                    player.sendMessage(this.plugin.getTranslation("daily_msg_phase", lang, "{phase}", "Treino Livre"));
                     String obuWarning = this.getOBUWarning(player, track);
                     if (obuWarning != null) {
                         player.sendMessage("");
                         player.sendMessage(obuWarning);
                     }
-
                     player.sendMessage("");
-                    ClickableMessageUtil.sendEventSignBroadcast(player, this.plugin.getTranslation("daily_sign_click", lang, new String[]{"{event}", eventName}), this.plugin.getTranslation("daily_sign_hover", lang, new String[]{"{event}", eventName}), eventName);
-                    player.sendMessage("");
-                    var10001 = String.valueOf(ChatColor.GOLD);
-                    player.sendMessage(var10001 + String.valueOf(ChatColor.BOLD) + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                    player.sendMessage("");
+                    ClickableMessageUtil.sendEventSignBroadcast(player, this.plugin.getTranslation("daily_sign_click", lang, "{event}", eventName), this.plugin.getTranslation("daily_sign_hover", lang, "{event}", eventName), eventName);
                 } else if (this.phase == DailyRaceManager.Phase.QUALIFICATION) {
-                    String var13 = String.valueOf(ChatColor.GOLD);
-                    player.sendMessage(var13 + this.plugin.getTranslation("daily_qual_header", lang, new String[0]));
-                    this.plugin.sendMessage(player, "daily_signup_track", new String[]{"{track}", track});
+                    player.sendMessage(this.plugin.getTranslation("daily_qual_header", lang));
+                    player.sendMessage(this.plugin.getTranslation("daily_msg_track", lang, "{track}", track));
+                    player.sendMessage(this.plugin.getTranslation("daily_msg_phase", lang, "{phase}", "Qualificação"));
+                    String obuWarning = this.getOBUWarning(player, track);
+                    if (obuWarning != null) {
+                        player.sendMessage("");
+                        player.sendMessage(obuWarning);
+                    }
+                    player.sendMessage("");
+                    ClickableMessageUtil.sendEventSignBroadcast(player, this.plugin.getTranslation("daily_sign_click", lang, "{event}", eventName), this.plugin.getTranslation("daily_sign_hover", lang, "{event}", eventName), eventName);
                 } else if (this.phase == DailyRaceManager.Phase.FINAL) {
-                    String var14 = String.valueOf(ChatColor.GOLD);
-                    player.sendMessage(var14 + this.plugin.getTranslation("daily_race_header", lang, new String[0]));
-                    this.plugin.sendMessage(player, "daily_signup_track", new String[]{"{track}", track});
+                    player.sendMessage(this.plugin.getTranslation("daily_race_header", lang));
+                    player.sendMessage(this.plugin.getTranslation("daily_msg_track", lang, "{track}", track));
+                    String obuWarning = this.getOBUWarning(player, track);
+                    if (obuWarning != null) {
+                        player.sendMessage("");
+                        player.sendMessage(obuWarning);
+                    }
+                    player.sendMessage("");
+                    ClickableMessageUtil.sendEventSignBroadcast(player, this.plugin.getTranslation("daily_sign_click", lang, "{event}", eventName), this.plugin.getTranslation("daily_sign_hover", lang, "{event}", eventName), eventName);
                 }
 
+                player.sendMessage(box);
+                player.sendMessage("");
             }
         }
     }
 
     private void notifyManualEvents(Player player) {
         Integer dailyId = this.activeEventId;
+        String box = ChatColor.GOLD + "" + ChatColor.BOLD + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
 
         for(Events event : this.plugin.getRaceEventManager().getActiveEvents()) {
             if ((dailyId == null || event.getId() != dailyId) && event.getState() == EventState.RUNNING) {
@@ -715,11 +725,10 @@ public class DailyRaceManager {
                 String track = event.getTrackNameWS();
                 String lang = this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
                 player.sendMessage("");
-                String var10001 = String.valueOf(ChatColor.GOLD);
-                player.sendMessage(var10001 + String.valueOf(ChatColor.BOLD) + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                this.plugin.sendMessage(player, "event_formal_header", new String[]{"{event}", eventName});
+                player.sendMessage(box);
+                player.sendMessage(this.plugin.getTranslation("event_formal_header", lang, "{event}", eventName));
                 if (track != null) {
-                    this.plugin.sendMessage(player, "daily_signup_track", new String[]{"{track}", track});
+                    player.sendMessage(this.plugin.getTranslation("daily_msg_track", lang, "{track}", track));
                     String obuWarning = this.getOBUWarning(player, track);
                     if (obuWarning != null) {
                         player.sendMessage("");
@@ -729,21 +738,19 @@ public class DailyRaceManager {
 
                 Rounds currentRound = (Rounds)event.getEventSchedule().getCurrentRound().orElse(null);
                 if (currentRound != null) {
-                    this.plugin.sendMessage(player, "event_formal_phase", new String[]{"{phase}", currentRound.getType().toString()});
+                    player.sendMessage(this.plugin.getTranslation("event_formal_phase", lang, "{phase}", currentRound.getType().toString()));
                 }
 
                 player.sendMessage("");
                 if (event.isOpenSign()) {
-                    ClickableMessageUtil.sendEventSignBroadcast(player, this.plugin.getTranslation("daily_sign_click", lang, new String[]{"{event}", eventName}), this.plugin.getTranslation("daily_sign_hover", lang, new String[]{"{event}", eventName}), eventName);
+                    ClickableMessageUtil.sendEventSignBroadcast(player, this.plugin.getTranslation("daily_sign_click", lang, "{event}", eventName), this.plugin.getTranslation("daily_sign_hover", lang, "{event}", eventName), eventName);
                 }
 
-                TextComponent specComp = new TextComponent(this.plugin.getTranslation("event_watch_click", lang, new String[0]));
-                specComp.setHoverEvent(new HoverEvent(Action.SHOW_TEXT, new Content[]{new Text(this.plugin.getTranslation("event_watch_hover", lang, new String[]{"{event}", eventName}))}));
+                TextComponent specComp = new TextComponent(this.plugin.getTranslation("event_watch_click", lang));
+                specComp.setHoverEvent(new HoverEvent(Action.SHOW_TEXT, new Content[]{new Text(this.plugin.getTranslation("event_watch_hover", lang, "{event}", eventName))}));
                 specComp.setClickEvent(new ClickEvent(net.md_5.bungee.api.chat.ClickEvent.Action.RUN_COMMAND, "/spectate " + eventName));
                 player.spigot().sendMessage(specComp);
-                player.sendMessage("");
-                var10001 = String.valueOf(ChatColor.GOLD);
-                player.sendMessage(var10001 + String.valueOf(ChatColor.BOLD) + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                player.sendMessage(box);
                 player.sendMessage("");
             }
         }
@@ -753,20 +760,17 @@ public class DailyRaceManager {
     private void broadcastPracticeStart(Events event, int practiceMinutes) {
         String track = event.getTrackNameWS();
         String eventName = event.getDisplayName();
+        String box = ChatColor.GOLD + "" + ChatColor.BOLD + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
         for(Player player : Bukkit.getOnlinePlayers()) {
             String lang = this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
             player.sendMessage("");
-            String var10001 = String.valueOf(ChatColor.GOLD);
-            player.sendMessage(var10001 + String.valueOf(ChatColor.BOLD) + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            var10001 = String.valueOf(ChatColor.YELLOW);
-            player.sendMessage(var10001 + this.plugin.getTranslation("daily_start_header", lang, new String[0]));
-            this.plugin.sendMessage(player, "daily_signup_track", new String[]{"{track}", track});
-            this.plugin.sendMessage(player, "daily_start_practice", new String[]{"{time}", String.valueOf(practiceMinutes)});
+            player.sendMessage(box);
+            player.sendMessage(this.plugin.getTranslation("daily_start_header", lang));
+            player.sendMessage(this.plugin.getTranslation("daily_msg_track", lang, "{track}", track));
+            player.sendMessage(this.plugin.getTranslation("daily_start_practice", lang, "{time}", String.valueOf(practiceMinutes)));
             player.sendMessage("");
-            ClickableMessageUtil.sendEventSignBroadcast(player, this.plugin.getTranslation("daily_sign_click", lang, new String[]{"{event}", eventName}), this.plugin.getTranslation("daily_sign_hover", lang, new String[]{"{event}", eventName}), eventName);
-            player.sendMessage("");
-            var10001 = String.valueOf(ChatColor.GOLD);
-            player.sendMessage(var10001 + String.valueOf(ChatColor.BOLD) + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            ClickableMessageUtil.sendEventSignBroadcast(player, this.plugin.getTranslation("daily_sign_click", lang, "{event}", eventName), this.plugin.getTranslation("daily_sign_hover", lang, "{event}", eventName), eventName);
+            player.sendMessage(box);
             player.sendMessage("");
         }
 
