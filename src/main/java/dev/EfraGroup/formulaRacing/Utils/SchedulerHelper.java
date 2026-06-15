@@ -2,6 +2,7 @@ package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.plugin.Plugin;
 
@@ -35,12 +36,12 @@ public class SchedulerHelper {
         return SCHEDULER.runDelayedTaskAtLocation(plugin, location, runnable, delayTicks);
     }
 
-    public static FRTask runTaskTimerAtLocation(Plugin plugin, Location location, Runnable runnable, long delayTicks, long periodTicks) {
+public static FRTask runTaskTimerAtLocation(Plugin plugin, Location location, Runnable runnable, long delayTicks, long periodTicks) {
         return SCHEDULER.runTaskTimerAtLocation(plugin, location, runnable, delayTicks, periodTicks);
     }
 
-    public static FRTask runTaskAtEntity(Plugin plugin, Entity entity, Runnable runnable) {
-        return SCHEDULER.runTaskAtEntity(plugin, entity, runnable, null);
+    public static FRTask runTaskTimerAt(Plugin plugin, World world, Runnable runnable, long delayTicks, long periodTicks) {
+        return SCHEDULER.runTaskTimerAtWorld(plugin, world, runnable, delayTicks, periodTicks);
     }
 
     public static FRTask runTaskAtEntity(Plugin plugin, Entity entity, Runnable runnable, Runnable retired) {

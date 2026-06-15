@@ -69,6 +69,11 @@ public class FoliaScheduler implements TaskScheduler {
     }
 
     @Override
+    public FRTask runTaskTimerAt(Plugin plugin, World world, Runnable runnable, long delayTicks, long periodTicks) {
+        return new FoliaFRTask(Bukkit.getRegionScheduler().runAtFixedRate(plugin, world, t -> runnable.run(), Math.max(1, delayTicks), Math.max(1, periodTicks)));
+    }
+
+    @Override
     public FRTask runTaskAtEntity(Plugin plugin, Entity entity, Runnable runnable, Runnable retired) {
         return new FoliaFRTask(entity.getScheduler().run(plugin, t -> runnable.run(), retired));
     }

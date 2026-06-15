@@ -146,18 +146,18 @@ public double getPlayerLapElapsedSeconds(Player player) {
           return session.getCurrentLapTime();
       }
 
-      private void startGlobalUpdateTask() {
-          World world = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
-          if (world == null) {
-              SchedulerHelper.runTaskTimer(this.plugin, () -> {
-                  this.updateDuelVisuals();
-              }, 1L, 20L);
-          } else {
-              SchedulerHelper.runTaskTimerAt(this.plugin, world, 0, 0, task -> {
-                  this.updateDuelVisuals();
-              }, 1L, 20L);
-          }
-      }
+private void startGlobalUpdateTask() {
+           World world = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
+           if (world == null) {
+               SchedulerHelper.runTaskTimer(this.plugin, () -> {
+                   this.updateDuelVisuals();
+               }, 1L, 20L);
+           } else {
+               SchedulerHelper.runTaskTimerAt(this.plugin, world, () -> {
+                   this.updateDuelVisuals();
+               }, 1L, 20L);
+           }
+       }
       
       private void updateDuelVisuals() {
            TimeTrialDuelsAction.this.activeVisuals.forEach((uuid, duelId) -> {

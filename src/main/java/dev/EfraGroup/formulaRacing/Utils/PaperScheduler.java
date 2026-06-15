@@ -67,6 +67,11 @@ public class PaperScheduler implements TaskScheduler {
     }
 
     @Override
+    public FRTask runTaskTimerAt(Plugin plugin, World world, Runnable runnable, long delayTicks, long periodTicks) {
+        return runTaskTimer(plugin, runnable, delayTicks, periodTicks);
+    }
+
+    @Override
     public FRTask runTaskAtEntity(Plugin plugin, Entity entity, Runnable runnable, Runnable retired) {
         return runTask(plugin, runnable);
     }
