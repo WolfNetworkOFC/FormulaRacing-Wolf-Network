@@ -374,8 +374,8 @@ public class LonelyController implements Listener {
 
     private void showPlayer(Player viewer, Player target) {
         SchedulerHelper.runTaskFor(plugin, viewer, () -> viewer.showPlayer(plugin, target));
-        SchedulerHelper.runTaskFor(plugin, target, t -> {
-            Entity vehicle = t.getVehicle();
+        SchedulerHelper.runTaskFor(plugin, target, () -> {
+            Entity vehicle = target.getVehicle();
             if (vehicle != null) {
                 viewer.showEntity(plugin, vehicle);
                 if (plugin.getConfig().getBoolean("FrostHexAddOn", false)) {
@@ -389,8 +389,8 @@ public class LonelyController implements Listener {
 
     private void hidePlayer(Player viewer, Player target) {
         SchedulerHelper.runTaskFor(plugin, viewer, () -> viewer.hidePlayer(plugin, target));
-        SchedulerHelper.runTaskFor(plugin, target, t -> {
-            Entity vehicle = t.getVehicle();
+        SchedulerHelper.runTaskFor(plugin, target, () -> {
+            Entity vehicle = target.getVehicle();
             if (vehicle != null) {
                 viewer.hideEntity(plugin, vehicle);
                 if (plugin.getConfig().getBoolean("FrostHexAddOn", false)) {
