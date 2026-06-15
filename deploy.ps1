@@ -30,22 +30,31 @@ if (-not $token) {
 }
 
 $servers = @(
-    "https://painel.faws.net.br/server/58934340",
-    "https://painel.faws.net.br/server/44514b9d"
+    @{ id = "58934340"; url = "https://painel.faws.net.br" },
+    @{ id = "44514b9d"; url = "https://painel.faws.net.br" }
 )
 
-foreach ($serverUrl in $servers) {
+foreach ($server in $servers) {
     try {
-        $uri = [System.Uri]$serverUrl
-        $panelUrl = $uri.GetLeftPart([System.UriPartial]::Authority)
-        $serverId = $uri.Segments[-1]
-
+        $serverId = $server.id
+        $serverUrl = $server.url
+        
+        $fileBytes = [System.IO.File]::ReadAllBytes($jarPath)
+        
+        $headers = @{ 
+            Authorization = "Bearer $token"
+        }
+        
+        $uploadUri = "$serverUrl/api/client/servers/$serverId/files/write?file=plugins%2F$jarFile&raw=true"
+        
+        Invoke-RestMethod -Uri $uploadUri -Headers $headers -Method POST -Body $fileBytes -ContentType "application/octet-stream" -ErrorAction Stop | Out-Null
+        Write-Host "Plugin enviado para servidor $serverId"
+        
         $restartHeaders = @{ Authorization = "Bearer $token"; "Content-Type" = "application/json" }
-        Invoke-RestMethod -Uri "$panelUrl/api/client/servers/$serverId/power" -Method POST -Headers $restartHeaders -Body '{"signal":"restart"}' -ErrorAction Stop | Out-Null
+        Invoke-RestMethod -Uri "$serverUrl/api/client/servers/$serverId/power" -Method POST -Headers $restartHeaders -Body '{"signal":"restart"}' -ErrorAction Stop | Out-Null
         Write-Host "Server $serverId reiniciado!"
     } catch {
-        $errMsg = $_.Exception.Message
-        Write-Warning "Falha ao reiniciar servidor $serverUrl`: $errMsg"
+        Write-Warning "Falha ao processar servidor $serverId`: $($_.Exception.Message)"
     }
     Start-Sleep -Seconds 5
 }
