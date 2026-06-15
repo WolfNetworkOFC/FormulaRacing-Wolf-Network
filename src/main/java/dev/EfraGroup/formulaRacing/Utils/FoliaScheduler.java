@@ -3,6 +3,7 @@ package dev.EfraGroup.formulaRacing.Utils;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.plugin.Plugin;
 
@@ -70,7 +71,7 @@ public class FoliaScheduler implements TaskScheduler {
 
     @Override
     public FRTask runTaskTimerAt(Plugin plugin, World world, Runnable runnable, long delayTicks, long periodTicks) {
-        return new FoliaFRTask(Bukkit.getRegionScheduler().runAtFixedRate(plugin, world, t -> runnable.run(), Math.max(1, delayTicks), Math.max(1, periodTicks)));
+        return new FoliaFRTask(Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, t -> runnable.run(), Math.max(1, delayTicks), Math.max(1, periodTicks)));
     }
 
     @Override

@@ -2,11 +2,11 @@ package dev.EfraGroup.formulaRacing.AI;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.FRTask;
 
 import java.util.ArrayList;
 import java.util.HashMap;

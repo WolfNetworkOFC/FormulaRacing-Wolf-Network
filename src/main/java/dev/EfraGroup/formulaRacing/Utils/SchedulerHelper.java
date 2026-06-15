@@ -28,6 +28,10 @@ public class SchedulerHelper {
         return SCHEDULER.runTaskTimer(plugin, runnable, delayTicks, periodTicks);
     }
 
+    public static FRTask runTaskLater(Plugin plugin, Runnable runnable, long delayTicks) {
+        return SCHEDULER.runDelayedTask(plugin, runnable, delayTicks);
+    }
+
     public static FRTask runTaskAtLocation(Plugin plugin, Location location, Runnable runnable) {
         return SCHEDULER.runTaskAtLocation(plugin, location, runnable);
     }
@@ -42,6 +46,22 @@ public static FRTask runTaskTimerAtLocation(Plugin plugin, Location location, Ru
 
     public static FRTask runTaskTimerAt(Plugin plugin, World world, Runnable runnable, long delayTicks, long periodTicks) {
         return SCHEDULER.runTaskTimerAt(plugin, world, runnable, delayTicks, periodTicks);
+    }
+
+    public static FRTask runTaskAt(Plugin plugin, Location location, Runnable runnable) {
+        return SCHEDULER.runTaskAtLocation(plugin, location, runnable);
+    }
+
+    public static FRTask runTaskFor(Plugin plugin, Entity entity, Runnable runnable) {
+        return SCHEDULER.runTaskAtEntity(plugin, entity, runnable, null);
+    }
+
+    public static boolean teleport(Entity entity, Location destination) {
+        if (PlatformUtils.isFolia()) {
+            return entity.teleport(destination);
+        } else {
+            return entity.teleport(destination);
+        }
     }
 
     public static FRTask runTaskAtEntity(Plugin plugin, Entity entity, Runnable runnable, Runnable retired) {
