@@ -1,16 +1,21 @@
-param([string]$jarPath)
+param([string]$jarPath, [switch]$SkipRestart)
 
-# 1. Copy to local plugins folder
+$jarFile = Split-Path $jarPath -Leaf
+
 $pluginsDir = Join-Path $PSScriptRoot "plugins"
 if (Test-Path $jarPath) {
-    Copy-Item -Path $jarPath -Destination (Join-Path $pluginsDir (Split-Path $jarPath -Leaf)) -Force
-    Write-Host "Plugin copiado para plugins/"
+    Copy-Item -Path $jarPath -Destination (Join-Path $pluginsDir $jarFile) -Force
+    Write-Host "Plugin copiado para plugins/$jarFile"
 } else {
     Write-Warning "JAR nao encontrado: $jarPath"
     exit 1
 }
 
-# 2. Restart server via panel API
+if ($SkipRestart) {
+    Write-Host "SkipRestart ativado - pulando reinicio"
+    exit 0
+}
+
 $tokenPath = Join-Path $PSScriptRoot "cp.txt"
 if (-not (Test-Path $tokenPath)) {
     Write-Warning "cp.txt not found - skipping restart"
@@ -24,20 +29,25 @@ if (-not $token) {
     exit 0
 }
 
-$serverUrl = $lines[1].Trim()
-if (-not $serverUrl) {
-    Write-Warning "Server URL not found in cp.txt line 2 - skipping restart"
-    exit 0
+$servers = @(
+    "https://painel.faws.net.br/server/58934340",
+    "https://painel.faws.net.br/server/44514b9d"
+)
+
+foreach ($serverUrl in $servers) {
+    try {
+        $uri = [System.Uri]$serverUrl
+        $panelUrl = $uri.GetLeftPart([System.UriPartial]::Authority)
+        $serverId = $uri.Segments[-1]
+
+        $restartHeaders = @{ Authorization = "Bearer $token"; "Content-Type" = "application/json" }
+        Invoke-RestMethod -Uri "$panelUrl/api/client/servers/$serverId/power" -Method POST -Headers $restartHeaders -Body '{"signal":"restart"}' -ErrorAction Stop | Out-Null
+        Write-Host "Server $serverId reiniciado!"
+    } catch {
+        $errMsg = $_.Exception.Message
+        Write-Warning "Falha ao reiniciar servidor $serverUrl`: $errMsg"
+    }
+    Start-Sleep -Seconds 5
 }
 
-$uri = [System.Uri]$serverUrl
-$panelUrl = $uri.GetLeftPart([System.UriPartial]::Authority)
-$serverId = $uri.Segments[-1]
-
-try {
-    $restartHeaders = @{ Authorization = "Bearer $token"; "Content-Type" = "application/json" }
-    Invoke-RestMethod -Uri "$panelUrl/api/client/servers/$serverId/power" -Method POST -Headers $restartHeaders -Body '{"signal":"restart"}' -ErrorAction Stop | Out-Null
-    Write-Host "Server reiniciado!"
-} catch {
-    Write-Warning "Falha ao reiniciar servidor: $($_.Exception.Message)"
-}
+Write-Host "Deploy completo para $jarFile"

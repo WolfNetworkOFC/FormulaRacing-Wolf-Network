@@ -266,18 +266,6 @@
                     </dependency>
                 </dependencies>
                 <executions>
-                    <execution>
-                        <id>upload-jar</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>upload-single</goal>
-                        </goals>
-                        <configuration>
-                            <fromFile>${project.build.directory}/${project.build.finalName}.jar</fromFile>
-                            <url>sftp://node1.faws.net.br:2022/plugins</url>
-                            <serverId>meu-servidor-minecraft1</serverId>
-                        </configuration>
-                    </execution>
                 </executions>
             </plugin>
 
