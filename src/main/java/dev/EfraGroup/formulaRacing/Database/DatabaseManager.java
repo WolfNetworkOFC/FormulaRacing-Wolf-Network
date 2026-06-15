@@ -105,7 +105,7 @@ public class DatabaseManager {
             dataFolder.mkdirs();
         }
 
-        File dbFile = new File(dataFolder, "database.db");
+        File dbFile = new File(dataFolder, plugin.getFileManager().getSQLiteFile());
         SQLException lastException = null;
 
         for (int attempt = 1; attempt <= 3; attempt++) {
@@ -254,27 +254,31 @@ public class DatabaseManager {
      * @param conn A conexão ativa passada pelo método inicializador para evitar recursão.
      */
     private void initDatabase(Connection conn) {
-        try (Statement stmt = conn.createStatement()) {
-            // 1. Configurações Globais das Tabelas (Cameras, Tracks, Regions)
-            stmt.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS fr_cameras (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    trackNameWS TEXT DEFAULT NULL,
-                    worldName TEXT NOT NULL,
-                    x REAL NOT NULL, y REAL NOT NULL, z REAL NOT NULL,
-                    yaw REAL NOT NULL, pitch REAL NOT NULL
-                )"""
-            );
-            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN cam_index INTEGER DEFAULT NULL"); } catch (SQLException ignored) {}
-            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN min_x REAL DEFAULT NULL"); } catch (SQLException ignored) {}
-            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN min_y REAL DEFAULT NULL"); } catch (SQLException ignored) {}
-            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN min_z REAL DEFAULT NULL"); } catch (SQLException ignored) {}
-            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN max_x REAL DEFAULT NULL"); } catch (SQLException ignored) {}
-            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN max_y REAL DEFAULT NULL"); } catch (SQLException ignored) {}
-            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN max_z REAL DEFAULT NULL"); } catch (SQLException ignored) {}
-            try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN label TEXT DEFAULT NULL"); } catch (SQLException ignored) {}
-            stmt.executeUpdate("UPDATE fr_player_times SET plataforma = 'JAVA' WHERE plataforma = 'Java'");
+        try {
+            conn.setAutoCommit(false);
+            try (Statement stmt = conn.createStatement()) {
+                // 1. Configurações Globais das Tabelas (Cameras, Tracks, Regions)
+                stmt.executeUpdate(
+                    """
+                    CREATE TABLE IF NOT EXISTS fr_cameras (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        trackNameWS TEXT DEFAULT NULL,
+                        worldName TEXT NOT NULL,
+                        x REAL NOT NULL, y REAL NOT NULL, z REAL NOT NULL,
+                        yaw REAL NOT NULL, pitch REAL NOT NULL
+                    )"""
+                );
+                try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN cam_index INTEGER DEFAULT NULL"); } catch (SQLException ignored) {}
+                try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN min_x REAL DEFAULT NULL"); } catch (SQLException ignored) {}
+                try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN min_y REAL DEFAULT NULL"); } catch (SQLException ignored) {}
+                try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN min_z REAL DEFAULT NULL"); } catch (SQLException ignored) {}
+                try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN max_x REAL DEFAULT NULL"); } catch (SQLException ignored) {}
+                try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN max_y REAL DEFAULT NULL"); } catch (SQLException ignored) {}
+                try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN max_z REAL DEFAULT NULL"); } catch (SQLException ignored) {}
+                try { stmt.executeUpdate("ALTER TABLE fr_cameras ADD COLUMN label TEXT DEFAULT NULL"); } catch (SQLException ignored) {}
+                try {
+                    stmt.executeUpdate("UPDATE fr_player_times SET plataforma = 'JAVA' WHERE plataforma = 'Java'");
+                } catch (SQLException ignored) {}
             stmt.executeUpdate(
                 """
                 CREATE TABLE IF NOT EXISTS fr_tracks (
@@ -723,6 +727,8 @@ public class DatabaseManager {
                 .logDatabaseOperation(
                     "[FormulaRacing] Tabelas do banco de dados verificadas com sucesso."
                 );
+            }
+            conn.commit();
         } catch (SQLException e) {
             plugin
                 .getDebugManager()
@@ -730,6 +736,13 @@ public class DatabaseManager {
                     "[FormulaRacing] Erro crítico ao criar tabelas: " +
                         e.getMessage()
                 );
+            try {
+                conn.rollback();
+            } catch (SQLException ignored) {}
+        } finally {
+            try {
+                conn.setAutoCommit(true);
+            } catch (SQLException ignored) {}
         }
     }
 

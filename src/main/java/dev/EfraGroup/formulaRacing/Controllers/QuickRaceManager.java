@@ -1,8 +1,3 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by Fernflower decompiler)
-//
-
 package dev.EfraGroup.formulaRacing.Controllers;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
@@ -34,7 +29,7 @@ import org.bukkit.entity.Boat;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 
 public class QuickRaceManager {
     private final FormulaRacing plugin;
@@ -45,8 +40,8 @@ public class QuickRaceManager {
     private Rounds currentRound;
     private Heats currentHeat;
     private volatile boolean creating = false;
-    private ScheduledTask lobbyTimerTask;
-    private ScheduledTask completionMonitorTask;
+    private FRTask lobbyTimerTask;
+    private FRTask completionMonitorTask;
     private int lobbyTimerSeconds = 60;
     private static final int TIMER_LONG = 60;
     private static final int TIMER_SHORT = 15;

@@ -15,7 +15,7 @@ import org.bukkit.World;
 import org.bukkit.entity.Boat;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import org.bukkit.util.Vector;
 
 import java.util.Collection;
@@ -35,7 +35,7 @@ public class AIOpponentManager {
 
     private final FormulaRacing plugin;
     private final Map<UUID, AIOpponent> aiOpponents;
-    private ScheduledTask aiUpdateTask;
+    private FRTask aiUpdateTask;
     private Integer activeHeatId;
 
     public AIOpponentManager(FormulaRacing plugin) {

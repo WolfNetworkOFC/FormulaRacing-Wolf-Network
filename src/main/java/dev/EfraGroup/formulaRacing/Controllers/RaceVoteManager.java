@@ -11,7 +11,7 @@ import net.md_5.bungee.api.chat.hover.content.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import io.papermc.paper.threadedregions.scheduler.FRTask;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -74,7 +74,7 @@ public class RaceVoteManager {
         private final int requiredVotes; // Nova variável para guardar a meta de votos
         private final Set<UUID> voters = ConcurrentHashMap.newKeySet();
         private boolean expired = false;
-        private ScheduledTask timeoutTask;
+        private FRTask timeoutTask;
 
         public RaceProposal(Player proposer, String trackName, int laps, int pits) {
             this.proposerUUID = proposer.getUniqueId();

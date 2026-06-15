@@ -587,10 +587,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this
         );
         this.lightningRodListener = new LightningRodListener(this);
-        Bukkit.getPluginManager().registerEvents(
-            this.lightningRodListener,
-            this
-        );
+        this.lightningRodListener.start();
     }
 
     private void registerPlaceholders() {

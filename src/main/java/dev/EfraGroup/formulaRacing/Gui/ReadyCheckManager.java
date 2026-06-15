@@ -1,8 +1,3 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by Fernflower decompiler)
-//
-
 package dev.EfraGroup.formulaRacing.Gui;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
@@ -24,14 +19,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 
 public class ReadyCheckManager implements Listener {
     private final FormulaRacing plugin;
     private final Map<Integer, Set<UUID>> readyPlayersByHeat = new HashMap();
     private final Map<Integer, ReadyCheckView> activeViews = new HashMap();
     private final Map<Integer, Runnable> callbacks = new HashMap();
-    private final Map<Integer, ScheduledTask> activeTasks = new HashMap();
+    private final Map<Integer, FRTask> activeTasks = new HashMap();
     private final Map<Integer, UUID> initiatorsByHeat = new HashMap();
 
     public ReadyCheckManager(FormulaRacing plugin) {
@@ -68,7 +63,7 @@ public class ReadyCheckManager implements Listener {
             }
         }
 
-        ScheduledTask task = SchedulerHelper.runTaskTimer(this.plugin, (scheduledTask) -> {
+        FRTask task = SchedulerHelper.runTaskTimer(this.plugin, (scheduledTask) -> {
             Set<UUID> ready = ReadyCheckManager.this.readyPlayersByHeat.get(heatId);
             if (ready == null) {
                 scheduledTask.cancel();
@@ -195,7 +190,7 @@ public class ReadyCheckManager implements Listener {
         this.readyPlayersByHeat.remove(heatId);
         this.initiatorsByHeat.remove(heatId);
         this.callbacks.remove(heatId);
-        ScheduledTask task = (ScheduledTask)this.activeTasks.remove(heatId);
+        FRTask task = (FRTask)this.activeTasks.remove(heatId);
         if (task != null) {
             task.cancel();
         }

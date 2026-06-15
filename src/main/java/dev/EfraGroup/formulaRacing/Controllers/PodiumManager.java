@@ -29,7 +29,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.projectiles.ProjectileSource;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 
 public class PodiumManager implements Listener {
     private static final String CONFIG_ROOT = "podium";
@@ -405,8 +405,8 @@ public class PodiumManager implements Listener {
         private final Set<UUID> participants;
         private final int topLimitUsed;
         private final AtomicInteger currentRevealPosition;
-        private ScheduledTask revealTask;
-        private ScheduledTask finalizeTask;
+        private FRTask revealTask;
+        private FRTask finalizeTask;
 
         private PodiumCeremonySession(Events event, List<Driver> results, Set<UUID> participants, int topLimitUsed, AtomicInteger currentRevealPosition) {
             this.event = event;

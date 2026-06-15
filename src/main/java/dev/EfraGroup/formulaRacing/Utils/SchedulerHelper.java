@@ -1,170 +1,90 @@
 package dev.EfraGroup.formulaRacing.Utils;
 
-import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
-import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
-import io.papermc.paper.threadedregions.scheduler.RegionScheduler;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
-public final class SchedulerHelper {
+public class SchedulerHelper {
 
-    private static final GlobalRegionScheduler GLOBAL = Bukkit.getGlobalRegionScheduler();
-    private static final RegionScheduler REGION = Bukkit.getRegionScheduler();
-    private static final AsyncScheduler ASYNC = Bukkit.getAsyncScheduler();
-    private static Plugin staticPlugin;
+    private static final TaskScheduler SCHEDULER = PlatformUtils.isFolia() ? new FoliaScheduler() : new PaperScheduler();
 
-    public static void init(Plugin plugin) {
-        staticPlugin = plugin;
+    public static FRTask runTask(Plugin plugin, Runnable runnable) {
+        return SCHEDULER.runTask(plugin, runnable);
     }
 
-    private SchedulerHelper() {}
-
-    public static void runTask(Plugin plugin, Runnable task) {
-        GLOBAL.execute(plugin, task);
+    public static FRTask runDelayedTask(Plugin plugin, Runnable runnable, long delayTicks) {
+        return SCHEDULER.runDelayedTask(plugin, runnable, delayTicks);
     }
 
-    public static ScheduledTask runTaskLater(Plugin plugin, Runnable task, long delayTicks) {
-        return GLOBAL.runDelayed(plugin, scheduledTask -> task.run(), Math.max(1, delayTicks));
+    public static FRTask runTaskTimer(Plugin plugin, Runnable runnable, long delayTicks, long periodTicks) {
+        return SCHEDULER.runTaskTimer(plugin, runnable, delayTicks, periodTicks);
     }
 
-    public static ScheduledTask runTaskTimer(Plugin plugin, Runnable task, long delayTicks, long periodTicks) {
-        return GLOBAL.runAtFixedRate(plugin, scheduledTask -> task.run(), Math.max(1, delayTicks), Math.max(1, periodTicks));
+    public static FRTask runTaskAtLocation(Plugin plugin, Location location, Runnable runnable) {
+        return SCHEDULER.runTaskAtLocation(plugin, location, runnable);
     }
 
-    public static ScheduledTask runTaskTimer(Plugin plugin, Runnable task) {
-        return runTaskTimer(plugin, task, 1L, 1L);
+    public static FRTask runDelayedTaskAtLocation(Plugin plugin, Location location, Runnable runnable, long delayTicks) {
+        return SCHEDULER.runDelayedTaskAtLocation(plugin, location, runnable, delayTicks);
     }
 
-    public static ScheduledTask runTaskTimer(Plugin plugin, Consumer<ScheduledTask> task, long delayTicks, long periodTicks) {
-        return GLOBAL.runAtFixedRate(plugin, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
+    public static FRTask runTaskTimerAtLocation(Plugin plugin, Location location, Runnable runnable, long delayTicks, long periodTicks) {
+        return SCHEDULER.runTaskTimerAtLocation(plugin, location, runnable, delayTicks, periodTicks);
     }
 
-    public static ScheduledTask runTaskTimer(Plugin plugin, Consumer<ScheduledTask> task) {
-        return runTaskTimer(plugin, task, 1L, 1L);
+    public static FRTask runTaskAtEntity(Plugin plugin, Entity entity, Runnable runnable) {
+        return SCHEDULER.runTaskAtEntity(plugin, entity, runnable, null);
     }
 
-    public static void runTaskAt(Plugin plugin, Location location, Runnable task) {
-        World world = location.getWorld();
-        if (world == null) {
-            GLOBAL.execute(plugin, task);
-            return;
+    public static FRTask runTaskAtEntity(Plugin plugin, Entity entity, Runnable runnable, Runnable retired) {
+        return SCHEDULER.runTaskAtEntity(plugin, entity, runnable, retired);
+    }
+
+    public static FRTask runDelayedTaskAtEntity(Plugin plugin, Entity entity, Runnable runnable, long delayTicks) {
+        return SCHEDULER.runDelayedTaskAtEntity(plugin, entity, runnable, null, delayTicks);
+    }
+
+    public static FRTask runDelayedTaskAtEntity(Plugin plugin, Entity entity, Runnable runnable, Runnable retired, long delayTicks) {
+        return SCHEDULER.runDelayedTaskAtEntity(plugin, entity, runnable, retired, delayTicks);
+    }
+
+    public static FRTask runTaskTimerAtEntity(Plugin plugin, Entity entity, Runnable runnable, long delayTicks, long periodTicks) {
+        return SCHEDULER.runTaskTimerAtEntity(plugin, entity, runnable, null, delayTicks, periodTicks);
+    }
+
+    public static FRTask runTaskTimerAtEntity(Plugin plugin, Entity entity, Runnable runnable, Runnable retired, long delayTicks, long periodTicks) {
+        return SCHEDULER.runTaskTimerAtEntity(plugin, entity, runnable, retired, delayTicks, periodTicks);
+    }
+
+    public static FRTask runAsync(Plugin plugin, Runnable runnable) {
+        return SCHEDULER.runAsync(plugin, runnable);
+    }
+
+    public static FRTask runAsyncDelayed(Plugin plugin, Runnable runnable, long delayTicks) {
+        return SCHEDULER.runAsyncDelayed(plugin, runnable, delayTicks);
+    }
+
+    public static FRTask runAsyncTimer(Plugin plugin, Runnable runnable, long delayTicks, long periodTicks) {
+        return SCHEDULER.runAsyncTimer(plugin, runnable, delayTicks, periodTicks);
+    }
+
+    public static CompletableFuture<Boolean> teleportAsync(Entity entity, Location destination) {
+        if (PlatformUtils.isFolia()) {
+            return entity.teleportAsync(destination);
+        } else {
+            CompletableFuture<Boolean> future = new CompletableFuture<>();
+            future.complete(entity.teleport(destination));
+            return future;
         }
-        REGION.execute(plugin, world, location.getBlockX() >> 4, location.getBlockZ() >> 4, task);
-    }
-
-    public static void runTaskAt(Plugin plugin, World world, int chunkX, int chunkZ, Runnable task) {
-        REGION.execute(plugin, world, chunkX, chunkZ, task);
-    }
-
-    public static ScheduledTask runTaskTimerAt(Plugin plugin, World world, int chunkX, int chunkZ, Consumer<ScheduledTask> task, long delayTicks, long periodTicks) {
-        return REGION.runAtFixedRate(plugin, world, chunkX, chunkZ, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
-    }
-
-    public static ScheduledTask runTaskTimerAt(Plugin plugin, Location location, Consumer<ScheduledTask> task, long delayTicks, long periodTicks) {
-        World world = location.getWorld();
-        if (world == null) {
-            return GLOBAL.runAtFixedRate(plugin, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
-        }
-        return REGION.runAtFixedRate(plugin, world, location.getBlockX() >> 4, location.getBlockZ() >> 4, task, Math.max(1, delayTicks), Math.max(1, periodTicks));
-    }
-
-    public static void runTaskFor(Plugin plugin, Entity entity, Runnable task) {
-        entity.getScheduler().execute(plugin, task, null, 1L);
-    }
-
-    public static void runTaskFor(Plugin plugin, Entity entity, Consumer<Entity> task) {
-        entity.getScheduler().execute(plugin, () -> task.accept(entity), null, 1L);
-    }
-
-    public static void runTaskFor(Plugin plugin, Entity entity, Consumer<Entity> task, long delayTicks) {
-        entity.getScheduler().execute(plugin, () -> task.accept(entity), null, delayTicks);
-    }
-
-    public static void runTaskFor(Plugin plugin, Entity entity, Runnable task, long delayTicks) {
-        entity.getScheduler().execute(plugin, task, null, delayTicks);
-    }
-
-    public static void runTaskTimerFor(Plugin plugin, Entity entity, Consumer<ScheduledTask> task, long delayTicks, long periodTicks) {
-        entity.getScheduler().runAtFixedRate(plugin, task, null, Math.max(1, delayTicks), Math.max(1, periodTicks));
-    }
-
-    public static void runAsync(Plugin plugin, Runnable task) {
-        ASYNC.runNow(plugin, t -> task.run());
-    }
-
-    public static CompletableFuture<Void> runAsyncFuture(Plugin plugin, Runnable task) {
-        CompletableFuture<Void> future = new CompletableFuture<>();
-        ASYNC.runNow(plugin, t -> {
-            try {
-                task.run();
-                future.complete(null);
-            } catch (Exception e) {
-                future.completeExceptionally(e);
-            }
-        });
-        return future;
-    }
-
-    public static void runAsyncLater(Plugin plugin, Runnable task, long delayTicks) {
-        ASYNC.runDelayed(plugin, t -> task.run(), delayTicks * 50L, TimeUnit.MILLISECONDS);
-    }
-
-    public static void runAsyncTimer(Plugin plugin, Runnable task, long delayTicks, long periodTicks) {
-        ASYNC.runAtFixedRate(plugin, t -> task.run(), delayTicks * 50L, periodTicks * 50L, TimeUnit.MILLISECONDS);
-    }
-
-    public static void teleportNextTick(Plugin plugin, Entity entity, Location destination) {
-        runTaskFor(plugin, entity, e -> {
-            if (e instanceof Player player) {
-                Entity vehicle = player.getVehicle();
-                if (vehicle != null) {
-                    vehicle.removePassenger(player);
-                }
-            }
-            e.teleportAsync(destination);
-        });
-    }
-
-    public static void teleport(Plugin plugin, Player player, Location destination) {
-        teleportNextTick(plugin, player, destination);
-    }
-
-    public static CompletableFuture<Boolean> teleport(Player player, Location destination) {
-        if (player == null) return CompletableFuture.completedFuture(false);
-        return player.teleportAsync(destination);
-    }
-
-    public static void teleport(Entity entity, Location destination) {
-        if (entity == null || staticPlugin == null) return;
-        entity.getScheduler().execute(staticPlugin, () -> entity.teleport(destination), null, 1L);
-    }
-
-    public static CompletableFuture<Boolean> teleportAsync(Plugin plugin, Entity entity, Location destination) {
-        runTaskFor(plugin, entity, e -> {
-            if (e instanceof Player player) {
-                Entity vehicle = player.getVehicle();
-                if (vehicle != null) {
-                    vehicle.removePassenger(player);
-                }
-            }
-        });
-        return entity.teleportAsync(destination);
     }
 
     public static void cancelAllTasks(Plugin plugin) {
-        GLOBAL.cancelTasks(plugin);
-        ASYNC.cancelTasks(plugin);
+        SCHEDULER.cancelTasks(plugin);
     }
 
     public static void shutdownAsyncPool() {
+        // Not needed for current implementation
     }
 }

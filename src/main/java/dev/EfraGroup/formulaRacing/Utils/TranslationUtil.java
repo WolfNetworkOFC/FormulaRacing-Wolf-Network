@@ -1,10 +1,3 @@
-/*
- * Decompiled with CFR 0.153-SNAPSHOT (d6f6758-dirty).
- *
- * Could not load the following classes:
- *  dev.EfraGroup.formulaRacing.Database.DatabaseManager
- *  org.bukkit.entity.Player
- */
 package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;

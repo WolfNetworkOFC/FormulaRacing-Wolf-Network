@@ -1,8 +1,3 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by Fernflower decompiler)
-//
-
 package dev.EfraGroup.formulaRacing.Listener;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
@@ -38,6 +33,7 @@ public class JoinListener implements Listener {
     private final DatabaseManager mysql;
     private final PacketSender packetSender;
     private final boolean hasLuckPerms;
+    private final boolean hasTab;
     private final HotbarController hotbarController;
 
     public JoinListener(FormulaRacing plugin, DatabaseManager mysql, PacketSender packetSender, HotbarController hotbarController) {
@@ -46,6 +42,7 @@ public class JoinListener implements Listener {
         this.packetSender = packetSender;
         this.hotbarController = hotbarController;
         this.hasLuckPerms = plugin.getServer().getPluginManager().getPlugin("LuckPerms") != null;
+        this.hasTab = plugin.getServer().getPluginManager().getPlugin("TAB") != null;
     }
 
     private String getPlayerRank(UUID uuid) {
@@ -162,19 +159,16 @@ public class JoinListener implements Listener {
     }
 
     public void updatePlayerPrefix(Player player) {
-        if (!this.hasLuckPerms) return;
+        if (!this.hasLuckPerms || !this.hasTab) return;
 
-        // 1. Obter a instância do LuckPerms
         LuckPerms luckPerms = LuckPermsProvider.get();
         User user = luckPerms.getUserManager().getUser(player.getUniqueId());
 
         if (user == null) return;
 
-        // 2. Obter o jogador na API do TAB
         TabPlayer tabPlayer = TabAPI.getInstance().getPlayer(player.getUniqueId());
         if (tabPlayer == null) return;
 
-        // 3. Verificar se o grupo primário é "default"
         String primaryGroup = user.getPrimaryGroup();
 
         if (primaryGroup.equalsIgnoreCase("default")) {
@@ -188,7 +182,6 @@ public class JoinListener implements Listener {
                 TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, "%img_java% §r");
             }
 
-            // 4. Atualizar meta prefix no LuckPerms
             user.data().clear(node -> node instanceof PrefixNode);
             user.data().add(PrefixNode.builder(prefix, 100).build());
             luckPerms.getUserManager().saveUser(user);

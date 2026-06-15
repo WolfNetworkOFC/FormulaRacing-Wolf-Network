@@ -4,7 +4,6 @@ import dev.EfraGroup.formulaRacing.Controllers.SpectatorManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
-import com.destroystokyo.paper.event.server.ServerTickStartEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -45,8 +44,11 @@ public class LightningRodListener implements Listener {
         this.plugin = plugin;
     }
 
-    @EventHandler
-    public void onTickStart(ServerTickStartEvent e) {
+    public void start() {
+        SchedulerHelper.runTaskTimer(plugin, this::processRods, 1L, 1L);
+    }
+
+    private void processRods() {
         tickCounter++;
         boolean rodsEnabled = LightningRodManager.isLightningRodsEnabled();
         boolean shouldDebug = tickCounter % DEBUG_INTERVAL == 0;
@@ -60,9 +62,7 @@ public class LightningRodListener implements Listener {
         }
 
         for (Player rodOwner : Bukkit.getOnlinePlayers()) {
-            rodOwner.getScheduler().execute(plugin, () -> {
-                updateRodForOwner(rodOwner, shouldDebug);
-            }, null, 1L);
+            updateRodForOwner(rodOwner, shouldDebug);
         }
     }
 
@@ -94,13 +94,13 @@ public class LightningRodListener implements Listener {
                 }
             }
         } else {
-            rod.teleportAsync(targetLocation);
+            SchedulerHelper.teleportAsync(rod, targetLocation);
         }
 
         if (rod == null) return;
 
         ItemDisplay finalRod = rod;
-        finalRod.getScheduler().execute(plugin, () -> {
+        SchedulerHelper.runTask(plugin, () -> {
             if (!finalRod.isValid()) return;
             for (Player viewer : Bukkit.getOnlinePlayers()) {
                 boolean canSee = canViewerSeeRod(viewer, rodOwner);
@@ -110,7 +110,7 @@ public class LightningRodListener implements Listener {
                     viewer.hideEntity(plugin, finalRod);
                 }
             }
-        }, null, 1L);
+        });
     }
 
     private ItemDisplay createRodForPlayer(Player rodOwner, Location location) {
@@ -132,9 +132,9 @@ public class LightningRodListener implements Listener {
     private void removeRodForPlayer(UUID playerId) {
         ItemDisplay rod = playerRods.remove(playerId);
         if (rod != null && rod.isValid()) {
-            rod.getScheduler().execute(plugin, () -> {
+            SchedulerHelper.runTask(plugin, () -> {
                 if (rod.isValid()) rod.remove();
-            }, null, 1L);
+            });
         }
     }
 

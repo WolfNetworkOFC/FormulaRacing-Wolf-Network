@@ -6,7 +6,7 @@ import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import io.papermc.paper.threadedregions.scheduler.FRTask;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,7 +24,7 @@ public class AIRacingLineRecorder {
     private final FormulaRacing plugin;
     private final AIRacingLineManager racingLineManager;
     private final Map<UUID, RecordingSession> activeSessions;
-    private ScheduledTask cleanupTask;
+    private FRTask cleanupTask;
 
     public AIRacingLineRecorder(FormulaRacing plugin, AIRacingLineManager racingLineManager) {
         this.plugin = plugin;
@@ -169,7 +169,7 @@ public class AIRacingLineRecorder {
         private final long registerTime;
         private long lastUpdateTime;
         private long recordingStartTime;
-        private ScheduledTask recordingTask;
+        private FRTask recordingTask;
         private boolean recording;
         private boolean cancelled;
         private boolean completed;

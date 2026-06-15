@@ -1,16 +1,10 @@
- /*
-  * Decompiled with CFR 0.153-SNAPSHOT (d6f6758-dirty).
-  *
-  * Could not load the following classes:
-  *  org.bukkit.Location
-  */
- package dev.EfraGroup.formulaRacing.Utils;
+package dev.EfraGroup.formulaRacing.Utils;
 
- import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
- import dev.EfraGroup.formulaRacing.RegionBox;
- import org.bukkit.Location;
+import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.RegionBox;
+import org.bukkit.Location;
 
- public class RegionMathUtils {
+public class RegionMathUtils {
      public static double calculateRegionEntryProportion(Location from, Location to, RegionBox region) {
          double low = 0.0;
          double high = 1.0;

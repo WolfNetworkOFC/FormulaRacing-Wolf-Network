@@ -1,21 +1,4 @@
- /*
-  * Decompiled with CFR 0.153-SNAPSHOT (d6f6758-dirty).
-  *
-  * Could not load the following classes:
-  *  dev.EfraGroup.formulaRacing.Database.DatabaseManager
-  *  net.md_5.bungee.api.ChatMessageType
-  *  net.md_5.bungee.api.chat.BaseComponent
-  *  net.md_5.bungee.api.chat.TextComponent
-  *  org.bukkit.Bukkit
-  *  org.bukkit.Color
-  *  org.bukkit.Particle
-  *  org.bukkit.Particle$DustOptions
-  *  org.bukkit.Sound
-  *  org.bukkit.entity.Player
-  *  org.bukkit.plugin.Plugin
-  *  org.bukkit.scheduler.BukkitRunnable
-  */
- package dev.EfraGroup.formulaRacing.Utils;
+package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;

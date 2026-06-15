@@ -23,6 +23,7 @@ public class TrackLeaderboard {
     private ScheduledTask task;
 
     private final Map<String, Hologram> holograms = new HashMap<>();
+    private volatile boolean removed;
 
     public TrackLeaderboard(JavaPlugin plugin, String trackName, Location defaultLocation, DatabaseManager mySQLManager) {
         this.plugin = plugin;
@@ -33,6 +34,7 @@ public class TrackLeaderboard {
     }
 
     public void startAutoUpdate() {
+        if (this.removed) return;
         if (this.task == null || this.task.isCancelled()) {
             long ticks = this.plugin.getConfig().getLong("leaderboards.updateticks", 200L);
             this.task = SchedulerHelper.runTaskTimer(this.plugin, () -> {
@@ -43,24 +45,30 @@ public class TrackLeaderboard {
     }
 
     public void updateJavaLeaderboard() {
+        if (this.removed) return;
         SchedulerHelper.runAsync(this.plugin, () -> {
+            if (this.removed) return;
             List<DatabaseManager.PlayerTime> leaderboard = this.mySQLManager.getLeaderboardJava(this.trackName);
             processAndShow(leaderboard, "java");
         });
     }
 
     public void updateBedrockLeaderboard() {
+        if (this.removed) return;
         SchedulerHelper.runAsync(this.plugin, () -> {
+            if (this.removed) return;
             List<DatabaseManager.PlayerTime> leaderboard = this.mySQLManager.getLeaderboardBedrock(this.trackName);
             processAndShow(leaderboard, "bedrock");
         });
     }
 
     public void setLocation(Location newLocation) {
+        if (this.removed) return;
         this.location = newLocation;
         this.mySQLManager.saveHologramLocation(this.trackName, newLocation);
 
-        SchedulerHelper.runTask(this.plugin, () -> {
+        Runnable moveHolograms = () -> {
+            if (this.removed) return;
             if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
                 try {
                     holograms.forEach((type, holo) -> {
@@ -72,10 +80,17 @@ public class TrackLeaderboard {
                     });
                 } catch (Exception ignored) {}
             }
-        });
+        };
+
+        if (this.plugin.isEnabled()) {
+            SchedulerHelper.runTask(this.plugin, moveHolograms);
+        } else {
+            moveHolograms.run();
+        }
     }
 
     private void processAndShow(List<DatabaseManager.PlayerTime> leaderboard, String type) {
+        if (this.removed) return;
         int totalCheckpoints = this.mySQLManager.getCheckpointCount(this.trackName);
 
         List<DatabaseManager.PlayerTime> top10 = leaderboard.stream()
@@ -128,7 +143,8 @@ public class TrackLeaderboard {
         Location holoLoc = this.location.clone().add(xOffset, 0.5, 0.0);
 
         if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
-            SchedulerHelper.runTask(this.plugin, () -> {
+            Runnable updateDecentHologram = () -> {
+                if (this.removed) return;
                 try {
                     String holoName = "lb_" + type + "_" + safeTrackName;
                     Hologram holo = DHAPI.getHologram(holoName);
@@ -140,18 +156,33 @@ public class TrackLeaderboard {
                     }
                     holograms.put(type, holo);
                 } catch (Exception ignored) {}
-            });
+            };
+
+            if (this.plugin.isEnabled()) {
+                SchedulerHelper.runTask(this.plugin, updateDecentHologram);
+            } else {
+                updateDecentHologram.run();
+            }
         } else {
-            SchedulerHelper.runTaskAt(this.plugin, holoLoc, () -> {
+            Runnable updateInternalHologram = () -> {
+                if (this.removed) return;
                 if (holoLoc.getWorld() == null) return;
                 FormulaRacing.getInstance().getHologramManager().createHologramSync(safeTrackName + "_" + type, holoLoc, finalLines);
-            });
+            };
+
+            if (this.plugin.isEnabled()) {
+                SchedulerHelper.runTaskAt(this.plugin, holoLoc, updateInternalHologram);
+            } else {
+                updateInternalHologram.run();
+            }
         }
     }
 
     public synchronized void removeHologram() {
+        this.removed = true;
         this.cancelUpdateTask();
-        SchedulerHelper.runTask(this.plugin, () -> {
+
+        Runnable cleanup = () -> {
             holograms.values().forEach(holo -> {
                 if (holo != null) {
                     try { holo.delete(); } catch (Exception ignored) {}
@@ -178,7 +209,13 @@ public class TrackLeaderboard {
                     }
                 }
             }
-        });
+        };
+
+        if (this.plugin.isEnabled()) {
+            SchedulerHelper.runTask(this.plugin, cleanup);
+        } else {
+            cleanup.run();
+        }
     }
 
     public void cancelUpdateTask() {

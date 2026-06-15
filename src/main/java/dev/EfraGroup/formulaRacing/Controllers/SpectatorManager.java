@@ -24,7 +24,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 
 public class SpectatorManager {
     private final FormulaRacing plugin;
@@ -34,9 +34,9 @@ public class SpectatorManager {
     private final Map<Integer, Set<UUID>> eventToSpectators;
     private final Map<UUID, Heats> spectatorBoundHeat;
     private final Map<UUID, GameMode> previousGameModes;
-    private ScheduledTask followTask;
-    private ScheduledTask bindingTask;
-    private ScheduledTask proximityActionBarTask;
+    private FRTask followTask;
+    private FRTask bindingTask;
+    private FRTask proximityActionBarTask;
     private static final int FOLLOW_UPDATE_INTERVAL_TICKS = 5;
     private static final int BINDING_UPDATE_INTERVAL_TICKS = 10;
     private final boolean proximityActionBarEnabled;

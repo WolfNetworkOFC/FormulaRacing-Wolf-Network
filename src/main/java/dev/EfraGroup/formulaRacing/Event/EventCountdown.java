@@ -1,8 +1,4 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by Fernflower decompiler)
-//
-
+ 
 package dev.EfraGroup.formulaRacing.Event;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
@@ -21,13 +17,13 @@ import org.bukkit.boss.BarFlag;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 
 public class EventCountdown {
     private final FormulaRacing plugin;
     private final Events event;
     private BossBar bossBar;
-    private ScheduledTask countdownTask;
+    private FRTask countdownTask;
     private int totalSeconds;
     private int remainingSeconds;
     private String label;

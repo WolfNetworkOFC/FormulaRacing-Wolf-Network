@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.entity.ArmorStand;
@@ -209,7 +210,7 @@ public class APIFormulaRacing {
     }
 
     public void clearAllBoats() {
-        for (Player player : this.plugin.getOnlinePlayers()) {
+        for (Player player : Bukkit.getOnlinePlayers()) {
             Entity vehicle = player.getVehicle();
             if (vehicle instanceof Boat) {
                 player.leaveVehicle();

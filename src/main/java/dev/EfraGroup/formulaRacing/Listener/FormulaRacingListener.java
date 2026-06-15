@@ -1,8 +1,3 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by Fernflower decompiler)
-//
-
 package dev.EfraGroup.formulaRacing.Listener;
 
 import dev.EfraGroup.formulaRacing.APIFormulaRacing;
@@ -82,23 +77,22 @@ private void startBoatCleaner() {
                             Driver d = heat.getDriver(player.getUniqueId());
 
                             if (d != null && heat.getHeatState() == HeatState.RACING) {
-
-                                // --- Lógica do PTP ---
                                 if (heat.isPushtopass()) {
                                     event.setCancelled(true);
                                     if (this.plugin.getPTP() != null) {
                                         this.plugin.getPTP().togglePTP(player, d, heat);
                                     }
-                                    return; // Se o PTP foi processado, encerra aqui
+                                    return;
                                 }
-                                this.plugin.getERS().cycleERSMode(player, d, heat);
+                                if (this.plugin.getERS() != null) {
+                                    this.plugin.getERS().cycleERSMode(player, d, heat);
+                                }
                                 return;
-                                }
                             }
                         }
                     }
                 }
-
+            }
         }
     }
 
@@ -124,7 +118,7 @@ private void startBoatCleaner() {
                         event.setCancelled(true);
                         this.sendDismountMessage(player);
                     }
-                } else if (this.plugin.getQuickRaceManager().isPlayerInActiveRace(player.getUniqueId())) {
+                } else if (this.plugin.getQuickRaceManager() != null && this.plugin.getQuickRaceManager().isPlayerInActiveRace(player.getUniqueId())) {
                     this.plugin.getDebugManager().logTimeTrialSystem("[LISTENER] " + player.getName() + " está em Quick Race");
                     if (this.plugin.getQuickRaceManager().isPlayerActivelyRacing(player.getUniqueId())) {
                         this.plugin.getDebugManager().logTimeTrialSystem("[LISTENER] Cancelando ejeção de " + player.getName() + " (correndo em Quick Race)");
@@ -189,7 +183,6 @@ private void startBoatCleaner() {
                             return;
                         }
 
-                        this.plugin.getDebugManager().logTimeTrialSystem("[LISTENER] " + player.getName() + " NÃO está em nenhum heat, continuando...");
                         this.plugin.getDebugManager().logTimeTrialSystem("[LISTENER] " + player.getName() + " NÃO está em nenhum heat, continuando...");
                     }
 

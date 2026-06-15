@@ -1,8 +1,3 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by Fernflower decompiler)
-//
-
 package dev.EfraGroup.formulaRacing.Controllers;
 
 import dev.EfraGroup.formulaRacing.FileManager;
@@ -44,7 +39,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 
 public class DailyRaceManager {
     private static final UUID DAILY_CREATOR_UUID = new UUID(0L, 0L);
@@ -53,9 +48,9 @@ public class DailyRaceManager {
     private final FormulaRacing plugin;
     private final EventSignupService signupService;
     private final Random random = new Random();
-    private ScheduledTask scheduleTickTask;
-    private ScheduledTask phaseTask;
-    private ScheduledTask monitorTask;
+    private FRTask scheduleTickTask;
+    private FRTask phaseTask;
+    private FRTask monitorTask;
     private volatile Integer activeEventId;
     private volatile String activeEventName;
     private volatile Phase phase;

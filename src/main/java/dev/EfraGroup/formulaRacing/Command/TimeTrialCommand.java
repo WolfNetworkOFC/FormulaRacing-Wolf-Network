@@ -236,7 +236,8 @@ import dev.EfraGroup.formulaRacing.PacketSender;
 
             // Verifica QuickRace
             if (this.plugin.getQuickRaceManager() != null && this.plugin.getQuickRaceManager().isPlayerInActiveRace(uuid)) {
-                this.plugin.sendMessage(player, "tt_error_quickrace");                player.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0F, 1.0F);
+                this.plugin.sendMessage(player, "tt_error_quickrace");
+                player.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0F, 1.0F);
                 return true;
             }
 

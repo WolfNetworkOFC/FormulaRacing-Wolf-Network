@@ -1,8 +1,3 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by Fernflower decompiler)
-//
-
 package dev.EfraGroup.formulaRacing.TimeTrial.Events;
 
 import dev.EfraGroup.formulaRacing.TimeTrial.TimeTrialSession;
