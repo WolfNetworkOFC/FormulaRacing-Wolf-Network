@@ -41,7 +41,7 @@ public static FRTask runTaskTimerAtLocation(Plugin plugin, Location location, Ru
     }
 
     public static FRTask runTaskTimerAt(Plugin plugin, World world, Runnable runnable, long delayTicks, long periodTicks) {
-        return SCHEDULER.runTaskTimerAtWorld(plugin, world, runnable, delayTicks, periodTicks);
+        return SCHEDULER.runTaskTimerAt(plugin, world, runnable, delayTicks, periodTicks);
     }
 
     public static FRTask runTaskAtEntity(Plugin plugin, Entity entity, Runnable runnable, Runnable retired) {
