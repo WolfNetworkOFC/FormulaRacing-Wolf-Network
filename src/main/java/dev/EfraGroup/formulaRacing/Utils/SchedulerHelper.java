@@ -1,5 +1,6 @@
 package dev.EfraGroup.formulaRacing.Utils;
 
+import dev.EfraGroup.formulaRacing.FormulaRacing;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.plugin.Plugin;
@@ -9,6 +10,10 @@ import java.util.concurrent.CompletableFuture;
 public class SchedulerHelper {
 
     private static final TaskScheduler SCHEDULER = PlatformUtils.isFolia() ? new FoliaScheduler() : new PaperScheduler();
+
+    public static void init(FormulaRacing plugin) {
+        // Initialize scheduler - already done via static initializer
+    }
 
     public static FRTask runTask(Plugin plugin, Runnable runnable) {
         return SCHEDULER.runTask(plugin, runnable);
