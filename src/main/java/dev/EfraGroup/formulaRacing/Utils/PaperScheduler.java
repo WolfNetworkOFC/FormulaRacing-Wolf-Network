@@ -24,7 +24,7 @@ public class PaperScheduler implements TaskScheduler {
 
         @Override
         public boolean isRepeating() {
-            return delegate.isRepeated();
+            return delegate.isRepeating();
         }
 
         @Override
@@ -49,8 +49,9 @@ public class PaperScheduler implements TaskScheduler {
 
     @Override
     public FRTask runTask(Plugin plugin, java.util.function.Consumer<FRTask> runnable) {
-        PaperFRTask wrapper = new PaperFRTask(Bukkit.getScheduler().runTask(plugin, () -> runnable.accept(wrapper)));
-        return wrapper;
+        PaperFRTask[] ref = new PaperFRTask[1];
+        ref[0] = new PaperFRTask(Bukkit.getScheduler().runTask(plugin, () -> runnable.accept(ref[0])));
+        return ref[0];
     }
 
     @Override
@@ -65,8 +66,9 @@ public class PaperScheduler implements TaskScheduler {
 
     @Override
     public FRTask runTaskTimer(Plugin plugin, Consumer<FRTask> runnable, long delayTicks, long periodTicks) {
-        PaperFRTask wrapper = new PaperFRTask(Bukkit.getScheduler().runTaskTimer(plugin, () -> runnable.accept(wrapper), Math.max(1, delayTicks), Math.max(1, periodTicks)));
-        return wrapper;
+        PaperFRTask[] ref = new PaperFRTask[1];
+        ref[0] = new PaperFRTask(Bukkit.getScheduler().runTaskTimer(plugin, () -> runnable.accept(ref[0]), Math.max(1, delayTicks), Math.max(1, periodTicks)));
+        return ref[0];
     }
 
     @Override
