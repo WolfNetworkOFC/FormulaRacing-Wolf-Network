@@ -481,8 +481,9 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
 
     private void releasePlayers(Player p1, Player p2) {
         for(Player p : Arrays.asList(p1, p2)) {
-            SchedulerHelper.runTaskFor(this.plugin, p, player -> {
-                Entity var6 = player.getVehicle();
+            final Player captured = p;
+            SchedulerHelper.runTaskFor(this.plugin, captured, () -> {
+                Entity var6 = captured.getVehicle();
                 if (var6 instanceof Boat boat) {
                     Entity var7 = boat.getVehicle();
                     if (var7 instanceof ArmorStand stand) {
@@ -666,28 +667,28 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
 
                                 SchedulerHelper.teleportAsync(this.plugin, player, spawnLoc).thenAccept(success -> {
                                     if (Boolean.TRUE.equals(success)) {
-                                        SchedulerHelper.runTaskFor(this.plugin, player, pl -> {
+                                        SchedulerHelper.runTaskFor(this.plugin, player, () -> {
                                             Location boatLoc = spawnLoc.clone().add(0, 0.5, 0);
 
                                             Boat newBoat = (Boat) spawnLoc.getWorld().spawnEntity(boatLoc, EntityType.OAK_BOAT);
                                             newBoat.setBoatType(finalWoodType);
-                                            newBoat.addPassenger(pl);
+                                            newBoat.addPassenger(player);
 
                                             plugin.getDebugManager().logDuelSystem("[LAP RESET] Spawnou novo barco (" + finalWoodType + ") para " +
-                                                    pl.getName() + " na volta " + finalNewLap);
+                                                    player.getName() + " na volta " + finalNewLap);
 
                                             if (duelState.isLonely()) {
-                                                plugin.getLonelyController().updatePlayersVisibility((Player) pl);
+                                                plugin.getLonelyController().updatePlayersVisibility(player);
                                             }
 
-                                            SchedulerHelper.runTaskFor(plugin, pl, e -> {
-                                                playersBeingLapReset.remove(e.getUniqueId());
+                                            SchedulerHelper.runTaskFor(plugin, player, () -> {
+                                                playersBeingLapReset.remove(player.getUniqueId());
                                             plugin.getDebugManager().logDuelSystem("[LAP RESET] Proteção de ejeção removida.");
                                         }, 3L);
                                     }, 2L);
                                 } else {
-                                    SchedulerHelper.runTaskFor(this.plugin, player, e ->
-                                            playersBeingLapReset.remove(e.getUniqueId()), 3L);
+                                    SchedulerHelper.runTaskFor(this.plugin, player, () ->
+                                            playersBeingLapReset.remove(player.getUniqueId()), 3L);
                                 }
                             });
                         });

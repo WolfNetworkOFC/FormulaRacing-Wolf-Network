@@ -23,8 +23,8 @@ public class NocolManager {
             return;
         }
         sendNocolPacket(player, shouldCollide);
-        SchedulerHelper.runTaskFor(FormulaRacing.getInstance(), player, p -> {
-            Entity vehicle = p.getVehicle();
+        SchedulerHelper.runTaskFor(FormulaRacing.getInstance(), player, () -> {
+            Entity vehicle = player.getVehicle();
             if (vehicle instanceof Boat) {
                 sendNocolPacket(vehicle, shouldCollide);
             }
