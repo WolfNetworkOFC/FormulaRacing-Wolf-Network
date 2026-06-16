@@ -8,40 +8,51 @@ import org.bukkit.entity.Entity;
 import org.bukkit.plugin.Plugin;
 
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public class FoliaScheduler implements TaskScheduler {
 
     private static class FoliaFRTask implements FRTask {
-        private final ScheduledTask task;
+        private final ScheduledTask delegate;
 
-        public FoliaFRTask(ScheduledTask task) {
-            this.task = task;
+        public FoliaFRTask(ScheduledTask delegate) {
+            this.delegate = delegate;
         }
 
         @Override
         public Plugin getOwningPlugin() {
-            return task.getOwningPlugin();
+            return delegate.getOwningPlugin();
         }
 
         @Override
         public boolean isRepeating() {
-            return task.isRepeatingTask();
+            return delegate.isRepeatingTask();
         }
 
         @Override
         public void cancel() {
-            task.cancel();
+            delegate.cancel();
         }
 
         @Override
         public boolean isCancelled() {
-            return task.isCancelled();
+            return delegate.isCancelled();
+        }
+
+        @Override
+        public void accept(FRTask task) {
         }
     }
 
     @Override
     public FRTask runTask(Plugin plugin, Runnable runnable) {
         return new FoliaFRTask(Bukkit.getGlobalRegionScheduler().run(plugin, t -> runnable.run()));
+    }
+
+    @Override
+    public FRTask runTask(Plugin plugin, Consumer<FRTask> runnable) {
+        FoliaFRTask task = new FoliaFRTask(Bukkit.getGlobalRegionScheduler().run(plugin, t -> runnable.accept(new FoliaFRTask(t))));
+        return task;
     }
 
     @Override
@@ -52,6 +63,11 @@ public class FoliaScheduler implements TaskScheduler {
     @Override
     public FRTask runTaskTimer(Plugin plugin, Runnable runnable, long delayTicks, long periodTicks) {
         return new FoliaFRTask(Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, t -> runnable.run(), Math.max(1, delayTicks), Math.max(1, periodTicks)));
+    }
+
+    @Override
+    public FRTask runTaskTimer(Plugin plugin, Consumer<FRTask> runnable, long delayTicks, long periodTicks) {
+        return new FoliaFRTask(Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, t -> runnable.accept(new FoliaFRTask(t)), Math.max(1, delayTicks), Math.max(1, periodTicks)));
     }
 
     @Override

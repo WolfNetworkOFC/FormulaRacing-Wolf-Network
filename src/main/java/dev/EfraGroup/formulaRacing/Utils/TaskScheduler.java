@@ -5,10 +5,14 @@ import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.plugin.Plugin;
 
+import java.util.function.Consumer;
+
 public interface TaskScheduler {
     FRTask runTask(Plugin plugin, Runnable runnable);
+    FRTask runTask(Plugin plugin, Consumer<FRTask> runnable);
     FRTask runDelayedTask(Plugin plugin, Runnable runnable, long delayTicks);
     FRTask runTaskTimer(Plugin plugin, Runnable runnable, long delayTicks, long periodTicks);
+    FRTask runTaskTimer(Plugin plugin, Consumer<FRTask> runnable, long delayTicks, long periodTicks);
 
     FRTask runTaskAtLocation(Plugin plugin, Location location, Runnable runnable);
     FRTask runDelayedTaskAtLocation(Plugin plugin, Location location, Runnable runnable, long delayTicks);

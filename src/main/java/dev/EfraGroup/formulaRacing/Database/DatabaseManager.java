@@ -704,6 +704,25 @@ public class DatabaseManager {
                 stmt.executeUpdate("ALTER TABLE fr_tracks ADD COLUMN game_time INTEGER DEFAULT NULL");
             } catch (SQLException ignored) {}
 
+            // [NOVO] Adiciona colunas para "Start Region" na tabela fr_pit_stops
+            String[] startColumns = {
+                "startMinX",
+                "startMinY",
+                "startMinZ",
+                "startMaxX",
+                "startMaxY",
+                "startMaxZ",
+            };
+            for (String col : startColumns) {
+                try {
+                    stmt.executeUpdate(
+                        "ALTER TABLE fr_pit_stops ADD COLUMN " + col + " REAL"
+                    );
+                } catch (SQLException ignored) {
+                    // Coluna já existe – ignora
+                }
+            }
+
             // [NOVO] Adiciona colunas para "finishAll" na tabela fr_tracks
             String[] finishAllColumns = {
                 "finishAll_x",

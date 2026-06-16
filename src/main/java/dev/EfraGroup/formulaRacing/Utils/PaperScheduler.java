@@ -6,40 +6,51 @@ import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
+import java.util.function.Consumer;
 
 public class PaperScheduler implements TaskScheduler {
 
     private static class PaperFRTask implements FRTask {
-        private final BukkitTask task;
+        private final BukkitTask delegate;
 
-        public PaperFRTask(BukkitTask task) {
-            this.task = task;
+        public PaperFRTask(BukkitTask delegate) {
+            this.delegate = delegate;
         }
 
         @Override
         public Plugin getOwningPlugin() {
-            return task.getOwner();
+            return delegate.getOwner();
         }
 
         @Override
         public boolean isRepeating() {
-            return false;
+            return delegate.isRepeated();
         }
 
         @Override
         public void cancel() {
-            task.cancel();
+            delegate.cancel();
         }
 
         @Override
         public boolean isCancelled() {
-            return task.isCancelled();
+            return delegate.isCancelled();
+        }
+
+        @Override
+        public void accept(FRTask task) {
         }
     }
 
     @Override
     public FRTask runTask(Plugin plugin, Runnable runnable) {
         return new PaperFRTask(Bukkit.getScheduler().runTask(plugin, runnable));
+    }
+
+    @Override
+    public FRTask runTask(Plugin plugin, java.util.function.Consumer<FRTask> runnable) {
+        PaperFRTask wrapper = new PaperFRTask(Bukkit.getScheduler().runTask(plugin, () -> runnable.accept(wrapper)));
+        return wrapper;
     }
 
     @Override
@@ -50,6 +61,12 @@ public class PaperScheduler implements TaskScheduler {
     @Override
     public FRTask runTaskTimer(Plugin plugin, Runnable runnable, long delayTicks, long periodTicks) {
         return new PaperFRTask(Bukkit.getScheduler().runTaskTimer(plugin, runnable, Math.max(1, delayTicks), Math.max(1, periodTicks)));
+    }
+
+    @Override
+    public FRTask runTaskTimer(Plugin plugin, Consumer<FRTask> runnable, long delayTicks, long periodTicks) {
+        PaperFRTask wrapper = new PaperFRTask(Bukkit.getScheduler().runTaskTimer(plugin, () -> runnable.accept(wrapper), Math.max(1, delayTicks), Math.max(1, periodTicks)));
+        return wrapper;
     }
 
     @Override
