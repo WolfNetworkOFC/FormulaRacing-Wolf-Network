@@ -21,8 +21,6 @@ import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
-
 public class RaceActionBarManager {
     private final FormulaRacing plugin;
     private final Map<UUID, Heats> playerHeats;
@@ -38,7 +36,7 @@ public class RaceActionBarManager {
     private final String progressEndColor;
     private final String progressEmptyColor;
     private final String progressBracketColor;
-    private ScheduledTask updateTask;
+    private FRTask updateTask;
 
     public RaceActionBarManager(FormulaRacing plugin) {
         this.plugin = plugin;
