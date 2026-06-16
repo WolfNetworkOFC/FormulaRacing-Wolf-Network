@@ -416,7 +416,7 @@ public class RaceCheckpointListener implements Listener {
         SchedulerHelper.runTaskFor(plugin, player, () -> {
             if (finalPlayer.isOnline()) {
                 this.plugin.getAPI().recoverPlayerBoatState(finalPlayer);
-                SchedulerHelper.teleport(plugin, finalPlayer, finalTargetLoc);
+                SchedulerHelper.teleport(finalPlayer, finalTargetLoc);
                 finalPlayer.playSound(finalTargetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
                 this.plugin.getAPI().spawnBoat(finalPlayer, false, false, false);
             }
