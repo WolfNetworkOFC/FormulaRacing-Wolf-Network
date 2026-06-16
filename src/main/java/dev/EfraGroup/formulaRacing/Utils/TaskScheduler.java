@@ -21,6 +21,7 @@ public interface TaskScheduler {
     FRTask runTaskTimerAt(Plugin plugin, World world, Runnable runnable, long delayTicks, long periodTicks);
 
     FRTask runTaskAtEntity(Plugin plugin, Entity entity, Runnable runnable, Runnable retired);
+    FRTask runTaskAtEntity(Plugin plugin, Entity entity, Consumer<FRTask> runnable, Runnable retired);
     FRTask runDelayedTaskAtEntity(Plugin plugin, Entity entity, Runnable runnable, Runnable retired, long delayTicks);
     FRTask runTaskTimerAtEntity(Plugin plugin, Entity entity, Runnable runnable, Runnable retired, long delayTicks, long periodTicks);
 

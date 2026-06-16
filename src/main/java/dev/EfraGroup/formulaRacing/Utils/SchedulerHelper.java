@@ -85,6 +85,10 @@ public class SchedulerHelper {
         return SCHEDULER.runTaskAtEntity(plugin, entity, runnable, null);
     }
 
+    public static FRTask runTaskFor(Plugin plugin, Entity entity, Consumer<FRTask> runnable) {
+        return SCHEDULER.runTaskAtEntity(plugin, entity, runnable, null);
+    }
+
     public static FRTask runTaskFor(Plugin plugin, Player player, Runnable runnable) {
         return SCHEDULER.runTaskAtEntity(plugin, player, runnable, null);
     }

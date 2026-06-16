@@ -96,6 +96,11 @@ public class FoliaScheduler implements TaskScheduler {
     }
 
     @Override
+    public FRTask runTaskAtEntity(Plugin plugin, Entity entity, Consumer<FRTask> runnable, Runnable retired) {
+        return new FoliaFRTask(entity.getScheduler().run(plugin, t -> runnable.accept(new FoliaFRTask(t)), retired));
+    }
+
+    @Override
     public FRTask runDelayedTaskAtEntity(Plugin plugin, Entity entity, Runnable runnable, Runnable retired, long delayTicks) {
         return new FoliaFRTask(entity.getScheduler().runDelayed(plugin, t -> runnable.run(), retired, Math.max(1, delayTicks)));
     }
