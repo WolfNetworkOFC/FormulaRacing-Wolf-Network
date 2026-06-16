@@ -96,7 +96,7 @@ public class TimeTrialRandomCommand extends BaseCommand {
         api.recoverPlayerBoatState(player);
 
         // Teleporte e Mensagens
-        SchedulerHelper.teleport(player, loc).thenAccept(success -> {
+        SchedulerHelper.teleportAsync(player, loc).thenAccept(success -> {
             if (Boolean.TRUE.equals(success)) {
                 api.spawnBoatAt(player, loc, false, false, false);
             }
