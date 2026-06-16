@@ -53,9 +53,10 @@ private void startBoatCleaner() {
             for(World world : Bukkit.getWorlds()) {
                 for(Boat boat : world.getEntitiesByClass(Boat.class)) {
                     if (!boat.isValid()) continue;
-                    SchedulerHelper.runTaskFor(this.plugin, boat, b -> {
-                        if (b.isValid() && b.getPassengers().isEmpty()) {
-                            this.api.queueDeleteBoat(b);
+                    final Boat captured = boat;
+                    SchedulerHelper.runTaskFor(this.plugin, captured, () -> {
+                        if (captured.isValid() && captured.getPassengers().isEmpty()) {
+                            this.api.queueDeleteBoat(captured);
                         }
                     });
                 }
