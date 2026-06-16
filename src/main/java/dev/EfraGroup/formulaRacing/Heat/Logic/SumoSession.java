@@ -4,12 +4,12 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.util.Vector;
 
 import java.util.*;
@@ -25,8 +25,8 @@ public class SumoSession implements SessionLogic {
     private static final int ARENA_SHRINK_TICKS = 600; // 30 segundos
     private static final int CHECK_INTERVAL_TICKS = 10; // 0.5 segundos
 
-    private ScheduledTask arenaTask;
-    private ScheduledTask checkTask;
+    private FRTask arenaTask;
+    private FRTask checkTask;
     private Location arenaCenter;
     private double arenaRadius = 20.0;
     private double minRadius = 5.0;

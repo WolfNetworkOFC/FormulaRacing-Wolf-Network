@@ -4,12 +4,13 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 import java.util.*;
 
@@ -24,7 +25,7 @@ public class TotalChaosSession implements SessionLogic {
 
     private static final int CHAOS_INTERVAL_TICKS = 200; // 10 segundos
 
-    private ScheduledTask chaosTask;
+    private FRTask chaosTask;
     private int chaosRound = 0;
     private final Random random = new Random();
 

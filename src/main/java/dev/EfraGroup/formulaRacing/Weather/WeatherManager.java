@@ -2,8 +2,8 @@ package dev.EfraGroup.formulaRacing.Weather;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import org.bukkit.Bukkit;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 
 import java.util.HashMap;
@@ -18,7 +18,7 @@ public class WeatherManager {
     private final FormulaRacing plugin;
     private final WeatherConfigManager configManager;
     private final Map<Integer, WeatherSession> activeSessions;
-    private ScheduledTask updateTask;
+    private FRTask updateTask;
 
     public WeatherManager(FormulaRacing plugin) {
         this.plugin = plugin;

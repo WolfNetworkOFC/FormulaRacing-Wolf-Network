@@ -2,10 +2,10 @@ package dev.EfraGroup.formulaRacing.Heat;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,10 +32,10 @@ public class ItemBoxManager {
 
     // ── Cooldown tracking ──
     // heatId → (boxIndex → respawnTask)
-    private final Map<Integer, Map<Integer, ScheduledTask>> respawnTasks = new ConcurrentHashMap<>();
+    private final Map<Integer, Map<Integer, FRTask>> respawnTasks = new ConcurrentHashMap<>();
 
     // ── Particle animation tasks ──
-    private final Map<Integer, ScheduledTask> animationTasks = new ConcurrentHashMap<>();
+    private final Map<Integer, FRTask> animationTasks = new ConcurrentHashMap<>();
 
     // ── Player cooldowns (prevent double-collection) ──
     // UUID → last collection tick
@@ -152,13 +152,13 @@ public class ItemBoxManager {
      */
     public void clearBoxesForHeat(int heatId) {
         // Cancel animation
-        ScheduledTask anim = animationTasks.remove(heatId);
+        FRTask anim = animationTasks.remove(heatId);
         if (anim != null) anim.cancel();
 
         // Cancel all respawn tasks
-        Map<Integer, ScheduledTask> tasks = respawnTasks.remove(heatId);
+        Map<Integer, FRTask> tasks = respawnTasks.remove(heatId);
         if (tasks != null) {
-            for (ScheduledTask t : tasks.values()) {
+            for (FRTask t : tasks.values()) {
                 if (t != null) t.cancel();
             }
         }
@@ -213,15 +213,15 @@ public class ItemBoxManager {
                 // Schedule respawn
                 int respawnTicks = getRespawnTicks(heatId);
                 if (respawnTicks > 0) {
-                    Map<Integer, ScheduledTask> heatTasks = respawnTasks
+                    Map<Integer, FRTask> heatTasks = respawnTasks
                             .computeIfAbsent(heatId, k -> new ConcurrentHashMap<>());
-                    ScheduledTask old = heatTasks.get(idx);
+                    FRTask old = heatTasks.get(idx);
                     if (old != null) old.cancel();
 
-                    ScheduledTask task = SchedulerHelper.runTaskLater(plugin, () -> {
+                    FRTask task = SchedulerHelper.runTaskLater(plugin, () -> {
                         Set<Integer> act = activeBoxes.get(heatId);
                         if (act != null) act.add(idx);
-                        Map<Integer, ScheduledTask> ht = respawnTasks.get(heatId);
+                        Map<Integer, FRTask> ht = respawnTasks.get(heatId);
                         if (ht != null) ht.remove(idx);
                         logDebug("[ItemBox] Box " + idx + " respawned for heat " + heatId);
                     }, respawnTicks);
@@ -262,10 +262,10 @@ public class ItemBoxManager {
     // ═══════════════════════════════════════════════════════════════════
 
     private void startAnimationTask(int heatId, List<ItemBoxEntry> boxes) {
-        ScheduledTask old = animationTasks.remove(heatId);
+        FRTask old = animationTasks.remove(heatId);
         if (old != null) old.cancel();
 
-        ScheduledTask task = SchedulerHelper.runTaskTimer(plugin, () -> {
+        FRTask task = SchedulerHelper.runTaskTimer(plugin, () -> {
             Set<Integer> active = activeBoxes.get(heatId);
             if (active == null) return;
 
@@ -364,11 +364,11 @@ public class ItemBoxManager {
      * Clear all cached data (on plugin disable).
      */
     public void shutdown() {
-        for (ScheduledTask t : animationTasks.values()) {
+        for (FRTask t : animationTasks.values()) {
             if (t != null) t.cancel();
         }
-        for (Map<Integer, ScheduledTask> tasks : respawnTasks.values()) {
-            for (ScheduledTask t : tasks.values()) {
+        for (Map<Integer, FRTask> tasks : respawnTasks.values()) {
+            for (FRTask t : tasks.values()) {
                 if (t != null) t.cancel();
             }
         }

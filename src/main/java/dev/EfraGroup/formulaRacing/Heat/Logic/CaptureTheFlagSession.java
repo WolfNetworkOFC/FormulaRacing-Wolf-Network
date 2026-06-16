@@ -4,13 +4,13 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 import java.util.*;
 
@@ -29,8 +29,8 @@ public class CaptureTheFlagSession implements SessionLogic {
     private final Map<UUID, Integer> scores = new HashMap<>();
     private final Set<Integer> flagCheckpointIds = new HashSet<>();
     private final Map<UUID, Long> stealCooldowns = new HashMap<>();
-    private ScheduledTask timeoutTask;
-    private ScheduledTask particleTask;
+    private FRTask timeoutTask;
+    private FRTask particleTask;
     private boolean matchFinished = false;
     private int matchTimeSeconds = 0;
 

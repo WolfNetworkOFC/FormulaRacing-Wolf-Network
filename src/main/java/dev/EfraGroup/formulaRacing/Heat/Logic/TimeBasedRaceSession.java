@@ -6,12 +6,12 @@ import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 import java.util.Comparator;
 import java.util.List;
@@ -23,7 +23,7 @@ import java.util.Optional;
  */
 public class TimeBasedRaceSession extends RaceSession {
 
-    private ScheduledTask timeMonitorTask;
+    private FRTask timeMonitorTask;
     private boolean lastLapAnnounced = false;
 
     public TimeBasedRaceSession(FormulaRacing plugin) {

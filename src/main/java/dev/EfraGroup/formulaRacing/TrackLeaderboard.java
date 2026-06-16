@@ -2,10 +2,10 @@ package dev.EfraGroup.formulaRacing;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Hologram.HologramManager;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import eu.decentsoftware.holograms.api.DHAPI;
 import eu.decentsoftware.holograms.api.holograms.Hologram;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,7 +20,7 @@ public class TrackLeaderboard {
     private Location location;
     private final DatabaseManager mySQLManager;
     private final JavaPlugin plugin;
-    private ScheduledTask task;
+    private FRTask task;
 
     private final Map<String, Hologram> holograms = new HashMap<>();
     private volatile boolean removed;

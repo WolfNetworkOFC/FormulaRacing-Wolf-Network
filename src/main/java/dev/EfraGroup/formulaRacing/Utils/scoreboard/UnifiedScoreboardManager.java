@@ -2,6 +2,7 @@ package dev.EfraGroup.formulaRacing.Utils.scoreboard;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardDuelsTimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardTimeTrialUtils;
@@ -14,8 +15,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
-
 /**
  * Consolidates all scoreboard update loops (Race, TimeTrial, Duel) into a single
  * timer to reduce per-tick overhead and eliminate redundant player iterations.
@@ -31,7 +30,7 @@ public class UnifiedScoreboardManager {
     private final ScoreboardDuelsTimeUtils duelUtils;
     private final ScoreboardOwnershipCoordinator ownershipCoordinator;
 
-    private ScheduledTask unifiedTask;
+    private FRTask unifiedTask;
 
     // --- Race scoreboard state (mirrors RaceScorebookV2Manager internals) ---
     private final Map<UUID, Heats> racePlayers = new ConcurrentHashMap<>();
@@ -67,7 +66,7 @@ public class UnifiedScoreboardManager {
         // ttUtils and duelUtils don't expose shutdown; we null out their loops by
         // not calling their startAutoUpdate() — they should NOT be started individually.
 
-        SchedulerHelper.runTaskTimer(plugin, () -> {
+        unifiedTask = SchedulerHelper.runTaskTimer(plugin, () -> {
             // Single pass: collect all active UUIDs, then dispatch by category
             // This avoids iterating onlinePlayers 3 times.
             processRaceUpdates();

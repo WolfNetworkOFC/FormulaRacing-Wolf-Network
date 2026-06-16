@@ -28,7 +28,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 
 public class Heats {
@@ -57,7 +57,7 @@ public class Heats {
     private String trackNameWS;
     private GridManager gridManager;
     private boolean drsEnabled;
-    private ScheduledTask offlineMonitorTask;
+    private FRTask offlineMonitorTask;
     private List<DrsRegion> drsRegions = new ArrayList<>();
     private boolean pushtopass;
     private int deltaghosting;
@@ -67,7 +67,7 @@ public class Heats {
     private boolean realistc;
     private boolean reversegrid;
     private double pushtopasspower;
-    private ScheduledTask sessionTask;
+    private FRTask sessionTask;
     private boolean configDirty = false;
     private boolean onlyBedrock = false;
     private boolean ErsEnabled = false;

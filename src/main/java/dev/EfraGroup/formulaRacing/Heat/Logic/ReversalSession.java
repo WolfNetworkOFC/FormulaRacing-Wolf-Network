@@ -4,11 +4,11 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
-import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -24,7 +24,7 @@ public class ReversalSession implements SessionLogic {
     private static final int REVERSAL_INTERVAL_TICKS = 400; // 20 segundos
     private static final int TOTAL_REVERSALS = 6; // 6 reversões = 2 minutos
 
-    private ScheduledTask reversalTask;
+    private FRTask reversalTask;
     private int reversalCount = 0;
     private boolean matchFinished = false;
     private final Map<UUID, Integer> points = new HashMap<>();

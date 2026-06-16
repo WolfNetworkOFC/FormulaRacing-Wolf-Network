@@ -19,12 +19,13 @@ import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 
 public class EliminationSession implements SessionLogic {
     private int eliminationIntervalSeconds = 30;
     private int minimumDrivers = 2;
-    private ScheduledTask eliminationTask;
-    private ScheduledTask countdownTask;
+    private FRTask eliminationTask;
+    private FRTask countdownTask;
     private int eliminationCount = 0;
     private int secondsUntilNextElimination = 0;
     private final List<UUID> eliminatedDrivers = new ArrayList<>();

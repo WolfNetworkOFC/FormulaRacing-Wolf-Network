@@ -4,12 +4,11 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 import java.util.*;
 
@@ -25,8 +24,8 @@ public class MusicalChairSession implements SessionLogic {
     private static final int ROUND_INTERVAL_TICKS = 600; // 30 segundos
     private static final int MUSIC_STOP_WARNING_TICKS = 100; // 5 segundos antes
 
-    private ScheduledTask roundTask;
-    private ScheduledTask musicTask;
+    private FRTask roundTask;
+    private FRTask musicTask;
     private int round = 0;
     private int safeZones = 0;
     private boolean musicPlaying = true;

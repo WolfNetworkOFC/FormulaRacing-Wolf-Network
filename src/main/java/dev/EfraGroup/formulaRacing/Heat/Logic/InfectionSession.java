@@ -4,12 +4,11 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 import java.util.*;
 
@@ -31,8 +30,8 @@ public class InfectionSession implements SessionLogic {
     private final Set<UUID> infected = new HashSet<>();
     private final Map<UUID, Integer> infectionTime = new HashMap(); // ticks desde infecção
     private UUID patientZero = null;
-    private ScheduledTask checkTask;
-    private ScheduledTask decayTask;
+    private FRTask checkTask;
+    private FRTask decayTask;
     private int tickCounter = 0;
 
     @Override

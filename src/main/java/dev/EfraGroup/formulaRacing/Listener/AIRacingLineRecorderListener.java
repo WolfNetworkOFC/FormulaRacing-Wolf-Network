@@ -4,11 +4,11 @@ import dev.EfraGroup.formulaRacing.AI.AIRacingLineRecorder;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Event.Events;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import org.bukkit.event.Listener;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -22,7 +22,7 @@ public class AIRacingLineRecorderListener implements Listener {
 
     private final FormulaRacing plugin;
     private final Map<Integer, HeatState> heatStates;
-    private ScheduledTask pollTask;
+    private FRTask pollTask;
 
     public AIRacingLineRecorderListener(FormulaRacing plugin) {
         this.plugin = plugin;

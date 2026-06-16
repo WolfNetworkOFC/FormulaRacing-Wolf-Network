@@ -3,17 +3,17 @@ package dev.EfraGroup.formulaRacing.Heat;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class RaceCountdown {
     private final FormulaRacing plugin;
     private final Heats heat;
     private final Runnable onComplete;
-    private ScheduledTask countdownTask;
+    private FRTask countdownTask;
     private int lightsOn;
     private boolean completed;
     private int maxLights;

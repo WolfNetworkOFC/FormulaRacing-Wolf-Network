@@ -4,6 +4,7 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
@@ -11,7 +12,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 import java.util.*;
 
@@ -29,8 +29,8 @@ public class HotPotatoSession implements SessionLogic {
 
     private final Map<UUID, Integer> heatLevels = new HashMap<>();
     private UUID currentPotatoHolder = null;
-    private ScheduledTask potatoTask;
-    private ScheduledTask heatTask;
+    private FRTask potatoTask;
+    private FRTask heatTask;
     private int tickCounter = 0;
 
     @Override
