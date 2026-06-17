@@ -159,7 +159,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
     }
 
     private void startFullCountdownSequence(final Player p1, final Player p2, final int duelId, final int timeLimit) {
-        ScheduledTask[] cdTask = {null};
+        FRTask[] cdTask = {null};
         cdTask[0] = SchedulerHelper.runTaskTimer(this.plugin, new Runnable() {
             int countdown = 5;
 
@@ -213,7 +213,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
     private void startTimeLimitTimer(final int duelId, final int timeLimitSeconds) {
         DuelState duelState = (DuelState)this.activeDuels.get(duelId);
         if (duelState != null) {
-            ScheduledTask[] tlimitTask = {null};
+            FRTask[] tlimitTask = {null};
             tlimitTask[0] = SchedulerHelper.runTaskTimer(this.plugin, new Runnable() {
                 int secondsRemaining = timeLimitSeconds;
 
@@ -311,7 +311,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
             }
 
             this.plugin.getDebugManager().logDuelSystem("§e[TIME LIMIT] Timeout configurado: " + timeoutSeconds + "s (baseado no melhor tempo: " + String.format("%.1f", bestLapTime) + "s)");
-            ScheduledTask[] checkTask = {null};
+            FRTask[] checkTask = {null};
             checkTask[0] = SchedulerHelper.runTaskTimer(this.plugin, new Runnable() {
                 int checksRemaining = timeoutSeconds;
 

@@ -14,8 +14,6 @@ import org.bukkit.ChatColor;
 import org.bukkit.Sound;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
-
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;

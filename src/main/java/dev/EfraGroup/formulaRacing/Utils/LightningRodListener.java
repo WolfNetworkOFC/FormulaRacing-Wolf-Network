@@ -62,16 +62,44 @@ public class LightningRodListener implements Listener {
         }
 
         for (Player rodOwner : Bukkit.getOnlinePlayers()) {
-            updateRodForOwner(rodOwner, shouldDebug);
+            if (PlatformUtils.isFoliaRuntime()) {
+                UUID ownerId = rodOwner.getUniqueId();
+                SchedulerHelper.runTaskFor(plugin, rodOwner, () -> {
+                    Entity vehicle = rodOwner.getVehicle();
+                    if (vehicle == null) {
+                        if (shouldDebug && playerRods.containsKey(ownerId)) {
+                            Bukkit.getLogger().info("[RodDebug] " + rodOwner.getName() + ": Not in vehicle, removing rod");
+                        }
+                        removeRodForPlayer(ownerId);
+                        return;
+                    }
+                    if (!shouldPlayerHaveRod(rodOwner)) {
+                        if (shouldDebug && playerRods.containsKey(ownerId)) {
+                            Bukkit.getLogger().info("[RodDebug] " + rodOwner.getName() + ": Not in valid heat state, removing rod");
+                        }
+                        removeRodForPlayer(ownerId);
+                        return;
+                    }
+                    Location targetLocation = rodOwner.getLocation().clone();
+                    targetLocation.setYaw(0F);
+                    targetLocation.setPitch(0F);
+                    SchedulerHelper.runTaskFor(plugin, vehicle, () -> {
+                        updateRodOnVehicle(rodOwner, vehicle, ownerId, targetLocation, shouldDebug);
+                    });
+                });
+            } else {
+                updateRodForOwner(rodOwner, shouldDebug);
+            }
         }
     }
 
     private void updateRodForOwner(Player rodOwner, boolean shouldDebug) {
         UUID ownerId = rodOwner.getUniqueId();
+        Entity vehicle = rodOwner.getVehicle();
 
-        if (rodOwner.getVehicle() == null
-            || rodOwner.getVehicle().getPassengers().isEmpty()
-            || !((Entity) rodOwner.getVehicle().getPassengers().getFirst()).getUniqueId().equals(ownerId)
+        if (vehicle == null
+            || vehicle.getPassengers().isEmpty()
+            || !vehicle.getPassengers().getFirst().getUniqueId().equals(ownerId)
             || !shouldPlayerHaveRod(rodOwner)) {
             if (shouldDebug && playerRods.containsKey(ownerId)) {
                 Bukkit.getLogger().info("[RodDebug] " + rodOwner.getName() + ": Not in vehicle or heat, removing rod");
@@ -86,7 +114,7 @@ public class LightningRodListener implements Listener {
         targetLocation.setPitch(0F);
 
         if (rod == null || !rod.isValid()) {
-            rod = createRodForPlayer(rodOwner, targetLocation);
+            rod = createRodForPlayer(rodOwner.getUniqueId(), targetLocation);
             if (rod != null) {
                 playerRods.put(ownerId, rod);
                 if (shouldDebug) {
@@ -99,21 +127,66 @@ public class LightningRodListener implements Listener {
 
         if (rod == null) return;
 
-        ItemDisplay finalRod = rod;
-        SchedulerHelper.runTask(plugin, () -> {
-            if (!finalRod.isValid()) return;
-            for (Player viewer : Bukkit.getOnlinePlayers()) {
-                boolean canSee = canViewerSeeRod(viewer, rodOwner);
-                if (canSee) {
-                    viewer.showEntity(plugin, finalRod);
-                } else {
-                    viewer.hideEntity(plugin, finalRod);
-                }
-            }
-        });
+        updateRodVisibility(rod, rodOwner);
     }
 
-    private ItemDisplay createRodForPlayer(Player rodOwner, Location location) {
+    private void updateRodOnVehicle(Player rodOwner, Entity vehicle, UUID ownerId, Location targetLocation, boolean shouldDebug) {
+        if (vehicle.getPassengers().isEmpty()
+            || !vehicle.getPassengers().getFirst().getUniqueId().equals(ownerId)) {
+            if (shouldDebug && playerRods.containsKey(ownerId)) {
+                Bukkit.getLogger().info("[RodDebug] " + rodOwner.getName() + ": Not primary passenger, removing rod");
+            }
+            removeRodForPlayer(ownerId);
+            return;
+        }
+
+        ItemDisplay rod = playerRods.get(ownerId);
+        if (rod == null || !rod.isValid()) {
+            rod = createRodForPlayer(ownerId, targetLocation);
+            if (rod != null) {
+                playerRods.put(ownerId, rod);
+                if (shouldDebug) {
+                    Bukkit.getLogger().info("[RodDebug] " + rodOwner.getName() + ": Created new rod");
+                }
+            }
+        } else {
+            SchedulerHelper.teleportAsync(rod, targetLocation);
+        }
+
+        if (rod == null) return;
+
+        updateRodVisibility(rod, rodOwner);
+    }
+
+    private void updateRodVisibility(ItemDisplay rod, Player rodOwner) {
+        if (PlatformUtils.isFoliaRuntime()) {
+            for (Player viewer : Bukkit.getOnlinePlayers()) {
+                boolean canSee = canViewerSeeRod(viewer, rodOwner);
+                SchedulerHelper.runTaskFor(plugin, viewer, () -> {
+                    if (!rod.isValid()) return;
+                    if (canSee) {
+                        viewer.showEntity(plugin, rod);
+                    } else {
+                        viewer.hideEntity(plugin, rod);
+                    }
+                });
+            }
+        } else {
+            SchedulerHelper.runTask(plugin, () -> {
+                if (!rod.isValid()) return;
+                for (Player viewer : Bukkit.getOnlinePlayers()) {
+                    boolean canSee = canViewerSeeRod(viewer, rodOwner);
+                    if (canSee) {
+                        viewer.showEntity(plugin, rod);
+                    } else {
+                        viewer.hideEntity(plugin, rod);
+                    }
+                }
+            });
+        }
+    }
+
+    private ItemDisplay createRodForPlayer(UUID ownerId, Location location) {
         return location.getWorld().spawn(location, ItemDisplay.class, entity -> {
             entity.setInvulnerable(true);
             entity.setSilent(true);
@@ -125,16 +198,22 @@ public class LightningRodListener implements Listener {
                 PersistentDataType.INTEGER, 1);
             entity.getPersistentDataContainer().set(
                 Objects.requireNonNull(NamespacedKey.fromString("rod_owner", plugin)),
-                PersistentDataType.STRING, rodOwner.getUniqueId().toString());
+                PersistentDataType.STRING, ownerId.toString());
         });
     }
 
     private void removeRodForPlayer(UUID playerId) {
         ItemDisplay rod = playerRods.remove(playerId);
         if (rod != null && rod.isValid()) {
-            SchedulerHelper.runTask(plugin, () -> {
-                if (rod.isValid()) rod.remove();
-            });
+            if (PlatformUtils.isFoliaRuntime()) {
+                SchedulerHelper.runTaskFor(plugin, rod, () -> {
+                    if (rod.isValid()) rod.remove();
+                });
+            } else {
+                SchedulerHelper.runTask(plugin, () -> {
+                    if (rod.isValid()) rod.remove();
+                });
+            }
         }
     }
 

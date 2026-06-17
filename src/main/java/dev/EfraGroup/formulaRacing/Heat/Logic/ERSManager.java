@@ -15,7 +15,6 @@ import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 public class ERSManager {
     private final FormulaRacing plugin;

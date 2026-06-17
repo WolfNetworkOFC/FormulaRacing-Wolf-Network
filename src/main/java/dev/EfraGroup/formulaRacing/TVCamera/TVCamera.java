@@ -1,5 +1,6 @@
 package dev.EfraGroup.formulaRacing.TVCamera;
 
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
@@ -25,7 +26,7 @@ public class TVCamera {
     }
 
     public void tpPlayer(Player player) {
-        player.teleport(location);
+        SchedulerHelper.teleport(player, location);
     }
 
     public boolean isInsideRegion(Player player) {
