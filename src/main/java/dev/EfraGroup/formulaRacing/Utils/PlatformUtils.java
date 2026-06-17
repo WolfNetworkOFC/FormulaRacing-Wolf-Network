@@ -3,7 +3,7 @@ package dev.EfraGroup.formulaRacing.Utils;
 import org.bukkit.Bukkit;
 
 public final class PlatformUtils {
-    private static final boolean IS_FOLIA = isClassAvailable("io.papermc.paper.threadedregions.RegionScheduler");
+    private static final boolean IS_FOLIA = isClassAvailable("io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler");
 
     private PlatformUtils() {}
 
