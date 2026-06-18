@@ -99,7 +99,7 @@ public class SchedulerHelper {
 
     public static boolean teleport(Entity entity, Location destination) {
         if (PlatformUtils.isFolia()) {
-            return entity.teleport(destination);
+            return entity.teleportAsync(destination).join();
         } else {
             return entity.teleport(destination);
         }
