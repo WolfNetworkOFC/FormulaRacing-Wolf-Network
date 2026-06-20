@@ -12,9 +12,15 @@ public class PaperScheduler implements TaskScheduler {
 
     private static class PaperFRTask implements FRTask {
         private final BukkitTask delegate;
+        private final boolean repeating;
 
         public PaperFRTask(BukkitTask delegate) {
+            this(delegate, false);
+        }
+
+        public PaperFRTask(BukkitTask delegate, boolean repeating) {
             this.delegate = delegate;
+            this.repeating = repeating;
         }
 
         @Override
@@ -24,7 +30,7 @@ public class PaperScheduler implements TaskScheduler {
 
         @Override
         public boolean isRepeating() {
-            return delegate.isRepeating();
+            return repeating;
         }
 
         @Override
@@ -61,13 +67,13 @@ public class PaperScheduler implements TaskScheduler {
 
     @Override
     public FRTask runTaskTimer(Plugin plugin, Runnable runnable, long delayTicks, long periodTicks) {
-        return new PaperFRTask(Bukkit.getScheduler().runTaskTimer(plugin, runnable, Math.max(1, delayTicks), Math.max(1, periodTicks)));
+        return new PaperFRTask(Bukkit.getScheduler().runTaskTimer(plugin, runnable, Math.max(1, delayTicks), Math.max(1, periodTicks)), true);
     }
 
     @Override
     public FRTask runTaskTimer(Plugin plugin, Consumer<FRTask> runnable, long delayTicks, long periodTicks) {
         PaperFRTask[] ref = new PaperFRTask[1];
-        ref[0] = new PaperFRTask(Bukkit.getScheduler().runTaskTimer(plugin, () -> runnable.accept(ref[0]), Math.max(1, delayTicks), Math.max(1, periodTicks)));
+        ref[0] = new PaperFRTask(Bukkit.getScheduler().runTaskTimer(plugin, () -> runnable.accept(ref[0]), Math.max(1, delayTicks), Math.max(1, periodTicks)), true);
         return ref[0];
     }
 
@@ -123,7 +129,7 @@ public class PaperScheduler implements TaskScheduler {
 
     @Override
     public FRTask runAsyncTimer(Plugin plugin, Runnable runnable, long delayTicks, long periodTicks) {
-        return new PaperFRTask(Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, runnable, Math.max(1, delayTicks), Math.max(1, periodTicks)));
+        return new PaperFRTask(Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, runnable, Math.max(1, delayTicks), Math.max(1, periodTicks)), true);
     }
 
     @Override

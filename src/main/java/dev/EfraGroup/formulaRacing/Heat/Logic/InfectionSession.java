@@ -8,7 +8,11 @@ import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import java.util.*;
 
