@@ -11,6 +11,7 @@ import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.PlatformUtils;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import java.util.Map;
@@ -48,11 +49,11 @@ public class FormulaRacingListener implements Listener {
         this.startBoatCleaner();
     }
 
-private void startBoatCleaner() {
+    private void startBoatCleaner() {
+        if (PlatformUtils.isFoliaRuntime()) return;
         SchedulerHelper.runTaskTimer(this.plugin, () -> {
             for(World world : Bukkit.getWorlds()) {
                 for(Boat boat : world.getEntitiesByClass(Boat.class)) {
-                    if (!boat.isValid()) continue;
                     final Boat captured = boat;
                     SchedulerHelper.runTaskFor(this.plugin, captured, () -> {
                         if (captured.isValid() && captured.getPassengers().isEmpty()) {

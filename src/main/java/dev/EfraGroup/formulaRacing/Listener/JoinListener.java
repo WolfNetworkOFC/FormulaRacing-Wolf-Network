@@ -225,9 +225,6 @@ public class JoinListener implements Listener {
         }
 
         this.plugin.getAPI().recoverPlayerBoatState(player);
-        if (player.isInsideVehicle() && player.getVehicle() != null) {
-            player.getVehicle().remove();
-        }
 
         SchedulerHelper.runAsync(this.plugin, () -> {
             try {

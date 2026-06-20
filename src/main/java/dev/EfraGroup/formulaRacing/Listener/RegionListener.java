@@ -852,13 +852,14 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
             if (regions.isEmpty()) return;
 
             for (Player player : Bukkit.getOnlinePlayers()) {
-                if (player.getVehicle() instanceof Boat) {
-                    SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                    if (!player.isOnline()) return;
+                    if (player.getVehicle() instanceof Boat) {
                         this.checkPlayerRegions(player);
-                    });
-                }
+                    }
+                });
             }
-        }, 0L, 1L);
+        }, 0L, 2L);
     }
 
 }

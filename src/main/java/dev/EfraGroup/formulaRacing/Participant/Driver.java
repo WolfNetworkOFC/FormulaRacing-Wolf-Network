@@ -260,13 +260,11 @@ public class Driver {
 
     public void incrementCheckpoint() {
         ++this.checkpointsReached;
-        if (this.currentLap != null) {
-            long timestamp = System.currentTimeMillis();
-            this.currentLap.recordCheckpointTime(this.checkpointsReached, timestamp);
-        } else {
-            Bukkit.getLogger().warning("[FormulaRacing] Driver " + this.uuid + " incremented checkpoint but currentLap was null!");
+        if (this.currentLap == null) {
+            this.newLap();
         }
-
+        long timestamp = System.currentTimeMillis();
+        this.currentLap.recordCheckpointTime(this.checkpointsReached, timestamp);
     }
 
     public DriverState getState() {

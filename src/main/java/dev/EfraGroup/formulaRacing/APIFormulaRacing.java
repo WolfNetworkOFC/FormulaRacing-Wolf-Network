@@ -23,6 +23,7 @@ public class APIFormulaRacing {
     private final DatabaseManager databaseManager;
     private final NMSHandler nmsHandler;
     private static final Map<UUID, ArmorStand> lockedBoats = new ConcurrentHashMap<>();
+    private final Map<UUID, Entity> playerBoats = new ConcurrentHashMap<>();
 
     public APIFormulaRacing(JavaPlugin plugin, DatabaseManager databaseManager, NMSHandler nmsHandler) {
         this.plugin = plugin;
@@ -71,7 +72,7 @@ public class APIFormulaRacing {
 
     public void spawnBoatAt(Player player, Location location, boolean trail, boolean locked, boolean checkground, boolean collidable) {
         Location loc = location.clone();
-        SchedulerHelper.runTaskAt(this.plugin, loc, () -> this.spawnBoatNow(player, loc, trail, locked, checkground, collidable));
+        SchedulerHelper.runTaskFor(this.plugin, player, () -> this.spawnBoatNow(player, loc, trail, locked, checkground, collidable));
     }
 
     private void spawnBoatNow(Player player, Location loc, boolean trail, boolean locked, boolean checkground, boolean collidable) {
@@ -109,6 +110,7 @@ public class APIFormulaRacing {
                 }
 
                 boat.addPassenger(player);
+                playerBoats.put(uuid, boat);
                 if (player.getGameMode() == GameMode.SPECTATOR) {
                     player.setGameMode(GameMode.ADVENTURE);
                 }
@@ -177,6 +179,7 @@ public class APIFormulaRacing {
 
     public void deleteBoat(Entity boat) {
         if (!(boat instanceof Boat)) return;
+        playerBoats.values().remove(boat);
 
         SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
             Entity vehicle = boat.getVehicle();
@@ -194,6 +197,7 @@ public class APIFormulaRacing {
 
     public void queueDeleteBoat(Entity boat) {
         if (!(boat instanceof Boat)) return;
+        playerBoats.values().remove(boat);
 
         SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
             Entity vehicle = boat.getVehicle();
@@ -207,6 +211,21 @@ public class APIFormulaRacing {
                 boat.remove();
             }
         });
+    }
+
+    public void removePlayerBoat(UUID uuid) {
+        ArmorStand anchor = lockedBoats.remove(uuid);
+        if (anchor != null) {
+            SchedulerHelper.runTaskFor(this.plugin, anchor, () -> {
+                if (anchor.isValid()) anchor.remove();
+            });
+        }
+        Entity vehicle = playerBoats.remove(uuid);
+        if (vehicle instanceof Boat boat) {
+            SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
+                if (boat.isValid()) boat.remove();
+            });
+        }
     }
 
     public void clearAllBoats() {

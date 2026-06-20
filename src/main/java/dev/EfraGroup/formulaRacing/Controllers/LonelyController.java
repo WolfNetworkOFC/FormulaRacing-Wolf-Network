@@ -3,11 +3,13 @@ package dev.EfraGroup.formulaRacing.Controllers;
 import dev.EfraGroup.formulaRacing.BoatUtils.NocolManager;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.PlatformUtils;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Heat.CollisionMode;
 import dev.EfraGroup.formulaRacing.Loneliness.ScopeResolver;
 import dev.EfraGroup.formulaRacing.Loneliness.VisibilityScope;
 import org.bukkit.Bukkit;
+import org.bukkit.World;
 import org.bukkit.entity.Boat;
 import org.bukkit.entity.ChestBoat;
 import org.bukkit.entity.Entity;
@@ -374,32 +376,90 @@ public class LonelyController implements Listener {
 
     private void showPlayer(Player viewer, Player target) {
         SchedulerHelper.runTaskFor(plugin, viewer, () -> viewer.showPlayer(plugin, target));
-        SchedulerHelper.runTaskFor(plugin, target, () -> {
-            Entity vehicle = target.getVehicle();
-            if (vehicle != null) {
-                viewer.showEntity(plugin, vehicle);
-                if (plugin.getConfig().getBoolean("FrostHexAddOn", false)) {
-                    for (Entity passenger : vehicle.getPassengers()) {
-                        viewer.showEntity(plugin, passenger);
+        if (PlatformUtils.isFoliaRuntime()) {
+            SchedulerHelper.runTaskFor(plugin, target, () -> {
+                Entity vehicle = target.getVehicle();
+                if (vehicle != null) {
+                    SchedulerHelper.runTaskFor(plugin, vehicle, () -> {
+                        if (!vehicle.isValid()) return;
+                        World vehWorld = vehicle.getWorld();
+                        int vehRegionX = vehicle.getLocation().getBlockX() >> 9;
+                        int vehRegionZ = vehicle.getLocation().getBlockZ() >> 9;
+                        boolean frostHex = plugin.getConfig().getBoolean("FrostHexAddOn", false);
+                        Entity[] passengers = frostHex ? vehicle.getPassengers().toArray(new Entity[0]) : null;
+                        SchedulerHelper.runTaskFor(plugin, viewer, () -> {
+                            if (!viewer.isOnline()) return;
+                            if (!viewer.getWorld().equals(vehWorld)) return;
+                            int viewerRegionX = viewer.getLocation().getBlockX() >> 9;
+                            int viewerRegionZ = viewer.getLocation().getBlockZ() >> 9;
+                            if (vehRegionX != viewerRegionX || vehRegionZ != viewerRegionZ) return;
+                            viewer.showEntity(plugin, vehicle);
+                            if (frostHex && passengers != null) {
+                                for (Entity passenger : passengers) {
+                                    viewer.showEntity(plugin, passenger);
+                                }
+                            }
+                        });
+                    });
+                }
+            });
+        } else {
+            SchedulerHelper.runTaskFor(plugin, target, () -> {
+                Entity vehicle = target.getVehicle();
+                if (vehicle != null) {
+                    viewer.showEntity(plugin, vehicle);
+                    if (plugin.getConfig().getBoolean("FrostHexAddOn", false)) {
+                        for (Entity passenger : vehicle.getPassengers()) {
+                            viewer.showEntity(plugin, passenger);
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
     }
 
     private void hidePlayer(Player viewer, Player target) {
         SchedulerHelper.runTaskFor(plugin, viewer, () -> viewer.hidePlayer(plugin, target));
-        SchedulerHelper.runTaskFor(plugin, target, () -> {
-            Entity vehicle = target.getVehicle();
-            if (vehicle != null) {
-                viewer.hideEntity(plugin, vehicle);
-                if (plugin.getConfig().getBoolean("FrostHexAddOn", false)) {
-                    for (Entity passenger : vehicle.getPassengers()) {
-                        viewer.hideEntity(plugin, passenger);
+        if (PlatformUtils.isFoliaRuntime()) {
+            SchedulerHelper.runTaskFor(plugin, target, () -> {
+                Entity vehicle = target.getVehicle();
+                if (vehicle != null) {
+                    SchedulerHelper.runTaskFor(plugin, vehicle, () -> {
+                        if (!vehicle.isValid()) return;
+                        World vehWorld = vehicle.getWorld();
+                        int vehRegionX = vehicle.getLocation().getBlockX() >> 9;
+                        int vehRegionZ = vehicle.getLocation().getBlockZ() >> 9;
+                        boolean frostHex = plugin.getConfig().getBoolean("FrostHexAddOn", false);
+                        Entity[] passengers = frostHex ? vehicle.getPassengers().toArray(new Entity[0]) : null;
+                        SchedulerHelper.runTaskFor(plugin, viewer, () -> {
+                            if (!viewer.isOnline()) return;
+                            if (!viewer.getWorld().equals(vehWorld)) return;
+                            int viewerRegionX = viewer.getLocation().getBlockX() >> 9;
+                            int viewerRegionZ = viewer.getLocation().getBlockZ() >> 9;
+                            if (vehRegionX != viewerRegionX || vehRegionZ != viewerRegionZ) return;
+                            viewer.hideEntity(plugin, vehicle);
+                            if (frostHex && passengers != null) {
+                                for (Entity passenger : passengers) {
+                                    viewer.hideEntity(plugin, passenger);
+                                }
+                            }
+                        });
+                    });
+                }
+            });
+        } else {
+            SchedulerHelper.runTaskFor(plugin, target, () -> {
+                Entity vehicle = target.getVehicle();
+                if (vehicle != null) {
+                    viewer.hideEntity(plugin, vehicle);
+                    if (plugin.getConfig().getBoolean("FrostHexAddOn", false)) {
+                        for (Entity passenger : vehicle.getPassengers()) {
+                            viewer.hideEntity(plugin, passenger);
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
     }
 
     private boolean isPlayerInBoat(Player player) {

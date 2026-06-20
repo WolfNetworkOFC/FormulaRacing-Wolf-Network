@@ -1118,6 +1118,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         if (this.driverLookup != null) {
             this.driverLookup.unregister(uuid);
         }
+        this.api.removePlayerBoat(uuid);
     }
 
     private void registerCommandContexts() {

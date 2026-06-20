@@ -8,6 +8,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
@@ -160,17 +161,28 @@ public class LightningRodListener implements Listener {
 
     private void updateRodVisibility(ItemDisplay rod, Player rodOwner) {
         if (PlatformUtils.isFoliaRuntime()) {
-            for (Player viewer : Bukkit.getOnlinePlayers()) {
-                boolean canSee = canViewerSeeRod(viewer, rodOwner);
-                SchedulerHelper.runTaskFor(plugin, viewer, () -> {
-                    if (!rod.isValid()) return;
-                    if (canSee) {
-                        viewer.showEntity(plugin, rod);
-                    } else {
-                        viewer.hideEntity(plugin, rod);
-                    }
-                });
-            }
+            SchedulerHelper.runTaskFor(plugin, rod, () -> {
+                if (!rod.isValid()) return;
+                World rodWorld = rod.getWorld();
+                int rodRegionX = rod.getLocation().getBlockX() >> 9;
+                int rodRegionZ = rod.getLocation().getBlockZ() >> 9;
+                for (Player viewer : Bukkit.getOnlinePlayers()) {
+                    if (viewer.equals(rodOwner)) continue;
+                    boolean canSee = canViewerSeeRod(viewer, rodOwner);
+                    SchedulerHelper.runTaskFor(plugin, viewer, () -> {
+                        if (!viewer.isOnline()) return;
+                        if (!rodWorld.equals(viewer.getWorld())) return;
+                        int viewerRegionX = viewer.getLocation().getBlockX() >> 9;
+                        int viewerRegionZ = viewer.getLocation().getBlockZ() >> 9;
+                        if (rodRegionX != viewerRegionX || rodRegionZ != viewerRegionZ) return;
+                        if (canSee) {
+                            viewer.showEntity(plugin, rod);
+                        } else {
+                            viewer.hideEntity(plugin, rod);
+                        }
+                    });
+                }
+            });
         } else {
             SchedulerHelper.runTask(plugin, () -> {
                 if (!rod.isValid()) return;

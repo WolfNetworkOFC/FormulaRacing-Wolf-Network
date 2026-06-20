@@ -43,6 +43,7 @@ public class RaceSession implements SessionLogic {
 
             for(Driver driver : heat.getDrivers().values()) {
                 driver.setStartTime(now);
+                driver.newLap();
                 Player player = Bukkit.getPlayer(driver.getUuid());
                 if (player != null && player.isOnline()) {
                     heat.clearTimeTrialActionBar(player);
