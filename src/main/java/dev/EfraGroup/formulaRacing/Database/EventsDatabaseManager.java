@@ -16,6 +16,8 @@ import dev.EfraGroup.formulaRacing.Round.RaceRound;
 import dev.EfraGroup.formulaRacing.Round.RoundState;
 import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
+import dev.EfraGroup.formulaRacing.Round.SprintQualificationRound;
+import dev.EfraGroup.formulaRacing.Round.SprintRaceRound;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -1366,8 +1368,14 @@ public class EventsDatabaseManager {
             case QUALIFICATION -> {
                 return new QualificationRound(plugin, id, event, index, type);
             }
+            case SPRINT_QUALIFICATION -> {
+                return new SprintQualificationRound(plugin, id, event, index, type);
+            }
             case ELIMINATION -> {
                 return new EliminationRound(plugin, id, event, index, type);
+            }
+            case SPRINT_RACE -> {
+                return new SprintRaceRound(plugin, id, event, index, type);
             }
             case FINAL -> {
                 return new RaceRound(plugin, id, event, index, type);

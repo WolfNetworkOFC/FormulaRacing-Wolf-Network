@@ -10,6 +10,8 @@ import dev.EfraGroup.formulaRacing.Round.RaceRound;
 import dev.EfraGroup.formulaRacing.Round.RoundState;
 import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
+import dev.EfraGroup.formulaRacing.Round.SprintQualificationRound;
+import dev.EfraGroup.formulaRacing.Round.SprintRaceRound;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -43,8 +45,14 @@ public class EventSchedule {
                 case QUALIFICATION:
                     round = new QualificationRound(this.plugin, 0, this.event, roundIndex, roundType);
                     break;
+                case SPRINT_QUALIFICATION:
+                    round = new SprintQualificationRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
                 case ELIMINATION:
                     round = new EliminationRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
+                case SPRINT_RACE:
+                    round = new SprintRaceRound(this.plugin, 0, this.event, roundIndex, roundType);
                     break;
                 case FINAL:
                 default:

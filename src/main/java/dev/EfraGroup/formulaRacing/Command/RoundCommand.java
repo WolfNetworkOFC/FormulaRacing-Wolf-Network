@@ -94,7 +94,7 @@ public class RoundCommand extends BaseCommand {
     }
 
     @Subcommand("create|new")
-    @CommandCompletion("PRACTICE|QUALIFICATION|ELIMINATION|FINAL @event")
+    @CommandCompletion("PRACTICE|QUALIFICATION|ELIMINATION|FINAL|SPRINT_QUALIFICATION|SPRINT_RACE @event")
     @CommandPermission("formularacing.event.admin")
     @Description("Cria um novo round no evento")
     public void onCreate(
@@ -270,6 +270,7 @@ public class RoundCommand extends BaseCommand {
 
         if (
             round.getType() == RoundType.QUALIFICATION ||
+            round.getType() == RoundType.SPRINT_QUALIFICATION ||
             round.getType() == RoundType.PRACTICE
         ) {
             player.sendMessage("");

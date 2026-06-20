@@ -1068,7 +1068,7 @@ public class RaceEventManager {
             timeLimit = 15;
             lonely = true;
             startDelay = 0;
-        } else if (round.getType() == RoundType.QUALIFICATION) {
+        } else if (round.getType() == RoundType.QUALIFICATION || round.getType() == RoundType.SPRINT_QUALIFICATION) {
             totalLaps = 0;
             timeLimit = 10;
             lonely = true;

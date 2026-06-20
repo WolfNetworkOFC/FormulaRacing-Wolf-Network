@@ -1603,9 +1603,11 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                                 String typePrefix;
                                 switch (r.getType()) {
                                     case QUALIFICATION -> typePrefix = "Q";
+                                    case SPRINT_QUALIFICATION -> typePrefix = "SQ";
                                     case FINAL -> typePrefix = "F";
                                     case ELIMINATION -> typePrefix = "E";
                                     case PRACTICE -> typePrefix = "P";
+                                    case SPRINT_RACE -> typePrefix = "S";
                                     default -> typePrefix = "H";
                                 }
                                 return r
@@ -1633,13 +1635,15 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                           .stream()
                           .map(h -> {
                                String typePrefix;
-                               switch (finalRound.getType()) {
-                                   case QUALIFICATION -> typePrefix = "Q";
-                                   case FINAL -> typePrefix = "F";
-                                   case ELIMINATION -> typePrefix = "E";
-                                   case PRACTICE -> typePrefix = "P";
-                                   default -> typePrefix = "H";
-                               }
+                                switch (finalRound.getType()) {
+                                    case QUALIFICATION -> typePrefix = "Q";
+                                    case SPRINT_QUALIFICATION -> typePrefix = "SQ";
+                                    case FINAL -> typePrefix = "F";
+                                    case ELIMINATION -> typePrefix = "E";
+                                    case PRACTICE -> typePrefix = "P";
+                                    case SPRINT_RACE -> typePrefix = "S";
+                                    default -> typePrefix = "H";
+                                }
                               return (
                                   "R" +
                                   finalRound.getRoundIndex() +

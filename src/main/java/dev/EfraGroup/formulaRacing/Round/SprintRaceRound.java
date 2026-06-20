@@ -9,8 +9,6 @@ import dev.EfraGroup.formulaRacing.Heat.Logic.SessionLogic;
 
 public class SprintRaceRound extends Rounds {
 
-    private int sprintLaps = 10;
-
     public SprintRaceRound(FormulaRacing plugin, int id, Events event, int roundIndex, RoundType roundType) {
         super(plugin, id, event, roundIndex, roundType);
     }
@@ -20,9 +18,6 @@ public class SprintRaceRound extends Rounds {
         Heats heat = new Heats(this.plugin, 0, this, heatNumber);
         heat.setCollisionMode(CollisionMode.HIGH);
         heat.setStartDelay(5);
-        heat.setTotalLaps(sprintLaps);
-        heat.setDrsEnabled(false);
-        heat.setPushtopass(false);
         this.heats.put(heatNumber, heat);
         return heat;
     }
@@ -30,7 +25,15 @@ public class SprintRaceRound extends Rounds {
     @Override
     protected void startHeat(Heats heat) {
         heat.loadHeat();
-        heat.startCountdown();
+        if (this.plugin.getReadyCheckManager() != null && !this.isQuickRaceRound()) {
+            this.plugin.getReadyCheckManager().startAutoReadyCheck(heat, () -> heat.startCountdown());
+        } else {
+            heat.startCountdown();
+        }
+    }
+
+    private boolean isQuickRaceRound() {
+        return this.event != null && this.event.getDisplayName() != null && this.event.getDisplayName().startsWith("QuickRace_");
     }
 
     @Override
@@ -41,13 +44,5 @@ public class SprintRaceRound extends Rounds {
     @Override
     public SessionLogic getSessionLogic() {
         return new RaceSession(this.plugin);
-    }
-
-    public int getSprintLaps() {
-        return sprintLaps;
-    }
-
-    public void setSprintLaps(int sprintLaps) {
-        this.sprintLaps = Math.max(1, sprintLaps);
     }
 }

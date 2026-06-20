@@ -33,7 +33,7 @@ public class RaceMovementListener implements Listener {
                 Optional<Rounds> roundOpt = raceEvent.getEventSchedule().getCurrentRound();
                 if (!roundOpt.isEmpty()) {
                     Rounds round = (Rounds)roundOpt.get();
-                    if (round.getRoundType() == RoundType.FINAL) {
+                    if (round.getRoundType() == RoundType.FINAL || round.getRoundType() == RoundType.SPRINT_RACE) {
                         Heats activeHeat = this.findActiveHeat(round);
                         if (activeHeat != null && activeHeat.getHeatState() == HeatState.RACING) {
                             Driver driver = activeHeat.getDriver(player.getUniqueId());

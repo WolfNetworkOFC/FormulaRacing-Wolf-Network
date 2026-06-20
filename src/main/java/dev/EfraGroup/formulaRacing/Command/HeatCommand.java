@@ -1039,9 +1039,9 @@ public class HeatCommand extends BaseCommand {
             if (event != null) {
                 RoundType currentType = currentRound.getType();
                 RoundType targetType;
-                if (currentType == RoundType.QUALIFICATION) {
+                if (currentType == RoundType.QUALIFICATION || currentType == RoundType.SPRINT_QUALIFICATION) {
                     targetType = RoundType.PRACTICE;
-                } else if (currentType == RoundType.FINAL) {
+                } else if (currentType == RoundType.FINAL || currentType == RoundType.SPRINT_RACE) {
                     targetType = RoundType.QUALIFICATION;
                 } else {
                     targetType = null;
@@ -1431,7 +1431,7 @@ public class HeatCommand extends BaseCommand {
 
             // Determina se usa Posição (para Finais) ou Melhor Volta (Qualificação)
             boolean usePosition = (sourceHeat.getRound() != null &&
-                sourceHeat.getRound().getType() == RoundType.FINAL);
+                (sourceHeat.getRound().getType() == RoundType.FINAL || sourceHeat.getRound().getType() == RoundType.SPRINT_RACE));
 
             sortedDrivers.sort((u1, u2) -> {
                 Driver d1 = sourceHeat.getDriver(u1);

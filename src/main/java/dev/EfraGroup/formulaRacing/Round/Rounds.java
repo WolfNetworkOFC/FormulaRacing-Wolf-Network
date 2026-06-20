@@ -91,7 +91,7 @@ public abstract class Rounds {
     }
 
     protected void startHeat(Heats heat) {
-        if ((this.roundType == RoundType.PRACTICE || this.roundType == RoundType.QUALIFICATION) && this.event != null && !this.event.getSubscribers().isEmpty()) {
+        if ((this.roundType == RoundType.PRACTICE || this.roundType == RoundType.QUALIFICATION || this.roundType == RoundType.SPRINT_QUALIFICATION) && this.event != null && !this.event.getSubscribers().isEmpty()) {
             int pos = 1;
 
             for(UUID uuid : this.event.getSubscribers().keySet()) {

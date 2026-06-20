@@ -1139,13 +1139,16 @@ public class EventCommand extends BaseCommand {
                             var10002 + "    ↳ " + heat.getName()
                         );
                         int var10000 = round.getRoundIndex();
-                        String heatRef =
-                            "R" +
-                            var10000 +
-                            (round.getType() == RoundType.QUALIFICATION
-                                ? "Q"
-                                : "F") +
-                            heat.getHeatNumber();
+                        String heatRef;
+                        if (round.getType() == RoundType.QUALIFICATION) {
+                            heatRef = "R" + var10000 + "Q" + heat.getHeatNumber();
+                        } else if (round.getType() == RoundType.SPRINT_QUALIFICATION) {
+                            heatRef = "R" + var10000 + "SQ" + heat.getHeatNumber();
+                        } else if (round.getType() == RoundType.SPRINT_RACE) {
+                            heatRef = "R" + var10000 + "S" + heat.getHeatNumber();
+                        } else {
+                            heatRef = "R" + var10000 + "F" + heat.getHeatNumber();
+                        }
                         heatLine.addExtra(new TextComponent("  "));
                         TextComponent loadBtn = new TextComponent("[L]");
                         loadBtn.setColor(ChatColor.YELLOW);

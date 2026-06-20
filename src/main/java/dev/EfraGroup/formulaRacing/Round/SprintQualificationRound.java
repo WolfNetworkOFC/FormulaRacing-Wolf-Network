@@ -15,19 +15,16 @@ public class SprintQualificationRound extends Rounds {
     public Heats createHeat(int heatNumber) {
         Heats heat = new Heats(this.plugin, 0, this, heatNumber);
         heat.setCollisionMode(CollisionMode.DISABLED);
+        heat.setTotalLaps((Integer)null);
         heat.setStartDelay(5);
-        heat.setTotalLaps(1);
         this.heats.put(heatNumber, heat);
         return heat;
     }
 
-    protected void startHeat(Heats heat) {
-        heat.loadHeat();
-        heat.startQualifying();
-    }
-
     public void broadcastResults() {
-        this.plugin.getDebugManager().logRaceSystem("Anunciando resultados da Qualificação Sprint...");
+        this.plugin.getDebugManager().logRaceSystem("Processando resultados da Qualificação Sprint...");
+        this.plugin.getRaceEventManager().processQualification(this.event, this);
+        this.plugin.getDebugManager().logRaceSystem("Qualificação Sprint finalizada! Grid de largada definido.");
     }
 
     public SessionLogic getSessionLogic() {

@@ -10,7 +10,7 @@ import java.util.List;
 public class EventResults {
     public static List<Driver> generateHeatResults(Heats heat) {
         List<Driver> newList = new ArrayList(heat.getDrivers().values());
-        if (heat.getRound() != null && heat.getRound().getType() == RoundType.QUALIFICATION) {
+        if (heat.getRound() != null && (heat.getRound().getType() == RoundType.QUALIFICATION || heat.getRound().getType() == RoundType.SPRINT_QUALIFICATION)) {
             newList.sort((d1, d2) -> {
                 if (d1.getFastestLap() == null) {
                     return 1;
@@ -34,7 +34,7 @@ public class EventResults {
 
         if (!results.isEmpty()) {
             Heats firstHeat = (Heats)heats.get(0);
-            if (firstHeat.getRound() != null && firstHeat.getRound().getType() == RoundType.QUALIFICATION) {
+            if (firstHeat.getRound() != null && (firstHeat.getRound().getType() == RoundType.QUALIFICATION || firstHeat.getRound().getType() == RoundType.SPRINT_QUALIFICATION)) {
                 results.sort((d1, d2) -> {
                     if (d1.getFastestLap() == null && d2.getFastestLap() == null) {
                         return 0;

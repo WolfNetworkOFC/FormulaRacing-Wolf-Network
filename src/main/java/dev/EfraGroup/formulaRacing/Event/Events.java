@@ -118,7 +118,7 @@ public class Events {
                 Rounds lastRound = (Rounds)this.eventSchedule.getCurrentRound().get();
                 List<Heats> heats = new ArrayList(lastRound.getHeats().values());
                 new ArrayList();
-                if (lastRound.getType() == RoundType.FINAL) {
+                if (lastRound.getType() == RoundType.FINAL || lastRound.getType() == RoundType.SPRINT_RACE) {
                     List<Driver> results = EventResults.generateRoundResults(heats);
                     this.announcements.broadcastFinalStandings((Heats)heats.get(0), results, lastRound.getRoundState() == RoundState.FINISHED ? HeatState.FINISHED : HeatState.RACING);
                     if (!results.isEmpty()) {

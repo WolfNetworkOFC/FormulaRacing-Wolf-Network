@@ -349,7 +349,8 @@ public class Heats {
         ) {
             boolean isQuali =
                 this.round != null &&
-                this.round.getRoundType() == RoundType.QUALIFICATION;
+                (this.round.getRoundType() == RoundType.QUALIFICATION ||
+                 this.round.getRoundType() == RoundType.SPRINT_QUALIFICATION);
             if (!isQuali) {
                 this.gridManager.teleportDriversToGrid();
             }
@@ -440,7 +441,8 @@ public class Heats {
             );
             boolean isQuali =
                 this.round != null &&
-                this.round.getRoundType() == RoundType.QUALIFICATION;
+                (this.round.getRoundType() == RoundType.QUALIFICATION ||
+                 this.round.getRoundType() == RoundType.SPRINT_QUALIFICATION);
             if (isQuali) {
                 List<Location> qualiGridPositions = this.plugin
                     .getTrackIntegrationManager()
@@ -1665,8 +1667,10 @@ public class Heats {
             switch (this.round.getType()) {
                 case PRACTICE -> var10000 = "P";
                 case QUALIFICATION -> var10000 = "Q";
+                case SPRINT_QUALIFICATION -> var10000 = "SQ";
                 case FINAL -> var10000 = "F";
                 case ELIMINATION -> var10000 = "E";
+                case SPRINT_RACE -> var10000 = "S";
                 default -> throw new MatchException(
                     (String) null,
                     (Throwable) null

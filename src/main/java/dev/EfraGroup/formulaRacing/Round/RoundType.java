@@ -4,5 +4,7 @@ public enum RoundType {
     PRACTICE,
     QUALIFICATION,
     ELIMINATION,
-    FINAL;
+    FINAL,
+    SPRINT_QUALIFICATION,
+    SPRINT_RACE;
 }
