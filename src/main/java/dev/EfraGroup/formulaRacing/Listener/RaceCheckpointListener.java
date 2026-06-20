@@ -161,6 +161,9 @@ public class RaceCheckpointListener implements Listener {
                                         }
                                     }
                                 }
+                                if (driver.getCurrentLap() == null) {
+                                    return;
+                                }
                                 int checkpointsReached =
                                     driver.getCheckpointsReached();
                                 int nextExpectedZeroBased = checkpointsReached;
