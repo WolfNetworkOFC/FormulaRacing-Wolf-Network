@@ -1,6 +1,8 @@
 package dev.EfraGroup.formulaRacing.Hologram;
 
+import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import me.clip.placeholderapi.PlaceholderAPI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +26,10 @@ public class HologramManager {
     private static final double LINE_SPACING = 0.25;
     private static final NamespacedKey HOLO_TAG = new NamespacedKey("formularacing", "hologram");
 
+    private static String resolvePAPI(String text) {
+        return PlaceholderAPI.setPlaceholders(null, text);
+    }
+
     public HologramManager(JavaPlugin plugin) {
         this.plugin = plugin;
     }
@@ -44,12 +50,17 @@ public class HologramManager {
             return;
         }
 
-        // No existing stands — clean orphans from crashed sessions (safe: no stands just created)
+        // Ensure chunk is loaded so getNearbyEntities can find orphan stands from prior sessions
+        if (!loc.getChunk().isLoaded()) {
+            loc.getChunk().load();
+        }
+
+        // Remove any orphan ArmorStand tagged as ours at this location (left from crashes or failed shutdown cleanup)
         for (Entity entity : loc.getWorld().getNearbyEntities(loc, 0.5, 5.0, 0.5,
                 e -> e instanceof ArmorStand && e.getPersistentDataContainer().has(HOLO_TAG, PersistentDataType.BYTE))) {
             try {
                 entity.remove();
-            } catch (Exception ignored) {}
+            } catch (Throwable ignored) {}
         }
 
         holograms.remove(name);
@@ -64,7 +75,7 @@ public class HologramManager {
             stand.setGravity(false);
             stand.setInvulnerable(true);
             stand.setCustomNameVisible(true);
-            stand.setCustomName(lines.get(i));
+            stand.setCustomName(resolvePAPI(lines.get(i)));
             stand.getPersistentDataContainer().set(HOLO_TAG, PersistentDataType.BYTE, (byte) 1);
             stands.add(stand);
         }
@@ -94,7 +105,7 @@ public class HologramManager {
         }
         for (int i = 0; i < lines.size(); i++) {
             ArmorStand stand = (ArmorStand) stands.get(i);
-            stand.setCustomName(lines.get(i));
+            stand.setCustomName(resolvePAPI(lines.get(i)));
             Location expectedLoc = baseLoc.clone().add(0, (lines.size() - 1 - i) * LINE_SPACING, 0);
             if (!stand.getLocation().equals(expectedLoc)) {
                 SchedulerHelper.teleport(stand, expectedLoc);
@@ -136,7 +147,7 @@ public class HologramManager {
             for (int i = 0; i < lines.size(); i++) {
                 Entity entity = stands.get(i);
                 ArmorStand stand = (ArmorStand) entity;
-                stand.setCustomName(lines.get(i));
+                stand.setCustomName(resolvePAPI(lines.get(i)));
 
                 // Reposition in case line count changed
                 Location expectedLoc = baseLoc.clone().add(0, (lines.size() - 1 - i) * LINE_SPACING, 0);
@@ -153,14 +164,22 @@ public class HologramManager {
         if (stands != null) {
             for (Entity entity : stands) {
                 if (entity != null) {
-                    SchedulerHelper.runTaskFor(plugin, entity, () -> {
-                        if (entity.isValid()) {
-                    try {
-                        entity.remove();
-                    } catch (Exception ignored) {
-                    }
+                    if (plugin.isEnabled()) {
+                        SchedulerHelper.runTaskFor(plugin, entity, () -> {
+                            if (entity.isValid()) {
+                                try {
+                                    entity.remove();
+                                } catch (Exception ignored) {
+                                }
+                            }
+                        });
+                    } else {
+                        // During shutdown, scheduler tasks are retired — remove directly
+                        try {
+                            if (entity.isValid()) entity.remove();
+                        } catch (Throwable ignored) {
                         }
-                    });
+                    }
                 }
             }
         }
@@ -215,11 +234,24 @@ public class HologramManager {
         for (World world : Bukkit.getWorlds()) {
             for (Entity entity : world.getEntitiesByClass(ArmorStand.class)) {
                 if (entity.getPersistentDataContainer().has(HOLO_TAG, PersistentDataType.BYTE)) {
-                    try {
-                        entity.remove();
-                    } catch (Exception ignored) {
-                        // Folia: world data may already be null during shutdown
+                    if (entity.isValid()) {
+                        try {
+                            entity.remove();
+                        } catch (Throwable ignored) {
+                            // Folia: entity.remove() must be called from the owning region thread.
+                            // During shutdown this may fail — the startup orphan scan handles it.
+                        }
                     }
+                }
+            }
+        }
+    }
+
+    public static void removeOrphanStands() {
+        for (World world : Bukkit.getWorlds()) {
+            for (Entity entity : world.getEntitiesByClass(ArmorStand.class)) {
+                if (entity.getPersistentDataContainer().has(HOLO_TAG, PersistentDataType.BYTE) && entity.isValid()) {
+                    entity.getScheduler().run(FormulaRacing.getInstance(), t -> entity.remove(), null);
                 }
             }
         }

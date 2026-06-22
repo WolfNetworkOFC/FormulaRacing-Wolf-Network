@@ -409,6 +409,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             SchedulerHelper.runAsync(this, () ->
                 this.dm.cleanOrphanedCheckpoints()
             );
+            // Delayed safety net: remove any orphan hologram armor stands left from failed shutdown cleanup
+            SchedulerHelper.runDelayedTask(this, () ->
+                HologramManager.removeOrphanStands(), 100L
+            );
             if (this.debugManager != null) {
                 this.getLogger().info(
                     "[FormulaRacing] Plugin ativado com sucesso!"

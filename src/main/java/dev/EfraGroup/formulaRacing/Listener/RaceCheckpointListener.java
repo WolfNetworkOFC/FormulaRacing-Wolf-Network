@@ -162,6 +162,9 @@ public class RaceCheckpointListener implements Listener {
                                     }
                                 }
                                 if (driver.getCurrentLap() == null) {
+                                    this.plugin.getDebugManager().logRaceSystem(
+                                        "§c[CHECKPOINT] " + player.getName() + " currentLap is null - pulando detecção"
+                                    );
                                     return;
                                 }
                                 int checkpointsReached =
@@ -301,11 +304,12 @@ public class RaceCheckpointListener implements Listener {
         driver.incrementCheckpoint();
         this.plugin.getDebugManager().logRaceSystem(
             String.format(
-                "§e[CHECKPOINT] %s passou por CP%d - Progresso: %d/%d",
+                "§a[CHECKPOINT] %s passou por CP%d - Progresso: %d/%d (heatState=%s)",
                 player.getName(),
                 checkpointId,
                 driver.getCheckpointsReached(),
-                totalCheckpoints
+                totalCheckpoints,
+                heat.getHeatState()
             )
         );
         DriverPassCheckpointEvent event = new DriverPassCheckpointEvent(
@@ -612,10 +616,12 @@ public class RaceCheckpointListener implements Listener {
 
             this.plugin.getDebugManager().logRaceSystem(
                 String.format(
-                    "§a[LAP] %s completou volta %d em %s",
+                    "§a[LAP] %s completou volta %d em %s (laps.size=%d, heatState=%s)",
                     player.getName(),
                     lapNumber,
-                    lapTime
+                    lapTime,
+                    driver.getLaps().size(),
+                    heat.getHeatState()
                 )
             );
         }

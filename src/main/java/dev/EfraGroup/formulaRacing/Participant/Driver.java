@@ -476,7 +476,7 @@ public class Driver {
     }
 
     public boolean hasPassedAllCheckpoints(int totalCheckpoints) {
-        return totalCheckpoints > 0 && this.checkpointsReached >= totalCheckpoints;
+        return totalCheckpoints <= 0 || this.checkpointsReached >= totalCheckpoints;
     }
 
     public void reset() {

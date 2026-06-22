@@ -43,7 +43,6 @@ public class RaceSession implements SessionLogic {
 
             for(Driver driver : heat.getDrivers().values()) {
                 driver.setStartTime(now);
-                driver.newLap();
                 Player player = Bukkit.getPlayer(driver.getUuid());
                 if (player != null && player.isOnline()) {
                     heat.clearTimeTrialActionBar(player);
@@ -178,27 +177,22 @@ public class RaceSession implements SessionLogic {
         if (player == null) {
             return false;
         }
-        if (heat.getPlugin().getDebugManager().isRaceSystemVerboseEnabled()) {
-            heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] passLap chamado para " + player.getName());
-        }
+        heat.getPlugin().getDebugManager().logRaceSystem("[LAP] passLap chamado para " + player.getName());
         if (driver.getCurrentLap() == null) {
-            heat.getPlugin().getDebugManager().logRaceSystem("[RACE] " + player.getName() + " iniciando primeira volta");
+            heat.getPlugin().getDebugManager().logRaceSystem("[LAP] " + player.getName() + " iniciando primeira volta");
             driver.newLap();
             heat.updateLivePositions();
             Bukkit.getPluginManager().callEvent(new DriverNewLapEvent(driver, driver.getCurrentLap()));
             return true;
         }
         int totalCheckpoints = heat.getPlugin().getTrackIntegrationManager().getCheckpointCount(heat.getTrackNameWS());
+        heat.getPlugin().getDebugManager().logRaceSystem("[LAP] " + player.getName() + " checkpoints: " + driver.getCheckpointsReached() + "/" + totalCheckpoints);
         if (!driver.hasPassedAllCheckpoints(totalCheckpoints)) {
-            if (heat.getPlugin().getDebugManager().isRaceSystemVerboseEnabled()) {
-                heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] " + player.getName() + " NÃO passou por todos os checkpoints!");
-            }
+            heat.getPlugin().getDebugManager().logRaceSystem("[LAP] " + player.getName() + " NÃO passou por todos os checkpoints!");
             heat.getPlugin().sendMessage(player, "timetrial_incomplete_lap", new String[]{"{count}", String.valueOf(driver.getCheckpointsReached()), "{total}", String.valueOf(totalCheckpoints)});
             return false;
         }
-        if (heat.getPlugin().getDebugManager().isRaceSystemVerboseEnabled()) {
-            heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] " + player.getName() + " passou por todos os checkpoints!");
-        }
+        heat.getPlugin().getDebugManager().logRaceSystem("[LAP] " + player.getName() + " passou por todos os checkpoints!");
         return completeLap(heat, driver, player, false);
     }
 
@@ -207,17 +201,18 @@ public class RaceSession implements SessionLogic {
         if (player == null) {
             return false;
         }
-        heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] passLap(com localização) chamado para " + player.getName());
+        heat.getPlugin().getDebugManager().logRaceSystem("[LAP] passLap(com localização) chamado para " + player.getName());
         if (driver.getCurrentLap() == null) {
-            heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] Primeira volta - inicializando");
+            heat.getPlugin().getDebugManager().logRaceSystem("[LAP] Primeira volta - inicializando");
             driver.newLap();
             heat.updateLivePositions();
             Bukkit.getPluginManager().callEvent(new DriverNewLapEvent(driver, driver.getCurrentLap()));
             return true;
         }
         int totalCheckpoints = heat.getPlugin().getTrackIntegrationManager().getCheckpointCount(heat.getTrackNameWS());
+        heat.getPlugin().getDebugManager().logRaceSystem("[LAP] " + player.getName() + " checkpoints: " + driver.getCheckpointsReached() + "/" + totalCheckpoints + " heatState=" + heat.getHeatState() + " finished=" + driver.isFinished() + " dnf=" + driver.isDnf());
         if (!driver.hasPassedAllCheckpoints(totalCheckpoints)) {
-            heat.getPlugin().getDebugManager().logRaceSystem("[RACE LAP DEBUG] " + player.getName() + " NÃO passou por todos os checkpoints!");
+            heat.getPlugin().getDebugManager().logRaceSystem("[LAP] " + player.getName() + " NÃO passou por todos os checkpoints!");
             heat.getPlugin().sendMessage(player, "timetrial_incomplete_lap", new String[]{"{count}", String.valueOf(driver.getCheckpointsReached()), "{total}", String.valueOf(totalCheckpoints)});
             return false;
         }

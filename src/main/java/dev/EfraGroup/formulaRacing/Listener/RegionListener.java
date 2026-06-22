@@ -537,9 +537,12 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
 
                                     foundInHeat = true;
                                     if (!driver.isFinished() && !driver.isDnf() && (heatState == HeatState.RACING || heatState == HeatState.STARTING || heatState == HeatState.PRACTICE || heatState == HeatState.QUALIFYING)) {
-                                        this.plugin.getDebugManager().logRaceSystem(String.format("[HEAT] %s - BLOQUEADO: Em corrida oficial (Heat %s, Estado: %s)", player.getName(), heat.getName(), heatState));
+                                        this.plugin.getDebugManager().logRaceSystem(String.format("[HEAT] %s - Em corrida (Heat %s, Estado: %s, type=%s)", player.getName(), heat.getName(), heatState, type));
                                         if ((type.equals("START") || type.equals("END")) && (heatState == HeatState.RACING || heatState == HeatState.PRACTICE || heatState == HeatState.QUALIFYING)) {
+                                            this.plugin.getDebugManager().logRaceSystem(String.format("[HEAT] %s - Chamando handleRaceLapCrossing", player.getName()));
                                             this.handleRaceLapCrossing(player, driver, heat, from, to, region);
+                                        } else {
+                                            this.plugin.getDebugManager().logRaceSystem(String.format("[HEAT] %s - Ignorado (type=%s, state=%s)", player.getName(), type, heatState));
                                         }
 
                                         return;

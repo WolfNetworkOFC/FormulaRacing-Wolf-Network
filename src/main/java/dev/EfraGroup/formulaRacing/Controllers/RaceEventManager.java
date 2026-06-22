@@ -927,21 +927,52 @@ public class RaceEventManager {
     }
 
     public boolean removeEvent(int eventId) {
-        Events event = (Events) this.activeEvents.remove(eventId);
-        if (event != null) {
-            this.eventsByName.remove(event.getDisplayName().toLowerCase());
-            this.playerActiveEvent.entrySet().removeIf(
-                entry -> ((Events) entry.getValue()).getId() == eventId
-            );
-            this.dbManager.deleteEvent(eventId);
-            DebugManager var10000 = this.plugin.getDebugManager();
-            String var10001 = event.getDisplayName();
-            var10000.logRaceSystem(
-                "Evento removido: " + var10001 + " (ID=" + eventId + ")"
-            );
-            return true;
-        } else {
+        Events event = (Events) this.activeEvents.get(eventId);
+        if (event == null) {
             return false;
+        }
+
+        cleanupEventInMemory(event);
+
+        this.activeEvents.remove(eventId);
+        this.eventsByName.remove(event.getDisplayName().toLowerCase());
+        this.playerActiveEvent.entrySet().removeIf(
+            entry -> ((Events) entry.getValue()).getId() == eventId
+        );
+
+        this.dbManager.deleteEvent(eventId);
+        this.plugin.getDebugManager().logRaceSystem(
+            "Evento removido: " + event.getDisplayName() + " (ID=" + eventId + ")"
+        );
+        return true;
+    }
+
+    private void cleanupEventInMemory(Events event) {
+        event.getEventCountdown().stop();
+
+        for (Rounds round : event.getEventSchedule().getRounds().values()) {
+            for (Heats heat : round.getHeats().values()) {
+                HeatState state = heat.getHeatState();
+                if (state == HeatState.RACING || state == HeatState.PRACTICE || state == HeatState.QUALIFYING) {
+                    heat.finishHeat(true);
+                } else {
+                    for (UUID uuid : heat.getDrivers().keySet()) {
+                        this.plugin.getDriverLookup().unregister(uuid);
+                    }
+                    if (this.plugin.getRegionListener() != null) {
+                        this.plugin.getRegionListener().cleanupHeatPlayers(heat.getDrivers().keySet());
+                    }
+                    if (this.plugin.getRaceCheckpointListener() != null) {
+                        this.plugin.getRaceCheckpointListener().cleanupHeatPlayers(heat.getDrivers().keySet());
+                    }
+                }
+            }
+            round.getHeats().clear();
+        }
+        event.getEventSchedule().getRounds().clear();
+
+        if (this.plugin.getSpectatorManager() != null) {
+            this.plugin.getSpectatorManager().removeEventSpectators(event);
         }
     }
 
