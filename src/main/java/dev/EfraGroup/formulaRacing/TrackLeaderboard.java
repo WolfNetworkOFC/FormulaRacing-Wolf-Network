@@ -185,7 +185,7 @@ public class TrackLeaderboard {
         Runnable cleanup = () -> {
             holograms.values().forEach(holo -> {
                 if (holo != null) {
-                    try { holo.delete(); } catch (Exception ignored) {}
+                    try { holo.delete(); } catch (Throwable ignored) {}
                 }
             });
             holograms.clear();

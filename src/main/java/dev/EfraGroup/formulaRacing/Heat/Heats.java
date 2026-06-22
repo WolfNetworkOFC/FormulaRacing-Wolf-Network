@@ -830,16 +830,6 @@ public class Heats {
             this.plugin.getDebugManager().logRaceSystem(
                 "Heat " + this.id + " finalizado!"
             );
-            if (this.round != null) {
-                boolean allHeatsFinished = this.round.getHeats()
-                    .values()
-                    .stream()
-                    .allMatch(h -> h.getHeatState() == HeatState.FINISHED);
-                if (allHeatsFinished) {
-                    this.round.finishRound();
-                }
-            }
-
             this.displayFinalStandings();
             if (teleportToSpawn) {
                 Location targetLoc =
