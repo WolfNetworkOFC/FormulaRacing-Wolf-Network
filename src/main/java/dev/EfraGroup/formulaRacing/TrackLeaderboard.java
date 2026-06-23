@@ -4,6 +4,7 @@ import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Hologram.HologramManager;
 import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import dev.EfraGroup.formulaRacing.Utils.Text;
 import eu.decentsoftware.holograms.api.DHAPI;
 import eu.decentsoftware.holograms.api.holograms.Hologram;
 import java.util.ArrayList;
@@ -113,7 +114,7 @@ public class TrackLeaderboard {
 
         for (String configLine : configLines) {
             String processedLine = configLine.replace("{mapname}", this.trackName);
-            processedLine = processedLine.replace("$java$", ":java:").replace("$bedrock$", ":bedrock:");
+            processedLine = Text.translateEmojis(processedLine);
             String line = ChatColor.translateAlternateColorCodes('&', processedLine);
 
             if (line.contains("{name")) {

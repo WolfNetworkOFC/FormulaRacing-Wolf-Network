@@ -11,6 +11,11 @@ import org.bukkit.entity.Player;
 
 public class Text {
 
+    public static String translateEmojis(String text) {
+        if (text == null) return null;
+        return text.replace(":java:", "%img_java%").replace(":bedrock:", "%img_bedrock%");
+    }
+
     public static void send(CommandSender sender, String key, String... placeholders) {
         FRTheme theme = FRThemeResolver.resolveTheme(sender);
         String langCode = resolveLang(sender);
@@ -47,3 +52,4 @@ public class Text {
         return "en_US";
     }
 }
+

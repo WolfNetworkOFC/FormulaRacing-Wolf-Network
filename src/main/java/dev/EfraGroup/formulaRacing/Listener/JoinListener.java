@@ -54,17 +54,17 @@ public class JoinListener implements Listener {
 
         String primaryGroup = user.getPrimaryGroup();
 
-        // Checagem para o rank Default
+        // Check for Default rank
         if (primaryGroup != null && primaryGroup.equalsIgnoreCase("default")) {
                 if (isFloodgatePlayer(uuid)) {
-                    return ":bedrock:";
+                    return "%img_bedrock%";
                 } else {
-                    return ":java:";
+                    return "%img_java%";
                 }
 
         }
 
-        // Lógica normal para outros cargos (VIP, Staff, etc)
+        // Normal logic for other ranks (VIP, Staff, etc)
         CachedMetaData metaData = user.getCachedData().getMetaData();
         String prefix = metaData != null ? metaData.getPrefix() : null;
 
@@ -134,23 +134,23 @@ public class JoinListener implements Listener {
     }
 
     public boolean isFloodgatePlayer(UUID uuid) {
-        // 1. Tenta pegar o jogador online primeiro (mais rápido)
+        // 1. Try to get the online player first (faster)
         Player player = org.bukkit.Bukkit.getPlayer(uuid);
         String playerName;
 
         if (player != null) {
             playerName = player.getName();
         } else {
-            // 2. Se o jogador não estiver online, busca nos registros do servidor
+            // 2. If the player is not online, look up server records
             playerName = org.bukkit.Bukkit.getOfflinePlayer(uuid).getName();
         }
 
-        // 3. Verifica se o nome não é nulo e se começa com o ponto
+        // 3. Check if the name is not null and starts with a dot
         if (playerName != null && playerName.startsWith(".")) {
             return true;
         }
 
-        // 4. Fallback: Se não começar com ponto, verificamos via API do Floodgate para garantir
+        // 4. Fallback: If it doesn't start with a dot, check via Floodgate API to be sure
         if (org.bukkit.Bukkit.getPluginManager().getPlugin("floodgate") != null) {
             return org.geysermc.floodgate.api.FloodgateApi.getInstance().isFloodgatePlayer(uuid);
         }
@@ -174,11 +174,11 @@ public class JoinListener implements Listener {
         if (primaryGroup.equalsIgnoreCase("default")) {
             String prefix;
             if (isFloodgatePlayer(player.getUniqueId())){
-                prefix = ":bedrock: ";
+                prefix = "%img_bedrock% ";
                 TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, "%img_bedrock% §r");
 
             } else{
-                prefix = ":java: ";
+                prefix = "%img_java% ";
                 TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, "%img_java% §r");
             }
 
@@ -198,6 +198,13 @@ public class JoinListener implements Listener {
         String rank = this.getPlayerRank(uuid);
         this.plugin.getTimerUtils().stopTimer(player);
         this.plugin.getTimerUtils().clearTempCheckpoints(uuid);
+        
+        String lastTrack = this.plugin.getLastTimeTrialTrack(uuid);
+        if (lastTrack != null) {
+            this.mysql.resetPlayerTimes(uuid.toString(), lastTrack);
+            this.plugin.setLastTimeTrialTrack(uuid, null);
+        }
+        
         this.plugin.getTranslationUtil().removePlayer(uuid);
         if (this.plugin.getRaceActionBarManager() != null) {
             this.plugin.getRaceActionBarManager().removePlayer(player);
@@ -262,3 +269,4 @@ public class JoinListener implements Listener {
 
     }
 }
+
