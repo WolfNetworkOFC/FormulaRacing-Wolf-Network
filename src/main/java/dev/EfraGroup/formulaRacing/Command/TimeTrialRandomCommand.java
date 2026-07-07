@@ -21,7 +21,7 @@ import java.util.Random;
 import java.util.stream.Collectors;
 
 @CommandAlias("timetrialrandom|ttr|timetrialr|ttrandom")
-@Description("Entra em uma Time Trial aleatória")
+@Description("Joins a random Time Trial")
 public class TimeTrialRandomCommand extends BaseCommand {
 
     private final FormulaRacing plugin;
@@ -44,46 +44,46 @@ public class TimeTrialRandomCommand extends BaseCommand {
     @Default
     public void onRandom(Player player) {
 
-        // ⛔ BLOQUEIO DE DUELO ATIVO
+        // ⛔ ACTIVE DUEL BLOCK
         if (mysql.isPlayerInActiveDuel(player.getUniqueId())) {
-            player.sendMessage("§c§lERRO §8» §7Você não pode usar o comando aleatório enquanto estiver em um §b§lDUELO §7ativo!");
+            player.sendMessage("§c§lERROR §8» §7You cannot use the random command while in an active §b§lDUEL§7!");
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
             return;
         }
 
         List<String> availableTracks = mysql.getAllTracks();
         if (availableTracks == null || availableTracks.isEmpty()) {
-            player.sendMessage("§cNão há pistas disponíveis no momento.");
+            player.sendMessage("§cNo tracks available at the moment.");
             return;
         }
 
         boolean hasBoatUtils = FormulaRacing.hasOpenBoatUtilsMod(player);
 
-        // Filtro de pistas compatíveis
+        // Filter compatible tracks
         List<String> validTracks = availableTracks.stream()
                 .filter(mysql::isTrackOpen)
                 .filter(trackName -> hasBoatUtils || !mysql.trackHaveBoatUtils(trackName))
                 .collect(Collectors.toList());
 
         if (validTracks.isEmpty()) {
-            player.sendMessage("§cNão há pistas compatíveis disponíveis para você no momento.");
+            player.sendMessage("§cNo compatible tracks available for you at the moment.");
             return;
         }
 
-        // Seleção aleatória
+        // Random selection
         String trackName = validTracks.get(random.nextInt(validTracks.size()));
 
-        // Configurações de pacotes e Scoreboard
+        // Package and Scoreboard settings
         packetsender.sendBoatSetting(player, 0);
         packetsender.applyBoatUtilsToPlayer(player, trackName);
 
         Location loc = mysql.getTrackSpawn(trackName);
         if (loc == null) {
-            player.sendMessage("§cA pista selecionada não tem spawn definido.");
+            player.sendMessage("§cThe selected track has no spawn set.");
             return;
         }
 
-        // Limpeza de sessão anterior
+        // Clear previous session
         timerUtils.stopTimer(player);
         if (plugin.getTimeTrialController() != null) {
             plugin.getTimeTrialController().endSession(player);
@@ -92,10 +92,10 @@ public class TimeTrialRandomCommand extends BaseCommand {
         stt.setPlayerTrack(player, trackName, mysql.getTrackOwner(trackName));
         stt.show(player, trackName);
 
-        // 🚤 Gestão do Veículo
+        // 🚤 Vehicle Management
         api.recoverPlayerBoatState(player);
 
-        // Teleporte e Mensagens
+        // Teleport and Messages
         SchedulerHelper.teleportAsync(player, loc).thenAccept(success -> {
             if (Boolean.TRUE.equals(success)) {
                 api.spawnBoatAt(player, loc, false, false, false);
@@ -104,7 +104,7 @@ public class TimeTrialRandomCommand extends BaseCommand {
         String langCode = mysql.getPlayerLanguage(player.getUniqueId());
         player.sendMessage(plugin.getTranslation("timetrial_teleport", langCode, "{track}", trackName));
 
-        // Spawn do novo barco e persistência
+        // Spawn new boat and persist
         plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);
     }
 }

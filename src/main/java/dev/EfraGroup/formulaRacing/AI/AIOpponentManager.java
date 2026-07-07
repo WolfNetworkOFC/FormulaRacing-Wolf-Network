@@ -26,7 +26,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Sistema de IA de oponentes com entidade física própria.
+ * AI opponent system with its own physical entity.
  */
 public class AIOpponentManager {
 
@@ -293,11 +293,11 @@ public class AIOpponentManager {
 
             Location spawn = resolveSpawnLocation(heat);
             if (spawn == null || spawn.getWorld() == null) {
-                plugin.getDebugManager().logRaceSystem("[AI] Spawn falhou para " + displayName + ": spawn nulo ou mundo nulo");
+                plugin.getDebugManager().logRaceSystem("[AI] Spawn failed for " + displayName + ": spawn or world is null");
                 return;
             }
 
-            plugin.getDebugManager().logRaceSystem("[AI] Spawnando " + displayName + " em " + spawn.getWorld().getName() + " (" + String.format("%.1f", spawn.getX()) + ", " + String.format("%.1f", spawn.getY()) + ", " + String.format("%.1f", spawn.getZ()) + ")");
+            plugin.getDebugManager().logRaceSystem("[AI] Spawning " + displayName + " at " + spawn.getWorld().getName() + " (" + String.format("%.1f", spawn.getX()) + ", " + String.format("%.1f", spawn.getY()) + ", " + String.format("%.1f", spawn.getZ()) + ")");
 
             Boat boat = spawn.getWorld().spawn(spawn, Boat.class, spawnedBoat -> {
                 spawnedBoat.setCustomName(displayName);

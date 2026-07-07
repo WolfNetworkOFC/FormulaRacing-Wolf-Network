@@ -16,22 +16,22 @@ public class ApiCommand extends BaseCommand {
 
     @Default
     public void onDefault(CommandSender sender) {
-        sender.sendMessage("§6§lFormulaRacing API §7- §eComandos disponíveis:");
-        sender.sendMessage("§e/api status §7- Mostra o status da API");
-        sender.sendMessage("§e/api reload §7- Recarrega a configuração da API");
-        sender.sendMessage("§e/api info §7- Mostra informações da API");
+        sender.sendMessage("§6§lFormulaRacing API §7- §eAvailable commands:");
+        sender.sendMessage("§e/api status §7- Shows API status");
+        sender.sendMessage("§e/api reload §7- Reloads API configuration");
+        sender.sendMessage("§e/api info §7- Shows API info");
     }
 
     @Subcommand("status")
     public void onStatus(CommandSender sender) {
         ApiManager apiManager = FormulaRacing.getInstance().getApiManager();
         if (apiManager == null) {
-            sender.sendMessage("§c§lERRO: §cA API não está inicializada!");
+            sender.sendMessage("§c§lERROR: §cAPI is not initialized!");
             return;
         }
 
-        sender.sendMessage("§a§lStatus da API:");
-        sender.sendMessage("§7Porta: §f" + apiManager.getPort());
+        sender.sendMessage("§a§lAPI Status:");
+        sender.sendMessage("§7Port: §f" + apiManager.getPort());
         sender.sendMessage("§7Status: §aOnline");
     }
 
@@ -39,26 +39,26 @@ public class ApiCommand extends BaseCommand {
     public void onReload(CommandSender sender) {
         ApiManager apiManager = FormulaRacing.getInstance().getApiManager();
         if (apiManager == null) {
-            sender.sendMessage("§c§lERRO: §cA API não está inicializada!");
+            sender.sendMessage("§c§lERROR: §cAPI is not initialized!");
             return;
         }
 
         apiManager.reloadConfig();
-        sender.sendMessage("§a§lSUCESSO: §aConfiguração da API recarregada!");
+        sender.sendMessage("§a§lSUCCESS: §aAPI configuration reloaded!");
     }
 
     @Subcommand("info")
     public void onInfo(CommandSender sender) {
         ApiManager apiManager = FormulaRacing.getInstance().getApiManager();
         if (apiManager == null) {
-            sender.sendMessage("§c§lERRO: §cA API não está inicializada!");
+            sender.sendMessage("§c§lERROR: §cAPI is not initialized!");
             return;
         }
 
-        sender.sendMessage("§6§lInformações da API:");
-        sender.sendMessage("§7Versão do Plugin: §f" + FormulaRacing.getInstance().getDescription().getVersion());
-        sender.sendMessage("§7Porta: §f" + apiManager.getPort());
-        sender.sendMessage("§7Endpoints disponíveis:");
+        sender.sendMessage("§6§lAPI Information:");
+        sender.sendMessage("§7Plugin Version: §f" + FormulaRacing.getInstance().getDescription().getVersion());
+        sender.sendMessage("§7Port: §f" + apiManager.getPort());
+        sender.sendMessage("§7Available endpoints:");
         sender.sendMessage("§f  GET /api/v1/readonly/tracks");
         sender.sendMessage("§f  GET /api/v1/readonly/tracks/:trackname");
         sender.sendMessage("§f  GET /api/v1/readonly/players/:uuidorusername");

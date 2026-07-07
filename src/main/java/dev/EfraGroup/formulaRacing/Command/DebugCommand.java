@@ -15,7 +15,7 @@ import java.util.List;
 
 @CommandAlias("debug|frdebug")
 @CommandPermission("formularacing.admin.debug")
-@Description("Gerencia os modos de debug do FormulaRacing")
+@Description("Manages FormulaRacing debug modes")
 public class DebugCommand extends BaseCommand {
 
     private final FormulaRacing plugin;
@@ -46,7 +46,7 @@ public class DebugCommand extends BaseCommand {
     }
 
     @Subcommand("list|status|ls")
-    @Description("Lista todos os modos de debug e seus estados atuais")
+    @Description("Lists all debug modes and their current states")
     public void onList(CommandSender sender) {
         sender.sendMessage("§6=== Debug Flags ===");
         sender.sendMessage(formatFlag("Region Detection", debugManager.isRegionDetectionEnabled()));
@@ -70,58 +70,58 @@ public class DebugCommand extends BaseCommand {
 
     @Subcommand("enable|on")
     @Syntax("<flag|all>")
-    @Description("Ativa um modo de debug específico ou todos")
+    @Description("Enables a specific debug mode or all")
     public void onEnable(CommandSender sender, String flag) {
         if (flag.equalsIgnoreCase("all")) {
             setAllDebugFlags(true);
-            sender.sendMessage("§aTodos os modos de debug foram §2ATIVADOS§a!");
+            sender.sendMessage("§aAll debug modes have been §2ENABLED§a!");
             logDebugChange(sender, "ALL", true);
             return;
         }
 
         String normalizedFlag = normalizeFlag(flag);
         if (normalizedFlag == null) {
-            sender.sendMessage("§cFlag de debug inválida: §f" + flag);
-            sender.sendMessage("§7Use §f/debug list §7para ver as flags disponíveis.");
+            sender.sendMessage("§cInvalid debug flag: §f" + flag);
+            sender.sendMessage("§7Use §f/debug list §7to see available flags.");
             return;
         }
 
         setDebugFlag(normalizedFlag, true);
-        sender.sendMessage("§aModo de debug §f" + normalizedFlag + " §2ATIVADO§a!");
+        sender.sendMessage("§aDebug mode §f" + normalizedFlag + " §2ENABLED§a!");
         logDebugChange(sender, normalizedFlag, true);
     }
 
     @Subcommand("disable|off")
     @Syntax("<flag|all>")
-    @Description("Desativa um modo de debug específico ou todos")
+    @Description("Disables a specific debug mode or all")
     public void onDisable(CommandSender sender, String flag) {
         if (flag.equalsIgnoreCase("all")) {
             setAllDebugFlags(false);
-            sender.sendMessage("§cTodos os modos de debug foram §4DESATIVADOS§c!");
+            sender.sendMessage("§cAll debug modes have been §4DISABLED§c!");
             logDebugChange(sender, "ALL", false);
             return;
         }
 
         String normalizedFlag = normalizeFlag(flag);
         if (normalizedFlag == null) {
-            sender.sendMessage("§cFlag de debug inválida: §f" + flag);
-            sender.sendMessage("§7Use §f/debug list §7para ver as flags disponíveis.");
+            sender.sendMessage("§cInvalid debug flag: §f" + flag);
+            sender.sendMessage("§7Use §f/debug list §7to see available flags.");
             return;
         }
 
         setDebugFlag(normalizedFlag, false);
-        sender.sendMessage("§cModo de debug §f" + normalizedFlag + " §4DESATIVADO§c!");
+        sender.sendMessage("§cDebug mode §f" + normalizedFlag + " §4DISABLED§c!");
         logDebugChange(sender, normalizedFlag, false);
     }
 
     @Subcommand("toggle|t")
     @Syntax("<flag>")
-    @Description("Alterna o estado de um modo de debug")
+    @Description("Toggles the state of a debug mode")
     public void onToggle(CommandSender sender, String flag) {
         String normalizedFlag = normalizeFlag(flag);
         if (normalizedFlag == null) {
-            sender.sendMessage("§cFlag de debug inválida: §f" + flag);
-            sender.sendMessage("§7Use §f/debug list §7para ver as flags disponíveis.");
+            sender.sendMessage("§cInvalid debug flag: §f" + flag);
+            sender.sendMessage("§7Use §f/debug list §7to see available flags.");
             return;
         }
 
@@ -129,17 +129,17 @@ public class DebugCommand extends BaseCommand {
         boolean newState = !currentState;
         setDebugFlag(normalizedFlag, newState);
 
-        String statusMsg = newState ? "§2ATIVADO" : "§4DESATIVADO";
-        sender.sendMessage("§eModo de debug §f" + normalizedFlag + " §ealternado para " + statusMsg + "§e!");
+        String statusMsg = newState ? "§2ENABLED" : "§4DISABLED";
+        sender.sendMessage("§eDebug mode §f" + normalizedFlag + " §etoggled to " + statusMsg + "§e!");
         logDebugChange(sender, normalizedFlag, newState);
     }
 
     @Subcommand("reload")
-    @Description("Recarrega as configurações de debug do arquivo config.yml")
+    @Description("Reloads debug configurations from config.yml")
     public void onReload(CommandSender sender) {
         debugManager.reload();
-        sender.sendMessage("§aConfigurações de debug recarregadas do §fconfig.yml§a!");
-        plugin.getLogger().info("[Debug] Configurações recarregadas por: " + sender.getName());
+        sender.sendMessage("§aDebug configurations reloaded from §fconfig.yml§a!");
+        plugin.getLogger().info("[Debug] Settings reloaded by: " + sender.getName());
     }
 
     private String formatFlag(String name, boolean enabled) {
@@ -220,6 +220,6 @@ public class DebugCommand extends BaseCommand {
     }
 
     private void logDebugChange(CommandSender sender, String flag, boolean enabled) {
-        plugin.getLogger().info("[Debug] Flag '" + flag + "' " + (enabled ? "ATIVADA" : "DESATIVADA") + " por: " + sender.getName());
+        plugin.getLogger().info("[Debug] Flag '" + flag + "' " + (enabled ? "ENABLED" : "DISABLED") + " by: " + sender.getName());
     }
 }

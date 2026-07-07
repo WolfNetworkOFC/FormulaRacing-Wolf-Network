@@ -37,7 +37,7 @@ public class FileManager {
         try {
             this.config.save(this.configFile);
         } catch (IOException e) {
-            this.plugin.getDebugManager().logFileSystem("❌ Não foi possível salvar o config.yml: " + e.getMessage());
+            this.plugin.getDebugManager().logFileSystem("❌ Could not save config.yml: " + e.getMessage());
         }
 
     }
@@ -105,9 +105,9 @@ public class FileManager {
         if (!outFile.exists()) {
             try {
                 this.plugin.saveResource(resourcePath, false);
-                this.plugin.getDebugManager().logFileSystem("✔ Arquivo copiado: " + resourcePath);
+                this.plugin.getDebugManager().logFileSystem("✔ File copied: " + resourcePath);
             } catch (Exception e) {
-                this.plugin.getDebugManager().logFileSystem("❌ Falha ao copiar o arquivo: " + resourcePath + " (" + e.getMessage() + ")");
+                this.plugin.getDebugManager().logFileSystem("❌ Failed to copy file: " + resourcePath + " (" + e.getMessage() + ")");
             }
 
         }

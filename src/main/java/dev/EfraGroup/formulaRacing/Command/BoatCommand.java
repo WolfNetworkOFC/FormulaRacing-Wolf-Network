@@ -20,6 +20,5 @@ public class BoatCommand extends BaseCommand {
     @Default // Comando executado ao digitar apenas /boat
     public void onSpawnBoat(Player player) {
         api.respawnBoat(player, true, false, true);
-        player.sendMessage("§a[FormulaRacing] Barco de corrida spawnado!");
     }
 }

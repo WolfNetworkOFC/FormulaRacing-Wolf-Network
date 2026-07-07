@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Gerencia o arquivo de configuração de clima
+ * Manages the weather configuration file
  */
 public class WeatherConfigManager {
 
@@ -25,7 +25,7 @@ public class WeatherConfigManager {
     }
 
     /**
-     * Carrega o arquivo de configuração de clima
+     * Loads the weather configuration file
      */
     public void loadConfig() {
         if (!configFile.exists()) {
@@ -35,7 +35,7 @@ public class WeatherConfigManager {
     }
 
     /**
-     * Cria o arquivo de configuração padrão
+     * Creates the default configuration file
      */
     private void createDefaultConfig() {
         try {
@@ -44,15 +44,15 @@ public class WeatherConfigManager {
 
             FileConfiguration defaultConfig = YamlConfiguration.loadConfiguration(configFile);
 
-            // Configuração padrão de clima
+            // Default weather configuration
             defaultConfig.set("enabled", true);
-            defaultConfig.set("track_drying_rate", 2); // Quanto rápido a pista seca (0-100 por volta)
-            defaultConfig.set("track_wetting_rate", 5); // Quanto rápido a pista molha (0-100 por volta)
+            defaultConfig.set("track_drying_rate", 2); // How fast the track dries (0-100 per lap)
+            defaultConfig.set("track_wetting_rate", 5); // How fast the track wets (0-100 per lap)
 
-            // Clima padrão para cada pista
+            // Default weather for each track
             defaultConfig.set("default_weather", "CLEAR:999");
 
-            // Exemplo de clima dinâmico para uma pista
+            // Example dynamic weather for a track
             List<String> dynamicWeather = new ArrayList<>();
             dynamicWeather.add("CLEAR:3");
             dynamicWeather.add("CLOUDY:2");
@@ -66,14 +66,14 @@ public class WeatherConfigManager {
             defaultConfig.set("dynamic_weather.ExampleTrack", dynamicWeather);
 
             defaultConfig.save(configFile);
-            plugin.getLogger().info("Arquivo de clima padrão criado: " + configFile.getAbsolutePath());
+            plugin.getLogger().info("Default weather file created: " + configFile.getAbsolutePath());
         } catch (IOException e) {
-            plugin.getLogger().severe("Erro ao criar arquivo de clima: " + e.getMessage());
+            plugin.getLogger().severe("Error creating weather file: " + e.getMessage());
         }
     }
 
     /**
-     * Obtém a lista de clima dinâmico para uma pista
+     * Gets the dynamic weather list for a track
      */
     public List<WeatherCondition> getDynamicWeather(String trackName) {
         List<WeatherCondition> conditions = new ArrayList<>();
@@ -84,7 +84,7 @@ public class WeatherConfigManager {
                 conditions.add(WeatherCondition.fromString(weatherStr));
             }
         } else {
-            // Usa clima padrão
+            // Use default weather
             conditions.add(WeatherCondition.fromString(config.getString("default_weather", "CLEAR:999")));
         }
 
@@ -92,7 +92,7 @@ public class WeatherConfigManager {
     }
 
     /**
-     * Define o clima dinâmico para uma pista
+     * Sets the dynamic weather for a track
      */
     public void setDynamicWeather(String trackName, List<WeatherCondition> conditions) {
         List<String> weatherList = new ArrayList<>();
@@ -104,39 +104,39 @@ public class WeatherConfigManager {
     }
 
     /**
-     * Obtém a taxa de secagem da pista
+     * Gets the track drying rate
      */
     public int getTrackDryingRate() {
         return config.getInt("track_drying_rate", 2);
     }
 
     /**
-     * Obtém a taxa de molhamento da pista
+     * Gets the track wetting rate
      */
     public int getTrackWettingRate() {
         return config.getInt("track_wetting_rate", 5);
     }
 
     /**
-     * Verifica se o sistema de clima está habilitado
+     * Checks if the weather system is enabled
      */
     public boolean isEnabled() {
         return config.getBoolean("enabled", true);
     }
 
     /**
-     * Salva a configuração
+     * Saves the configuration
      */
     public void saveConfig() {
         try {
             config.save(configFile);
         } catch (IOException e) {
-            plugin.getLogger().severe("Erro ao salvar configuração de clima: " + e.getMessage());
+            plugin.getLogger().severe("Error saving weather configuration: " + e.getMessage());
         }
     }
 
     /**
-     * Recarrega a configuração
+     * Reloads the configuration
      */
     public void reloadConfig() {
         loadConfig();

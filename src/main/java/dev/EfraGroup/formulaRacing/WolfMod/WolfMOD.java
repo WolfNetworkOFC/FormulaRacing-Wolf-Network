@@ -16,33 +16,33 @@ public class WolfMOD {
     }
 
     /**
-     * Registra os canais de comunicação no Messenger do Bukkit.
+     * Registers communication channels in Bukkit's Messenger.
      */
     private void registerChannels() {
-        // Canal para enviar dados do Servidor -> Mod
+        // Channel to send data from Server -> Mod
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CHANNEL);
 
-        // Canal para receber dados do Mod -> Servidor (se necessário futuramente)
+        // Channel to receive data from Mod -> Server (for future use)
         plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, CHANNEL, (channel, player, message) -> {
-            // Lógica para processar dados vindos do Wolfmod (ex: confirmação de versão)
+            // Logic to process data from Wolfmod (e.g., version confirmation)
         });
     }
 
     /**
-     * Método versátil para enviar payloads estruturados para o Wolfmod.
-     * * @param player O jogador que receberá os dados.
-     * @param key    A identificação do pacote (ex: "4", "telemetry", "ers").
-     * @param values Valores adicionais (String, Integer, Boolean, Float, Double, Long).
+     * Versatile method to send structured payloads to Wolfmod.
+     * * @param player The player who will receive the data.
+     * @param key    The packet identifier (e.g., "4", "telemetry", "ers").
+     * @param values Additional values (String, Integer, Boolean, Float, Double, Long).
      */
     public void sendPayload(Player player, String key, Object... values) {
         if (player == null || !player.isOnline()) return;
 
         ByteArrayDataOutput out = ByteStreams.newDataOutput();
 
-        // 1. Escreve a chave (ID do pacote)
+        // 1. Write the key (packet ID)
         out.writeUTF(key);
 
-        // 2. Escreve os valores seguindo a ordem e tipo passados
+        // 2. Write values following the passed order and types
         for (Object value : values) {
             if (value instanceof String) {
                 out.writeUTF((String) value);
@@ -59,19 +59,19 @@ public class WolfMOD {
             }
         }
 
-        // 3. Despacha o pacote pelo canal oficial
+        // 3. Dispatch the packet through the official channel
         player.sendPluginMessage(plugin, CHANNEL, out.toByteArray());
     }
 
     /**
-     * Atalho específico para disparar a animação de Fastest Lap.
+     * Shortcut to trigger the Fastest Lap animation.
      */
     public void sendFastestLap(Player player, String playerName, String lapTime) {
         sendPayload(player, "4", playerName, lapTime);
     }
 
     /**
-     * Atalho para atualizar o estado do Cronômetro (Start/Stop).
+     * Shortcut to update the Timer state (Start/Stop).
      */
     public void setTimerState(Player player, boolean running) {
         String key = running ? "2" : "3";

@@ -5,22 +5,22 @@ import net.kyori.adventure.text.format.TextColor;
 
 public class FRTheme {
 
-    // ── Tokens derivados da cor do jogador ──────────────────────────────────
-    private final TextColor primary;   // &p  destaque principal (color1 do jogador)
-    private final TextColor accent;    // &a  destaque secundário (color2 do jogador)
+    // ── Tokens derived from the player's color ─────────────────────────────
+    private final TextColor primary;   // &p  main highlight (player's color1)
+    private final TextColor accent;    // &a  secondary highlight (player's color2)
 
-    // ── Tokens fixos — corpo legível, independentes do jogador ──────────────
-    private final TextColor headline;  // &h  títulos / scoreboard header
-    private final TextColor text;      // &x  corpo de texto principal
-    private final TextColor muted;     // &m  labels, separadores, unidades
-    private final TextColor success;   // &s  OK / positivo
-    private final TextColor warning;   // &w  atenção
-    private final TextColor error;     // &e  erro / negativo
-    private final TextColor info;      // &i  informativo neutro
-    private final TextColor award;     // &v  pódio / prêmios
-    private final TextColor broadcast; // &b  anúncios globais
+    // ── Fixed tokens — readable body, independent of the player ─────────────
+    private final TextColor headline;  // &h  titles / scoreboard header
+    private final TextColor text;      // &x  main text body
+    private final TextColor muted;     // &m  labels, separators, units
+    private final TextColor success;   // &s  OK / positive
+    private final TextColor warning;   // &w  warning
+    private final TextColor error;     // &e  error / negative
+    private final TextColor info;      // &i  neutral info
+    private final TextColor award;     // &v  podium / awards
+    private final TextColor broadcast; // &b  global announcements
 
-    // ── Aliases de compatibilidade (tokens antigos) ─────────────────────────
+    // ── Legacy compatibility aliases (old tokens) ──────────────────────────
     /** @deprecated use {@link #getPrimary()} via &amp;p */
     @Deprecated public TextColor getSecondary()  { return accent; }
     /** @deprecated use {@link #getMuted()} via &amp;m */

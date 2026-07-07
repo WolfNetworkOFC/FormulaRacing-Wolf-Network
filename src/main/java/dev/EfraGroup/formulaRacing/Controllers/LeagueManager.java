@@ -115,7 +115,7 @@ public class LeagueManager {
             return true;
         } catch (SQLException e) {
             plugin.getDebugManager().logDatabaseOperation(
-                "[League] Erro ao vincular evento à liga: " + e.getMessage()
+                "[League] Error linking event to league: " + e.getMessage()
             );
             return false;
         }

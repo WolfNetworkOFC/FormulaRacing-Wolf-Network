@@ -99,6 +99,9 @@ public class RaceCheckpointListener implements Listener {
                                     );
                                 Location from = event.getFrom();
                                 Location to = event.getTo();
+                                if (from.getBlockX() == to.getBlockX() && from.getBlockZ() == to.getBlockZ()) {
+                                    return;
+                                }
                                 if (
                                     this.trackManager.hasLagStartRegion(
                                         trackNameWS
@@ -163,7 +166,7 @@ public class RaceCheckpointListener implements Listener {
                                 }
                                 if (driver.getCurrentLap() == null) {
                                     this.plugin.getDebugManager().logRaceSystem(
-                                        "§c[CHECKPOINT] " + player.getName() + " currentLap is null - pulando detecção"
+                                        "§c[CHECKPOINT] " + player.getName() + " currentLap is null - skipping detection"
                                     );
                                     return;
                                 }
@@ -336,7 +339,7 @@ public class RaceCheckpointListener implements Listener {
     ) {
         this.plugin.getDebugManager().logRaceSystem(
             String.format(
-                "§c[CHECKPOINT SKIP] %s saltou CP%d (esperado CP%d) - Resetando",
+                "§c[CHECKPOINT SKIP] %s skipped CP%d (expected CP%d) - Resetting",
                 player.getName(),
                 detectedCheckpointId,
                 expectedCheckpointId
@@ -491,15 +494,15 @@ public class RaceCheckpointListener implements Listener {
         Lap currentLap = driver.getCurrentLap();
         if (currentLap == null) {
             this.plugin.getDebugManager().logRaceSystem(
-                "§c[LAP ERROR] " +
-                    player.getName() +
-                    " completou volta mas currentLap é null!"
+                    "§c[LAP ERROR] " +
+                        player.getName() +
+                        " completed lap but currentLap is null!"
             );
         } else if (driver.getLaps().isEmpty()) {
             this.plugin.getDebugManager().logRaceSystem(
-                "§c[LAP ERROR] " +
-                    player.getName() +
-                    " completou volta mas lista de laps está vazia!"
+                    "§c[LAP ERROR] " +
+                        player.getName() +
+                        " completed lap but laps list is empty!"
             );
         } else {
             Lap completedLap = (Lap) driver
@@ -616,7 +619,7 @@ public class RaceCheckpointListener implements Listener {
 
             this.plugin.getDebugManager().logRaceSystem(
                 String.format(
-                    "§a[LAP] %s completou volta %d em %s (laps.size=%d, heatState=%s)",
+                    "§a[LAP] %s completed lap %d in %s (laps.size=%d, heatState=%s)",
                     player.getName(),
                     lapNumber,
                     lapTime,
@@ -870,13 +873,13 @@ public class RaceCheckpointListener implements Listener {
             }
 
             if (sessionState == HeatState.RACING) {
+                this.teleportToSpectatorArea(player, heat);
                 this.plugin.getAPI().recoverPlayerBoatState(player);
                 if (this.plugin.getPacketSender() != null) {
                     this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
                     boolean dbLonely = this.plugin.getDatabaseManager().getLonelyModePlayer(player.getUniqueId());
                     this.plugin.getLonelyController().setLonelyMode(player, dbLonely);
                 }
-                this.teleportToSpectatorArea(player, heat);
             }
 
             this.checkAllFinished(heat);
@@ -893,7 +896,7 @@ public class RaceCheckpointListener implements Listener {
                     this.plugin.getDebugManager().logRaceSystem(
                         "Driver " +
                             String.valueOf(driver.getUuid()) +
-                            " está offline - marcando como DNF"
+                            " is offline - marking as DNF"
                     );
                     driver.setDnf(true);
                     driver.setPtpActive(false);
@@ -918,7 +921,7 @@ public class RaceCheckpointListener implements Listener {
             .allMatch(driverx -> driverx.isFinished() || driverx.isDnf());
         if (allFinished) {
             this.plugin.getDebugManager().logRaceSystem(
-                "Todos os pilotos finalizaram ou foram marcados como DNF no Heat " +
+                "All drivers finished or were marked as DNF in Heat " +
                     heat.getId()
             );
             SchedulerHelper.runTaskLater(
@@ -934,6 +937,7 @@ public class RaceCheckpointListener implements Listener {
                             ? event.getAnnouncements()
                             : this.plugin.getEventAnnouncements();
                     announcements.broadcastHeatComplete(heat);
+                    this.plugin.getRaceEventManager().tryDeleteEventForHeat(heat);
                 },
                 100L
             );
@@ -960,7 +964,7 @@ public class RaceCheckpointListener implements Listener {
                 if (finishPosLoc != null) {
                     SchedulerHelper.teleport(player, finishPosLoc);
                     player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0F, 1.0F);
-                    String title = "§6§l" + driver.getPosition() + "º LUGAR!";
+                    String title = "§6§l#" + driver.getPosition() + " PLACE!";
                     TitleHelper.sendThemedTitle(
                         player,
                         "&s&lRACE FINISHED",
@@ -977,7 +981,7 @@ public class RaceCheckpointListener implements Listener {
             if (finishAllLoc != null) {
                 SchedulerHelper.teleport(player, finishAllLoc);
                 if (driver != null) {
-                    String title = "§6§l" + driver.getPosition() + "º LUGAR!";
+                    String title = "§6§l#" + driver.getPosition() + " PLACE!";
                     TitleHelper.sendThemedTitle(
                         player,
                         "&s&lRACE FINISHED",
@@ -1006,3 +1010,4 @@ public class RaceCheckpointListener implements Listener {
             : String.format("%d.%03d", seconds, millis);
     }
 }
+

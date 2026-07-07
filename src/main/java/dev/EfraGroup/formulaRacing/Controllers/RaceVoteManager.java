@@ -30,24 +30,24 @@ public class RaceVoteManager {
 
     public boolean propose(Player proposer, String trackName, int laps, int pits) {
         if (isProposalActive()) {
-            proposer.sendMessage("§cJá existe uma votação ativa!");
+            proposer.sendMessage("§cThere is already an active vote!");
             return false;
         }
         if (quickRaceManager.isQuickRaceActive()) {
-            proposer.sendMessage("§cNão é possível iniciar votação com corrida em andamento.");
+            proposer.sendMessage("§cCannot start a vote while a race is in progress.");
             return false;
         }
 
         DatabaseManager.TrackData trackData = database.getTrackData(trackName);
         if (trackData == null) {
-            proposer.sendMessage("§cPista não encontrada!");
+            proposer.sendMessage("§cTrack not found!");
             return false;
         }
 
         String trackNameWS = trackData.getTrackName().replaceAll("\\s+", "").toLowerCase();
         int gridCount = plugin.getTrackIntegrationManager().getGridPositionCount(trackNameWS);
         if (gridCount <= 0) {
-            proposer.sendMessage("§c✗ A pista §e" + trackData.getTrackName() + " §cnão possui grid definido!");
+            proposer.sendMessage("§c✗ Track §e" + trackData.getTrackName() + " §chas no grid defined!");
             return false;
         }
 
@@ -58,7 +58,7 @@ public class RaceVoteManager {
 
     public void vote(Player player) {
         if (isProposalActive()) currentProposal.addVote(player);
-        else player.sendMessage("§cNão há votação ativa.");
+        else player.sendMessage("§cThere is no active vote.");
     }
 
     public boolean isProposalActive() {
@@ -71,7 +71,7 @@ public class RaceVoteManager {
         private final String trackName;
         private final int laps;
         private final int pits;
-        private final int requiredVotes; // Nova variável para guardar a meta de votos
+        private final int requiredVotes; // New variable to store the vote target
         private final Set<UUID> voters = ConcurrentHashMap.newKeySet();
         private boolean expired = false;
         private FRTask timeoutTask;
@@ -83,8 +83,8 @@ public class RaceVoteManager {
             this.laps = laps;
             this.pits = pits;
 
-            // Calcula 30% dos jogadores online na hora que a proposta é criada.
-            // O Math.ceil arredonda para cima, e o Math.max garante que precisa de no mínimo 1 voto.
+            // Calculates 30% of online players at the time the proposal is created.
+            // Math.ceil rounds up, and Math.max ensures at least 1 vote is needed.
             int onlinePlayers = Bukkit.getOnlinePlayers().size();
             this.requiredVotes = Math.max(1, (int) Math.ceil(onlinePlayers * 0.30));
 
@@ -93,7 +93,7 @@ public class RaceVoteManager {
 
         public void start() {
             broadcastProposalCreated();
-            // Aprova automaticamente se a pessoa que criou for a única no servidor
+            // Auto-approve if the creator is the only one on the server
             if (voters.size() >= requiredVotes) {
                 approve();
             } else {
@@ -103,17 +103,17 @@ public class RaceVoteManager {
 
         private void broadcastProposalCreated() {
             Bukkit.broadcastMessage(" ");
-            Bukkit.broadcastMessage("§6§l════════════ NOVA PROPOSTA ════════════");
-            Bukkit.broadcastMessage("§f§l" + proposerName + " §7iniciou uma votação para:");
-            Bukkit.broadcastMessage("§c§l" + trackName + " §7| §f" + laps + " Voltas §7| §f" + pits + " Pits");
-            Bukkit.broadcastMessage("§7Meta de votos: §a" + voters.size() + "/" + requiredVotes); // Mostra a meta no anúncio inicial
+            Bukkit.broadcastMessage("§6§l════════════ NEW PROPOSAL ════════════");
+            Bukkit.broadcastMessage("§f§l" + proposerName + " §7started a vote for:");
+            Bukkit.broadcastMessage("§c§l" + trackName + " §7| §f" + laps + " Laps §7| §f" + pits + " Pits");
+            Bukkit.broadcastMessage("§7Target votes: §a" + voters.size() + "/" + requiredVotes); // Shows target in initial announcement
             Bukkit.broadcastMessage(" ");
 
-            TextComponent clickButton = new TextComponent("[ §a§lCLIQUE PARA VOTAR §r]");
+            TextComponent clickButton = new TextComponent("[ §a§lCLICK TO VOTE §r]");
             clickButton.setColor(ChatColor.GREEN);
             clickButton.setBold(true);
             clickButton.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/voterace"));
-            clickButton.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text("§aClique para registrar seu voto!")));
+            clickButton.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text("§aClick to cast your vote!")));
 
             for (Player p : Bukkit.getOnlinePlayers()) {
                 p.spigot().sendMessage(clickButton);
@@ -126,21 +126,21 @@ public class RaceVoteManager {
 
         public void addVote(Player player) {
             if (voters.contains(player.getUniqueId())) {
-                player.sendMessage("§eVocê já votou!");
+                player.sendMessage("§eYou have already voted!");
                 return;
             }
             voters.add(player.getUniqueId());
 
-            // Agora o chat atualiza mostrando a meta de votos calculada dinamicamente
-            TextComponent voteMsg = new TextComponent("§7► §f§l" + player.getName() + " §atambém quer §f" + trackName + " §6[" + voters.size() + "/" + requiredVotes + "]");
+            // Now the chat updates showing the dynamically calculated vote target
+            TextComponent voteMsg = new TextComponent("§7► §f§l" + player.getName() + " §aalso wants §f" + trackName + " §6[" + voters.size() + "/" + requiredVotes + "]");
             voteMsg.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/voterace"));
-            voteMsg.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text("§aClique para votar também!")));
+            voteMsg.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text("§aClick to vote too!")));
 
             for (Player p : Bukkit.getOnlinePlayers()) {
                 p.spigot().sendMessage(voteMsg);
             }
 
-            // Substitui o "3" fixo pela variável
+            // Replaces fixed "3" with the variable
             if (voters.size() >= requiredVotes) approve();
         }
 
@@ -148,9 +148,9 @@ public class RaceVoteManager {
             this.expired = true;
             if (timeoutTask != null) timeoutTask.cancel();
 
-            Bukkit.broadcastMessage("§6§l════════════ CORRIDA APROVADA ════════════");
+            Bukkit.broadcastMessage("§6§l════════════ RACE APPROVED ════════════");
             Bukkit.broadcastMessage("§7Pista: §f§l" + trackName);
-            Bukkit.broadcastMessage("§7Config: §f" + laps + " Voltas | " + pits + " Pits");
+            Bukkit.broadcastMessage("§7Config: §f" + laps + " Laps | " + pits + " Pits");
             Bukkit.broadcastMessage("§6§l═══════════════════════════════════════");
 
             SchedulerHelper.runTaskLater(plugin, () -> {
@@ -162,7 +162,7 @@ public class RaceVoteManager {
 
         private void expire() {
             this.expired = true;
-            Bukkit.broadcastMessage("§c§lVotação expirada para: " + trackName);
+            Bukkit.broadcastMessage("§c§lVote expired for: " + trackName);
             currentProposal = null;
         }
 

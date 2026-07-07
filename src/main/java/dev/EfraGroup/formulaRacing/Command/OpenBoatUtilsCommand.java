@@ -13,7 +13,7 @@ import org.bukkit.entity.Player;
 
 @CommandAlias("openboatutils|obu")
 @CommandPermission("formularacing.admin")
-@Description("Comandos para enviar pacotes do OpenBoatUtils")
+@Description("Commands to send OpenBoatUtils packets")
 public class OpenBoatUtilsCommand extends BaseCommand {
 
     private final FormulaRacing plugin;
@@ -23,17 +23,25 @@ public class OpenBoatUtilsCommand extends BaseCommand {
     }
 
     @Default
-    @Description("Envia um pacote do OpenBoatUtils para um jogador")
+    @Description("Sends an OpenBoatUtils packet to a player")
     @CommandCompletion("@players")
     public void onDefault(Player player, String[] args) {
         if (args.length < 1) {
-            player.sendMessage("§cUso: /openboatutils <packetId> <valor1> [valor2] ... [jogador]");
+            player.sendMessage("§cUsage: /openboatutils <packetId> <value1> [value2] ... [player]");
             player.sendMessage("§eExemplos:");
             player.sendMessage("§f  /openboatutils 11 0.05");
             player.sendMessage("§f  /openboatutils 11 0.05 EfraMLG");
             player.sendMessage("§f  /openboatutils 3 0.5 stone,dirt");
             player.sendMessage("§f  /openboatutils 4 true");
             player.sendMessage("§f  /openboatutils 9 -0.04");
+            player.sendMessage("§f  /openboatutils 26 0 0.1 minecraft:ice");
+            player.sendMessage("§f  /openboatutils 27 2");
+            player.sendMessage("§f  /openboatutils 34 0.5");
+            player.sendMessage("§f  /openboatutils 35 2");
+            player.sendMessage("§f  /openboatutils 36 1.5");
+            player.sendMessage("§f  /openboatutils 40 0.8");
+            player.sendMessage("§f  /openboatutils 44 true");
+            player.sendMessage("§f  /openboatutils 47 true");
             return;
         }
 
@@ -43,12 +51,12 @@ public class OpenBoatUtilsCommand extends BaseCommand {
             // Determina o alvo
             Player target;
             if (args.length > 1) {
-                // Tenta encontrar um jogador no último argumento
+                // Try to find a player in the last argument
                 String lastArg = args[args.length - 1];
                 Player potentialTarget = Bukkit.getPlayerExact(lastArg);
                 if (potentialTarget != null) {
                     target = potentialTarget;
-                    // Remove o nome do jogador dos argumentos
+                    // Remove the player name from arguments
                     String[] newArgs = new String[args.length - 1];
                     System.arraycopy(args, 0, newArgs, 0, args.length - 1);
                     args = newArgs;
@@ -59,26 +67,26 @@ public class OpenBoatUtilsCommand extends BaseCommand {
                 target = player;
             }
 
-            // Parse os valores
+            // Parse values
             Object[] values = parseValues(args, 1);
 
-            // Envia o pacote
+            // Send the packet
             if (plugin.getPacketSender() != null) {
                 plugin.getPacketSender().sendBoatSetting(target, packetId, values);
-                player.sendMessage("§aPacote §f" + packetId + " §aenviado para §f" + target.getName() + "§a.");
+                player.sendMessage("§aPacket §f" + packetId + " §asent to §f" + target.getName() + "§a.");
             } else {
-                player.sendMessage("§cPacketSender não está disponível.");
+                player.sendMessage("§cPacketSender is not available.");
             }
 
         } catch (NumberFormatException e) {
-            player.sendMessage("§cID do pacote inválido. Deve ser um número.");
+            player.sendMessage("§cInvalid packet ID. Must be a number.");
         } catch (Exception e) {
             player.sendMessage("§cErro ao enviar pacote: " + e.getMessage());
         }
     }
 
     @Subcommand("send")
-    @Description("Envia um pacote específico")
+    @Description("Sends a specific packet")
     @CommandCompletion("@players")
     public void onSend(Player player, short packetId, @co.aikar.commands.annotation.Optional Player target, String[] values) {
         Player actualTarget = target != null ? target : player;
@@ -88,34 +96,34 @@ public class OpenBoatUtilsCommand extends BaseCommand {
 
             if (plugin.getPacketSender() != null) {
                 plugin.getPacketSender().sendBoatSetting(actualTarget, packetId, parsedValues);
-                player.sendMessage("§aPacote §f" + packetId + " §aenviado para §f" + actualTarget.getName() + "§a.");
+                player.sendMessage("§aPacket §f" + packetId + " §asent to §f" + actualTarget.getName() + "§a.");
             } else {
-                player.sendMessage("§cPacketSender não está disponível.");
+                player.sendMessage("§cPacketSender is not available.");
             }
         } catch (Exception e) {
-            player.sendMessage("§cErro ao enviar pacote: " + e.getMessage());
+            player.sendMessage("§cError sending packet: " + e.getMessage());
         }
     }
 
     @Subcommand("reset")
-    @Description("Reseta as configurações do OpenBoatUtils para o padrão")
+    @Description("Resets OpenBoatUtils settings to default")
     @CommandCompletion("@players")
     public void onReset(Player player, @co.aikar.commands.annotation.Optional Player target) {
         Player actualTarget = target != null ? target : player;
 
         if (plugin.getPacketSender() != null) {
             plugin.getPacketSender().resetBoatUtilsToVanilla(actualTarget);
-            player.sendMessage("§aConfigurações do OpenBoatUtils resetadas para §f" + actualTarget.getName() + "§a.");
+            player.sendMessage("§aOpenBoatUtils settings reset for §f" + actualTarget.getName() + "§a.");
         } else {
-            player.sendMessage("§cPacketSender não está disponível.");
+            player.sendMessage("§cPacketSender is not available.");
         }
     }
 
     @Subcommand("list")
-    @Description("Lista todos os pacotes disponíveis do OpenBoatUtils")
+    @Description("Lists all available OpenBoatUtils packets")
     public void onList(Player player) {
         player.sendMessage("§e═══════════════════════════════════");
-        player.sendMessage("§6§lPacotes do OpenBoatUtils");
+        player.sendMessage("§6§lOpenBoatUtils Packets");
         player.sendMessage("§e═══════════════════════════════════");
         player.sendMessage("§f1  §7Step Height (float)");
         player.sendMessage("§f2  §7Default Slipperiness (float)");
@@ -136,12 +144,18 @@ public class OpenBoatUtilsCommand extends BaseCommand {
         player.sendMessage("§f20 §7Water Jumping (boolean)");
         player.sendMessage("§f21 §7Swim Force (float)");
         player.sendMessage("§f26 §7Per Block Setting (short, float, string)");
-        player.sendMessage("§f27 §7Collision Mode (short)");
         player.sendMessage("§f28 §7Air Stepping (boolean)");
-        player.sendMessage("§f29 §7Ten Step Interpolation (boolean)");
-        player.sendMessage("§f30 §7Collision Resolution (byte)");
+        player.sendMessage("§f34 §7Walltap Multiplier (float)");
+        player.sendMessage("§f35 §7Jumps (int)");
+        player.sendMessage("§f36 §7Scale (float)");
+        player.sendMessage("§f37 §7Step Up Slipperiness (float)");
+        player.sendMessage("§f41 §7Brake Slipperiness (float)");
+        player.sendMessage("§f44 §7Multi Stepping (boolean)");
+        player.sendMessage("§f45 §7Max Speed (float)");
+        player.sendMessage("§f46 §7Max Speed Resistance (float)");
+        player.sendMessage("§f47 §7Honey Compatibility (boolean)");
         player.sendMessage("§e═══════════════════════════════════");
-        player.sendMessage("§eUso: §f/openboatutils <packetId> <valor1> [valor2] ... [jogador]");
+        player.sendMessage("§eUsage: §f/openboatutils <packetId> <value1> [value2] ... [player]");
     }
 
     private Object[] parseValues(String[] args, int startIndex) {
@@ -153,13 +167,13 @@ public class OpenBoatUtilsCommand extends BaseCommand {
         for (int i = startIndex; i < args.length; i++) {
             String arg = args[i];
 
-            // Tenta boolean primeiro
+            // Try boolean first
             if (arg.equalsIgnoreCase("true")) {
                 values[i - startIndex] = true;
             } else if (arg.equalsIgnoreCase("false")) {
                 values[i - startIndex] = false;
             }
-            // Tenta byte
+            // Try byte
             else if (arg.matches("-?\\d{1,3}")) {
                 try {
                     byte b = Byte.parseByte(arg);
@@ -167,7 +181,7 @@ public class OpenBoatUtilsCommand extends BaseCommand {
                     continue;
                 } catch (NumberFormatException ignored) {}
             }
-            // Tenta short
+            // Try short
             else if (arg.matches("-?\\d{1,5}")) {
                 try {
                     short s = Short.parseShort(arg);
@@ -175,7 +189,7 @@ public class OpenBoatUtilsCommand extends BaseCommand {
                     continue;
                 } catch (NumberFormatException ignored) {}
             }
-            // Tenta int
+            // Try int
             else if (arg.matches("-?\\d+")) {
                 try {
                     int intValue = Integer.parseInt(arg);
@@ -183,7 +197,7 @@ public class OpenBoatUtilsCommand extends BaseCommand {
                     continue;
                 } catch (NumberFormatException ignored) {}
             }
-            // Tenta float
+            // Try float
             else if (arg.matches("-?\\d+\\.\\d+[fF]?")) {
                 try {
                     float f = Float.parseFloat(arg);
@@ -191,7 +205,7 @@ public class OpenBoatUtilsCommand extends BaseCommand {
                     continue;
                 } catch (NumberFormatException ignored) {}
             }
-            // Tenta double
+            // Try double
             else if (arg.matches("-?\\d+\\.\\d+[dD]?")) {
                 try {
                     double d = Double.parseDouble(arg);
@@ -199,7 +213,7 @@ public class OpenBoatUtilsCommand extends BaseCommand {
                     continue;
                 } catch (NumberFormatException ignored) {}
             }
-            // Se não for número, mantém como string
+            // If not a number, keep as string
             else {
                 values[i - startIndex] = arg;
             }

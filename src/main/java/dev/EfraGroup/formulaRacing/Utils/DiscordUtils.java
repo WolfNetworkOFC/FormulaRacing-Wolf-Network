@@ -17,22 +17,31 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
 public class DiscordUtils {
-    // Nota: Em produção, o ideal é mover essas Strings para a config.yml
-    private static final String WEBHOOK = "https://ptb.discord.com/api/webhooks/1420179966489919560/bijNlYQsQK9H9u50Yk2vWxTgHztrgdPf83FGfCbivc0oa89uUA3SFdsprKZv_kBS949o";
-    private static final String ROLE_MENTION = "<@&1403835295153000560>";
+    private static String webhook = "";
+    private static String roleMention = "";
+
+    public static void init(String webhookUrl, String roleId) {
+        webhook = webhookUrl;
+        roleMention = roleId != null && !roleId.isEmpty() ? "<@&" + roleId + ">" : "";
+    }
+
+    private static boolean isEnabled() {
+        return webhook != null && !webhook.isEmpty();
+    }
 
     public static void sendNewTrackEmbed(JavaPlugin plugin, String trackName, String creator, String description, String imageUrl) {
+        if (!isEnabled()) return;
         SchedulerHelper.runAsync(plugin, () -> {
             try {
-                URL url = URI.create(WEBHOOK).toURL();
+                URL url = URI.create(webhook).toURL();
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("POST");
                 connection.setDoOutput(true);
                 connection.setRequestProperty("Content-Type", "application/json");
 
                 JsonObject embed = new JsonObject();
-                embed.addProperty("title", "🏁 Nova pista adicionada!");
-                embed.addProperty("color", 65280); // Verde
+                embed.addProperty("title", "🏁 New track added!");
+                embed.addProperty("color", 65280); // Green
 
                 JsonArray fields = new JsonArray();
                 fields.add(createField("Track", trackName, false));
@@ -59,9 +68,9 @@ public class DiscordUtils {
                 JsonArray embedsArray = new JsonArray();
                 embedsArray.add(embed);
                 payload.add("embeds", embedsArray);
-                payload.addProperty("content", ROLE_MENTION);
+                payload.addProperty("content", roleMention);
 
-                // Configuração de menção
+                // Mention configuration
                 JsonObject allowedMentions = new JsonObject();
                 JsonArray parse = new JsonArray();
                 parse.add("roles");
@@ -72,18 +81,19 @@ public class DiscordUtils {
 
                 int responseCode = connection.getResponseCode();
                 if (responseCode >= 300) {
-                    logError(plugin, "Falha ao enviar embed. Código: " + responseCode);
+                    logError(plugin, "Failed to send embed. Code: " + responseCode);
                 }
             } catch (Exception e) {
-                logError(plugin, "Erro ao enviar embed: " + e.getMessage());
+                logError(plugin, "Error sending embed: " + e.getMessage());
             }
         });
     }
 
     public static void sendRecordMessage(JavaPlugin plugin, String firstPlayer, double firstTime, String secondPlayer, double secondTime, String trackName) {
+        if (!isEnabled()) return;
         SchedulerHelper.runAsync(plugin, () -> {
             try {
-                URL url = URI.create(WEBHOOK).toURL();
+                URL url = URI.create(webhook).toURL();
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("POST");
                 connection.setDoOutput(true);
@@ -110,15 +120,15 @@ public class DiscordUtils {
 
                 int responseCode = connection.getResponseCode();
                 if (responseCode >= 300) {
-                    logError(plugin, "Falha ao enviar recorde. Código: " + responseCode);
+                    logError(plugin, "Failed to send record. Code: " + responseCode);
                 }
             } catch (Exception e) {
-                logError(plugin, "Erro ao enviar recorde: " + e.getMessage());
+                logError(plugin, "Error sending record: " + e.getMessage());
             }
         });
     }
 
-    // --- MÉTODOS AUXILIARES ---
+    // --- HELPER METHODS ---
 
     private static JsonObject createField(String name, String value, boolean inline) {
         JsonObject field = new JsonObject();
@@ -158,7 +168,7 @@ public class DiscordUtils {
                 Files.copy(in, file.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (Exception e) {
-            logError(plugin, "Erro ao baixar imagem: " + e.getMessage());
+            logError(plugin, "Error downloading image: " + e.getMessage());
         }
     }
 }

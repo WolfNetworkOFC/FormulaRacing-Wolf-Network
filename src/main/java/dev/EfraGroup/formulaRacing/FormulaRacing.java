@@ -64,6 +64,7 @@ import dev.EfraGroup.formulaRacing.Utils.TimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.TranslationUtil;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
+import dev.EfraGroup.formulaRacing.Utils.trackexchange.TrackExchangeManager;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.ScoreboardOwnershipCoordinator;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.RaceScoreboardV2Manager;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.MegavexAdapter;
@@ -75,6 +76,8 @@ import dev.EfraGroup.formulaRacing.Heat.GimmickManager;
 import dev.EfraGroup.formulaRacing.Hologram.HologramManager;
 import dev.EfraGroup.formulaRacing.Visuals.TrackVisualizer;
 import dev.EfraGroup.formulaRacing.Weather.WeatherManager;
+import dev.EfraGroup.formulaRacing.BoatUtils.OpenBoatUtilsVersion;
+import me.clip.placeholderapi.PlaceholderAPI;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.sql.SQLException;
@@ -97,11 +100,13 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
+// ServerShutdownEvent is not available in Paper 1.21.8; shutdown logic is in onDisable()
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class FormulaRacing extends JavaPlugin implements Listener {
 
     private static FormulaRacing instance;
+    private boolean papiAvailable = false;
     private final Map<UUID, String> lastTimeTrialTrack = new HashMap();
     private final Map<UUID, String> lastDuelTrack = new HashMap();
     private final Map<UUID, Boolean> lastDuelLonelyStatus = new HashMap();
@@ -114,6 +119,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private FileManager fileManager;
     public DatabaseManager dm;
     private WorldEditSelect worldEditSelect;
+    private TrackExchangeManager trackExchangeManager;
     private TimerUtils timerUtils;
     private RegionListener rcl;
     private TimeUtils tu;
@@ -280,7 +286,12 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.translationUtil = new TranslationUtil(this, this.dm);
             this.tu = new TimeUtils();
             this.worldEditSelect = new WorldEditSelect();
+            this.trackExchangeManager = new TrackExchangeManager(this, this.dm);
             this.dcu = new DiscordUtils();
+            DiscordUtils.init(
+                this.getConfig().getString("discord.webhook-url", ""),
+                this.getConfig().getString("discord.role-id", "")
+            );
             this.hotbarController = new HotbarController(this, this.dm);
             this.scoreboardOwnershipCoordinator =
                 new ScoreboardOwnershipCoordinator();
@@ -356,6 +367,27 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.leagueManager = new LeagueManager(this);
             this.weatherManager = new WeatherManager(this);
             this.raceEventManager.loadActiveEventsFromDatabase();
+            SchedulerHelper.runTask(this, () -> {
+                List<Integer> staleEventIds = new java.util.ArrayList<>();
+                for (Events evt : this.raceEventManager.getActiveEvents()) {
+                    String name = evt.getDisplayName();
+                    if (name.startsWith("QuickRace_") || name.startsWith("PartyRace_") || name.startsWith("DuelRace_")) {
+                        staleEventIds.add(evt.getId());
+                    }
+                }
+                for (int id : staleEventIds) {
+                    this.raceEventManager.removeEvent(id);
+                }
+                try {
+                    if (this.dm != null) {
+                        this.dm.deleteAllParties();
+                    }
+                } catch (java.sql.SQLException e) {
+                    if (this.debugManager != null) {
+                        this.debugManager.logRaceSystem(                    "[FormulaRacing] Error cleaning party races on startup: " + e.getMessage());
+                    }
+                }
+            });
             this.dailyRaceManager = new DailyRaceManager(this);
             this.dailyRaceManager.start();
             ScoreboardDuelsTimeUtils scoreboardDuelsUtils =
@@ -415,21 +447,21 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             );
             if (this.debugManager != null) {
                 this.getLogger().info(
-                    "[FormulaRacing] Plugin ativado com sucesso!"
+                    "[FormulaRacing] Plugin enabled successfully!"
                 );
                 this.getLogger().info(
-                    "[FormulaRacing] Banco de dados conectado com sucesso!"
+                    "[FormulaRacing] Database connected successfully!"
                 );
             }
         } catch (Exception var2) {
             if (this.debugManager != null) {
                 this.debugManager.logRaceSystem(
-                    "[FormulaRacing] Erro ao inicializar o plugin: " +
+                    "[FormulaRacing] Error initializing plugin: " +
                         var2.getMessage()
                 );
             } else {
                 this.getLogger().severe(
-                    "[FormulaRacing] Erro crítico ao inicializar o plugin (DebugManager nulo): " +
+                    "[FormulaRacing] Critical error initializing plugin (DebugManager null): " +
                         var2.getMessage()
                 );
             }
@@ -441,7 +473,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     public void onDisable() {
         if (this.debugManager != null) {
-            this.getLogger().info("[FormulaRacing] Desativando plugin...");
+            this.getLogger().info("[FormulaRacing] Disabling plugin...");
         }
 
         if (this.placeholderRegister != null) {
@@ -494,20 +526,11 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
         if (this.raceEventManager != null) {
             for (Events event : this.raceEventManager.getActiveEvents()) {
-                if (event.getDisplayName().startsWith("QuickRace_")) {
+                String name = event.getDisplayName();
+                if (name.startsWith("QuickRace_") || name.startsWith("PartyRace_") || name.startsWith("DuelRace_")) {
                     this.raceEventManager.unloadEvent(event.getId());
                 } else {
-                    dev.EfraGroup.formulaRacing.Event.EventSchedule schedule = event.getEventSchedule();
-                    if (schedule != null) {
-                        for (dev.EfraGroup.formulaRacing.Round.Rounds round : schedule.getRoundsCollection()) {
-                            for (dev.EfraGroup.formulaRacing.Heat.Heats heat : round.getHeatsCollection()) {
-                                dev.EfraGroup.formulaRacing.Heat.HeatState state = heat.getHeatState();
-                                if (state == dev.EfraGroup.formulaRacing.Heat.HeatState.LOADED || state == dev.EfraGroup.formulaRacing.Heat.HeatState.STARTING || state == dev.EfraGroup.formulaRacing.Heat.HeatState.RACING) {
-                                    heat.resetHeat();
-                                }
-                            }
-                        }
-                    }
+                    this.raceEventManager.removeEvent(event.getId());
                 }
             }
             this.raceEventManager.shutdown();
@@ -595,7 +618,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     }
 
     private void registerPlaceholders() {
-        if (!Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+        this.papiAvailable = Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI");
+
+        if (!this.papiAvailable) {
             this.getLogger().info(
                 "[FormulaRacing] PlaceholderAPI não encontrado. Placeholder %open_tracks_count% não será registrado."
             );
@@ -645,7 +670,8 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                     this,
                     this.dm,
                     this.packetSender,
-                    this.worldEditSelect
+                    this.worldEditSelect,
+                    this.trackExchangeManager
                 )
             );
             this.commandManager.registerCommand(new PartyCommand(this));
@@ -821,10 +847,41 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return message;
     }
 
+    public String applyPapi(Player player, String message) {
+        if (message == null) return null;
+        if (this.papiAvailable) {
+            try {
+                message = PlaceholderAPI.setPlaceholders(player, message);
+            } catch (Exception ignored) {}
+        }
+        message = message.replace("%img_java%", "\uE000").replace("%img_bedrock%", "\uE001");
+        return message;
+    }
+
+    /**
+     * Resolves WolfLang/PAPI placeholders first, then applies FR {placeholder} substitution.
+     * This allows WolfLang values to contain {track}, {player}, etc. markers.
+     */
+    private String resolveForPlayer(Player player, String key, String langCode, String... placeholders) {
+        String raw = this.getDirectTranslation(key, langCode);
+        String papiResolved = applyPapi(player, raw);
+        // Apply FR placeholder substitution on the PAPI-resolved text
+        if (placeholders != null && placeholders.length > 0) {
+            for (int i = 0; i < placeholders.length - 1; i += 2) {
+                String ph = placeholders[i];
+                String val = placeholders[i + 1];
+                if (papiResolved.contains(ph)) {
+                    papiResolved = papiResolved.replace(ph, val);
+                }
+            }
+            papiResolved = this.applyLegacyStringPlaceholders(papiResolved, placeholders);
+        }
+        return ChatColor.translateAlternateColorCodes('&', papiResolved);
+    }
+
     public void sendMessage(Player player, String key, String... placeholders) {
         String langCode = this.dm.getPlayerLanguage(player.getUniqueId());
-        String message = this.getTranslation(key, langCode, placeholders);
-        player.sendMessage(message);
+        player.sendMessage(resolveForPlayer(player, key, langCode, placeholders));
     }
 
     public void sendMessage(
@@ -832,33 +889,33 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         String key,
         String... placeholders
     ) {
-        String langCode = "en_US";
         if (sender instanceof Player player) {
-            langCode = this.dm.getPlayerLanguage(player.getUniqueId());
+            sendMessage(player, key, placeholders);
+            return;
         }
-
+        String langCode = "en_US";
         String message = this.getTranslation(key, langCode, placeholders);
         sender.sendMessage(message);
     }
 
     public void startLeaderboardUpdater() {
-        // Puxa o intervalo do config (ex: 18000 ticks) ou usa 300 como fallback
+        // Pulls interval from config (e.g. 18000 ticks) or defaults to 300
         long ticks = this.getConfig().getLong("leaderboards.updateticks", 300L);
 
         SchedulerHelper.runTaskTimer(
                 this,
                 () -> {
-                    // Só processa se houver jogadores online para economizar recursos do banco
+                    // Only process if players are online to save database resources
                     if (!Bukkit.getOnlinePlayers().isEmpty()) {
                         this.trackLeaderboards.values().forEach(leaderboard -> {
-                            // Atualiza ambos os hologramas para cada pista registrada
+                            // Update both holograms for each registered track
                             leaderboard.updateJavaLeaderboard();
                             leaderboard.updateBedrockLeaderboard();
                         });
                     }
                 },
-                100L, // Delay inicial
-                ticks  // Intervalo de repetição
+                100L, // Initial delay
+                ticks  // Repeat interval
         );
     }
 
@@ -878,7 +935,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         this.leaderboardsLoaded = true;
         
         if (this.debugManager != null) {
-            this.debugManager.logDatabaseOperations("[FormulaRacing] Carregando leaderboards...");
+            this.debugManager.logDatabaseOperations("[FormulaRacing] Loading leaderboards...");
         }
 
         try {
@@ -888,14 +945,14 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 Location savedLoc = this.dm.getHologramLocation(trackName);
 
                 if (savedLoc != null) {
-                    // USAR APENAS UMA INSTÂNCIA:
-                    // O método getOrCreateLeaderboard (singular) deve retornar a instância única
+                    // Use only ONE instance:
+                    // The getOrCreateLeaderboard method returns the single instance
                     TrackLeaderboard leaderboard = this.getOrCreateLeaderboard(trackName, savedLoc);
 
-                    // Seta a localização uma única vez para a pista
+                    // Set location once for the track
                     leaderboard.setLocation(savedLoc);
 
-                    // Chama os updates específicos dentro da mesma instância
+                    // Call specific updates within the same instance
                     leaderboard.updateJavaLeaderboard();
                     leaderboard.updateBedrockLeaderboard();
 
@@ -934,6 +991,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                                 player.getUniqueId(),
                                 versionId
                             );
+                            OpenBoatUtilsVersion.setPlayerVersion(player.getUniqueId(), versionId);
                             if (this.debugManager != null) {
                                 DebugManager var10000 = this.debugManager;
                                 String var10001 = player.getName();
@@ -1063,6 +1121,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return this.api;
     }
 
+    public LightningRodListener getLightningRodListener() {
+        return this.lightningRodListener;
+    }
+
     public PacketSender getPacketSender() {
         return this.packetSender;
     }
@@ -1101,6 +1163,14 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     public HotbarController getHotbarController() {
         return this.hotbarController;
+    }
+
+    public int getOpenBoatUtilsVersion(UUID playerUUID) {
+        return dev.EfraGroup.formulaRacing.BoatUtils.OpenBoatUtilsVersion.getPlayerVersion(playerUUID);
+    }
+
+    public void setOpenBoatUtilsVersion(UUID playerUUID, int version) {
+        dev.EfraGroup.formulaRacing.BoatUtils.OpenBoatUtilsVersion.setPlayerVersion(playerUUID, version);
     }
 
     @EventHandler
@@ -1210,7 +1280,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 Events event = null;
                 Rounds round = null;
                 String heatArg = null;
-                if (arg1.toUpperCase().matches("R\\d+[QFEH]\\d+")) {
+                if (arg1.toUpperCase().matches("R\\d+(?:SQ|S|P|Q|F|E|H)\\d+")) {
                     this.getLogger().info(
                         "[HEAT RESOLVER DEBUG] Tentando resolver código de heat: " +
                             arg1
@@ -1437,7 +1507,21 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                     "tenstepinterpolation",
                     "collisionmode",
                     "collisionresolution",
-                    "coyotetime"
+                    "coyotime",
+                    "walltapmultiplier",
+                    "jumps",
+                    "scale",
+                    "stepupslipperiness",
+                    "fixdoublewaterelevation",
+                    "lateralslipperiness",
+                    "brakeslipperiness",
+                    "multistepping",
+                    "maxspeed",
+                    "maxspeedresistance",
+                    "honeycompatibility",
+                    "collisionfilter",
+                    "customslipperiness",
+                    "perblocksetting"
                 )
         );
         this.commandManager.getCommandCompletions().registerCompletion(
@@ -1556,6 +1640,13 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                           .toList();
             }
         );
+        this.commandManager.getCommandCompletions().registerAsyncCompletion(
+            "trackexchangeFiles",
+            c -> {
+                if (trackExchangeManager == null) return List.of();
+                return trackExchangeManager.listFiles();
+            }
+        );
         this.commandManager.getCommandCompletions().registerCompletion(
             "heat",
             c -> {
@@ -1590,7 +1681,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                     }
                 }
 
-                // Criamos uma cópia final da variável para a Lambda
+                // Create a final copy of the variable for the Lambda
                 final Rounds finalRound = round;
 
                 if (finalRound == null && c.getPlayer() != null) {
@@ -1630,7 +1721,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                     }
                 }
 
-                // Usamos a cópia final aqui também
+                // Use the final copy here too
                 return finalRound == null
                     ? Collections.emptyList()
                     : finalRound
@@ -1723,7 +1814,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             // 2. Usa a instância do FloodgateApi para checar o UUID
             return org.geysermc.floodgate.api.FloodgateApi.getInstance().isFloodgatePlayer(player.getUniqueId());
         }
-        // Se o Floodgate não estiver instalado, tecnicamente ninguém é Bedrock
+        // If Floodgate is not installed, technically no one is Bedrock
         return false;
     }
 }

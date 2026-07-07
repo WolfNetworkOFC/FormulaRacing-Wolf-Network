@@ -34,8 +34,8 @@ public class DuelCommand extends BaseCommand implements Listener {
     private final TimeTrialDuelsAction ttda;
 
     private static final Map<UUID, String> searchingPlayers = new HashMap<>();
-    private final String GUI_SETUP = "§8Configurar Duelo";
-    private final String GUI_TRACKS = "§8Selecionar Pista";
+    private final String GUI_SETUP = "§8Configure Duel";
+    private final String GUI_TRACKS = "§8Select Track";
     private final String GUI_DUEL = "§b§lDUEL • TIME TRIAL";
 
     private final NamespacedKey KEY_TARGET = new NamespacedKey("formula", "target");
@@ -46,7 +46,7 @@ public class DuelCommand extends BaseCommand implements Listener {
     private final NamespacedKey KEY_LONELY = new NamespacedKey("formula", "lonely");
     private static final Map<UUID, UUID> pendingInvites = new HashMap<>();
 
-    // Construtor
+    // Constructor
     public DuelCommand(FormulaRacing plugin, DatabaseManager databaseManager, TimeTrialDuels timeTrialDuels, TimeTrialDuelsAction ttda, PacketSender packetSender) {
         this.plugin = plugin;
         this.databaseManager = databaseManager;
@@ -55,12 +55,12 @@ public class DuelCommand extends BaseCommand implements Listener {
         this.packet = packetSender;
     }
 
-    // 1. Comando Padrão: /duel [jogador]
+    // 1. Default Command: /duel [player]
     @Default
     @CommandCompletion("@players")
     public void onDefaultChallenge(Player player, String targetName) {
         if (targetName == null) {
-            player.sendMessage("§cUse: /duel <jogador> ou /duel sair");
+            player.sendMessage("§cUse: /duel <player> or /duel quit");
             playSound(player, Sound.ENTITY_VILLAGER_NO, 1.0f);
             return;
         }
@@ -68,20 +68,20 @@ public class DuelCommand extends BaseCommand implements Listener {
         Player target = Bukkit.getPlayer(targetName);
 
         if (target == null || !target.isOnline()) {
-            player.sendMessage("§cJogador inválido ou offline.");
+            player.sendMessage("§cInvalid or offline player.");
             playSound(player, Sound.ENTITY_ITEM_BREAK, 1.0f);
             return;
         }
 
         if (target.equals(player)) {
-            player.sendMessage("§cVocê não pode desafiar a si mesmo.");
+            player.sendMessage("§cYou cannot challenge yourself.");
             return;
         }
 
         openSetupGUI(player, target);
     }
 
-    // 2. Subcomando: /duel accept [jogador]
+    // 2. Subcommand: /duel accept [player]
     @Subcommand("accept")
     @CommandCompletion("@players")
     public void onAccept(Player player, String challengerName) {
@@ -94,28 +94,28 @@ public class DuelCommand extends BaseCommand implements Listener {
                     return;
                 }
             }
-            player.sendMessage("§cUse: /duel accept <nome>");
+            player.sendMessage("§cUse: /duel accept <name>");
             return;
         }
         handleAccept(player, challengerName);
     }
 
-    // 3. Subcomando: /duel deny
+    // 3. Subcommand: /duel deny
     @Subcommand("deny")
     public void onDeny(Player player) {
-        player.sendMessage("§cConvite recusado.");
+        player.sendMessage("§cInvite denied.");
         pendingInvites.remove(player.getUniqueId());
         playSound(player, Sound.BLOCK_NOTE_BLOCK_BASS, 0.5f);
     }
 
-    // 4. Subcomando: /duel sair (quit/leave)
+    // 4. Subcommand: /duel sair (quit/leave)
     @Subcommand("quit|leave|sair")
     public void onLeave(Player player) {
         handleLeave(player);
     }
 
     // =========================================================================
-    // O RESTO DO SEU CÓDIGO (GUI, Eventos e Lógica de Duelo) FICA INTACTO ABAIXO
+    // REMAINING CODE (GUI, Events, and Duel Logic) STAYS INTACT BELOW
     // =========================================================================
 
     public void openSetupGUI(Player player, Player target) {
@@ -127,25 +127,25 @@ public class DuelCommand extends BaseCommand implements Listener {
         String mode = player.getPersistentDataContainer().getOrDefault(KEY_MODE, PersistentDataType.STRING, "CORRIDA");
 
         int lonelyInt = player.getPersistentDataContainer().getOrDefault(KEY_LONELY, PersistentDataType.INTEGER, 0);
-        String lonelyStatus = (lonelyInt == 1) ? "§aATIVADO" : "§cDESATIVADO";
+        String lonelyStatus = (lonelyInt == 1) ? "§aENABLED" : "§cDISABLED";
         Material lonelyMaterial = (lonelyInt == 1) ? Material.ENDER_EYE : Material.ENDER_PEARL;
 
-        inv.setItem(10, createItem(Material.MAP, "§b§lPista", "§7Selecionada: §f" + track, "", "§eClique para alterar"));
+        inv.setItem(10, createItem(Material.MAP, "§b§lTrack", "§7Selected: §f" + track, "", "§eClick to change"));
 
         String formattedTime = formatTime(time);
-        inv.setItem(11, createItem(Material.CLOCK, "§e§lTempo Limite", "§7Atual: §f" + formattedTime, "", "§7Esq: §a+10s §8| §7Dir: §c-10s", "§7Shift: §f+/- 1min"));
-        inv.setItem(12, createItem(Material.REPEATER, "§f§lVoltas", "§7Atual: §f" + laps, "", "§7Esq: §a+1 §8| §7Dir: §c-1"));
-        inv.setItem(13, createItem(Material.COMPASS, "§d§lModo", "§7Atual: §f" + mode, "", "§eClique para alternar"));
+        inv.setItem(11, createItem(Material.CLOCK, "§e§lTime Limit", "§7Current: §f" + formattedTime, "", "§7Left: §a+10s §8| §7Right: §c-10s", "§7Shift: §f+/- 1min"));
+        inv.setItem(12, createItem(Material.REPEATER, "§f§lLaps", "§7Current: §f" + laps, "", "§7Left: §a+1 §8| §7Right: §c-1"));
+        inv.setItem(13, createItem(Material.COMPASS, "§d§lMode", "§7Current: §f" + mode, "", "§eClick to toggle"));
 
-        inv.setItem(14, createItem(lonelyMaterial, "§5§lModo Lonely",
+        inv.setItem(14, createItem(lonelyMaterial, "§5§lLonely Mode",
                 "§7Status: " + lonelyStatus,
                 "",
-                "§7Jogadores ficam invisíveis",
-                "§7uns para os outros.",
-                "", "§eClique para alternar"));
+                "§7Players become invisible",
+                "§7to each other.",
+                "", "§eClick to toggle"));
 
-        inv.setItem(15, createItem(Material.LIME_CONCRETE, "§a§lENVIAR CONVITE", "§7Enviar para: §e" + target.getName()));
-        inv.setItem(16, createItem(Material.BARRIER, "§c§lFECHAR"));
+        inv.setItem(15, createItem(Material.LIME_CONCRETE, "§a§lSEND INVITE", "§7Send to: §e" + target.getName()));
+        inv.setItem(16, createItem(Material.BARRIER, "§c§lCLOSE"));
 
         player.getPersistentDataContainer().set(KEY_TARGET, PersistentDataType.STRING, target.getName());
         player.openInventory(inv);
@@ -166,11 +166,11 @@ public class DuelCommand extends BaseCommand implements Listener {
             } catch (IllegalArgumentException e) {
                 material = Material.PAPER;
             }
-            inv.setItem(slot++, createItem(material, "§b" + trackName, "§7Clique para selecionar esta pista"));
+            inv.setItem(slot++, createItem(material, "§b" + trackName, "§7Click to select this track"));
         }
 
-        inv.setItem(49, createItem(Material.NAME_TAG, "§e§lPesquisar por Nome", "§7Clique para digitar o nome no chat"));
-        inv.setItem(45, createItem(Material.ARROW, "§cVoltar", "§7Voltar para configuração"));
+        inv.setItem(49, createItem(Material.NAME_TAG, "§e§lSearch by Name", "§7Click to type the name in chat"));
+        inv.setItem(45, createItem(Material.ARROW, "§cBack", "§7Back to setup"));
 
         player.openInventory(inv);
         playSound(player, Sound.ITEM_ARMOR_EQUIP_LEATHER, 1.0f);
@@ -255,7 +255,7 @@ public class DuelCommand extends BaseCommand implements Listener {
             player.closeInventory();
             String targetName = player.getPersistentDataContainer().get(KEY_TARGET, PersistentDataType.STRING);
             searchingPlayers.put(player.getUniqueId(), targetName);
-            player.sendMessage("§e§lPESQUISA §8» §fDigite o nome da pista no chat.");
+            player.sendMessage("§e§lSEARCH §8» §fType the track name in chat.");
             playSound(player, Sound.BLOCK_ANVIL_USE, 1.5f);
             return;
         }
@@ -283,7 +283,7 @@ public class DuelCommand extends BaseCommand implements Listener {
         UUID playerUUID = player.getUniqueId();
 
         if (!databaseManager.isPlayerInActiveDuel(playerUUID)) {
-            player.sendMessage("§cVocê não está em um duelo ativo.");
+            player.sendMessage("§cYou are not in an active duel.");
             return;
         }
 
@@ -292,7 +292,7 @@ public class DuelCommand extends BaseCommand implements Listener {
 
         timeTrialDuels.removePlayerFromDuel(playerUUID, duelId);
 
-        player.sendMessage("§7Você saiu do duelo.");
+        player.sendMessage("§7You left the duel.");
         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1f, 0.5f);
     }
 
@@ -307,7 +307,7 @@ public class DuelCommand extends BaseCommand implements Listener {
 
         if (message.equalsIgnoreCase("cancel") || message.equalsIgnoreCase("cancelar")) {
             searchingPlayers.remove(player.getUniqueId());
-            player.sendMessage("§cBusca cancelada.");
+            player.sendMessage("§cSearch cancelled.");
             playSound(player, Sound.BLOCK_NOTE_BLOCK_BASS, 0.5f);
             SchedulerHelper.runTask(plugin, () -> openTrackSelector(player));
             return;
@@ -323,13 +323,13 @@ public class DuelCommand extends BaseCommand implements Listener {
             String finalTrack = foundTrack;
             SchedulerHelper.runTask(plugin, () -> {
                 player.getPersistentDataContainer().set(KEY_TRACK, PersistentDataType.STRING, finalTrack);
-                player.sendMessage("§aPista selecionada: §f" + finalTrack);
+                player.sendMessage("§aTrack selected: §f" + finalTrack);
                 playSound(player, Sound.ENTITY_PLAYER_LEVELUP, 1.5f);
                 Player target = Bukkit.getPlayer(targetName);
                 if (target != null) openSetupGUI(player, target);
             });
         } else {
-            player.sendMessage("§c§lERRO §8» §7Pista não encontrada.");
+            player.sendMessage("§c§lERROR §8» §7Track not found.");
             playSound(player, Sound.ENTITY_VILLAGER_NO, 1.0f);
         }
     }
@@ -339,27 +339,27 @@ public class DuelCommand extends BaseCommand implements Listener {
         UUID challengerUUID = challenger.getUniqueId();
 
         pendingInvites.put(targetUUID, challengerUUID);
-        plugin.getLogger().info("[DEBUG] Convite registrado: " + challenger.getName() + " -> " + target.getName());
+        plugin.getLogger().info("[DEBUG] Invite registered: " + challenger.getName() + " -> " + target.getName());
 
-        String track = challenger.getPersistentDataContainer().getOrDefault(KEY_TRACK, PersistentDataType.STRING, "Nenhuma");
+        String track = challenger.getPersistentDataContainer().getOrDefault(KEY_TRACK, PersistentDataType.STRING, "None");
         int laps = challenger.getPersistentDataContainer().getOrDefault(KEY_LAPS, PersistentDataType.INTEGER, 3);
 
-        challenger.sendMessage("§a§lDUELO §8» §fConvite enviado para §e" + target.getName() + "§f!");
+        challenger.sendMessage("§a§lDUEL §8» §fInvite sent to §e" + target.getName() + "§f!");
 
-        TextComponent msg = new TextComponent("§e" + challenger.getName() + " §7te desafiou para um duelo!\n" +
-                "§fPista: §b" + track + " §8| §fVoltas: §b" + laps + "\n");
+        TextComponent msg = new TextComponent("§e" + challenger.getName() + " §7challenged you to a duel!\n" +
+                "§fTrack: §b" + track + " §8| §fLaps: §b" + laps + "\n");
 
-        TextComponent accept = new TextComponent("§a§l[ACEITAR CONVITE]");
+        TextComponent accept = new TextComponent("§a§l[ACCEPT INVITE]");
         accept.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/duel accept " + challenger.getName()));
 
         TextComponent space = new TextComponent("   ");
-        TextComponent deny = new TextComponent("§c§l[RECUSAR]");
+        TextComponent deny = new TextComponent("§c§l[DECLINE]");
         deny.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/duel deny"));
 
         target.sendMessage(" ");
         target.spigot().sendMessage(msg);
         target.spigot().sendMessage(accept, space, deny);
-        target.sendMessage("§8(Este convite expira em 60 segundos)");
+        target.sendMessage("§8(This invite expires in 60 seconds)");
         target.sendMessage(" ");
 
         playSound(target, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f);
@@ -369,23 +369,23 @@ public class DuelCommand extends BaseCommand implements Listener {
                 pendingInvites.remove(targetUUID);
 
                 if (target.isOnline()) {
-                    target.sendMessage("§c§lDUELO §8» §7O convite de §f" + challenger.getName() + " §7expirou.");
+                    target.sendMessage("§c§lDUEL §8» §7The invite from §f" + challenger.getName() + " §7expired.");
                 }
                 if (challenger.isOnline()) {
-                    challenger.sendMessage("§c§lDUELO §8» §7Seu convite para §f" + target.getName() + " §7expirou.");
+                    challenger.sendMessage("§c§lDUEL §8» §7Your invite to §f" + target.getName() + " §7expired.");
                 }
-                plugin.getLogger().info("[DEBUG] Convite expirado: " + challenger.getName() + " -> " + target.getName());
+                plugin.getLogger().info("[DEBUG] Invite expired: " + challenger.getName() + " -> " + target.getName());
             }
         }, 20 * 60L);
     }
 
     private void handleAccept(Player responder, String challengerName) {
-        plugin.getLogger().info("[DEBUG] " + responder.getName() + " tentou /duel accept " + challengerName);
+        plugin.getLogger().info("[DEBUG] " + responder.getName() + " attempted /duel accept " + challengerName);
 
         Player challenger = Bukkit.getPlayer(challengerName);
 
         if (challenger == null || !challenger.isOnline()) {
-            responder.sendMessage("§c§lERRO §8» §7O desafiante §f" + challengerName + " §7está offline.");
+            responder.sendMessage("§c§lERROR §8» §7The challenger §f" + challengerName + " §7is offline.");
             return;
         }
 
@@ -393,35 +393,35 @@ public class DuelCommand extends BaseCommand implements Listener {
         UUID challengerUUID = challenger.getUniqueId();
 
         if (!pendingInvites.containsKey(responderUUID)) {
-            responder.sendMessage("§c§lERRO §8» §7Não há convites pendentes para você.");
+            responder.sendMessage("§c§lERROR §8» §7No pending invites for you.");
             return;
         }
 
         UUID storedChallengerUUID = pendingInvites.get(responderUUID);
         if (!storedChallengerUUID.equals(challengerUUID)) {
-            responder.sendMessage("§c§lERRO §8» §7O convite pendente não pertence a este desafiante.");
+            responder.sendMessage("§c§lERROR §8» §7The pending invite does not belong to this challenger.");
             return;
         }
 
         try {
             if (databaseManager.isPlayerInActiveDuel(responderUUID)) {
-                responder.sendMessage("§c§lERRO §8» §7Você já está em um duelo!");
+                responder.sendMessage("§c§lERROR §8» §7You are already in a duel!");
                 return;
             }
 
             if (databaseManager.isPlayerInActiveDuel(challengerUUID)) {
-                responder.sendMessage("§c§lERRO §8» §7O desafiante já entrou em outra corrida.");
+                responder.sendMessage("§c§lERROR §8» §7The challenger has already entered another race.");
                 pendingInvites.remove(responderUUID);
                 return;
             }
         } catch (Exception e) {
-            responder.sendMessage("§c§lERRO §8» §7Falha ao consultar o banco de dados.");
+            responder.sendMessage("§c§lERROR §8» §7Failed to query the database.");
             return;
         }
 
         pendingInvites.remove(responderUUID);
 
-        String track = challenger.getPersistentDataContainer().getOrDefault(KEY_TRACK, PersistentDataType.STRING, "Nenhuma");
+        String track = challenger.getPersistentDataContainer().getOrDefault(KEY_TRACK, PersistentDataType.STRING, "None");
         int laps = challenger.getPersistentDataContainer().getOrDefault(KEY_LAPS, PersistentDataType.INTEGER, 3);
         int timeLimitSeconds = challenger.getPersistentDataContainer().getOrDefault(KEY_TIME, PersistentDataType.INTEGER, 60);
 
@@ -431,8 +431,8 @@ public class DuelCommand extends BaseCommand implements Listener {
         String mode = challenger.getPersistentDataContainer().getOrDefault(KEY_MODE, PersistentDataType.STRING, "CORRIDA");
         boolean isTimeTrialMode = mode.equalsIgnoreCase("TIME TRIAL") || mode.equalsIgnoreCase("TIME_TRIAL") || mode.toUpperCase().contains("TIME");
 
-        if (track.equals("Nenhuma")) {
-            responder.sendMessage("§c§lERRO §8» §7O desafiante não selecionou uma pista válida.");
+        if (track.equals("None")) {
+            responder.sendMessage("§c§lERROR §8» §7The challenger did not select a valid track.");
             return;
         }
 
@@ -448,7 +448,7 @@ public class DuelCommand extends BaseCommand implements Listener {
             }
         } catch (Exception e) {
             e.printStackTrace();
-            responder.sendMessage("§c§lERRO §8» §7Falha crítica ao iniciar o duelo.");
+            responder.sendMessage("§c§lERROR §8» §7Critical failure while starting the duel.");
         }
     }
 

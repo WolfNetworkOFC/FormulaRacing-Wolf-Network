@@ -32,3 +32,4 @@ public class MovingTargetRound extends Rounds {
         return new RaceSession(this.plugin);
     }
 }
+

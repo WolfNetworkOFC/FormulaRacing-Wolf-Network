@@ -92,14 +92,13 @@ public class TimeTrialDuels implements Listener {
             p2.sendMessage(this.plugin.getDirectTranslation("duel_error_spawn", lang2));
         } else {
             if (this.dm.trackHaveBoatUtils(trackName)) {
-                boolean p1HasObu = FormulaRacing.hasOpenBoatUtilsMod(p1);
-                boolean p2HasObu = FormulaRacing.hasOpenBoatUtilsMod(p2);
-                if (!p1HasObu) {
+                if (!FormulaRacing.hasOpenBoatUtilsMod(p1)) {
                     this.plugin.sendMessage(p1, "obu_mandatory_warning", new String[]{"{track}", trackName});
+                    return;
                 }
-
-                if (!p2HasObu) {
+                if (!FormulaRacing.hasOpenBoatUtilsMod(p2)) {
                     this.plugin.sendMessage(p2, "obu_mandatory_warning", new String[]{"{track}", trackName});
+                    return;
                 }
             }
 
@@ -108,14 +107,14 @@ public class TimeTrialDuels implements Listener {
             String trackNameWS = trackName.replace(" ", "");
             List<Player> participants = Arrays.asList(p1, p2);
             String modeStr = isTimeTrialMode ? "TIME TRIAL" : "CORRIDA";
-            this.plugin.getDebugManager().logDuelSystem("[SETUP] Modo de duelo: " + modeStr);
+            this.plugin.getDebugManager().logDuelSystem("[SETUP] Duel mode: " + modeStr);
             int[] duelIdHolder = new int[]{-1};
 SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                 this.dm.createDuel(p1, participants, trackNameWS, laps, timeLimit, lonely);
                 int duelId = this.dm.getActiveDuelId(p1.getUniqueId());
                 duelIdHolder[0] = duelId;
                 if (duelId == -1) {
-                    this.plugin.getDebugManager().logDuelSystem("§c[ERRO CRÍTICO] Duelo criado mas ID não encontrado!");
+                    this.plugin.getDebugManager().logDuelSystem("§c[CRITICAL ERROR] Duel created but ID not found!");
                     String lang1 = this.dm.getPlayerLanguage(p1.getUniqueId());
                     String lang2 = this.dm.getPlayerLanguage(p2.getUniqueId());
                     p1.sendMessage(this.plugin.getDirectTranslation("duel_error_create", lang1));
@@ -127,19 +126,19 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                     this.activeDuels.put(duelId, duelState);
                     this.playerStates.put(p1.getUniqueId(), new PlayerDuelState(p1.getUniqueId(), duelId));
                     this.playerStates.put(p2.getUniqueId(), new PlayerDuelState(p2.getUniqueId(), duelId));
-                    this.plugin.getDebugManager().logDuelSystem("§a[DUEL] Duelo #" + duelId + " criado: " + p1.getName() + " vs " + p2.getName());
+                    this.plugin.getDebugManager().logDuelSystem("§a[DUEL] Duel #" + duelId + " created: " + p1.getName() + " vs " + p2.getName());
                     if (p1.getVehicle() != null && p1.getVehicle() instanceof Boat) {
                         Boat oldBoat = (Boat)p1.getVehicle();
                         oldBoat.eject();
                         oldBoat.remove();
-                        this.plugin.getDebugManager().logDuelSystem("[PREP] Removeu barco antigo de " + p1.getName());
+                        this.plugin.getDebugManager().logDuelSystem("[PREP] Removed old boat of " + p1.getName());
                     }
 
                     if (p2.getVehicle() != null && p2.getVehicle() instanceof Boat) {
                         Boat oldBoat = (Boat)p2.getVehicle();
                         oldBoat.eject();
                         oldBoat.remove();
-                        this.plugin.getDebugManager().logDuelSystem("[PREP] Removeu barco antigo de " + p2.getName());
+                        this.plugin.getDebugManager().logDuelSystem("[PREP] Removed old boat of " + p2.getName());
                     }
 
                     this.packet.resetBoatUtilsToVanilla(p1);
@@ -194,7 +193,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                             timeLimitStr = timeLimit + " segundo" + (timeLimit != 1 ? "s" : "");
                         }
 
-                        TimeTrialDuels.this.plugin.getDebugManager().logDuelSystem("Duelo #" + duelId + " iniciado! Tempo limite: " + timeLimitStr);
+                        TimeTrialDuels.this.plugin.getDebugManager().logDuelSystem("Duel #" + duelId + " started! Time limit: " + timeLimitStr);
                         if (timeLimit > 0) {
                             TimeTrialDuels.this.startTimeLimitTimer(duelId, timeLimit);
                         }
@@ -251,7 +250,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
     private void endDuelByTimeLimit(int duelId) {
         DuelState duelState = (DuelState)this.activeDuels.get(duelId);
         if (duelState != null) {
-            this.plugin.getDebugManager().logDuelSystem("§c[DUEL] Tempo limite atingido no duelo #" + duelId + " - Aguardando jogadores completarem a volta atual");
+            this.plugin.getDebugManager().logDuelSystem("§c[DUEL] Time limit reached on duel #" + duelId + " - Waiting for players to complete current lap");
             duelState.setTimeLimitReached(true);
 
             for(UUID uuid : duelState.getPlayers()) {
@@ -261,7 +260,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                     playerState.setLapWhenTimeLimitReached(currentLap);
                     DebugManager var10000 = this.plugin.getDebugManager();
                     String var10001 = Bukkit.getOfflinePlayer(uuid).getName();
-                    var10000.logDuelSystem("§e[TIME LIMIT] " + var10001 + " estava na volta " + currentLap + " quando tempo limite foi atingido");
+                    var10000.logDuelSystem("§e[TIME LIMIT] " + var10001 + " was on lap " + currentLap + " when time limit was reached");
                 }
             }
 
@@ -302,15 +301,15 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
             final int timeoutSeconds;
 
             if (bestLapTime != Double.MAX_VALUE) {
-                // Calculamos em uma variável auxiliar primeiro
+                // Calculate in an auxiliary variable first
                 int calculated = (int) Math.ceil(bestLapTime * 3.0);
-                // Aplicamos os limites (mínimo 60s, máximo 180s)
+                // Apply limits (minimum 60s, maximum 180s)
                 timeoutSeconds = Math.max(60, Math.min(180, calculated));
             } else {
                 timeoutSeconds = 120;
             }
 
-            this.plugin.getDebugManager().logDuelSystem("§e[TIME LIMIT] Timeout configurado: " + timeoutSeconds + "s (baseado no melhor tempo: " + String.format("%.1f", bestLapTime) + "s)");
+            this.plugin.getDebugManager().logDuelSystem("§e[TIME LIMIT] Timeout set: " + timeoutSeconds + "s (based on best time: " + String.format("%.1f", bestLapTime) + "s)");
             FRTask[] checkTask = {null};
             checkTask[0] = SchedulerHelper.runTaskTimer(this.plugin, new Runnable() {
                 int checksRemaining = timeoutSeconds;
@@ -334,11 +333,11 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                         }
 
                         if (allPlayersReady) {
-                            TimeTrialDuels.this.plugin.getDebugManager().logDuelSystem("§a[TIME LIMIT] Todos os jogadores completaram a volta atual - finalizando duelo #" + duelId);
+                            TimeTrialDuels.this.plugin.getDebugManager().logDuelSystem("§a[TIME LIMIT] All players completed the current lap - finalizing duel #" + duelId);
                             TimeTrialDuels.this.finalizeDuelAfterTimeLimit(duelId);
                             if (checkTask[0] != null) checkTask[0].cancel();
                         } else if (this.checksRemaining <= 0) {
-                            TimeTrialDuels.this.plugin.getDebugManager().logDuelSystem("§c[TIME LIMIT] Timeout esgotado (" + timeoutSeconds + "s) - finalizando duelo #" + duelId + " (possível AFK/trollagem)");
+                            TimeTrialDuels.this.plugin.getDebugManager().logDuelSystem("§c[TIME LIMIT] Timeout exhausted (" + timeoutSeconds + "s) - finalizing duel #" + duelId + " (possible AFK/trolling)");
                             TimeTrialDuels.this.finalizeDuelAfterTimeLimit(duelId);
                             if (checkTask[0] != null) checkTask[0].cancel();
                         } else {
@@ -363,16 +362,16 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                     boolean playerReady = playerState.isFinished() || lapWhenTimeLimitReached >= 0 && currentLap > lapWhenTimeLimitReached;
                     if (!playerReady) {
                         allPlayersReady = false;
-                        this.plugin.getDebugManager().logDuelSystem("§e[TIME LIMIT] " + Bukkit.getOfflinePlayer(uuid).getName() + " ainda não está pronto (volta quando tempo esgotou: " + lapWhenTimeLimitReached + ", volta atual: " + currentLap + ", finished=" + playerState.isFinished() + ")");
+                        this.plugin.getDebugManager().logDuelSystem("§e[TIME LIMIT] " + Bukkit.getOfflinePlayer(uuid).getName() + " not ready yet (lap when time ran out: " + lapWhenTimeLimitReached + ", current lap: " + currentLap + ", finished=" + playerState.isFinished() + ")");
                         break;
                     }
 
-                    this.plugin.getDebugManager().logDuelSystem("§a[TIME LIMIT] " + Bukkit.getOfflinePlayer(uuid).getName() + " está pronto (volta quando tempo esgotou: " + lapWhenTimeLimitReached + ", volta atual: " + currentLap + ", finished=" + playerState.isFinished() + ")");
+                    this.plugin.getDebugManager().logDuelSystem("§a[TIME LIMIT] " + Bukkit.getOfflinePlayer(uuid).getName() + " is ready (lap when time ran out: " + lapWhenTimeLimitReached + ", current lap: " + currentLap + ", finished=" + playerState.isFinished() + ")");
                 }
             }
 
             if (allPlayersReady) {
-                this.plugin.getDebugManager().logDuelSystem("§a[TIME LIMIT] Todos os jogadores completaram a volta atual - finalizando duelo #" + duelId);
+                this.plugin.getDebugManager().logDuelSystem("§a[TIME LIMIT] All players completed the current lap - finalizing duel #" + duelId);
                 SchedulerHelper.runTask(this.plugin, () -> this.finalizeDuelAfterTimeLimit(duelId));
             }
 
@@ -382,15 +381,15 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
     private void finalizeDuelAfterTimeLimit(int duelId) {
         DuelState duelState = (DuelState)this.activeDuels.get(duelId);
         if (duelState == null) {
-            this.plugin.getDebugManager().logDuelSystem("§e[DUEL] finalizeDuelAfterTimeLimit() chamado mas duelo #" + duelId + " já foi finalizado");
+            this.plugin.getDebugManager().logDuelSystem("§e[DUEL] finalizeDuelAfterTimeLimit() called but duel #" + duelId + " already finalized");
         } else {
             this.activeDuels.remove(duelId);
-            this.plugin.getDebugManager().logDuelSystem("§a[DUEL] Finalizando duelo #" + duelId + " após tempo limite");
+            this.plugin.getDebugManager().logDuelSystem("§a[DUEL] Finalizing duel #" + duelId + " after time limit");
             String trackName = duelState.getTrackName();
 
             for(UUID uuid : duelState.getPlayers()) {
                 this.plugin.setLastDuelTrack(uuid, trackName);
-                this.plugin.getDebugManager().logDuelSystem("§a[AUTO TT] Registrado lastDuelTrack=" + trackName + " para " + Bukkit.getOfflinePlayer(uuid).getName());
+                this.plugin.getDebugManager().logDuelSystem("§a[AUTO TT] Registered lastDuelTrack=" + trackName + " para " + Bukkit.getOfflinePlayer(uuid).getName());
             }
 
             UUID winnerUUID = this.determineWinnerAfterTimeLimit(duelState);
@@ -474,7 +473,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                 }
             }
 
-            this.plugin.getDebugManager().logDuelSystem("[PROGRESS] Vencedor por progresso: " + String.valueOf(winner) + " (volta " + maxLap + ", tempo: " + bestTime + "ms)");
+            this.plugin.getDebugManager().logDuelSystem("[PROGRESS] Winner by progress: " + String.valueOf(winner) + " (lap " + maxLap + ", time: " + bestTime + "ms)");
             return winner;
         }
     }
@@ -514,13 +513,13 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
         DuelState duelState = (DuelState)this.activeDuels.get(duelId);
         if (state != null && duelState != null) {
             if (!duelState.isRaceStarted()) {
-                this.plugin.getDebugManager().logDuelSystem("§e[START] Ignorado - corrida ainda não começou para " + player.getName());
+                this.plugin.getDebugManager().logDuelSystem("§e[START] Ignored - race hasn't started yet for " + player.getName());
             } else if (state.isFinished()) {
-                this.plugin.getDebugManager().logDuelSystem("§e[DUEL] START ignorado - jogador já finalizou");
+                this.plugin.getDebugManager().logDuelSystem("§e[DUEL] START Ignored - player already finished");
             } else {
                 int currentLap = state.getCurrentLap();
                 int totalLaps = duelState.getTotalLaps();
-                this.plugin.getDebugManager().logDuelSystem("§b[START] " + player.getName() + " cruzou START - Volta atual: " + currentLap + "/" + totalLaps + " | raceStarted=" + duelState.isRaceStarted());
+                this.plugin.getDebugManager().logDuelSystem("§b[START] " + player.getName() + " crossed START - Current lap: " + currentLap + "/" + totalLaps + " | raceStarted=" + duelState.isRaceStarted());
                 if (currentLap == 0) {
                     long now = System.currentTimeMillis();
                     state.setCurrentLap(1);
@@ -529,41 +528,41 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                     this.ttda.toggleTimer(player, duelId, true);
                     this.scoreboardDuelsUtils.updatePlayerLap(player, 1);
                     this.dm.clearDuelCheckpointTimes(player.getUniqueId(), duelId);
-                    this.plugin.getDebugManager().logDuelSystem("[DEBUG] Limpou checkpoints da volta anterior para " + player.getName());
-                    this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Ignorando lap reset na primeira cruz de START para " + player.getName() + " (evitar loop)");
+                    this.plugin.getDebugManager().logDuelSystem("[DEBUG] Cleared checkpoints from previous lap for " + player.getName());
+                    this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Ignoring lap reset on first START cross for " + player.getName() + " (prevent loop)");
                     this.ttda.resetLapTimer(player);
-                    this.plugin.getDebugManager().logDuelSystem("[LAP TIMER] Timer resetado para " + player.getName());
+                    this.plugin.getDebugManager().logDuelSystem("[LAP TIMER] Timer reset for " + player.getName());
                     String langCode = this.dm.getPlayerLanguage(player.getUniqueId());
                     TitleHelper.sendThemedTitle(player, "", this.plugin.getTranslation("duel_lap_first_title", langCode, new String[0]), 0, 15, 5);
                     player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0F, 2.0F);
                     DebugManager var33 = this.plugin.getDebugManager();
                     String var38 = player.getName();
-                    var33.logDuelSystem(var38 + " iniciou volta 1 no duelo #" + duelId);
+                    var33.logDuelSystem(var38 + " started lap 1 on duel #" + duelId);
                 } else {
                     if (duelState.isTimeTrialMode() && state.needsLapTimerReset()) {
                         this.ttda.resetLapTimer(player);
                         state.setNeedsLapTimerReset(false);
-                        this.plugin.getDebugManager().logDuelSystem("[LAP TIMER] Timer resetado para " + player.getName() + " ao cruzar START (pós lap reset)");
+                        this.plugin.getDebugManager().logDuelSystem("[LAP TIMER] Timer reset for " + player.getName() + " on crossing START (post lap reset)");
                         player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0F, 2.0F);
                         return;
                     }
 
                     long timeSinceLastCross = System.currentTimeMillis() - state.getLastCrossTime();
                     if (timeSinceLastCross < 3000L) {
-                        this.plugin.getDebugManager().logDuelSystem("§e[DUEL] START ignorado por debounce (< 3s)");
+                        this.plugin.getDebugManager().logDuelSystem("§e[DUEL] START Ignored due to debounce (< 3s)");
                         return;
                     }
 
                     if (currentLap >= totalLaps) {
-                        this.plugin.getDebugManager().logDuelSystem("§e[DUEL] START ignorado - já atingiu o máximo de voltas (" + currentLap + "/" + totalLaps + ")");
-                        this.plugin.getDebugManager().logDuelSystem("[DEBUG] Redirecionando para onPlayerCrossFinish (START = FINISH na última volta)");
+                        this.plugin.getDebugManager().logDuelSystem("§e[DUEL] START Ignored - already reached max laps (" + currentLap + "/" + totalLaps + ")");
+                        this.plugin.getDebugManager().logDuelSystem("[DEBUG] Redirecting to onPlayerCrossFinish (START = FINISH on last lap)");
                         this.onPlayerCrossFinish(player, duelId);
                         return;
                     }
 
                     if (duelState.isTimeLimitReached()) {
                         if (state.hasCompletedCurrentLapAfterTimeLimit()) {
-                            this.plugin.getDebugManager().logDuelSystem("§e[TIME LIMIT] " + player.getName() + " já completou volta atual - ignorando cruz de START");
+                                this.plugin.getDebugManager().logDuelSystem("§e[TIME LIMIT] " + player.getName() + " already completed current lap - ignoring START cross");
                             return;
                         }
 
@@ -577,7 +576,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                                 this.dm.saveDuelLapTime(player.getUniqueId(), player.getName(), duelId, currentLap, lapTime, duelState.getTrackName());
                                 DebugManager var37 = this.plugin.getDebugManager();
                                 String var42 = player.getName();
-                                var37.logDuelSystem("§a[DUEL] " + var42 + " completou volta " + currentLap + " em " + String.format("%.3f", lapTime) + "s (após tempo limite)");
+                                    var37.logDuelSystem("§a[DUEL] " + var42 + " completed lap " + currentLap + " in " + String.format("%.3f", lapTime) + "s (after time limit)");
                                 this.ttda.updateBestLapTime(player, lapTime);
                                 duelState.updateBestLapTime(player.getUniqueId(), lapTime);
                                 String langCode = this.dm.getPlayerLanguage(player.getUniqueId());
@@ -600,9 +599,9 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                             state.setCurrentLap(newLap);
                             state.setLastCrossTime(System.currentTimeMillis());
                             this.dm.clearDuelCheckpointTimes(player.getUniqueId(), duelId);
-                            this.plugin.getDebugManager().logDuelSystem("§a[TIME LIMIT] " + player.getName() + " completou volta " + currentLap + " após tempo limite - Avançou para volta " + newLap + "/" + totalLaps);
+                            this.plugin.getDebugManager().logDuelSystem("§a[TIME LIMIT] " + player.getName() + " completed lap " + currentLap + " after time limit - Advanced to lap " + newLap + "/" + totalLaps);
                         } else {
-                            this.plugin.getDebugManager().logDuelSystem("§e[TIME LIMIT] " + player.getName() + " cruzou START mas faltam checkpoints (" + checkpointsPassed + "/" + totalCheckpoints + ") - Cruz ignorada");
+                            this.plugin.getDebugManager().logDuelSystem("§e[TIME LIMIT] " + player.getName() + " crossed START but missing checkpoints (" + checkpointsPassed + "/" + totalCheckpoints + ") - Cross ignored");
                         }
 
                         this.checkIfAllPlayersCompletedAfterTimeLimit(duelId);
@@ -614,7 +613,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                     int checkpointsPassed = playerCheckpoints.size();
                     this.plugin.getDebugManager().logDuelSystem("[CHECKPOINT VALIDATION] " + player.getName() + " - Checkpoints: " + checkpointsPassed + "/" + totalCheckpoints);
                     if (checkpointsPassed < totalCheckpoints) {
-                        this.plugin.getDebugManager().logDuelSystem("§e[INVALID LAP] " + player.getName() + " NÃO passou por todos os checkpoints (" + checkpointsPassed + "/" + totalCheckpoints + ") - Cruz de START IGNORADA");
+                        this.plugin.getDebugManager().logDuelSystem("§e[INVALID LAP] " + player.getName() + " did NOT pass all checkpoints (" + checkpointsPassed + "/" + totalCheckpoints + ") - START cross IGNORED");
                         return;
                     }
 
@@ -624,7 +623,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                         this.dm.saveDuelLapTime(player.getUniqueId(), player.getName(), duelId, currentLap, lapTime, duelState.getTrackName());
                         DebugManager var34 = this.plugin.getDebugManager();
                         String var39 = player.getName();
-                        var34.logDuelSystem("§a[DUEL] " + var39 + " completou volta " + currentLap + " em " + String.format("%.3f", lapTime) + "s");
+                        var34.logDuelSystem("§a[DUEL] " + var39 + " completed lap " + currentLap + " in " + String.format("%.3f", lapTime) + "s");
                         this.ttda.updateBestLapTime(player, lapTime);
                         if (duelState.isTimeTrialMode()) {
                             duelState.updateBestLapTime(player.getUniqueId(), lapTime);
@@ -636,18 +635,18 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                     state.setLastCrossTime(System.currentTimeMillis());
                     this.scoreboardDuelsUtils.updatePlayerLap(player, newLap);
                     this.dm.clearDuelCheckpointTimes(player.getUniqueId(), duelId);
-                    this.plugin.getDebugManager().logDuelSystem(player.getName() + " - checkpoints da volta limpos");
+                    this.plugin.getDebugManager().logDuelSystem(player.getName() + " - lap checkpoints cleaned");
                     if (duelState.isTimeTrialMode()) {
                         Location spawnLoc = this.dm.getTrackSpawn(duelState.getTrackName());
-                        this.plugin.getDebugManager().logDuelSystem("[TIME TRIAL] Tentando lap reset para " + player.getName() + " volta " + newLap + " - Spawn: " + (spawnLoc != null ? "OK" : "NULL"));
+                        this.plugin.getDebugManager().logDuelSystem("[TIME TRIAL] Attempting lap reset for " + player.getName() + " lap " + newLap + " - Spawn: " + (spawnLoc != null ? "OK" : "NULL"));
 
                         if (spawnLoc != null) {
-                            // Capturamos newLap como final para o uso em lambdas aninhados
+                            // Capture newLap as final for use in nested lambdas
                             final int finalNewLap = newLap;
 
                             SchedulerHelper.runTaskFor(this.plugin, player, () -> {
                                 this.ttda.pauseLapTimer(player);
-                                this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Timer pausado para " + player.getName());
+                                this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Timer paused for " + player.getName());
 
                                 playersBeingLapReset.add(player.getUniqueId());
 
@@ -658,7 +657,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                                     boatWoodType = oldBoat.getBoatType();
                                     oldBoat.eject();
                                     oldBoat.remove();
-                                    this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Removeu barco antigo de " + player.getName());
+                                    this.plugin.getDebugManager().logDuelSystem("[LAP RESET] Removed old boat of " + player.getName());
                                 }
 
                                 state.setNeedsLapTimerReset(true);
@@ -674,8 +673,8 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                                             newBoat.setBoatType(finalWoodType);
                                             newBoat.addPassenger(player);
 
-                                            plugin.getDebugManager().logDuelSystem("[LAP RESET] Spawnou novo barco (" + finalWoodType + ") para " +
-                                                    player.getName() + " na volta " + finalNewLap);
+                                    plugin.getDebugManager().logDuelSystem("[LAP RESET] Spawned new boat (" + finalWoodType + ") for " +
+                                            player.getName() + " on lap " + finalNewLap);
 
                                             if (duelState.isLonely()) {
                                                 plugin.getLonelyController().updatePlayersVisibility(player);
@@ -683,7 +682,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
 
                                             SchedulerHelper.runTaskFor(plugin, player, () -> {
                                                 playersBeingLapReset.remove(player.getUniqueId());
-                                            plugin.getDebugManager().logDuelSystem("[LAP RESET] Proteção de ejeção removida.");
+                                            plugin.getDebugManager().logDuelSystem("[LAP RESET] Ejection protection removed.");
                                         }, 3L);
                                     }, 2L);
                                 } else {
@@ -697,33 +696,33 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                                 TitleHelper.sendThemedTitle(player, "",
                                     this.plugin.getTranslation("duel_lap_prefix", langCode4) + newLap, 0, 15, 5);
                             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0F, 2.0F);
-                            this.plugin.getDebugManager().logDuelSystem(player.getName() + " iniciou volta " + newLap + "/" + totalLaps);
+                            this.plugin.getDebugManager().logDuelSystem(player.getName() + " started lap " + newLap + "/" + totalLaps);
                         } else {
-                            this.plugin.getDebugManager().logDuelSystem("§c[DUEL] Spawn location é NULL para " + duelState.getTrackName());
+                            this.plugin.getDebugManager().logDuelSystem("§c[DUEL] Spawn location is NULL for " + duelState.getTrackName());
                             this.ttda.resetLapTimer(player);
                         }
                     } else {
                         this.ttda.resetLapTimer(player);
                         DebugManager var35 = this.plugin.getDebugManager();
                         String var40 = player.getName();
-                        var35.logDuelSystem("[CORRIDA] " + var40 + " completou volta " + currentLap + " - Continuando sem lap reset");
+                        var35.logDuelSystem("[RACE] " + var40 + " completed lap " + currentLap + " - Continuing without lap reset");
                     }
 
                     String langCode5 = this.dm.getPlayerLanguage(player.getUniqueId());
                         TitleHelper.sendThemedTitle(player, "",
                             this.plugin.getTranslation("duel_lap_prefix", langCode5) + newLap, 0, 15, 5);
                     player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.5F);
-                    this.plugin.getDebugManager().logDuelSystem(player.getName() + " iniciou volta " + newLap + "/" + totalLaps);
+                    this.plugin.getDebugManager().logDuelSystem(player.getName() + " started lap " + newLap + "/" + totalLaps);
                 }
 
                 DebugManager var36 = this.plugin.getDebugManager();
                 String var41 = player.getName();
-                var36.logDuelSystemVerbose("§a[START CROSSED] " + var41 + " cruzou START no duelo #" + duelId);
+                var36.logDuelSystemVerbose("§a[START CROSSED] " + var41 + " crossed START on duel #" + duelId);
             }
         } else {
             DebugManager var10000 = this.plugin.getDebugManager();
             String var10001 = player.getName();
-            var10000.logDuelSystem("§c[START] Estado não encontrado para " + var10001 + " no duelo #" + duelId);
+            var10000.logDuelSystem("§c[START] State not found for " + var10001 + " on duel #" + duelId);
         }
     }
 
@@ -735,34 +734,34 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                 int currentLap = state.getCurrentLap();
                 int totalLaps = duelState.getTotalLaps();
                 if (currentLap == 0) {
-                    this.plugin.getDebugManager().logDuelSystem("§e[FINISH] Ignorado - jogador ainda não cruzou START (currentLap=0)");
+                    this.plugin.getDebugManager().logDuelSystem("§e[FINISH] Ignored - player hasn't crossed START yet (currentLap=0)");
                 } else {
-                    this.plugin.getDebugManager().logDuelSystem("§6[FINISH DETECTADO] " + player.getName() + " cruzou FINISH - Volta: " + currentLap + "/" + totalLaps);
+                    this.plugin.getDebugManager().logDuelSystem("§6[FINISH DETECTED] " + player.getName() + " crossed FINISH - Lap: " + currentLap + "/" + totalLaps);
                     if (currentLap >= totalLaps) {
                         long timeSinceLastCross = System.currentTimeMillis() - state.getLastCrossTime();
                         if (timeSinceLastCross < 2000L) {
-                            this.plugin.getDebugManager().logDuelSystem("§e[FINISH] Ignorado por debounce (< 2s)");
+                            this.plugin.getDebugManager().logDuelSystem("§e[FINISH] Ignored due to debounce (< 2s)");
                             return;
                         }
 
-                        this.plugin.getDebugManager().logDuelSystem("§a[FINISH] " + player.getName() + " COMPLETOU TODAS AS VOLTAS! Finalizando duelo...");
+                        this.plugin.getDebugManager().logDuelSystem("§a[FINISH] " + player.getName() + " COMPLETED ALL LAPS! Finalizing duel...");
                         this.finishPlayerInDuel(player, duelId);
                     } else {
                         DebugManager var10 = this.plugin.getDebugManager();
                         String var12 = player.getName();
-                        var10.logDuelSystem("§e[FINISH] " + var12 + " ainda precisa completar " + (totalLaps - currentLap) + " volta(s)");
+                        var10.logDuelSystem("§e[FINISH] " + var12 + " still needs to complete " + (totalLaps - currentLap) + " lap(s)");
                     }
 
                 }
             } else {
                 DebugManager var9 = this.plugin.getDebugManager();
                 boolean var11 = duelState.isRaceStarted();
-                var9.logDuelSystem("§e[FINISH] Ignorado - corrida=" + var11 + " finished=" + state.isFinished());
+                var9.logDuelSystem("§e[FINISH] Ignored - race=" + var11 + " finished=" + state.isFinished());
             }
         } else {
             DebugManager var10000 = this.plugin.getDebugManager();
             String var10001 = player.getName();
-            var10000.logDuelSystem("§c[FINISH] Estado não encontrado para " + var10001 + " no duelo #" + duelId);
+            var10000.logDuelSystem("§c[FINISH] State not found for " + var10001 + " on duel #" + duelId);
         }
     }
 
@@ -793,9 +792,9 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
 
                     DebugManager var10000 = this.plugin.getDebugManager();
                     String var10001 = player.getName();
-                    var10000.logDuelSystem("§a[PLAYER FINISH] " + var10001 + " terminou no duelo #" + duelId + " - Tempo: " + String.format("%.3f", totalTime) + "s (posição será calculada ao final)");
+                    var10000.logDuelSystem("§a[PLAYER FINISH] " + var10001 + " finished in duel #" + duelId + " - Time: " + String.format("%.3f", totalTime) + "s (position will be calculated at end)");
                     if (duelState.isTimeLimitReached()) {
-                        this.plugin.getDebugManager().logDuelSystem(player.getName() + " completou após tempo limite - aguardando outros jogadores");
+                        this.plugin.getDebugManager().logDuelSystem(player.getName() + " completed after time limit - waiting for other players");
                         this.checkIfAllPlayersCompletedAfterTimeLimit(duelId);
                     }
                 } else {
@@ -810,12 +809,12 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                     player.sendMessage(totalTimeMessage);
                     DebugManager var22 = this.plugin.getDebugManager();
                     String var23 = player.getName();
-                    var22.logDuelSystem("§a[RACE FINISH] " + var23 + " finalizou em " + finishPosition + "º lugar no duelo #" + duelId + " - Tempo: " + String.format("%.3f", totalTime) + "s");
+                    var22.logDuelSystem("§a[RACE FINISH] " + var23 + " finished in " + finishPosition + "th place in duel #" + duelId + " - Time: " + String.format("%.3f", totalTime) + "s");
                 }
 
                 player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0F, 1.2F);
                 if (duelState.isTimeLimitReached()) {
-                    this.plugin.getDebugManager().logDuelSystem(player.getName() + " completou após tempo limite - aguardando outros jogadores");
+                    this.plugin.getDebugManager().logDuelSystem(player.getName() + " completed after time limit - waiting for other players");
                     String langCode = this.dm.getPlayerLanguage(player.getUniqueId());
                     String separator = this.plugin.getDirectTranslation("duel_separator_line", langCode);
                     String lapComplete = this.plugin.getDirectTranslation("duel_lap_complete_after_time_limit", langCode).replace("{lap}", "");
@@ -834,10 +833,10 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                             return pState != null && pState.isFinished();
                         });
                         if (allFinished) {
-                            this.plugin.getDebugManager().logDuelSystem("[TIME TRIAL] Todos os jogadores finalizaram - encerrando duelo");
+                            this.plugin.getDebugManager().logDuelSystem("[TIME TRIAL] All players finished - ending duel");
                             SchedulerHelper.runTaskLater(this.plugin, () -> this.endDuel(duelId), 20L);
                         } else {
-                            this.plugin.getDebugManager().logDuelSystem("[TIME TRIAL] " + player.getName() + " finalizou - aguardando outros jogadores");
+                            this.plugin.getDebugManager().logDuelSystem("[TIME TRIAL] " + player.getName() + " finished - waiting for other players");
                         }
                     } else if (duelState.getFinishCount() == 1) {
                         SchedulerHelper.runTaskLater(this.plugin, () -> {
@@ -845,7 +844,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                             if (currentState != null && !currentState.isTimeLimitReached()) {
                                 this.endDuel(duelId);
                             } else {
-                                this.plugin.getDebugManager().logDuelSystem("§e[DUEL] Cancelando endDuel() - tempo limite foi atingido durante a espera");
+                                this.plugin.getDebugManager().logDuelSystem("§e[DUEL] Canceling endDuel() - time limit was reached during wait");
                             }
 
                         }, 40L);
@@ -867,24 +866,24 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
     private void endDuel(int duelId) {
         DuelState duelState = (DuelState)this.activeDuels.get(duelId);
         if (duelState == null) {
-            this.plugin.getDebugManager().logDuelSystem("§e[DUEL] endDuel() chamado mas duelo #" + duelId + " já foi finalizado");
+            this.plugin.getDebugManager().logDuelSystem("§e[DUEL] endDuel() called but duel #" + duelId + " already finalized");
         } else {
             this.activeDuels.remove(duelId);
-            this.plugin.getDebugManager().logDuelSystem("§a[DUEL] Finalizando duelo #" + duelId);
+            this.plugin.getDebugManager().logDuelSystem("§a[DUEL] Finalizing duel #" + duelId);
             String trackName = duelState.getTrackName();
 
             for(UUID uuid : duelState.getPlayers()) {
                 this.plugin.setLastDuelTrack(uuid, trackName);
-                this.plugin.getDebugManager().logDuelSystem("§a[AUTO TT] Registrado lastDuelTrack=" + trackName + " para " + Bukkit.getOfflinePlayer(uuid).getName());
+                this.plugin.getDebugManager().logDuelSystem("§a[AUTO TT] Registered lastDuelTrack=" + trackName + " para " + Bukkit.getOfflinePlayer(uuid).getName());
             }
 
             UUID winnerUUID;
             if (duelState.isTimeTrialMode()) {
                 winnerUUID = this.determineTimeTrialWinner(duelState);
-                this.plugin.getDebugManager().logDuelSystem("[TIME TRIAL] Vencedor determinado por melhor tempo: " + String.valueOf(winnerUUID));
+                this.plugin.getDebugManager().logDuelSystem("[TIME TRIAL] Winner determined by best time: " + String.valueOf(winnerUUID));
             } else {
                 winnerUUID = duelState.getWinner();
-                this.plugin.getDebugManager().logDuelSystem("[CORRIDA] Vencedor determinado por ordem de chegada: " + String.valueOf(winnerUUID));
+                this.plugin.getDebugManager().logDuelSystem("[RACE] Winner determined by finish order: " + String.valueOf(winnerUUID));
             }
 
             if (winnerUUID != null) {
@@ -993,10 +992,10 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
     private void endDuelByDisconnect(int duelId) {
         DuelState duelState = (DuelState)this.activeDuels.get(duelId);
         if (duelState == null) {
-            this.plugin.getDebugManager().logDuelSystem("§e[DUEL] endDuelByDisconnect() chamado mas duelo #" + duelId + " já foi finalizado");
+            this.plugin.getDebugManager().logDuelSystem("§e[DUEL] endDuelByDisconnect() called but duel #" + duelId + " already finalized");
         } else {
             this.activeDuels.remove(duelId);
-            this.plugin.getDebugManager().logDuelSystem("§c[DUEL] Duelo #" + duelId + " cancelado por desconexão");
+            this.plugin.getDebugManager().logDuelSystem("§c[DUEL] Duel #" + duelId + " cancelled due to disconnect");
             this.dm.setDuelState(duelId, "CANCELLED");
 
             for(UUID uuid : duelState.getPlayers()) {
@@ -1046,7 +1045,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                 }
 
             });
-            this.plugin.getDebugManager().logDuelSystem("[CLEANUP] Limpou time trial solo de " + player.getName());
+            this.plugin.getDebugManager().logDuelSystem("[CLEANUP] Cleaned up solo time trial for " + player.getName());
         }
     }
 
@@ -1140,7 +1139,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                     playerState.setLastKnownPosition(position);
                     DebugManager var10000 = this.plugin.getDebugManager();
                     String var10001 = String.valueOf(playerUUID);
-                    var10000.logDuelSystem("[TIME TRIAL] " + var10001 + " mudou posição: " + lastPosition + " -> " + position + " (melhor tempo: " + String.format("%.3f", playerBestTime) + "s)");
+                    var10000.logDuelSystem("[TIME TRIAL] " + var10001 + " changed position: " + lastPosition + " -> " + position + " (best time: " + String.format("%.3f", playerBestTime) + "s)");
                 }
             }
 
@@ -1154,7 +1153,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
         if (playerLap == 0) {
             DebugManager var23 = this.plugin.getDebugManager();
             String var26 = String.valueOf(playerUUID);
-            var23.logDuelSystemVerbose(var26 + " posição = " + duelState.getPlayerCount() + " (não começou)");
+            var23.logDuelSystemVerbose(var26 + " position = " + duelState.getPlayerCount() + " (not started)");
             return duelState.getPlayerCount();
         } else {
             Map<Integer, Double> playerCheckpoints = this.dm.getDuelCheckpointTimes(playerUUID, duelState.getDuelId());
@@ -1175,7 +1174,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                                 ++position;
                                 DebugManager var10000 = this.plugin.getDebugManager();
                                 String var10001 = String.valueOf(otherUUID);
-                                var10000.logDuelSystemVerbose(var10001 + " à frente de " + String.valueOf(playerUUID) + " (volta " + otherLap + " vs " + playerLap + ")");
+                                var10000.logDuelSystemVerbose(var10001 + " ahead of " + String.valueOf(playerUUID) + " (lap " + otherLap + " vs " + playerLap + ")");
                             } else if (otherLap == playerLap) {
                                 Map<Integer, Double> otherCheckpoints = this.dm.getDuelCheckpointTimes(otherUUID, duelState.getDuelId());
                                 int otherCheckpointCount = otherCheckpoints.size();
@@ -1183,7 +1182,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                                     ++position;
                                     DebugManager var21 = this.plugin.getDebugManager();
                                     String var24 = String.valueOf(otherUUID);
-                                    var21.logDuelSystemVerbose(var24 + " à frente de " + String.valueOf(playerUUID) + " (mesma volta, checkpoints: " + otherCheckpointCount + " vs " + playerCheckpointCount + ")");
+                                    var21.logDuelSystemVerbose(var24 + " ahead of " + String.valueOf(playerUUID) + " (same lap, checkpoints: " + otherCheckpointCount + " vs " + playerCheckpointCount + ")");
                                 } else if (otherCheckpointCount == playerCheckpointCount && otherCheckpointCount > 0) {
                                     int otherLastCheckpointId = (Integer)otherCheckpoints.keySet().stream().max(Integer::compareTo).orElse(0);
                                     double otherLastCheckpointTime = (Double)otherCheckpoints.get(otherLastCheckpointId);
@@ -1191,7 +1190,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                                         ++position;
                                         DebugManager var22 = this.plugin.getDebugManager();
                                         String var25 = String.valueOf(otherUUID);
-                                        var22.logDuelSystemVerbose(var25 + " à frente de " + String.valueOf(playerUUID) + " (mesmo checkpoint " + otherCheckpointCount + ", tempo: " + String.format("%.3f", otherLastCheckpointTime) + "s vs " + String.format("%.3f", playerLastCheckpointTime) + "s)");
+                                        var22.logDuelSystemVerbose(var25 + " ahead of " + String.valueOf(playerUUID) + " (same checkpoint " + otherCheckpointCount + ", time: " + String.format("%.3f", otherLastCheckpointTime) + "s vs " + String.format("%.3f", playerLastCheckpointTime) + "s)");
                                     }
                                 }
                             }
@@ -1203,7 +1202,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
             int lastPosition = playerState.getLastKnownPosition();
             if (lastPosition != position) {
                 playerState.setLastKnownPosition(position);
-                this.plugin.getDebugManager().logDuelSystem("[CORRIDA] " + String.valueOf(playerUUID) + " mudou posição: " + lastPosition + " -> " + position + " (volta " + playerLap + ")");
+                this.plugin.getDebugManager().logDuelSystem("[RACE] " + String.valueOf(playerUUID) + " changed position: " + lastPosition + " -> " + position + " (lap " + playerLap + ")");
             }
 
             return position;
@@ -1484,3 +1483,4 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
         }
     }
 }
+

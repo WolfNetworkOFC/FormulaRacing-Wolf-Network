@@ -309,7 +309,7 @@ public class Heats {
         if (this.startTime == null) {
             this.startTime = Instant.now();
             this.plugin.getDebugManager().logRaceSystem(
-                "[HEAT] Cronômetro da sessão iniciado por " + player.getName()
+                "[HEAT] Session timer started by " + player.getName()
             );
             if (
                 this.plugin != null &&
@@ -325,12 +325,12 @@ public class Heats {
 
     public void setupDrs() {
         if (this.drsEnabled) {
-            // Agora o método getDrsRegionsList deve retornar uma List<DrsRegion>
+            // Now getDrsRegionsList should return a List<DrsRegion>
             this.drsRegions = this.plugin.getRaceEventManager()
                     .getDatabaseManager()
                     .getDrsRegionsList(this.trackNameWS);
 
-            this.plugin.getLogger().info("§a[DRS] Carregadas " + drsRegions.size() + " zonas para " + this.trackNameWS);
+            this.plugin.getLogger().info("§a[DRS] Loaded " + drsRegions.size() + " zones for " + this.trackNameWS);
         }
     }
 
@@ -361,9 +361,9 @@ public class Heats {
         DebugManager var10000 = this.plugin.getDebugManager();
         int var10001 = this.id;
         var10000.logRaceSystem(
-            "[LOAD DEBUG] Tentando carregar heat " +
+            "[LOAD DEBUG] Attempting to load heat " +
                 var10001 +
-                " (estado atual: " +
+                " (current state: " +
                 String.valueOf(this.heatState) +
                 ") - HeatObj: " +
                 System.identityHashCode(this)
@@ -377,19 +377,19 @@ public class Heats {
             var10000.logRaceSystem(
                 "Heat " +
                     var10001 +
-                    " está em estado " +
+                    " is in state " +
                     String.valueOf(this.heatState) +
-                    " - resetando automaticamente..."
+                    " - resetting automatically..."
             );
             this.resetHeat();
             this.plugin.getDebugManager().logRaceSystem(
-                "Heat " + this.id + " resetado, continuando carregamento..."
+                "Heat " + this.id + " reset, continuing load..."
             );
         }
 
         if (this.drivers.isEmpty()) {
             this.plugin.getDebugManager().logRaceSystem(
-                "Heat " + this.id + " não possui pilotos!"
+                "Heat " + this.id + " has no drivers!"
             );
             return false;
         } else {
@@ -398,22 +398,22 @@ public class Heats {
             var10000.logRaceSystem(
                 "[LOAD DEBUG] Heat " +
                     var10001 +
-                    " possui " +
+                    " has " +
                     this.drivers.size() +
-                    " pilotos"
+                    " drivers"
             );
             if (this.round != null && this.round.getEvent() != null) {
                 String eventTrack = this.round.getEvent().getTrackNameWS();
                 if (eventTrack == null || eventTrack.isEmpty()) {
                     this.plugin.getDebugManager().logRaceSystem(
-                        "Evento não possui pista definida!"
+                        "Event does not have a track defined!"
                     );
                     return false;
                 }
 
                 if (!eventTrack.equals(this.trackNameWS)) {
                     this.plugin.getDebugManager().logRaceSystem(
-                        "[LOAD DEBUG] Pista do heat atualizada: " +
+                        "[LOAD DEBUG] Heat track updated: " +
                             this.trackNameWS +
                             " -> " +
                             eventTrack
@@ -423,13 +423,13 @@ public class Heats {
                 }
             } else if (this.trackNameWS == null || this.trackNameWS.isEmpty()) {
                 this.plugin.getDebugManager().logRaceSystem(
-                    "Heat não está associado a um evento válido e não tem pista definida!"
+                    "Heat is not associated with a valid event and has no track defined!"
                 );
                 return false;
             }
 
             this.plugin.getDebugManager().logRaceSystem(
-                "[LOAD DEBUG] Pista configurada: " + this.trackNameWS
+                "[LOAD DEBUG] Track configured: " + this.trackNameWS
             );
             this.startPositions = new ArrayList(this.drivers.values());
             this.startPositions.sort(
@@ -437,7 +437,7 @@ public class Heats {
             );
             this.livePositions = new ArrayList(this.startPositions);
             this.plugin.getDebugManager().logRaceSystem(
-                "[LOAD DEBUG] Posições de largada organizadas"
+                "[LOAD DEBUG] Starting grid positions organized"
             );
             boolean isQuali =
                 this.round != null &&
@@ -454,7 +454,7 @@ public class Heats {
                         );
                     if (spawnLoc == null) {
                         this.plugin.getDebugManager().logRaceSystem(
-                            "Falha ao obter spawn da pista para Qualificatória!"
+                            "Failed to get track spawn for Qualifying!"
                         );
                         return false;
                     }
@@ -465,12 +465,11 @@ public class Heats {
                             SchedulerHelper.runTaskFor(this.plugin, player, () -> {
                                 this.plugin.getAPI().recoverPlayerBoatState(player);
                             });
-                            SchedulerHelper.teleportAsync(this.plugin, player, spawnLoc);
-                            this.spawnQualiDriver(player, driver);
+                            this.spawnQualiDriver(player, driver, spawnLoc);
                         }
                     }
                     this.plugin.getDebugManager().logRaceSystem(
-                        "Pilotos teleportados para o SPAWN para Qualificatória (qualigrid não configurado)."
+                        "Drivers teleported to SPAWN for Qualifying (qualigrid not configured)."
                     );
                 } else {
                     for (Driver driver : this.drivers.values()) {
@@ -482,15 +481,14 @@ public class Heats {
                                 SchedulerHelper.runTaskFor(this.plugin, player, () -> {
                                     this.plugin.getAPI().recoverPlayerBoatState(player);
                                 });
-                                SchedulerHelper.teleportAsync(this.plugin, player, qualiLoc);
-                                this.spawnQualiDriver(player, driver);
+                                this.spawnQualiDriver(player, driver, qualiLoc);
                             } else {
-                                player.sendMessage("§cPosição inválida no qualigrid.");
+                                player.sendMessage("§cInvalid position on qualigrid.");
                             }
                         }
                     }
                     this.plugin.getDebugManager().logRaceSystem(
-                        "Pilotos teleportados para o QUALIGRID para Qualificatória."
+                        "Drivers teleported to QUALIGRID for Qualifying."
                     );
                 }
             } else {
@@ -505,27 +503,27 @@ public class Heats {
 
                 if (!this.gridManager.generateGrid()) {
                     this.plugin.getDebugManager().logRaceSystem(
-                        "Falha ao gerar grid para Heat " + this.id
+                        "Failed to generate grid for Heat " + this.id
                     );
                     return false;
                 }
 
                 this.plugin.getDebugManager().logRaceSystem(
-                    "[LOAD DEBUG] Grid gerado com sucesso"
+                    "[LOAD DEBUG] Grid generated successfully"
                 );
                 int teleported = this.gridManager.teleportDriversToGrid();
                 this.plugin.getDebugManager().logRaceSystem(
                     "Heat " +
                         this.id +
-                        " carregado: " +
+                        " loaded: " +
                         teleported +
                         "/" +
                         this.drivers.size() +
-                        " pilotos no grid"
+                        " drivers on grid"
                 );
                 if (teleported == 0) {
                     this.plugin.getDebugManager().logRaceSystem(
-                        "Nenhum piloto foi teleportado!"
+                        "No drivers were teleported!"
                     );
                     return false;
                 }
@@ -546,7 +544,7 @@ public class Heats {
                 }
             }
 
-            // Re-registra todos os drivers no lookup após reset+load
+            // Re-register all drivers in the lookup after reset+load
             if (this.plugin != null && this.plugin.getDriverLookup() != null) {
                 for (Driver driver : this.drivers.values()) {
                     this.plugin.getDriverLookup().register(driver, this);
@@ -560,9 +558,9 @@ public class Heats {
             var10000.logRaceSystem(
                 "✓ Heat " +
                     var10001 +
-                    " carregado com " +
+                    " loaded with " +
                     this.drivers.size() +
-                    " pilotos."
+                    " drivers."
             );
             return true;
         }
@@ -587,9 +585,9 @@ public class Heats {
         DebugManager var10000 = this.plugin.getDebugManager();
         int var10001 = this.id;
         var10000.logRaceSystem(
-            "[START DEBUG] Tentando iniciar countdown heat " +
+            "[START DEBUG] Attempting to start countdown heat " +
                 var10001 +
-                " (estado atual: " +
+                " (current state: " +
                 String.valueOf(this.heatState) +
                 ") - HeatObj: " +
                 System.identityHashCode(this)
@@ -600,13 +598,13 @@ public class Heats {
             var10000.logRaceSystem(
                 "Heat " +
                     var10001 +
-                    " precisa estar LOADED para iniciar! Estado atual: " +
+                    " must be LOADED to start! Current state: " +
                     String.valueOf(this.heatState)
             );
             return false;
         } else {
             this.plugin.getDebugManager().logRaceSystem(
-                "Iniciando contagem regressiva do Heat " +
+                "Starting countdown for Heat " +
                     this.id +
                     " (" +
                     seconds +
@@ -723,7 +721,7 @@ public class Heats {
             this.heatState != HeatState.QUALIFYING
         ) {
             this.plugin.getDebugManager().logRaceSystem(
-                "Heat " + this.id + " não está em corrida, treino ou quali!"
+                "Heat " + this.id + " is not in race, practice or quali!"
             );
         } else {
             java.util.List<java.util.UUID> driverUUIDs =
@@ -742,6 +740,11 @@ public class Heats {
             if (this.plugin != null && this.plugin.getDriverLookup() != null) {
                 for (UUID uuid : driverUUIDs) {
                     this.plugin.getDriverLookup().unregister(uuid);
+                }
+            }
+            if (this.plugin != null && this.plugin.getLightningRodListener() != null) {
+                for (UUID uuid : driverUUIDs) {
+                    this.plugin.getLightningRodListener().removeRodForPlayer(uuid);
                 }
             }
             if (
@@ -828,9 +831,16 @@ public class Heats {
             }
 
             this.plugin.getDebugManager().logRaceSystem(
-                "Heat " + this.id + " finalizado!"
+                "Heat " + this.id + " finished!"
             );
             this.displayFinalStandings();
+
+            if (this.round != null) {
+                this.plugin.getDebugManager().logRaceSystem(
+                    "Heat " + this.id + " finished, advancing round... (roundId=" + this.round.getId() + ")"
+                );
+                this.round.nextHeat();
+            }
             if (teleportToSpawn) {
                 Location targetLoc =
                     this.plugin.getDatabaseManager().getTrackFinishAll(
@@ -951,7 +961,7 @@ public class Heats {
     }
 
     public void resetHeat() {
-        // Se estava em andamento, força parada
+        // If it was running, force stop
         if (this.heatState != HeatState.SETUP &&
                 this.heatState != HeatState.FINISHED &&
                 this.heatState != HeatState.PRACTICE) {
@@ -972,8 +982,8 @@ public class Heats {
             DebugManager var10000 = this.plugin.getDebugManager();
             int var10001 = this.id;
             var10000.logRaceSystem(
-                    "Heat " + var10001 + " em andamento (" + String.valueOf(this.heatState) +
-                            ") - forçando parada antes do reset..."
+                    "Heat " + var10001 + " in progress (" + String.valueOf(this.heatState) +
+                            ") - forcing stop before reset..."
             );
             if (this.heatState != HeatState.PRACTICE) {
                 EventAnnouncements announcements =
@@ -996,7 +1006,7 @@ public class Heats {
             }
         }
 
-        // Limpa timers e managers
+        // Clear timers and managers
         this.stopSessionTimer();
         this.stopOfflineMonitoring();
         if (this.plugin.getPitStopManager() != null) {
@@ -1006,17 +1016,17 @@ public class Heats {
         this.plugin.getRaceActionBarManager().removeHeat(this);
         this.plugin.getRaceScoreboardManager().removeHeat(this);
 
-        // Reset de variáveis internas
+        // Reset internal variables
         this.startTime = null;
         this.endTime = null;
         this.fastestLapUUID = null;
         if (this.startPositions != null) this.startPositions.clear();
         if (this.livePositions != null) this.livePositions.clear();
 
-        // Reset completo dos drivers
+        // Complete driver reset
         for (Driver driver : this.drivers.values()) {
-            driver.reset();                // limpa laps, pits, etc.
-            driver.resetLagFlags();        // garante que lagStart/lagEnd sejam resetados
+            driver.reset();                // clears laps, pits, etc.
+            driver.resetLagFlags();        // ensures lagStart/lagEnd are reset
             driver.setCheckpointsReached(0);
             driver.setFinished(false);
             driver.setDnf(false);
@@ -1029,24 +1039,31 @@ public class Heats {
             }
         }
 
-        // Limpa lookup para não ficar preso ao Heat antigo
+        // Remove rods from players
+        if (this.plugin != null && this.plugin.getLightningRodListener() != null) {
+            for (UUID uuid : this.drivers.keySet()) {
+                this.plugin.getLightningRodListener().removeRodForPlayer(uuid);
+            }
+        }
+
+        // Clear lookup so it doesn't stay stuck to the old Heat
         if (this.plugin != null && this.plugin.getDriverLookup() != null) {
             for (UUID uuid : this.drivers.keySet()) {
                 this.plugin.getDriverLookup().unregister(uuid);
             }
         }
 
-        // Limpa checkpoints no listener (evita cooldown bloqueando novos CPs)
+        // Clear checkpoints in listener (prevents cooldown blocking new CPs)
         if (this.plugin.getRaceCheckpointListener() != null) {
             this.plugin.getRaceCheckpointListener().cleanupHeatPlayers(this.drivers.keySet());
         }
 
-        // Volta para estado inicial
+        // Return to initial state
         if (this.heatState != HeatState.SETUP) {
             this.setHeatStateForLoad(HeatState.SETUP);
         }
         this.plugin.getDebugManager().logRaceSystem(
-                "✓ Heat " + this.id + " resetado para estado inicial."
+                "✓ Heat " + this.id + " reset to initial state."
         );
     }
 
@@ -1090,7 +1107,7 @@ public class Heats {
                                     this.plugin.getDebugManager().logRaceSystem(
                                         "Driver " +
                                             String.valueOf(driver.getUuid()) +
-                                            " desconectou durante corrida - marcando como DNF"
+                                            " disconnected during race - marking as DNF"
                                     );
                                     driver.setDnf(true);
                                     driver.setPtpActive(false);
@@ -1117,9 +1134,12 @@ public class Heats {
                             );
                         if (allFinished) {
                             this.plugin.getDebugManager().logRaceSystem(
-                                "Todos os pilotos finalizaram ou foram marcados como DNF - finalizando heat"
+                                "All drivers finished or were marked as DNF - finishing heat"
                             );
-                            SchedulerHelper.runTask(this.plugin, () -> this.finishHeat());
+                            SchedulerHelper.runTask(this.plugin, () -> {
+                                this.finishHeat();
+                                this.plugin.getRaceEventManager().tryDeleteEventForHeat(this);
+                            });
                         }
                     }
                 },
@@ -1127,7 +1147,7 @@ public class Heats {
                 200L
             );
         this.plugin.getDebugManager().logRaceSystem(
-            "Monitoramento de jogadores offline iniciado para Heat " + this.id
+            "Offline player monitoring started for Heat " + this.id
         );
     }
 
@@ -1138,7 +1158,7 @@ public class Heats {
         ) {
             this.offlineMonitorTask.cancel();
             this.plugin.getDebugManager().logRaceSystem(
-                "Monitoramento de jogadores offline cancelado para Heat " +
+                "Offline player monitoring cancelled for Heat " +
                     this.id
             );
         }
@@ -1156,7 +1176,7 @@ public class Heats {
         if (this.plugin.getTimerUtils() != null) {
             this.plugin.getTimerUtils().stopTimer(player);
             this.plugin.getDebugManager().logRaceSystem(
-                "[RACE DEBUG] Timer de Time Trial parado para " +
+                "[RACE DEBUG] Time Trial timer stopped for " +
                     player.getName()
             );
         }
@@ -1182,7 +1202,7 @@ public class Heats {
         this.plugin.getDebugManager().logRaceSystem(
             "Heat " +
                 this.id +
-                " forçadamente finalizado (sem salvar resultados)"
+                " force finished (without saving results)"
         );
     }
 
@@ -1247,17 +1267,18 @@ public class Heats {
         }
     }
 
-    private void spawnQualiDriver(Player player, Driver driver) {
+    private void spawnQualiDriver(Player player, Driver driver, Location gridLoc) {
         this.plugin.getLonelyController().updatePlayersVisibility(player);
         SchedulerHelper.runTaskLater(this.plugin, () -> {
             if (player.isOnline()) {
+                SchedulerHelper.teleport(player, gridLoc);
                 if (this.plugin.getPacketSender() != null) {
                     this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
                     this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, this.trackNameWS);
                     this.applyCollisionModeToPlayer(player);
                 }
                 boolean collidable = this.collisionMode != CollisionMode.DISABLED;
-                this.plugin.getAPI().spawnBoat(player, false, true, false, collidable);
+                this.plugin.getAPI().spawnBoatAt(player, gridLoc, false, true, false, collidable);
             }
         }, 10L);
     }
@@ -1274,9 +1295,9 @@ public class Heats {
                         DebugManager var10000 = this.plugin.getDebugManager();
                         String var10001 = String.valueOf(uuid);
                         var10000.logRaceSystem(
-                            "Tentativa de adicionar piloto " +
+                            "Attempt to add driver " +
                                 var10001 +
-                                " em múltiplos heats do round " +
+                                " to multiple heats in round " +
                                 this.round.getId()
                         );
                         return false;
@@ -1331,13 +1352,13 @@ public class Heats {
             DebugManager var10000 = this.plugin.getDebugManager();
             String var10001 = player.getName();
             var10000.logRaceSystem(
-                "Processando entrada tardia de " +
+                "Processing late join of " +
                     var10001 +
-                    " no Heat " +
+                    " to Heat " +
                     this.id
             );
 
-            // Só adiciona scoreboard se o heat já estiver carregado ou em andamento
+            // Only add scoreboard if the heat is already loaded or in progress
             if (this.heatState != HeatState.IDLE && this.heatState != HeatState.SETUP) {
                 this.plugin.getRaceScoreboardManager().addPlayer(player, this);
                 this.plugin.getRaceActionBarManager().addPlayer(player, this);
@@ -1384,9 +1405,9 @@ public class Heats {
                             var10000 = this.plugin.getDebugManager();
                             var10001 = player.getName();
                             var10000.logRaceSystem(
-                                "Jogador " +
+                                "Player " +
                                     var10001 +
-                                    " teleportado para o GRID (P" +
+                                    " teleported to GRID (P" +
                                     driver.getStartPosition() +
                                     ")."
                             );
@@ -1410,21 +1431,21 @@ public class Heats {
                                 player
                             );
                             this.plugin.getDebugManager().logRaceSystem(
-                                "Jogador " +
+                                "Player " +
                                     player.getName() +
-                                    " teleportado para spawn de Treino/Quali."
+                                    " teleported to Practice/Quali spawn."
                             );
                         }
                     }
                 } else {
                     this.plugin.getDebugManager().logRaceSystem(
-                        "Jogador " +
+                        "Player " +
                             player.getName() +
-                            " tentou entrar durante RACING/STARTING. Bloqueado."
+                            " tried to join during RACING/STARTING. Blocked."
                     );
                     player.sendMessage(
                         String.valueOf(ChatColor.RED) +
-                            "⚠ Você não pode entrar em uma corrida que já está em andamento!"
+                            "⚠ You cannot join a race that is already in progress!"
                     );
                 }
             }
@@ -1435,7 +1456,7 @@ public class Heats {
         DebugManager var10000 = this.plugin.getDebugManager();
         String var10001 = player.getName();
         var10000.logRaceSystem(
-            "Processando saída de " + var10001 + " do Heat " + this.id
+            "Processing leave of " + var10001 + " from Heat " + this.id
         );
         SchedulerHelper.runTaskFor(this.plugin, player, () -> {
             this.plugin.getLonelyController().clearGhost(player.getUniqueId());
@@ -1744,7 +1765,7 @@ public class Heats {
 
                     if (remaining <= 0L) {
                         this.plugin.getDebugManager().logRaceSystem(
-                            "Tempo de sessão esgotado no Heat " + this.id
+                            "Session time expired on Heat " + this.id
                         );
                         EventAnnouncements announcements =
                             this.round != null && this.round.getEvent() != null
@@ -1780,7 +1801,7 @@ public class Heats {
             );
         } else {
             this.plugin.getDebugManager().logRaceSystem(
-                "Heat " + this.id + " sem limite de tempo definido."
+                "Heat " + this.id + " has no time limit set."
             );
         }
     }
@@ -2125,7 +2146,7 @@ public class Heats {
     }
 
     public void markPositionsDirty() {
-        // Flag para indicar que as posições precisam ser recalculadas
+        // Flag to indicate that positions need to be recalculated
     }
 
     public static class DrsRegion {

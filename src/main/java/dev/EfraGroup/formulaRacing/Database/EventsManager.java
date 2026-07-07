@@ -42,7 +42,7 @@ public class EventsManager {
                 dbFile.createNewFile();
             }
         } catch (IOException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao criar arquivo SQLite: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error creating SQLite file: " + e.getMessage());
             throw new SQLException("Erro ao criar arquivo SQLite.", e);
         }
 
@@ -69,7 +69,7 @@ public class EventsManager {
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao criar evento: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error creating event: " + e.getMessage());
         }
 
     }
@@ -95,7 +95,7 @@ public class EventsManager {
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao obter roundId: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error obtaining roundId: " + e.getMessage());
             return null;
         }
     }
@@ -114,7 +114,7 @@ public class EventsManager {
 
                     try (ResultSet rs = ps.executeQuery()) {
                         if (!rs.next()) {
-                            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Tentativa de deletar round inexistente: " + roundId);
+                            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Attempt to delete non-existent round: " + roundId);
                             boolean var43 = false;
                             return var43;
                         }
@@ -124,7 +124,7 @@ public class EventsManager {
                             break label349;
                         }
 
-                        this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Round " + roundId + " não está em SETUP. Cancelando delete.");
+                        this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Round " + roundId + " is not in SETUP. Cancelling delete.");
                         var45 = false;
                     }
                 }
@@ -132,7 +132,7 @@ public class EventsManager {
                 return var45;
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao checar estado do round " + roundId + ": " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error checking state of round " + roundId + ": " + e.getMessage());
             return false;
         }
 
@@ -149,7 +149,7 @@ public class EventsManager {
                     while(rs.next()) {
                         String heatState = rs.getString("state");
                         if (!heatState.equalsIgnoreCase("SETUP")) {
-                            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Um ou mais heats do round " + roundId + " não estão em SETUP. Cancelando delete.");
+                            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] One or more heats of round " + roundId + " are not in SETUP. Cancelling delete.");
                             boolean var8 = false;
                             return var8;
                         }
@@ -157,7 +157,7 @@ public class EventsManager {
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao checar heats do round " + roundId + ": " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error checking heats of round " + roundId + ": " + e.getMessage());
             return false;
         }
 
@@ -170,7 +170,7 @@ public class EventsManager {
             ps.setInt(1, roundId);
             ps.executeUpdate();
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao deletar heats do round " + roundId + ": " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error deleting heats of round " + roundId + ": " + e.getMessage());
             return false;
         }
 
@@ -182,7 +182,7 @@ public class EventsManager {
                     ps.setInt(1, roundId);
                     int affected = ps.executeUpdate();
                     if (affected == 0) {
-                        this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Round " + roundId + " não foi deletado (não existia?).");
+                        this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Round " + roundId + " was not deleted (didn't exist?).");
                         boolean var9 = false;
                         return var9;
                     }
@@ -191,7 +191,7 @@ public class EventsManager {
 
             return true;
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao deletar round " + roundId + ": " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error deleting round " + roundId + ": " + e.getMessage());
             return false;
         }
     }
@@ -209,7 +209,7 @@ public class EventsManager {
                 events.add(rs.getString("name"));
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao buscar lista de eventos: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error fetching event list: " + e.getMessage());
         }
 
         return events;
@@ -234,7 +234,7 @@ public class EventsManager {
 
                 return var6;
             } catch (SQLException e) {
-                this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao verificar existência de evento '" + name + "': " + e.getMessage());
+                this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error checking existence of event '" + name + "': " + e.getMessage());
                 return false;
             }
         } else {
@@ -253,7 +253,7 @@ public class EventsManager {
             ps.setInt(2, eventId);
             ps.executeUpdate();
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao atualizar pista do evento (ID: " + eventId + "): " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error updating event track (ID: " + eventId + "): " + e.getMessage());
         }
 
     }
@@ -286,13 +286,13 @@ public class EventsManager {
                 }
 
                 conn.commit();
-                this.plugin.getDebugManager().logRaceSystem("[FormulaRacing] Player " + String.valueOf(uuid) + " adicionado ao heat " + heatId + " na posição " + position);
+                this.plugin.getDebugManager().logRaceSystem("[FormulaRacing] Player " + String.valueOf(uuid) + " added to heat " + heatId + " at position " + position);
                 var21 = true;
             }
 
             return var21;
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao adicionar player ao heat: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error adding player to heat: " + e.getMessage());
             return false;
         }
     }
@@ -317,7 +317,7 @@ public class EventsManager {
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao buscar ID do evento por nome: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error fetching event ID by name: " + e.getMessage());
             return -1;
         }
     }
@@ -338,7 +338,7 @@ public class EventsManager {
 
             return var6;
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao deletar evento '" + eventName + "': " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error deleting event '" + eventName + "': " + e.getMessage());
             return false;
         }
     }
@@ -363,7 +363,7 @@ public class EventsManager {
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao obter contagem de heats: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error getting heat count: " + e.getMessage());
             return 0;
         }
     }
@@ -394,7 +394,7 @@ public class EventsManager {
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao criar heat: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error creating heat: " + e.getMessage());
             return null;
         }
     }
@@ -410,7 +410,7 @@ public class EventsManager {
             ps.setString(2, uuid.toString());
             ps.executeUpdate();
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao definir selectedEvent: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error setting selectedEvent: " + e.getMessage());
         }
 
     }
@@ -435,7 +435,7 @@ public class EventsManager {
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao obter selectedEvent: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error getting selectedEvent: " + e.getMessage());
             return null;
         }
     }
@@ -466,7 +466,7 @@ public class EventsManager {
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao criar round: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error creating round: " + e.getMessage());
             return null;
         }
     }
@@ -492,7 +492,7 @@ public class EventsManager {
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao obter próximo roundIndex: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error getting next roundIndex: " + e.getMessage());
             return 1;
         }
     }
@@ -518,7 +518,7 @@ public class EventsManager {
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao buscar rounds do evento: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error fetching event rounds: " + e.getMessage());
         }
 
         return rounds;
@@ -544,7 +544,7 @@ public class EventsManager {
 
             return var6;
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao finalizar round: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error finishing round: " + e.getMessage());
             return false;
         }
     }
@@ -569,7 +569,7 @@ public class EventsManager {
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao pegar próximo heat number: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error getting next heat number: " + e.getMessage());
             return 1;
         }
     }
@@ -591,7 +591,7 @@ public class EventsManager {
                 }
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao buscar inscritos do evento " + eventName + ": " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error fetching subscribers of event " + eventName + ": " + e.getMessage());
         }
 
         return subscribers;
@@ -614,7 +614,7 @@ public class EventsManager {
 
             return var7;
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao definir openSign: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error setting openSign: " + e.getMessage());
             return false;
         }
     }
@@ -638,7 +638,7 @@ public class EventsManager {
 
             return var6;
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao verificar openSign: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error checking openSign: " + e.getMessage());
             return false;
         }
     }
@@ -658,7 +658,7 @@ public class EventsManager {
                 set.add(UUID.fromString(rs.getString("playerUUID")));
             }
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao buscar reservas: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error fetching reserves: " + e.getMessage());
         }
 
         return set;
@@ -675,7 +675,7 @@ public class EventsManager {
             ps.setString(2, playerUUID.toString());
             ps.executeUpdate();
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao adicionar subscriber: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error adding subscriber: " + e.getMessage());
         }
 
     }
@@ -691,7 +691,7 @@ public class EventsManager {
             ps.setString(2, playerUUID.toString());
             ps.executeUpdate();
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao remover subscriber: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error removing subscriber: " + e.getMessage());
         }
 
     }
@@ -707,7 +707,7 @@ public class EventsManager {
             ps.setString(2, playerUUID.toString());
             ps.executeUpdate();
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao adicionar reserve: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error adding reserve: " + e.getMessage());
         }
 
     }
@@ -723,7 +723,7 @@ public class EventsManager {
             ps.setString(2, playerUUID.toString());
             ps.executeUpdate();
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao remover reserve: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error removing reserve: " + e.getMessage());
         }
 
     }
@@ -739,7 +739,7 @@ public class EventsManager {
             ps.setString(2, playerUUID.toString());
             ps.executeUpdate();
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao adicionar spectator: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error adding spectator: " + e.getMessage());
         }
 
     }
@@ -755,7 +755,7 @@ public class EventsManager {
             ps.setString(2, playerUUID.toString());
             ps.executeUpdate();
         } catch (SQLException e) {
-            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao remover spectator: " + e.getMessage());
+            this.plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Error removing spectator: " + e.getMessage());
         }
 
     }

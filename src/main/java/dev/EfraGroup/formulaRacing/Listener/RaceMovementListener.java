@@ -25,6 +25,9 @@ public class RaceMovementListener implements Listener {
 
     @EventHandler
     public void onVehicleMove(VehicleMoveEvent event) {
+        if (event.getFrom().getBlockX() == event.getTo().getBlockX() && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
+            return;
+        }
         if (event.getVehicle().getPassengers().size() > 0 && event.getVehicle().getPassengers().get(0) instanceof Player) {
             Player player = (Player)event.getVehicle().getPassengers().get(0);
             Optional<Events> eventOpt = this.eventManager.getPlayerEvent(player.getUniqueId());

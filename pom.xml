@@ -14,8 +14,7 @@
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <skipAutoGitCommit>false</skipAutoGitCommit>
-        <autoGitBackupBranch>master</autoGitBackupBranch>
+        <skipAutoGitCommit>true</skipAutoGitCommit>
     </properties>
 
     <repositories>
@@ -181,14 +180,6 @@
 
     <build>
 
-        <extensions>
-            <extension>
-                <groupId>org.apache.maven.wagon</groupId>
-                <artifactId>wagon-ssh</artifactId>
-                <version>3.5.0</version>
-            </extension>
-        </extensions>
-
         <plugins>
             <!-- Compilador Java -->
             <plugin>
@@ -239,58 +230,6 @@
                                     </excludes>
                                 </filter>
                             </filters>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>wagon-maven-plugin</artifactId>
-                <version>2.0.2</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.apache.maven.wagon</groupId>
-                        <artifactId>wagon-ssh</artifactId>
-                        <version>3.5.3</version>
-                        <exclusions>
-                            <exclusion>
-                                <groupId>com.jcraft</groupId>
-                                <artifactId>jsch</artifactId>
-                            </exclusion>
-                        </exclusions>
-                    </dependency>
-                    <dependency>
-                        <groupId>com.github.mwiede</groupId>
-                        <artifactId>jsch</artifactId>
-                        <version>0.2.21</version>
-                    </dependency>
-                </dependencies>
-                <executions>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.5.0</version>
-                <executions>
-                    <execution>
-                        <id>git-autocommit-after-upload</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <skip>${skipAutoGitCommit}</skip>
-                            <workingDirectory>${project.basedir}</workingDirectory>
-                            <executable>powershell</executable>
-                            <arguments>
-                                <argument>-NoProfile</argument>
-                                <argument>-ExecutionPolicy</argument>
-                                <argument>Bypass</argument>
-                                <argument>-Command</argument>
-                                <argument>$ErrorActionPreference='Continue'; git add -A; if ($LASTEXITCODE -ne 0) { throw 'git add failed.' }; git diff --cached --quiet; if ($LASTEXITCODE -eq 0) { exit 0 }; if ($LASTEXITCODE -gt 1) { throw 'Failed to inspect staged changes.' }; $subject='auto: deploy ${project.artifactId}-${project.version}'; $changes=(git diff --cached --name-status) -join [Environment]::NewLine; $stats=(git diff --cached --shortstat) -join [Environment]::NewLine; $msg=@($subject,'','Changes:',$changes,'','Stats:',$stats) -join [Environment]::NewLine; $msgFile='.git/AUTO_COMMIT_MSG.txt'; $utf8NoBom = New-Object System.Text.UTF8Encoding($false); [System.IO.File]::WriteAllText($msgFile, $msg, $utf8NoBom); try { git commit -F $msgFile } finally { Remove-Item $msgFile -ErrorAction SilentlyContinue }; if ($LASTEXITCODE -ne 0) { throw 'Auto commit failed.' }; $branch='${autoGitBackupBranch}'; git fetch origin $branch 2&gt;$null; if ($LASTEXITCODE -eq 0) { git rebase "origin/$branch"; if ($LASTEXITCODE -ne 0) { git rebase --abort 2&gt;$null; Write-Host '[WARN] Auto rebase failed; commit kept locally.'; exit 0 } }; git push origin "HEAD:refs/heads/$branch"; if ($LASTEXITCODE -eq 0) { exit 0 }; Write-Host '[WARN] Push rejected; syncing and retrying...'; git fetch origin $branch 2&gt;$null; if ($LASTEXITCODE -eq 0) { git rebase "origin/$branch"; if ($LASTEXITCODE -ne 0) { git rebase --abort 2&gt;$null; Write-Host '[WARN] Retry rebase failed; commit kept locally.'; exit 0 } }; git push origin "HEAD:refs/heads/$branch"; if ($LASTEXITCODE -ne 0) { Write-Host ('[WARN] Auto push to {0} failed after retry; commit kept locally.' -f $branch); exit 0 }</argument>
-                            </arguments>
                         </configuration>
                     </execution>
                 </executions>

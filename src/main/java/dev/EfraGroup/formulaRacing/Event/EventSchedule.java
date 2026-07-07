@@ -4,6 +4,17 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Round.EliminationRound;
+import dev.EfraGroup.formulaRacing.Round.HotPotatoRound;
+import dev.EfraGroup.formulaRacing.Round.MusicalChairRound;
+import dev.EfraGroup.formulaRacing.Round.CaptureTheFlagRound;
+import dev.EfraGroup.formulaRacing.Round.InfectionRound;
+import dev.EfraGroup.formulaRacing.Round.TeamEliminationRound;
+import dev.EfraGroup.formulaRacing.Round.ObstacleRaceRound;
+import dev.EfraGroup.formulaRacing.Round.SumoRound;
+import dev.EfraGroup.formulaRacing.Round.BlindRaceRound;
+import dev.EfraGroup.formulaRacing.Round.MovingTargetRound;
+import dev.EfraGroup.formulaRacing.Round.TotalChaosRound;
+import dev.EfraGroup.formulaRacing.Round.RouletteRound;
 import dev.EfraGroup.formulaRacing.Round.PracticeRound;
 import dev.EfraGroup.formulaRacing.Round.QualificationRound;
 import dev.EfraGroup.formulaRacing.Round.RaceRound;
@@ -53,6 +64,39 @@ public class EventSchedule {
                     break;
                 case SPRINT_RACE:
                     round = new SprintRaceRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
+                case HOT_POTATO:
+                    round = new HotPotatoRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
+                case MUSICAL_CHAIR:
+                    round = new MusicalChairRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
+                case CAPTURE_THE_FLAG:
+                    round = new CaptureTheFlagRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
+                case INFECTION:
+                    round = new InfectionRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
+                case TEAM_ELIMINATION:
+                    round = new TeamEliminationRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
+                case OBSTACLE_RACE:
+                    round = new ObstacleRaceRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
+                case SUMO:
+                    round = new SumoRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
+                case BLIND_RACE:
+                    round = new BlindRaceRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
+                case MOVING_TARGET:
+                    round = new MovingTargetRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
+                case TOTAL_CHAOS:
+                    round = new TotalChaosRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
+                case ROULETTE:
+                    round = new RouletteRound(this.plugin, 0, this.event, roundIndex, roundType);
                     break;
                 case FINAL:
                 default:

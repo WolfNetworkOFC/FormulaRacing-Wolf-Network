@@ -99,10 +99,10 @@ public class EventAnnouncements {
             String title = this.t.getTranslated(p, "event_finish_title", new String[0]);
             String subtitleBase = this.t.getTranslated(p, "event_finish_subtitle", new String[]{"{pos}", String.valueOf(position)});
             if (title == null || title.isBlank()) {
-                title = "&s&lFINALIZOU!";
+                title = "&s&lFINISHED!";
             }
             if (subtitleBase == null || subtitleBase.isBlank()) {
-                subtitleBase = "&fPosição " + position;
+                subtitleBase = "&fPosition " + position;
             }
 
             String subtitle = subtitleBase + " &8| &e" + formattedTime;

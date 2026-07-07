@@ -18,7 +18,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 
 @CommandAlias("language|lang|l")
-@Description("Muda a linguagem do FormulaRacing")
+@Description("Changes the FormulaRacing language")
 public class LanguageCommand extends BaseCommand {
     private final FormulaRacing plugin;
     private final DatabaseManager db;
@@ -39,14 +39,14 @@ public class LanguageCommand extends BaseCommand {
     }
 
     @Subcommand("menu")
-    @Description("Abre o menu de idiomas")
+    @Description("Opens the language menu")
     public void onMenu(Player player) {
         this.onDefault(player);
     }
 
     @Subcommand("set")
     @CommandCompletion("@languages")
-    @Description("Define seu idioma")
+    @Description("Sets your language")
     public void onSet(Player player, @Values("@languages") String langCode) {
         File langFile = new File(this.plugin.getDataFolder(), "lang/" + langCode + ".yml");
         if (!langFile.exists()) {
@@ -68,15 +68,15 @@ public class LanguageCommand extends BaseCommand {
     }
 
     @Subcommand("list")
-    @Description("Lista os idiomas disponíveis")
+    @Description("Lists available languages")
     public void onList(Player player) {
         File langFolder = new File(this.plugin.getDataFolder(), "lang");
         if (!langFolder.exists()) {
-            player.sendMessage("§cPasta de idiomas não encontrada.");
+            player.sendMessage("§cLanguage folder not found.");
         } else {
             File[] files = langFolder.listFiles((dir, namex) -> namex.endsWith(".yml"));
             if (files != null && files.length != 0) {
-                player.sendMessage("§eIdiomas disponíveis:");
+                player.sendMessage("§eAvailable languages:");
 
                 for(File file : files) {
                     String name = file.getName().replace(".yml", "");
@@ -84,13 +84,13 @@ public class LanguageCommand extends BaseCommand {
                 }
 
             } else {
-                player.sendMessage("§cNenhum idioma encontrado.");
+                player.sendMessage("§cNo languages found.");
             }
         }
     }
 
     @Subcommand("help|ajuda")
-    @Description("Mostra ajuda do comando de idioma")
+    @Description("Shows language command help")
     public void onHelp(Player player) {
         CommandHelpService.sendHelp(player, this, "/lang");
     }

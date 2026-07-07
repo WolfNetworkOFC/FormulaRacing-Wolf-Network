@@ -35,18 +35,18 @@ public class PartyRaceManager {
     public boolean createPartyRace(Player creator, String trackName, int laps, int pits) {
         try {
             if (!database.hasParty(creator.getUniqueId())) {
-                creator.sendMessage("§cVocê não está em uma party.");
+                creator.sendMessage("§cYou are not in a party.");
                 return false;
             }
 
             UUID owner = database.getOwner(creator.getUniqueId());
             if (!owner.equals(creator.getUniqueId())) {
-                creator.sendMessage("§cApenas o líder pode iniciar uma corrida de party.");
+                creator.sendMessage("§cOnly the leader can start a party race.");
                 return false;
             }
 
             if (activePartyRaces.containsKey(owner)) {
-                creator.sendMessage("§cSua party já tem uma corrida ativa.");
+                creator.sendMessage("§cYour party already has an active race.");
                 return false;
             }
 
@@ -87,7 +87,7 @@ public class PartyRaceManager {
             }
 
             if (onlineMembers.size() < 2) {
-                creator.sendMessage("§cPrecisa de pelo menos 2 membros online para uma corrida de party.");
+                creator.sendMessage("§cNeed at least 2 online members for a party race.");
                 return false;
             }
 
@@ -97,21 +97,21 @@ public class PartyRaceManager {
 
             future.thenAccept(obj -> {
                 if (obj == null || !(obj instanceof Events event)) {
-                    creator.sendMessage("§cErro ao criar a corrida de party.");
+                    creator.sendMessage("§cError creating the party race.");
                     return;
                 }
 
                 Rounds round = event.getEventSchedule().getRounds().values().stream()
                         .findFirst().map(r -> (Rounds) r).orElse(null);
                 if (round == null) {
-                    creator.sendMessage("§cErro ao configurar a corrida (round).");
+                    creator.sendMessage("§cError setting up the race (round).");
                     return;
                 }
 
                 Heats heat = round.getHeats().values().stream()
                         .findFirst().map(h -> (Heats) h).orElse(null);
                 if (heat == null) {
-                    creator.sendMessage("§cErro ao configurar a corrida (heat).");
+                    creator.sendMessage("§cError setting up the race (heat).");
                     return;
                 }
 
@@ -142,7 +142,7 @@ public class PartyRaceManager {
                     member.sendMessage("");
                     member.sendMessage("§6§l⚐ PARTY RACE");
                     member.sendMessage("§7Pista: " + trackColor + finalTrackName);
-                    member.sendMessage("§7Voltas: §f" + finalLaps + " §7| Pit Stops: §f" + finalPits);
+                    member.sendMessage("§7Laps: §f" + finalLaps + " §7| Pit Stops: §f" + finalPits);
                     member.sendMessage("");
                     TitleHelper.sendThemedTitle(member,
                             "§6§lPARTY RACE",
@@ -162,7 +162,7 @@ public class PartyRaceManager {
             return true;
 
         } catch (SQLException e) {
-            creator.sendMessage("§cErro ao criar corrida de party.");
+            creator.sendMessage("§cError creating party race.");
             plugin.getDebugManager().logRaceSystem("[PartyRace] Error: " + e.getMessage());
             return false;
         }

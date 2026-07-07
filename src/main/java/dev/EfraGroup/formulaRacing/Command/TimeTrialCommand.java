@@ -36,7 +36,7 @@ import dev.EfraGroup.formulaRacing.PacketSender;
     import org.bukkit.entity.Player;
 
     @CommandAlias("timetrial|tt|timett")
-    @Description("Comandos do sistema de Time Trial")
+    @Description("Time Trial system commands")
     public class TimeTrialCommand extends BaseCommand {
         private final FormulaRacing plugin;
         private final DatabaseManager mysql;
@@ -101,14 +101,14 @@ import dev.EfraGroup.formulaRacing.PacketSender;
         }
 
         @Subcommand("help|ajuda|?")
-        @Description("Mostra a ajuda do comando timetrial")
+        @Description("Shows the timetrial command help")
         public void onHelp(Player player) {
             CommandHelpService.sendHelp(player, this, "/timetrial");
         }
 
         @Subcommand("solo")
         @CommandCompletion("@tracks")
-        @Description("Inicia um Time Trial solo em uma pista")
+        @Description("Starts a solo Time Trial on a track")
         public void onSolo(Player player, String[] args) {
             this.onDefault(player, args);
         }
@@ -165,7 +165,7 @@ import dev.EfraGroup.formulaRacing.PacketSender;
         }
 
         @CommandAlias("timetrialcancel|ttc|timetrialc|ttcancel")
-        @Description("Cancela o Time Trial atual")
+        @Description("Cancels the current Time Trial")
         public void onCancel(Player player) {
             this.timerUtils.stopTimer(player);
             this.timeTrialController.endSession(player);
@@ -178,31 +178,31 @@ import dev.EfraGroup.formulaRacing.PacketSender;
         }
 
         @CommandAlias("timetrialrandom|ttr|timetrialr|ttrandom")
-        @Description("Entra em uma Time Trial aleatória")
+        @Description("Joins a random Time Trial")
         public void onRandom(Player player) {
             UUID uuid = player.getUniqueId();
 
-            // 1. Verificações de Segurança (Early Returns)
+            // 1. Safety Checks (Early Returns)
             if (isBusy(player)) {
                 return;
             }
 
-            // 2. Obtenção de Pistas
+            // 2. Get Tracks
             List<String> availableTracks = this.mysql.getAllTracks();
             if (availableTracks == null || availableTracks.isEmpty()) {
                 this.plugin.sendMessage(player, "tt_no_tracks_avail");
                 return;
             }
 
-            // 3. Filtragem de Pistas Compatíveis
+            // 3. Filter Compatible Tracks
             boolean hasBoatUtils = FormulaRacing.hasOpenBoatUtilsMod(player);
 
             List<String> validTracks = availableTracks.stream()
-                    .filter(this.mysql::isTrackOpen) // Filtra pistas abertas
+                    .filter(this.mysql::isTrackOpen) // Filter open tracks
                     .filter(track -> {
                         boolean trackRequiresBoatUtils = this.mysql.trackHaveBoatUtils(track);
-                        // Se o player tem o mod, pode correr em qualquer uma.
-                        // Se não tem, só nas que não requerem.
+                        // If the player has the mod, they can race on any track.
+                        // If not, only those that don't require it.
                         return hasBoatUtils || !trackRequiresBoatUtils;
                     })
                     .collect(Collectors.toList());
@@ -212,7 +212,7 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                 return;
             }
 
-            // 4. Seleção e Início
+            // 4. Selection and Start
             String trackName = validTracks.get(this.random.nextInt(validTracks.size()));
             DatabaseManager.TrackData trackData = this.mysql.getTrackData(trackName);
             String owner = (trackData != null) ? trackData.getOwnerName() : null;
@@ -221,27 +221,27 @@ import dev.EfraGroup.formulaRacing.PacketSender;
         }
 
         /**
-         * Verifica se o jogador está ocupado em qualquer outro modo de jogo.
+         * Checks if the player is busy in any other game mode.
          */
         private boolean isBusy(Player player) {
             UUID uuid = player.getUniqueId();
             Location loc = player.getLocation();
 
-            // Verifica Duelo
+            // Check Duel
             if (this.plugin.getTimeTrialDuels() != null && this.plugin.getTimeTrialDuels().isPlayerInDuel(uuid)) {
                 this.plugin.sendMessage(player, "tt_error_duel_active");
                 player.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0F, 1.0F);
                 return true;
             }
 
-            // Verifica QuickRace
+            // Check QuickRace
             if (this.plugin.getQuickRaceManager() != null && this.plugin.getQuickRaceManager().isPlayerInActiveRace(uuid)) {
                 this.plugin.sendMessage(player, "tt_error_quickrace");
                 player.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0F, 1.0F);
                 return true;
             }
 
-            // Verifica Eventos Oficiais (Heats)
+            // Check Official Events (Heats)
             if (this.plugin.getRaceEventManager() != null && this.plugin.getRaceEventManager().getPlayerActiveHeat(uuid).isPresent()) {
                 this.plugin.sendMessage(player, "tt_error_event");
                 player.playSound(loc, Sound.ENTITY_VILLAGER_NO, 1.0F, 1.0F);
@@ -252,7 +252,7 @@ import dev.EfraGroup.formulaRacing.PacketSender;
         }
     
         @CommandAlias("reset")
-        @Description("Reseta sua Time Trial atual")
+        @Description("Resets your current Time Trial")
         public void onReset(Player player) {
             String trackName = null;
             Heats activeHeat = null;

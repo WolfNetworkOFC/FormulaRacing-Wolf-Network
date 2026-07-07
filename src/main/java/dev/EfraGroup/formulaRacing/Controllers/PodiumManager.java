@@ -50,23 +50,23 @@ public class PodiumManager implements Listener {
 
     public synchronized void startCeremony(Events event, List<Driver> results) {
         if (event == null || results == null || results.isEmpty()) {
-            this.plugin.getDebugManager().logRaceSystem("Cerimonia de podio ignorada: evento/resultados invalidos.");
+            this.plugin.getDebugManager().logRaceSystem("Podium ceremony skipped: invalid event/results.");
             return;
         }
 
         if (this.ceremonyActive) {
-            this.plugin.getDebugManager().logRaceSystem("Cerimonia de podio ja ativa. Ignorando nova chamada para " + event.getDisplayName());
+            this.plugin.getDebugManager().logRaceSystem("Podium ceremony already active. Ignoring new call for " + event.getDisplayName());
             return;
         }
 
         if (!this.config().getBoolean(CONFIG_ROOT + ".enabled", true)) {
-            this.plugin.getDebugManager().logRaceSystem("Cerimonia de podio desabilitada em config.yml.");
+            this.plugin.getDebugManager().logRaceSystem("Podium ceremony disabled in config.yml.");
             return;
         }
 
         for (String key : REQUIRED_LOCATIONS) {
             if (this.getConfiguredLocation(key) == null) {
-                this.plugin.getDebugManager().logRaceSystem("Cerimonia de podio abortada: localizacao invalida em '" + CONFIG_ROOT + ".locations." + key + "'.");
+                this.plugin.getDebugManager().logRaceSystem("Podium ceremony aborted: invalid location in '" + CONFIG_ROOT + ".locations." + key + "'.");
                 return;
             }
         }
@@ -76,17 +76,17 @@ public class PodiumManager implements Listener {
         int topLimit = Math.max(1, this.config().getInt(CONFIG_ROOT + ".top-limit", 15));
         int topLimitUsed = Math.min(topLimit, sortedResults.size());
         if (topLimitUsed <= 0) {
-            this.plugin.getDebugManager().logRaceSystem("Cerimonia de podio abortada: sem posicoes para revelar.");
+            this.plugin.getDebugManager().logRaceSystem("Podium ceremony aborted: no positions to reveal.");
             return;
         }
 
         Set<UUID> participants = this.resolveCeremonyParticipants(event);
         if (participants.isEmpty()) {
-            this.plugin.getDebugManager().logRaceSystem("Cerimonia de podio abortada: sem participantes do evento.");
+            this.plugin.getDebugManager().logRaceSystem("Podium ceremony aborted: no event participants.");
             return;
         }
 
-        this.plugin.getDebugManager().logRaceSystem("Iniciando cerimonia de podio para evento: " + event.getDisplayName());
+        this.plugin.getDebugManager().logRaceSystem("Starting podium ceremony for event: " + event.getDisplayName());
         this.ceremonyActive = true;
 
         PodiumCeremonySession session = new PodiumCeremonySession(
@@ -284,7 +284,7 @@ public class PodiumManager implements Listener {
                 }
             }
 
-            this.plugin.getDebugManager().logRaceSystem("Top " + position + " offline durante cerimonia de podio: " + driverName);
+            this.plugin.getDebugManager().logRaceSystem("Top " + position + " offline during podium ceremony: " + driverName);
             return;
         }
 
@@ -295,7 +295,7 @@ public class PodiumManager implements Listener {
         };
 
         if (podiumLocation == null) {
-            this.plugin.getDebugManager().logRaceSystem("Local de podio invalido para P" + position + ". Teleporte ignorado.");
+            this.plugin.getDebugManager().logRaceSystem("Invalid podium location for P" + position + ". Teleport skipped.");
             return;
         }
 
@@ -321,7 +321,7 @@ public class PodiumManager implements Listener {
     private void completeAndCleanup(PodiumCeremonySession session) {
         Location lobby = this.getConfiguredLocation("lobby");
         if (lobby == null) {
-            this.plugin.getDebugManager().logRaceSystem("Local de lobby invalido ao finalizar cerimonia. Pulando teleporte final.");
+            this.plugin.getDebugManager().logRaceSystem("Invalid lobby location when finishing ceremony. Skipping final teleport.");
         }
 
         boolean snowballEnabled = this.config().getBoolean(CONFIG_ROOT + ".snowball.enabled", true);
@@ -392,7 +392,7 @@ public class PodiumManager implements Listener {
                 Driver driver = session.results.get(driverIndex);
                 revealPosition(session, currentPosition, driver);
             } catch (Exception ex) {
-                plugin.getDebugManager().logRaceSystem("Erro na cerimonia de podio: " + ex.getMessage());
+                plugin.getDebugManager().logRaceSystem("Error in podium ceremony: " + ex.getMessage());
                 completeAndCleanup(session);
                 if (session.revealTask != null) session.revealTask.cancel();
             }
@@ -417,3 +417,4 @@ public class PodiumManager implements Listener {
         }
     }
 }
+

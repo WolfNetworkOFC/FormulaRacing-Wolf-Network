@@ -43,12 +43,12 @@ public class DatabaseManager {
     }
 
     private DatabaseType databaseType;
-    private boolean isDatabaseInitialized = false; // Flag para garantir inicialização única
+    private boolean isDatabaseInitialized = false; // Flag to ensure single initialization
 
     public DatabaseManager(FormulaRacing plugin, FileManager fileManager) {
         this.plugin = plugin;
 
-        // 1. Define o tipo de banco
+        // 1. Sets the database type
         try {
             this.databaseType = DatabaseType.valueOf(
                 fileManager.getDatabaseType().toUpperCase()
@@ -58,17 +58,17 @@ public class DatabaseManager {
             plugin
                 .getDebugManager()
                 .logDatabaseOperation(
-                    "[FormulaRacing] Tipo de banco de dados inválido na configuração. Usando SQLite por padrão."
+                    "[FormulaRacing] Invalid database type in config. Using SQLite by default."
                 );
         }
 
-        // 2. Abre a conexão inicial e inicializa as tabelas
+        // 2. Opens initial connection and initializes tables
         try {
             getOrConnect();
             plugin
                 .getDebugManager()
                 .logDatabaseOperation(
-                    "[FormulaRacing] Conexão inicial com o banco de dados estabelecida com sucesso (" +
+                    "[FormulaRacing] Initial database connection established successfully (" +
                         databaseType +
                         ")."
                 );
@@ -76,30 +76,30 @@ public class DatabaseManager {
             plugin
                 .getDebugManager()
                 .logDatabaseOperation(
-                    "[FormulaRacing] FALHA CRÍTICA ao conectar ao banco de dados: " +
+                    "[FormulaRacing] CRITICAL FAILURE connecting to database: " +
                         e.getMessage()
                 );
-            // Opcional: Desativar o plugin se o banco for essencial
+            // Optional: Disable plugin if database is essential
             // Bukkit.getPluginManager().disablePlugin(plugin);
         }
     }
 
     public synchronized Connection getOrConnect() throws SQLException {
-        // 1. Se a conexão já existe, vamos testar se ela ainda funciona
+        // 1. If the connection already exists, test if it still works
         if (connection != null && !connection.isClosed()) {
             try (Statement stmt = connection.createStatement()) {
-                stmt.setQueryTimeout(1); // Timeout rápido para o teste
+                stmt.setQueryTimeout(1); // Quick timeout for the test
                 stmt.execute("SELECT 1;");
-                return connection; // Conexão está viva, retorna ela mesma
+                return connection; // Connection is alive, return it
             } catch (SQLException e) {
-                // Se o SELECT 1 falhar, a conexão morreu. Vamos fechar e criar outra.
+                // If SELECT 1 fails, the connection died. Close and create a new one.
                 try {
                     connection.close();
                 } catch (SQLException ignored) {}
             }
         }
 
-        // 2. Se chegou aqui, ou é a primeira vez ou a conexão antiga caiu
+        // 2. If we got here, it's either the first time or the old connection dropped
         File dataFolder = plugin.getDataFolder();
         if (!dataFolder.exists()) {
             dataFolder.mkdirs();
@@ -110,7 +110,7 @@ public class DatabaseManager {
 
         for (int attempt = 1; attempt <= 3; attempt++) {
             try {
-                // Cria a conexão ÚNICA
+                // Creates the SINGLE connection
                 this.connection = DriverManager.getConnection(
                     "jdbc:sqlite:" + dbFile.getAbsolutePath()
                 );
@@ -154,7 +154,7 @@ public class DatabaseManager {
             Location min,
             Location max
     ) {
-        // Agora sempre usamos INSERT. O 'id' (AUTOINCREMENT) cuidará de diferenciar as zonas.
+        // Now we always use INSERT. The 'id' (AUTOINCREMENT) will differentiate the zones.
         String sql = "INSERT INTO fr_drs (trackNameWS, world, type, " +
                 "regionMinX, regionMinY, regionMinZ, " +
                 "regionMaxX, regionMaxY, regionMaxZ) " +
@@ -181,7 +181,7 @@ public class DatabaseManager {
      * Remove todas as zonas de DRS vinculadas a uma pista específica.
      */
     public boolean clearAllDrsRegions(String trackName) {
-        // Usamos DELETE para remover todas as linhas que compartilham o nome da pista
+        // Use DELETE to remove all rows that share the track name
         String sql = "DELETE FROM fr_drs WHERE trackNameWS = ?;";
 
         try (
@@ -190,8 +190,8 @@ public class DatabaseManager {
         ) {
             ps.setString(1, trackName);
 
-            // Em vez de verificar apenas > 0, executamos a ação.
-            // Se não houver nada para deletar, não é necessariamente um "erro".
+            // Instead of just checking > 0, we execute the action.
+            // If there's nothing to delete, it's not necessarily an "error".
             ps.executeUpdate();
             return true;
 
@@ -208,45 +208,46 @@ public class DatabaseManager {
     /**
      * Salva as coordenadas da região de START (onde o carro para) no banco de dados.
      */
-    public CompletableFuture<Boolean> savePitStopStart(
+    public synchronized boolean savePitStopStart(
         String trackName,
         Location min,
         Location max
     ) {
-        return CompletableFuture.supplyAsync(() -> {
-            String sql =
-                "UPDATE fr_pit_stops SET " +
-                "startMinX = ?, startMinY = ?, startMinZ = ?, " +
-                "startMaxX = ?, startMaxY = ?, startMaxZ = ? " +
-                "WHERE trackNameWS = ?";
-
-            try (
-                Connection conn = this.getOrConnect();
-                PreparedStatement ps = conn.prepareStatement(sql)
-            ) {
-                // Coordenadas Mínimas
-                ps.setDouble(1, min.getX());
-                ps.setDouble(2, min.getY());
-                ps.setDouble(3, min.getZ());
-
-                // Coordenadas Máximas
-                ps.setDouble(4, max.getX());
-                ps.setDouble(5, max.getY());
-                ps.setDouble(6, max.getZ());
-
-                // Identificador da Pista
-                ps.setString(7, trackName);
-
-                int affectedRows = ps.executeUpdate();
-                return affectedRows > 0;
-            } catch (SQLException e) {
-                this.plugin.getDebugManager().logDatabaseOperation(
-                    "Erro ao salvar região Start: " + e.getMessage()
-                );
-                e.printStackTrace();
-                return false;
+        if (trackName == null) return false;
+        String trackNameWS = trackName.replaceAll("\\s+", "");
+        String sql =
+            "INSERT INTO fr_pit_stops (trackNameWS, " +
+            "minX, minY, minZ, maxX, maxY, maxZ, " +
+            "startMinX, startMinY, startMinZ, startMaxX, startMaxY, startMaxZ, world) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
+            "ON CONFLICT(trackNameWS) DO UPDATE SET " +
+            "startMinX=excluded.startMinX, startMinY=excluded.startMinY, startMinZ=excluded.startMinZ, " +
+            "startMaxX=excluded.startMaxX, startMaxY=excluded.startMaxY, startMaxZ=excluded.startMaxZ, " +
+            "minX=excluded.minX, minY=excluded.minY, minZ=excluded.minZ, " +
+            "maxX=excluded.maxX, maxY=excluded.maxY, maxZ=excluded.maxZ";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackNameWS);
+                ps.setDouble(2, min.getX());
+                ps.setDouble(3, min.getY());
+                ps.setDouble(4, min.getZ());
+                ps.setDouble(5, max.getX());
+                ps.setDouble(6, max.getY());
+                ps.setDouble(7, max.getZ());
+                ps.setDouble(8, min.getX());
+                ps.setDouble(9, min.getY());
+                ps.setDouble(10, min.getZ());
+                ps.setDouble(11, max.getX());
+                ps.setDouble(12, max.getY());
+                ps.setDouble(13, max.getZ());
+                ps.setString(14, min.getWorld().getName());
+                return ps.executeUpdate() > 0;
             }
-        });
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
     }
 
     /**
@@ -257,7 +258,7 @@ public class DatabaseManager {
         try {
             conn.setAutoCommit(false);
             try (Statement stmt = conn.createStatement()) {
-                // 1. Configurações Globais das Tabelas (Cameras, Tracks, Regions)
+                // 1. Global Table Configurations (Cameras, Tracks, Regions)
                 stmt.executeUpdate(
                     """
                     CREATE TABLE IF NOT EXISTS fr_cameras (
@@ -327,7 +328,7 @@ public class DatabaseManager {
                 stmt.executeUpdate("ALTER TABLE fr_regions ADD COLUMN points TEXT");
             } catch (SQLException ignored) {}
 
-            // 2. Sistema de Corridas Oficiais (Events, Rounds, Heats, Drivers, Laps)
+            // 2. Official Race System (Events, Rounds, Heats, Drivers, Laps)
             stmt.executeUpdate(
                 "CREATE TABLE IF NOT EXISTS fr_events (id INTEGER PRIMARY KEY AUTOINCREMENT, creatorUUID TEXT NOT NULL, name TEXT NOT NULL, league TEXT, trackNameWS TEXT DEFAULT NULL, creationTime INTEGER DEFAULT NULL, state TEXT NOT NULL, openSign INTEGER NOT NULL DEFAULT 1)"
             );
@@ -400,7 +401,7 @@ public class DatabaseManager {
                 );
             } catch (SQLException ignored) {}
 
-            // 3. BoatUtils e Checkpoints
+            // 3. BoatUtils and Checkpoints
             stmt.executeUpdate(
                 """
                 CREATE TABLE IF NOT EXISTS fr_boatutils (
@@ -408,7 +409,7 @@ public class DatabaseManager {
                     stepHeight REAL DEFAULT 1.25,
                     defaultSlipperiness REAL DEFAULT 0.6,
                     fallDamage BOOLEAN DEFAULT TRUE,
-                    waterElevation BOOLEAN DEFAULT TRUE,
+                    waterElevation BOOLEAN DEFAULT FALSE,
                     airControl BOOLEAN DEFAULT TRUE,
                     jumpForce REAL DEFAULT 0.36,
                     gravity DOUBLE DEFAULT -0.03999999910593033,
@@ -428,13 +429,65 @@ public class DatabaseManager {
                     collisionResolution TINYINT DEFAULT 5,
                     exclusiveMode BOOLEAN DEFAULT FALSE,
                     customSlipperiness TEXT DEFAULT NULL,
-                    perBlockSetting TEXT DEFAULT NULL
+                    perBlockSetting TEXT DEFAULT NULL,
+                    walltapMultiplier REAL DEFAULT 0.0,
+                    jumps INT DEFAULT 1,
+                    scale REAL DEFAULT 1.0,
+                    stepUpSlipperiness REAL DEFAULT 1.0,
+                    fixDoubleWaterElevation BOOLEAN DEFAULT FALSE,
+                    lateralSlipperiness REAL DEFAULT 1.0,
+                    brakeSlipperiness REAL DEFAULT 1.0,
+                    multiStepping BOOLEAN DEFAULT FALSE,
+                    maxSpeed REAL DEFAULT -1.0,
+                    maxSpeedResistance REAL DEFAULT 0.0,
+                    honeyCompatibility BOOLEAN DEFAULT FALSE,
+                    collisionFilter TEXT DEFAULT NULL,
+                    minObuVersion INT DEFAULT 1
                 )"""
             );
             try {
                 stmt.execute(
                     "ALTER TABLE fr_boatutils ADD COLUMN exclusiveMode BOOLEAN DEFAULT FALSE;"
                 );
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN walltapMultiplier REAL DEFAULT 0.0;");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN jumps INT DEFAULT 1;");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN scale REAL DEFAULT 1.0;");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN stepUpSlipperiness REAL DEFAULT 1.0;");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN fixDoubleWaterElevation BOOLEAN DEFAULT FALSE;");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN lateralSlipperiness REAL DEFAULT 1.0;");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN brakeSlipperiness REAL DEFAULT 1.0;");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN multiStepping BOOLEAN DEFAULT FALSE;");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN maxSpeed REAL DEFAULT -1.0;");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN maxSpeedResistance REAL DEFAULT 0.0;");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN honeyCompatibility BOOLEAN DEFAULT FALSE;");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN collisionFilter TEXT DEFAULT NULL;");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN minObuVersion INT DEFAULT 1;");
             } catch (SQLException ignored) {}
 
             stmt.executeUpdate(
@@ -492,7 +545,7 @@ public class DatabaseManager {
                     PRIMARY KEY (player_uuid, trackNameWS, checkpointId)
                 )"""
             );
-            // 4. Sistema de DUELOS
+            // 4. DUEL System
             stmt.executeUpdate(
                 """
                 CREATE TABLE IF NOT EXISTS fr_timetrial_duels (
@@ -519,7 +572,7 @@ public class DatabaseManager {
                 );
             } catch (SQLException ignored) {}
 
-            // Migração segura para a coluna winner
+            // Safe migration for the winner column
             try {
                 stmt.execute(
                     "ALTER TABLE fr_timetrial_duels ADD COLUMN winner VARCHAR(36) NULL;"
@@ -550,7 +603,7 @@ public class DatabaseManager {
             try {
                 stmt.executeUpdate("DROP TABLE IF EXISTS fr_drs;");
             } catch (SQLException ignored) {}
-            // 5. Sistema de Jogadores e Tempos (Time Trial)
+            // 5. Player and Time System (Time Trial)
             stmt.executeUpdate(
                 """
                 CREATE TABLE IF NOT EXISTS fr_player_times (
@@ -561,6 +614,7 @@ public class DatabaseManager {
                      bestTime REAL DEFAULT 0,
                      checkpointsReached INTEGER DEFAULT 0,
                      finished BOOLEAN DEFAULT FALSE,
+                     plataforma TEXT DEFAULT 'JAVA',
                      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )"""
             );
@@ -571,8 +625,8 @@ public class DatabaseManager {
                             "trackNameWS TEXT NOT NULL, " +
                             "regionMinX REAL, regionMinY REAL, regionMinZ REAL, " +
                             "regionMaxX REAL, regionMaxY REAL, regionMaxZ REAL, " +
-                            "world TEXT NOT NULL, " + // <-- Adicionada a vírgula aqui
-                            "type TEXT NOT NULL" +     // <-- Agora o tipo fica em uma coluna separada
+                            "world TEXT NOT NULL, " + // <-- Comma added here
+                            "type TEXT NOT NULL" +     // <-- Now the type goes in a separate column
                             ");"
             );
 
@@ -601,10 +655,17 @@ public class DatabaseManager {
                 )"""
             );
 
-            // 6. Outros
+            // 6. Others
             stmt.executeUpdate(
-                "CREATE TABLE IF NOT EXISTS fr_holograms (trackNameWS TEXT PRIMARY KEY, world TEXT, x REAL, y REAL, z REAL)"
+                "CREATE TABLE IF NOT EXISTS fr_holograms (trackNameWS TEXT PRIMARY KEY, world TEXT, x REAL, y REAL, z REAL, java_enabled INTEGER DEFAULT 1, bedrock_enabled INTEGER DEFAULT 1)"
             );
+            // Migration for existing databases that lack toggle columns
+            try {
+                stmt.executeUpdate("ALTER TABLE fr_holograms ADD COLUMN java_enabled INTEGER DEFAULT 1");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.executeUpdate("ALTER TABLE fr_holograms ADD COLUMN bedrock_enabled INTEGER DEFAULT 1");
+            } catch (SQLException ignored) {}
             stmt.executeUpdate(
                 "CREATE TABLE IF NOT EXISTS fr_party (id INTEGER PRIMARY KEY AUTOINCREMENT, owner TEXT NOT NULL UNIQUE, members TEXT NOT NULL)"
             );
@@ -655,7 +716,7 @@ public class DatabaseManager {
                 )"""
             );
 
-            // MIGRAÇÃO: garante que todas as colunas novas existam (caso tabela seja antiga)
+            // MIGRATION: ensures all new columns exist (in case the table is old)
             String[] newColumns = {
                 "entryMinX",
                 "entryMinY",
@@ -676,11 +737,11 @@ public class DatabaseManager {
                         "ALTER TABLE fr_pit_stops ADD COLUMN " + col + " REAL"
                     );
                 } catch (SQLException ignored) {
-                    // Coluna já existe – ignora
+                    // Column already exists – ignore
                 }
             }
 
-            // [NOVO] Adiciona colunas para a "Pit Area"
+            // [NEW] Adds columns for the "Pit Area"
             String[] areaColumns = {
                 "areaMinX",
                 "areaMinY",
@@ -695,16 +756,16 @@ public class DatabaseManager {
                         "ALTER TABLE fr_pit_stops ADD COLUMN " + col + " REAL"
                     );
                 } catch (SQLException ignored) {
-                    // Coluna já existe – ignora
+                    // Column already exists – ignore
                 }
             }
 
-            // Adiciona coluna game_time na tabela fr_tracks
+            // Adds game_time column to the fr_tracks table
             try {
                 stmt.executeUpdate("ALTER TABLE fr_tracks ADD COLUMN game_time INTEGER DEFAULT NULL");
             } catch (SQLException ignored) {}
 
-            // [NOVO] Adiciona colunas para "Start Region" na tabela fr_pit_stops
+            // [NEW] Adds columns for "Start Region" to the fr_pit_stops table
             String[] startColumns = {
                 "startMinX",
                 "startMinY",
@@ -719,11 +780,11 @@ public class DatabaseManager {
                         "ALTER TABLE fr_pit_stops ADD COLUMN " + col + " REAL"
                     );
                 } catch (SQLException ignored) {
-                    // Coluna já existe – ignora
+                    // Column already exists – ignore
                 }
             }
 
-            // [NOVO] Adiciona colunas para "finishAll" na tabela fr_tracks
+            // [NEW] Adds columns for "finishAll" to the fr_tracks table
             String[] finishAllColumns = {
                 "finishAll_x",
                 "finishAll_y",
@@ -740,6 +801,9 @@ public class DatabaseManager {
                     );
                 } catch (SQLException ignored) {}
             }
+
+            // Normalizes all boatutils to lowercase (removes duplicates with uppercase)
+            stmt.executeUpdate("DELETE FROM fr_boatutils WHERE trackNameWS != LOWER(trackNameWS)");
 
             plugin
                 .getDebugManager()
@@ -919,7 +983,7 @@ public class DatabaseManager {
         try {
             Connection conn = getOrConnect();
 
-            // ========== PASSO 1: Mapear todos os trackNameWS antigos e novos ==========
+            // ========== STEP 1: Map all old and new trackNameWS ==========
             Map<String, String> trackNameMapping = new HashMap<>(); // old -> new
 
             String sqlSelect = "SELECT trackName, trackNameWS FROM fr_tracks";
@@ -1023,7 +1087,7 @@ public class DatabaseManager {
                 }
             }
 
-            // ========== PASSO 4: Atualizar fr_checkpoint ==========
+            // ========== STEP 4: Update fr_checkpoint ==========
             plugin
                 .getDebugManager()
                 .logDatabaseOperation(
@@ -1055,7 +1119,7 @@ public class DatabaseManager {
                 }
             }
 
-            // ========== PASSO 5: Atualizar fr_checkpoint_times ==========
+            // ========== STEP 5: Update fr_checkpoint_times ==========
             plugin
                 .getDebugManager()
                 .logDatabaseOperation(
@@ -1087,7 +1151,7 @@ public class DatabaseManager {
                 }
             }
 
-            // ========== PASSO 6: Atualizar fr_boatutils ==========
+            // ========== STEP 6: Update fr_boatutils ==========
             plugin
                 .getDebugManager()
                 .logDatabaseOperation(
@@ -1117,7 +1181,7 @@ public class DatabaseManager {
                 }
             }
 
-            // ========== PASSO 7: Atualizar fr_grid_positions ==========
+            // ========== STEP 7: Update fr_grid_positions ==========
             plugin
                 .getDebugManager()
                 .logDatabaseOperation(
@@ -1145,7 +1209,7 @@ public class DatabaseManager {
                 }
             }
 
-            // ========== PASSO 8: Atualizar fr_cameras ==========
+            // ========== STEP 8: Update fr_cameras ==========
             plugin
                 .getDebugManager()
                 .logDatabaseOperation(
@@ -1175,7 +1239,7 @@ public class DatabaseManager {
                 }
             }
 
-            // ========== PASSO 8.5: Atualizar fr_track_finish_positions ==========
+            // ========== STEP 8.5: Update fr_track_finish_positions ==========
             plugin
                 .getDebugManager()
                 .logDatabaseOperation(
@@ -1205,7 +1269,7 @@ public class DatabaseManager {
                 }
             }
 
-            // ========== PASSO 9: Atualizar fr_timetrial_duels ==========
+            // ========== STEP 9: Update fr_timetrial_duels ==========
             plugin
                 .getDebugManager()
                 .logDatabaseOperation(
@@ -1233,7 +1297,7 @@ public class DatabaseManager {
                 }
             }
 
-            // ========== PASSO 10: Atualizar fr_events (se houver coluna trackNameWS) ==========
+            // ========== STEP 10: Update fr_events (if trackNameWS column exists) ==========
             try {
                 plugin
                     .getDebugManager()
@@ -1266,7 +1330,7 @@ public class DatabaseManager {
                     }
                 }
             } catch (SQLException e) {
-                // Coluna trackNameWS pode não existir em fr_events
+                // Column trackNameWS may not exist in fr_events
                 plugin
                     .getDebugManager()
                     .logDatabaseOperation(
@@ -1547,7 +1611,7 @@ public class DatabaseManager {
     }
 
     public int getplayerpositiononduel(int duelId, Player player) {
-        // Nota: getBestTimesForDuel já é synchronized, não precisa de lock extra aqui
+        // Note: getBestTimesForDuel is already synchronized, no extra lock needed here
         Map<UUID, Long> duelTimes = getBestTimesForDuel(duelId);
         if (duelTimes == null || duelTimes.isEmpty()) return 1;
 
@@ -1562,14 +1626,14 @@ public class DatabaseManager {
     }
 
     public synchronized boolean playerExists(UUID uuid) {
-        // Debug inicial
+        // Initial debug
 
         String sql = "SELECT 1 FROM fr_players WHERE uuid = ?";
 
         try {
             Connection conn = getOrConnect();
 
-            // Debug de conexão
+            // Connection debug
             if (conn == null || conn.isClosed()) {
                 return false;
             }
@@ -1658,7 +1722,7 @@ public class DatabaseManager {
         } catch (SQLException e) {
             handleSqlError(e);
         }
-        return 1; // Oak Boat padrão
+        return 1; // Oak Boat default
     }
 
     public boolean getTimeTrialScoreboard(UUID playerUUID) {
@@ -1692,7 +1756,7 @@ public class DatabaseManager {
                 handleSqlError(e);
             }
         }
-        return true; // Habilitado por padrão
+        return true; // Enabled by default
     }
 
     /* =======================================================
@@ -2009,7 +2073,7 @@ public class DatabaseManager {
 
         try {
             Connection conn = getOrConnect();
-            conn.setAutoCommit(false); // Atômico: evita IDs pulados ou duplicados
+            conn.setAutoCommit(false); // Atomic: prevents skipped or duplicate IDs
 
             try {
                 int finalId = checkpointId;
@@ -2225,17 +2289,17 @@ public class DatabaseManager {
             }
         }
 
-        // Se não tem END, assumimos que é circuito (ou incompleto, mas tratamos como circuito por segurança)
+        // If there's no END, we assume it's a circuit (or incomplete, but we treat it as circuit for safety)
         if (end == null) return true;
-        // Se não tem START, mesma coisa
+        // If there's no START, same thing
         if (start == null) return true;
 
-        // Se START e END são a MESMA região (mesmo ID ou tecnicamente sobrepostos), é circuito
-        // Mas a convenção é: se existir END separado que não é o START, é sprint.
-        // No Heats.java, geralmente se a região é tipo START ela conta lap.
-        // Se for Sprint, a lap só fecha no END.
+        // If START and END are the SAME region (same ID or technically overlapping), it's a circuit
+        // But the convention is: if a separate END exists that is not the START, it's sprint.
+        // In Heats.java, generally if the region is type START it counts as a lap.
+        // If it's Sprint, the lap only closes at END.
 
-        // Vamos comparar a distância entre os centros
+        // Let's compare the distance between the centers
         double startX = (start.getMinX() + start.getMaxX()) / 2.0;
         double startZ = (start.getMinZ() + start.getMaxZ()) / 2.0;
         double endX = (end.getMinX() + end.getMaxX()) / 2.0;
@@ -2243,7 +2307,7 @@ public class DatabaseManager {
 
         double distSq = Math.pow(startX - endX, 2) + Math.pow(startZ - endZ, 2);
 
-        // Se a distância for significativa (> 20 blocos), consideramos Point-to-Point
+        // If the distance is significant (> 20 blocks), we consider Point-to-Point
         // 400 = 20^2
         return distSq < 400;
     }
@@ -2341,8 +2405,11 @@ public class DatabaseManager {
             "waterElevation, airControl, jumpForce, gravity, yawAcceleration, forwardAcceleration, " +
             "backwardAcceleration, turningForwardAcceleration, allowAccelerationStacking, underwaterControl, " +
             "surfaceWaterControl, coyoteTime, waterJumping, swimForce, collisionMode, " +
-            "airStepping, tenStepInterpolation, collisionResolution) " +
-            "VALUES (?, 0.0, 0.6, 1, 1, 0, 0.0, -0.04, 1.0, 0.04, 0.005, 0.005, 1, 0, 0, 0, 0, 0.0, 0, 0, 0, 5) " +
+            "airStepping, tenStepInterpolation, collisionResolution, walltapMultiplier, jumps, scale, " +
+            "stepUpSlipperiness, fixDoubleWaterElevation, lateralSlipperiness, brakeSlipperiness, " +
+            "multiStepping, maxSpeed, maxSpeedResistance, honeyCompatibility) " +
+            "VALUES (?, 0.0, 0.6, 1, 0, 0, 0.0, -0.04, 1.0, 0.04, 0.005, 0.005, 1, 0, 0, 0, 0, 0.0, 0, 0, 0, 5, " +
+            "0.0, 1, 1.0, 1.0, 0, 1.0, 1.0, 0, -1.0, 0.0, 0) " +
             "ON CONFLICT(trackNameWS) DO UPDATE SET " +
             "stepHeight = excluded.stepHeight, " +
             "defaultSlipperiness = excluded.defaultSlipperiness, " +
@@ -2364,11 +2431,22 @@ public class DatabaseManager {
             "collisionMode = excluded.collisionMode, " +
             "airStepping = excluded.airStepping, " +
             "tenStepInterpolation = excluded.tenStepInterpolation, " +
-            "collisionResolution = excluded.collisionResolution";
+            "collisionResolution = excluded.collisionResolution, " +
+            "walltapMultiplier = excluded.walltapMultiplier, " +
+            "jumps = excluded.jumps, " +
+            "scale = excluded.scale, " +
+            "stepUpSlipperiness = excluded.stepUpSlipperiness, " +
+            "fixDoubleWaterElevation = excluded.fixDoubleWaterElevation, " +
+            "lateralSlipperiness = excluded.lateralSlipperiness, " +
+            "brakeSlipperiness = excluded.brakeSlipperiness, " +
+            "multiStepping = excluded.multiStepping, " +
+            "maxSpeed = excluded.maxSpeed, " +
+            "maxSpeedResistance = excluded.maxSpeedResistance, " +
+            "honeyCompatibility = excluded.honeyCompatibility";
 
         try {
             Connection conn = getOrConnect();
-            conn.setAutoCommit(false); // Inicia transação para garantir integridade
+            conn.setAutoCommit(false); // Start transaction to ensure integrity
 
             try {
                 try (PreparedStatement ps = conn.prepareStatement(sqlTrack)) {
@@ -2413,12 +2491,12 @@ public class DatabaseManager {
         String trackName
     ) {
         Map<Integer, Double> checkpointTimes = new HashMap<>();
-        // ✅ Remove apenas espaços, sem toLowerCase
+        // ✅ Remove only spaces, without toLowerCase
         String trackNameWS = trackName.replaceAll("\\s+", "");
 
-        // ✅ LÓGICA CORRETA: Busca checkpoints do tempo mais rápido QUE TENHA checkpoints salvos
-        // Não busca o PB absoluto, porque ele pode não ter checkpoints (feito antes do sistema)
-        // Isso garante que o delta sempre compare com uma volta válida que tenha dados salvos
+        // ✅ CORRECT LOGIC: Fetch checkpoints from the fastest time THAT HAS saved checkpoints
+        // Does not fetch absolute PB, because it may not have checkpoints (done before the system)
+        // This ensures the delta always compares with a valid lap that has saved data
         String sql =
             "SELECT ct.checkpointId, ct.time " +
             "FROM fr_checkpoint_times ct " +
@@ -2429,11 +2507,11 @@ public class DatabaseManager {
             "    SELECT pt2.id FROM fr_player_times pt2 " +
             "    WHERE pt2.player_uuid = ? AND LOWER(pt2.trackNameWS) = LOWER(?) " +
             "    AND pt2.finished = TRUE " +
-            "    AND EXISTS (" + // ✅ CRÍTICO: Só considera tempos que TEM checkpoints
+            "    AND EXISTS (" + // ✅ CRITICAL: Only considers times that HAVE checkpoints
             "        SELECT 1 FROM fr_checkpoint_times ct3 " +
             "        WHERE ct3.timetrial_id = pt2.id LIMIT 1" +
             "    ) " +
-            "    ORDER BY pt2.bestTime ASC LIMIT 1" + // O mais rápido QUE TENHA checkpoints
+            "    ORDER BY pt2.bestTime ASC LIMIT 1" + // The fastest THAT HAS checkpoints
             ")";
 
         try {
@@ -2454,10 +2532,10 @@ public class DatabaseManager {
                 }
             }
 
-            // 🔍 DEBUG: Log detalhado
+            // 🔍 DEBUG: Detailed log
             if (plugin.getDebugManager().isTimeTrialSystemEnabled()) {
                 if (checkpointTimes.isEmpty()) {
-                    // Verifica se existe PB SEM checkpoints
+                    // Checks if there is a PB WITHOUT checkpoints
                     String debugSql =
                         "SELECT bestTime FROM fr_player_times " +
                         "WHERE player_uuid = ? AND LOWER(trackNameWS) = LOWER(?) " +
@@ -2519,7 +2597,7 @@ public class DatabaseManager {
         Location hologramLocation = null;
         String trackNameWS = trackName.replaceAll("\\s+", "");
 
-        // Queries de deleção organizada
+        // Organized deletion queries
         String selectHologramSql =
             "SELECT world, x, y, z FROM fr_holograms WHERE LOWER(trackNameWS) = LOWER(?)";
         String[] deleteSqls = {
@@ -2537,9 +2615,9 @@ public class DatabaseManager {
 
         try {
             Connection conn = getOrConnect();
-            conn.setAutoCommit(false); // Inicia transação atômica
+            conn.setAutoCommit(false); // Start atomic transaction
 
-            // 1. Buscar holograma antes de apagar
+            // 1. Fetch hologram before deleting
             try (
                 PreparedStatement ps = conn.prepareStatement(selectHologramSql)
             ) {
@@ -2559,7 +2637,7 @@ public class DatabaseManager {
                 }
             }
 
-            // 2. Executar deleções em cascata
+            // 2. Execute cascade deletions
             for (String sql : deleteSqls) {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
                     ps.setString(1, trackNameWS);
@@ -2621,7 +2699,7 @@ public class DatabaseManager {
 
         try {
             Connection conn = getOrConnect();
-            // Remove anterior do mesmo tipo (exceto RESET, que pode ter vários)
+            // Remove previous of the same type (except RESET, which can have multiple)
             int deletedCount = 0;
             if (!normalizedType.equals("RESET")) {
                 try (
@@ -2772,7 +2850,7 @@ public class DatabaseManager {
         List<String> tracks = new ArrayList<>();
         try {
             Connection conn = getOrConnect();
-            // ✅ Busca trackName ORIGINAL ao invés de trackNameWS
+            // ✅ Fetch ORIGINAL trackName instead of trackNameWS
             try (
                 PreparedStatement ps = conn.prepareStatement(
                     "SELECT trackName FROM fr_tracks"
@@ -2830,7 +2908,7 @@ public class DatabaseManager {
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         double record = rs.getDouble("record");
-                        // Retorna null se não houver registro (valor 0.0 do MIN em SQL quando não há dados)
+                        // Returns null if there's no record (0.0 value from MIN in SQL when there's no data)
                         return record > 0 ? record : null;
                     }
                 }
@@ -2883,11 +2961,11 @@ public class DatabaseManager {
         try {
             int totalCheckpoints = getCheckpointCount(trackWS);
 
-            // SQL Refatorado para garantir a ordem correta:
-            // 1. Quem terminou (finished = 1) vem antes de quem não terminou (finished = 0).
-            // 2. Entre os que terminaram: Menor tempo vence.
-            // 3. Entre os que NÃO terminaram: Mais checkpoints vencem.
-            // 4. Se empatarem em checkpoints: Menor tempo vence.
+            // SQL Refactored to ensure correct ordering:
+            // 1. Those who finished (finished = 1) come before those who did not finish (finished = 0).
+            // 2. Among those who finished: Lowest time wins.
+            // 3. Among those who did NOT finish: Most checkpoints wins.
+            // 4. If tied on checkpoints: Lowest time wins.
             String sql = """
                 SELECT player_uuid, player_name, bestTime, checkpointsReached, finished
                 FROM (
@@ -3315,8 +3393,8 @@ public class DatabaseManager {
         String trackNameWS,
         String newOwnerName
     ) {
-        // Usamos REPLACE para remover espaços e LOWER para ignorar maiúsculas
-        // O primeiro argumento de REPLACE é a coluna, o segundo é o caractere ' ' e o terceiro é vazio ''
+        // We use REPLACE to remove spaces and LOWER to ignore case
+        // The first argument of REPLACE is the column, the second is the ' ' character and the third is empty ''
         String sql =
             "UPDATE fr_tracks SET creatorName = ? WHERE REPLACE(LOWER(trackNameWS), ' ', '') = LOWER(?)";
 
@@ -3325,7 +3403,7 @@ public class DatabaseManager {
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, newOwnerName);
 
-                // Removemos os espaços do argumento que o jogador digitou tmb
+                // We also remove spaces from the argument the player typed
                 String cleanedTrackName = trackNameWS
                     .replace(" ", "")
                     .toLowerCase(Locale.ROOT);
@@ -3364,7 +3442,7 @@ public class DatabaseManager {
                 ResultSet rs = ps.executeQuery()
             ) {
                 while (rs.next()) {
-                    String trackName = rs.getString("trackName"); // Nome ORIGINAL com formatação
+                    String trackName = rs.getString("trackName"); // ORIGINAL name with formatting
                     String trackNameWS = rs.getString("trackNameWS");
                     String worldName = rs.getString("worldName");
 
@@ -3390,7 +3468,7 @@ public class DatabaseManager {
                         rs.getFloat("spawnPoint_pitch")
                     );
 
-                    // ✅ USA trackName ORIGINAL como chave (para exibir no menu)
+                    // ✅ Uses ORIGINAL trackName as key (to display in menu)
                     trackDataMap.put(
                         trackName,
                         new TrackData(
@@ -3488,7 +3566,7 @@ public class DatabaseManager {
         boolean newFinished
     ) throws SQLException {
         try {
-            // ✅ Remove apenas espaços, sem toLowerCase
+            // ✅ Remove only spaces, without toLowerCase
             String trackNameWS = trackName.replaceAll("\\s+", "");
             double roundedNewTime = Math.round(newTime * 1000.0) / 1000.0;
 
@@ -3496,7 +3574,7 @@ public class DatabaseManager {
                 .getTimerUtils()
                 .getTempCheckpoints(playerUUID);
 
-            // DEBUG: Log detalhado
+            // DEBUG: Detailed log
             if (plugin.getDebugManager().isTimeTrialSystemEnabled()) {
                 if (newCheckpoints == null) {
                     plugin
@@ -3526,8 +3604,8 @@ public class DatabaseManager {
                 return;
             }
 
-            // 🔹 CORREÇÃO CRÍTICA: Filtra apenas os checkpoints da pista atual!
-            // Isso evita salvar checkpoints de outras pistas quando o jogador troca de track
+            // 🔹 CRITICAL FIX: Filter only the checkpoints of the current track!
+            // This prevents saving checkpoints from other tracks when the player changes track
             List<TimerUtils.CheckpointData> filteredCheckpoints =
                 new ArrayList<>();
             for (TimerUtils.CheckpointData cp : newCheckpoints) {
@@ -3538,7 +3616,7 @@ public class DatabaseManager {
                 }
             }
 
-            // DEBUG: Log após filtro
+            // DEBUG: Log after filter
             if (plugin.getDebugManager().isTimeTrialSystemEnabled()) {
                 plugin
                     .getDebugManager()
@@ -3575,12 +3653,12 @@ public class DatabaseManager {
                 return;
             }
 
-            // Usa a lista filtrada em vez da original
+            // Use the filtered list instead of the original
             newCheckpoints = filteredCheckpoints;
 
-            // --- LÓGICA DE COMPARAÇÃO ---
-            // 🔹 CORREÇÃO CRÍTICA: Busca o melhor tempo COMPLETO (finished=1) QUE TEM CHECKPOINTS SALVOS
-            // Ignora registros órfãos (tempos sem checkpoints)
+            // --- COMPARISON LOGIC ---
+            // 🔹 CRITICAL FIX: Fetch the best COMPLETE time (finished=1) THAT HAS SAVED CHECKPOINTS
+            // Ignores orphan records (times without checkpoints)
             Integer oldTimetrialId = null;
             double oldTime = Double.MAX_VALUE;
             int oldCheckpoints = 0;
@@ -3665,7 +3743,7 @@ public class DatabaseManager {
                 return;
             }
 
-            // 🔹 NOVO: Deleta checkpoints do tempo ANTERIOR (antigo recorde) antes de salvar o novo
+            // 🔹 NEW: Delete checkpoints from the PREVIOUS time (old record) before saving the new one
             if (oldTimetrialId != null) {
                 String sqlDeleteOld =
                     "DELETE FROM fr_checkpoint_times WHERE timetrial_id = ?";
@@ -3750,7 +3828,7 @@ public class DatabaseManager {
                         psDel.executeUpdate();
                     }
 
-                    // Tenta inserir novamente após o delete forçado
+                    // Try to insert again after forced delete
                     executeCheckpointBatch(
                         conn,
                         sqlInsert,
@@ -3766,7 +3844,7 @@ public class DatabaseManager {
                             "[FormulaRacing] Recuperação concluída com sucesso."
                         );
                 } else {
-                    // Se for outro erro que não seja constraint, repassa para o log
+                    // If it's another error that is not a constraint, forward to log
                     throw e;
                 }
             }
@@ -3866,7 +3944,7 @@ public class DatabaseManager {
 
         SchedulerHelper.runAsync(plugin, () -> {
             synchronized (this) {
-                // Sincronização mesmo em task assíncrona
+                // Synchronization even in async task
                 try {
                     Connection conn = getOrConnect();
                     try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -3908,13 +3986,13 @@ public class DatabaseManager {
         int checkpointsReached
     ) {
         String trackNameWS = trackName.replaceAll("\\s+", "");
-        // Arredondamento para milissegundos (3 casas decimais) para suportar subtick
+        // Rounding to milliseconds (3 decimal places) to support subtick
         double roundedTime = Math.round(time * 1000.0) / 1000.0;
 
         try {
             Connection conn = getOrConnect();
 
-            // --- LÓGICA DE RECORDE (DISCORD) ---
+            // --- RECORD LOGIC (DISCORD) ---
             String prevBestPlayer = null;
             double prevBestTime = Double.MAX_VALUE;
             double playerOwnBestTime = Double.MAX_VALUE;
@@ -3932,7 +4010,7 @@ public class DatabaseManager {
                         roundedTime
                 );
 
-            // PRIMEIRO: Busca o melhor tempo do PRÓPRIO jogador (APENAS voltas COMPLETAS)
+            // FIRST: Fetch the player's OWN best time (ONLY COMPLETE laps)
             String ownBestSql =
                 "SELECT bestTime FROM fr_player_times WHERE LOWER(trackNameWS) = LOWER(?) AND player_uuid = ? AND finished = TRUE ORDER BY bestTime ASC LIMIT 1";
             try (PreparedStatement psOwn = conn.prepareStatement(ownBestSql)) {
@@ -3951,7 +4029,7 @@ public class DatabaseManager {
                 }
             }
 
-            // NOVO: Busca o melhor tempo do jogador QUE TEM CHECKPOINTS SALVOS
+            // NEW: Fetch the player's best time THAT HAS SAVED CHECKPOINTS
             String ownBestWithCheckpointsSql =
                 "SELECT pt.bestTime " +
                 "FROM fr_player_times pt " +
@@ -3981,8 +4059,8 @@ public class DatabaseManager {
                 }
             }
 
-            // SE O TEMPO NÃO É MELHOR QUE O PRÓPRIO TEMPO DO JOGADOR, NÃO SALVA O TEMPO
-            // MAS AINDA PODE SALVAR CHECKPOINTS SE FOR MELHOR QUE O TEMPO COM CHECKPOINTS
+            // IF THE TIME IS NOT BETTER THAN THE PLAYER'S OWN TIME, DO NOT SAVE THE TIME
+            // BUT CAN STILL SAVE CHECKPOINTS IF IT IS BETTER THAN THE CHECKPOINT TIME
             boolean shouldSaveTime = roundedTime < playerOwnBestTime;
             boolean shouldSaveCheckpoints =
                 roundedTime < playerBestTimeWithCheckpoints;
@@ -4008,7 +4086,7 @@ public class DatabaseManager {
                     );
             }
 
-            // SEGUNDO: Busca o melhor tempo GLOBAL (de qualquer jogador, APENAS voltas COMPLETAS) - APENAS SE SALVAR TEMPO
+            // SECOND: Fetch the GLOBAL best time (from any player, ONLY COMPLETE laps) - ONLY IF SAVING TIME
             if (shouldSaveTime) {
                 String globalRecordSql =
                     "SELECT player_name, bestTime FROM fr_player_times WHERE LOWER(trackNameWS) = LOWER(?) AND finished = TRUE ORDER BY bestTime ASC LIMIT 1";
@@ -4031,20 +4109,20 @@ public class DatabaseManager {
                                         prevBestTime
                                 );
 
-                            // É recorde APENAS se:
-                            // 1. Tempo novo < tempo do recorde global atual
-                            // 2. E o recorde global NÃO é do próprio jogador (ou é, mas melhorou)
+                            // It's a record ONLY if:
+                            // 1. New time < current global record time
+                            // 2. And the global record is NOT by the player themselves (or it is, but improved)
                             if (roundedTime < (prevBestTime - 0.001)) {
-                                // Bateu o recorde global
+                                // Beat the global record
                                 if (prevBestPlayer.equals(playerName)) {
-                                    // É o próprio jogador, melhorando seu próprio recorde
+                                    // It's the player themselves, improving their own record
                                     plugin
                                         .getDebugManager()
                                         .logTimeTrialSystem(
                                             "[saveFullTime] ✅ Jogador melhorou seu PRÓPRIO recorde!"
                                         );
                                 } else {
-                                    // Bateu o recorde de OUTRO jogador
+                                    // Beat another player's record
                                     plugin
                                         .getDebugManager()
                                         .logTimeTrialSystem(
@@ -4066,7 +4144,7 @@ public class DatabaseManager {
                                     );
                             }
                         } else {
-                            // Nenhum tempo na pista ainda = primeiro recorde!
+                            // No time on the track yet = first record!
                             plugin
                                 .getDebugManager()
                                 .logTimeTrialSystem(
@@ -4084,7 +4162,7 @@ public class DatabaseManager {
                             "[saveFullTime] 📢 Enviando mensagem de recorde para o Discord!"
                         );
 
-                    // ✅ CORREÇÃO: Busca o nome de exibição (display name) da pista para o Discord
+                    // ✅ FIX: Fetch the track's display name for Discord
                     String displayTrackName = trackName;
                     try (
                         PreparedStatement psName = conn.prepareStatement(
@@ -4100,7 +4178,7 @@ public class DatabaseManager {
                             }
                         }
                     } catch (SQLException ignored) {
-                        // Se falhar o SELECT do nome, usa o que já tem (fail-safe)
+                        // If the name SELECT fails, use what we already have (fail-safe)
                     }
 
                     DiscordUtils.sendRecordMessage(
@@ -4111,6 +4189,10 @@ public class DatabaseManager {
                         (prevBestTime == Double.MAX_VALUE ? 0 : prevBestTime),
                         displayTrackName
                     );
+
+                    if (prevBestPlayer != null && !prevBestPlayer.isEmpty() && prevBestTime > 0 && !playerName.equalsIgnoreCase(prevBestPlayer)) {
+                        Bukkit.broadcastMessage("§e" + playerName + " fez o recorde da pista " + displayTrackName);
+                    }
                 } else {
                     plugin
                         .getDebugManager()
@@ -4120,17 +4202,17 @@ public class DatabaseManager {
                 }
             }
 
-// --- TRANSAÇÃO DE ESCRITA ---
+// --- WRITE TRANSACTION ---
             try {
                 conn.setAutoCommit(false);
 
                 Integer generatedId = null;
 
-                // Determina a plataforma com base no nome
-                String platform = playerName.startsWith(".") ? "BEDROCK" : "JAVA";
+                // Determines the platform based on the name
+                String platform = playerName.startsWith("*") ? "BEDROCK" : "JAVA";
 
                 if (shouldSaveTime) {
-                    // Salva o tempo normalmente (é um novo recorde pessoal)
+                    // Saves the time normally (it's a new personal record)
                     String insertSql =
                             "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, plataforma) VALUES (?, ?, ?, ?, ?, ?, ?)";
                     try (
@@ -4153,7 +4235,7 @@ public class DatabaseManager {
                         }
                     }
                 } else if (shouldSaveCheckpoints) {
-                    // Não é recorde pessoal, mas é melhor que o tempo com checkpoints
+                    // Not a personal record, but it's better than the checkpoint time
                     String insertSql =
                             "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, plataforma) VALUES (?, ?, ?, ?, ?, ?, ?)";
                     try (
@@ -4241,8 +4323,8 @@ public class DatabaseManager {
                 if (roundedTime < prevTime) {
                     Integer generatedId = null;
 
-                    // Determina a plataforma com base no nome do jogador
-                    String platform = playerName.startsWith(".") ? "BEDROCK" : "JAVA";
+                    // Determines the platform based on the player's name
+                    String platform = playerName.startsWith("*") ? "BEDROCK" : "JAVA";
 
                     String insertSql =
                             "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, plataforma) VALUES (?, ?, ?, ?, ?, FALSE, ?)";
@@ -4364,7 +4446,7 @@ public class DatabaseManager {
         List<Location> cameras = new ArrayList<>();
         if (trackName == null || trackName.isBlank()) return cameras;
 
-        // ✅ Remove apenas espaços, sem toLowerCase
+        // ✅ Remove only spaces, without toLowerCase
         String trackNameWS = trackName.replaceAll("\\s+", "");
         String sql =
             "SELECT x, y, z FROM fr_cameras WHERE LOWER(trackNameWS) = LOWER(?)";
@@ -4378,7 +4460,7 @@ public class DatabaseManager {
                         double x = rs.getDouble("x");
                         double y = rs.getDouble("y");
                         double z = rs.getDouble("z");
-                        // Tenta pegar o mundo padrão com segurança
+                        // Try to get the default world safely
                         World defaultWorld = plugin
                             .getServer()
                             .getWorlds()
@@ -4480,7 +4562,7 @@ public class DatabaseManager {
     }
 
     public synchronized int getPlayerRank(UUID playerUUID, String trackNameWS) {
-        // 1. Verificar se o jogador tem tempo
+        // 1. Check if the player has a time
         String checkTimeSql =
             "SELECT 1 FROM fr_player_times WHERE player_uuid = ? AND LOWER(trackNameWS) = LOWER(?) AND finished = TRUE LIMIT 1";
 
@@ -4496,7 +4578,7 @@ public class DatabaseManager {
                 }
             }
 
-            // 2. Calcular Rank: Contar quantos jogadores ÚNICOS têm tempo melhor
+            // 2. Calculate Rank: Count how many UNIQUE players have a better time
             String sql = """
                     SELECT COUNT(DISTINCT player_uuid) + 1 AS rank
                     FROM fr_player_times
@@ -4605,7 +4687,7 @@ public class DatabaseManager {
     }
 
     public synchronized TrackData getTrackData(String trackName) {
-        // ✅ Usa LOWER() na query
+        // ✅ Uses LOWER() in the query
         String sql =
             "SELECT trackName, worldName, spawnPoint_x, spawnPoint_y, spawnPoint_z, " +
             "spawnPoint_pitch, spawnPoint_yaw, creatorName, creatorUUID, icon_name, game_time " +
@@ -4613,7 +4695,7 @@ public class DatabaseManager {
         try {
             Connection conn = getOrConnect();
 
-            // 1. Tenta buscar pelo nome exato (display name) primeiro - Resolve conflitos de "Floor is Lava" vs "floorislava"
+            // 1. Try to fetch by exact name (display name) first - Resolves conflicts like "Floor is Lava" vs "floorislava"
             String sqlExact =
                 "SELECT trackName, worldName, spawnPoint_x, spawnPoint_y, spawnPoint_z, " +
                 "spawnPoint_pitch, spawnPoint_yaw, creatorName, creatorUUID, icon_name, trackNameWS, game_time " +
@@ -4631,14 +4713,14 @@ public class DatabaseManager {
                 }
             }
 
-            // 2. Fallback: Busca pelo trackNameWS (lógica antiga)
-            // ✅ Remove apenas espaços, sem toLowerCase para montar o critério de busca (mas a query usa LOWER)
+            // 2. Fallback: Fetch by trackNameWS (old logic)
+            // ✅ Remove only spaces, without toLowerCase to build the search criteria (but the query uses LOWER)
             String trackNameWS = trackName.replaceAll("\\s+", "");
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, trackNameWS);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
-                        String trackNameOriginal = rs.getString("trackName"); // Nome original da pista
+                        String trackNameOriginal = rs.getString("trackName"); // Original track name
                         String worldName = rs.getString("worldName");
                         World world = Bukkit.getWorld(worldName);
                         if (world == null) return null;
@@ -4682,10 +4764,10 @@ public class DatabaseManager {
             return null;
         }
 
-        // ✅ Remove apenas os espaços, mantém o case original
+        // ✅ Remove only spaces, keep the original case
         String trackNameWS = trackName.replaceAll("\\s+", "");
 
-        // ✅ Usa LOWER() na query para comparação case-insensitive
+        // ✅ Uses LOWER() in the query for case-insensitive comparison
         String sql =
             "SELECT spawnPoint_x, spawnPoint_y, spawnPoint_z, spawnPoint_yaw, spawnPoint_pitch, worldName " +
             "FROM fr_tracks WHERE LOWER(trackNameWS) = LOWER(?) LIMIT 1";
@@ -4809,7 +4891,7 @@ public class DatabaseManager {
     ) {
         String trackWS = trackName.replaceAll("\\s+", "").toLowerCase();
 
-        // Usamos rowid (específico do SQLite) para deletar exatamente a melhor entrada
+        // We use rowid (SQLite-specific) to delete exactly the best entry
         String deleteSql = """
                 DELETE FROM fr_player_times
                 WHERE rowid IN (
@@ -5057,6 +5139,45 @@ public class DatabaseManager {
             handleSqlError(e);
         }
         return null;
+    }
+
+    public synchronized boolean isHologramEnabled(String trackName, String type) {
+        if (trackName == null) return true;
+        String trackNameWS = trackName.replaceAll("\\s+", "");
+        String column = type.equalsIgnoreCase("bedrock") ? "bedrock_enabled" : "java_enabled";
+        String sql = "SELECT " + column + " FROM fr_holograms WHERE LOWER(trackNameWS) = LOWER(?)";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackNameWS);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(column) == 1;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return true; // default enabled
+    }
+
+    public synchronized void setHologramEnabled(String trackName, String type, boolean enabled) {
+        if (trackName == null) return;
+        String trackNameWS = trackName.replaceAll("\\s+", "");
+        String column = type.equalsIgnoreCase("bedrock") ? "bedrock_enabled" : "java_enabled";
+        String sql = "INSERT INTO fr_holograms (trackNameWS, " + column + ") VALUES (?, ?) " +
+                     "ON CONFLICT(trackNameWS) DO UPDATE SET " + column + " = excluded." + column;
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackNameWS);
+                ps.setInt(2, enabled ? 1 : 0);
+                ps.executeUpdate();
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
     }
 
     public synchronized void setStepHigh(
@@ -5451,14 +5572,19 @@ public class DatabaseManager {
     }
 
     public synchronized void resetBoatUtilsSettings(String trackNameWS) {
+        trackNameWS = trackNameWS.toLowerCase();
         final String sql = """
             UPDATE fr_boatutils SET
-                stepHeight = 1.25, defaultSlipperiness = 0.6, fallDamage = TRUE, waterElevation = TRUE,
-                airControl = TRUE, jumpForce = 0.36, gravity = -0.03999999910593033, yawAcceleration = 1.0,
+                stepHeight = 0.0, defaultSlipperiness = 0.6, fallDamage = TRUE, waterElevation = FALSE,
+                airControl = FALSE, jumpForce = 0.0, gravity = -0.03999999910593033, yawAcceleration = 1.0,
                 forwardAcceleration = 0.04, backwardAcceleration = 0.005, turningForwardAcceleration = 0.005,
-                allowAccelerationStacking = TRUE, underwaterControl = TRUE, surfaceWaterControl = TRUE,
-                coyoteTime = 0, waterJumping = TRUE, swimForce = 0.0, collisionMode = 0, airStepping = FALSE,
-                tenStepInterpolation = FALSE, collisionResolution = 5, customSlipperiness = NULL, perBlockSetting = NULL
+                allowAccelerationStacking = TRUE, underwaterControl = FALSE, surfaceWaterControl = FALSE,
+                coyoteTime = 0, waterJumping = FALSE, swimForce = 0.0, collisionMode = 0, airStepping = FALSE,
+                tenStepInterpolation = FALSE, collisionResolution = 5, customSlipperiness = NULL, perBlockSetting = NULL,
+                walltapMultiplier = 0.0, jumps = 1, scale = 1.0, stepUpSlipperiness = 1.0,
+                fixDoubleWaterElevation = FALSE, lateralSlipperiness = 1.0, brakeSlipperiness = 1.0,
+                multiStepping = FALSE, maxSpeed = -1.0, maxSpeedResistance = 0.0, honeyCompatibility = FALSE,
+                collisionFilter = NULL
             WHERE trackNameWS = ?
             """;
         try {
@@ -5503,16 +5629,32 @@ public class DatabaseManager {
         boolean tenStepInterpolation,
         int collisionResolution,
         String customSlipperiness,
-        String perBlockSetting
+        String perBlockSetting,
+        float walltapMultiplier,
+        int jumps,
+        float scale,
+        float stepUpSlipperiness,
+        boolean fixDoubleWaterElevation,
+        float lateralSlipperiness,
+        float brakeSlipperiness,
+        boolean multiStepping,
+        float maxSpeed,
+        float maxSpeedResistance,
+        boolean honeyCompatibility
     ) {
+        trackNameWS = trackNameWS.toLowerCase();
         final String sql = """
             INSERT INTO fr_boatutils (
                 trackNameWS, stepHeight, defaultSlipperiness, fallDamage, waterElevation, airControl,
                 jumpForce, gravity, yawAcceleration, forwardAcceleration, backwardAcceleration,
                 turningForwardAcceleration, allowAccelerationStacking, underwaterControl, surfaceWaterControl,
                 coyoteTime, waterJumping, swimForce, collisionMode, airStepping, tenStepInterpolation,
-                collisionResolution, customSlipperiness, perBlockSetting
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                collisionResolution, customSlipperiness, perBlockSetting,
+                walltapMultiplier, jumps, scale, stepUpSlipperiness, fixDoubleWaterElevation,
+                lateralSlipperiness, brakeSlipperiness, multiStepping, maxSpeed, maxSpeedResistance,
+                honeyCompatibility
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(trackNameWS) DO UPDATE SET
                 stepHeight = excluded.stepHeight, defaultSlipperiness = excluded.defaultSlipperiness,
                 fallDamage = excluded.fallDamage, waterElevation = excluded.waterElevation,
@@ -5524,7 +5666,12 @@ public class DatabaseManager {
                 waterJumping = excluded.waterJumping, swimForce = excluded.swimForce, collisionMode = excluded.collisionMode,
                 airStepping = excluded.airStepping, tenStepInterpolation = excluded.tenStepInterpolation,
                 collisionResolution = excluded.collisionResolution, customSlipperiness = excluded.customSlipperiness,
-                perBlockSetting = excluded.perBlockSetting;
+                perBlockSetting = excluded.perBlockSetting,
+                walltapMultiplier = excluded.walltapMultiplier, jumps = excluded.jumps, scale = excluded.scale,
+                stepUpSlipperiness = excluded.stepUpSlipperiness, fixDoubleWaterElevation = excluded.fixDoubleWaterElevation,
+                lateralSlipperiness = excluded.lateralSlipperiness, brakeSlipperiness = excluded.brakeSlipperiness,
+                multiStepping = excluded.multiStepping, maxSpeed = excluded.maxSpeed,
+                maxSpeedResistance = excluded.maxSpeedResistance, honeyCompatibility = excluded.honeyCompatibility;
             """;
 
         try {
@@ -5555,6 +5702,17 @@ public class DatabaseManager {
                 ps.setInt(i++, collisionResolution);
                 ps.setString(i++, customSlipperiness);
                 ps.setString(i++, perBlockSetting);
+                ps.setFloat(i++, walltapMultiplier);
+                ps.setInt(i++, jumps);
+                ps.setFloat(i++, scale);
+                ps.setFloat(i++, stepUpSlipperiness);
+                ps.setBoolean(i++, fixDoubleWaterElevation);
+                ps.setFloat(i++, lateralSlipperiness);
+                ps.setFloat(i++, brakeSlipperiness);
+                ps.setBoolean(i++, multiStepping);
+                ps.setFloat(i++, maxSpeed);
+                ps.setFloat(i++, maxSpeedResistance);
+                ps.setBoolean(i++, honeyCompatibility);
                 ps.executeUpdate();
             }
             return true;
@@ -5565,6 +5723,26 @@ public class DatabaseManager {
             handleSqlError(e);
         }
         return false;
+    }
+
+    public synchronized void applyGroupModeValues(
+        String trackNameWS,
+        float stepHeight,
+        float defaultSlipperiness,
+        boolean fallDamage,
+        boolean waterElevation,
+        boolean airControl,
+        Float jumpForce
+    ) {
+        trackNameWS = trackNameWS.toLowerCase();
+        setStepHigh(trackNameWS, stepHeight);
+        setDefaultSlipperiness(trackNameWS, defaultSlipperiness);
+        setFallDamage(trackNameWS, fallDamage);
+        setWaterElevation(trackNameWS, waterElevation);
+        setAirControl(trackNameWS, airControl);
+        if (jumpForce != null) {
+            setJumpForce(trackNameWS, jumpForce);
+        }
     }
 
     public synchronized void setCollisionResolution(
@@ -5586,6 +5764,150 @@ public class DatabaseManager {
                 .getDebugManager()
                 .logDatabaseOperation("Database error: " + e.getMessage());
             if (e instanceof SQLException) handleSqlError((SQLException) e);
+        }
+    }
+
+    public synchronized void setWalltapMultiplier(String trackNameWS, float value) {
+        String sql = "INSERT INTO fr_boatutils (trackNameWS, walltapMultiplier) VALUES (?, ?) ON CONFLICT(trackNameWS) DO UPDATE SET walltapMultiplier = excluded.walltapMultiplier;";
+        try (Connection conn = getOrConnect(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, trackNameWS);
+            ps.setFloat(2, value);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation("Erro ao definir walltapMultiplier para " + trackNameWS + ": " + e.getMessage());
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized void setJumps(String trackNameWS, int value) {
+        String sql = "INSERT INTO fr_boatutils (trackNameWS, jumps) VALUES (?, ?) ON CONFLICT(trackNameWS) DO UPDATE SET jumps = excluded.jumps;";
+        try (Connection conn = getOrConnect(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, trackNameWS);
+            ps.setInt(2, value);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation("Erro ao definir jumps para " + trackNameWS + ": " + e.getMessage());
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized void setScale(String trackNameWS, float value) {
+        String sql = "INSERT INTO fr_boatutils (trackNameWS, scale) VALUES (?, ?) ON CONFLICT(trackNameWS) DO UPDATE SET scale = excluded.scale;";
+        try (Connection conn = getOrConnect(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, trackNameWS);
+            ps.setFloat(2, value);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation("Erro ao definir scale para " + trackNameWS + ": " + e.getMessage());
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized void setStepUpSlipperiness(String trackNameWS, float value) {
+        String sql = "INSERT INTO fr_boatutils (trackNameWS, stepUpSlipperiness) VALUES (?, ?) ON CONFLICT(trackNameWS) DO UPDATE SET stepUpSlipperiness = excluded.stepUpSlipperiness;";
+        try (Connection conn = getOrConnect(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, trackNameWS);
+            ps.setFloat(2, value);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation("Erro ao definir stepUpSlipperiness para " + trackNameWS + ": " + e.getMessage());
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized void setFixDoubleWaterElevation(String trackNameWS, boolean value) {
+        String sql = "INSERT INTO fr_boatutils (trackNameWS, fixDoubleWaterElevation) VALUES (?, ?) ON CONFLICT(trackNameWS) DO UPDATE SET fixDoubleWaterElevation = excluded.fixDoubleWaterElevation;";
+        try (Connection conn = getOrConnect(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, trackNameWS);
+            ps.setBoolean(2, value);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation("Erro ao definir fixDoubleWaterElevation para " + trackNameWS + ": " + e.getMessage());
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized void setLateralSlipperiness(String trackNameWS, float value) {
+        String sql = "INSERT INTO fr_boatutils (trackNameWS, lateralSlipperiness) VALUES (?, ?) ON CONFLICT(trackNameWS) DO UPDATE SET lateralSlipperiness = excluded.lateralSlipperiness;";
+        try (Connection conn = getOrConnect(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, trackNameWS);
+            ps.setFloat(2, value);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation("Erro ao definir lateralSlipperiness para " + trackNameWS + ": " + e.getMessage());
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized void setBrakeSlipperiness(String trackNameWS, float value) {
+        String sql = "INSERT INTO fr_boatutils (trackNameWS, brakeSlipperiness) VALUES (?, ?) ON CONFLICT(trackNameWS) DO UPDATE SET brakeSlipperiness = excluded.brakeSlipperiness;";
+        try (Connection conn = getOrConnect(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, trackNameWS);
+            ps.setFloat(2, value);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation("Erro ao definir brakeSlipperiness para " + trackNameWS + ": " + e.getMessage());
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized void setMultiStepping(String trackNameWS, boolean value) {
+        String sql = "INSERT INTO fr_boatutils (trackNameWS, multiStepping) VALUES (?, ?) ON CONFLICT(trackNameWS) DO UPDATE SET multiStepping = excluded.multiStepping;";
+        try (Connection conn = getOrConnect(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, trackNameWS);
+            ps.setBoolean(2, value);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation("Erro ao definir multiStepping para " + trackNameWS + ": " + e.getMessage());
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized void setMaxSpeed(String trackNameWS, float value) {
+        String sql = "INSERT INTO fr_boatutils (trackNameWS, maxSpeed) VALUES (?, ?) ON CONFLICT(trackNameWS) DO UPDATE SET maxSpeed = excluded.maxSpeed;";
+        try (Connection conn = getOrConnect(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, trackNameWS);
+            ps.setFloat(2, value);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation("Erro ao definir maxSpeed para " + trackNameWS + ": " + e.getMessage());
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized void setMaxSpeedResistance(String trackNameWS, float value) {
+        String sql = "INSERT INTO fr_boatutils (trackNameWS, maxSpeedResistance) VALUES (?, ?) ON CONFLICT(trackNameWS) DO UPDATE SET maxSpeedResistance = excluded.maxSpeedResistance;";
+        try (Connection conn = getOrConnect(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, trackNameWS);
+            ps.setFloat(2, value);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation("Erro ao definir maxSpeedResistance para " + trackNameWS + ": " + e.getMessage());
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized void setHoneyCompatibility(String trackNameWS, boolean value) {
+        String sql = "INSERT INTO fr_boatutils (trackNameWS, honeyCompatibility) VALUES (?, ?) ON CONFLICT(trackNameWS) DO UPDATE SET honeyCompatibility = excluded.honeyCompatibility;";
+        try (Connection conn = getOrConnect(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, trackNameWS);
+            ps.setBoolean(2, value);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation("Erro ao definir honeyCompatibility para " + trackNameWS + ": " + e.getMessage());
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized void setCollisionFilter(String trackNameWS, String value) {
+        String sql = "INSERT INTO fr_boatutils (trackNameWS, collisionFilter) VALUES (?, ?) ON CONFLICT(trackNameWS) DO UPDATE SET collisionFilter = excluded.collisionFilter;";
+        try (Connection conn = getOrConnect(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, trackNameWS);
+            ps.setString(2, value);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation("Erro ao definir collisionFilter para " + trackNameWS + ": " + e.getMessage());
+            handleSqlError(e);
         }
     }
 
@@ -5992,7 +6314,7 @@ public class DatabaseManager {
 
         try {
             Connection conn = getOrConnect();
-            // Transação: Desativar auto-commit
+            // Transaction: Disable auto-commit
             conn.setAutoCommit(false);
 
             try (
@@ -6239,7 +6561,7 @@ public class DatabaseManager {
     public synchronized Map<String, Object> getBoatUtilsRaw(
         String trackNameWS
     ) {
-        // ✅ Remove espaços do nome da pista para normalização
+        // ✅ Remove spaces from track name for normalization
         String trackNameNormalized = trackNameWS.replaceAll("\\s+", "");
         final String sql =
             "SELECT * FROM fr_boatutils WHERE LOWER(trackNameWS) = LOWER(?)";
@@ -6308,6 +6630,18 @@ public class DatabaseManager {
                         rs.getString("customSlipperiness")
                     );
                     map.put("perBlockSetting", rs.getString("perBlockSetting"));
+                    map.put("walltapMultiplier", rs.getFloat("walltapMultiplier"));
+                    map.put("jumps", rs.getInt("jumps"));
+                    map.put("scale", rs.getFloat("scale"));
+                    map.put("stepUpSlipperiness", rs.getFloat("stepUpSlipperiness"));
+                    map.put("fixDoubleWaterElevation", rs.getBoolean("fixDoubleWaterElevation"));
+                    map.put("lateralSlipperiness", rs.getFloat("lateralSlipperiness"));
+                    map.put("brakeSlipperiness", rs.getFloat("brakeSlipperiness"));
+                    map.put("multiStepping", rs.getBoolean("multiStepping"));
+                    map.put("maxSpeed", rs.getFloat("maxSpeed"));
+                    map.put("maxSpeedResistance", rs.getFloat("maxSpeedResistance"));
+                    map.put("honeyCompatibility", rs.getBoolean("honeyCompatibility"));
+                    map.put("collisionFilter", rs.getString("collisionFilter"));
 
                     return map;
                 }
@@ -6330,6 +6664,7 @@ public class DatabaseManager {
         String trackNameWS,
         String value
     ) {
+        trackNameWS = trackNameWS.toLowerCase();
         String sql =
             "INSERT INTO fr_boatutils (trackNameWS, perBlockSetting) VALUES (?, ?) " +
             "ON CONFLICT(trackNameWS) DO UPDATE SET perBlockSetting = excluded.perBlockSetting";
@@ -6355,7 +6690,7 @@ public class DatabaseManager {
     }
 
     public synchronized boolean trackHaveBoatUtils(String trackNameWS) {
-        // ✅ Remove espaços do nome da pista para normalização
+        // ✅ Remove spaces from track name for normalization
         String trackNameNormalized = trackNameWS.replaceAll("\\s+", "");
         final String sql =
             "SELECT * FROM fr_boatutils WHERE LOWER(trackNameWS) = LOWER(?)";
@@ -6370,7 +6705,7 @@ public class DatabaseManager {
 
                     boolean modified = false;
 
-                    // Comparações de valores
+                    // Value comparisons
                     if (
                         rs.getFloat("stepHeight") !=
                         BoatUtilsVanillaValues.STEP_HEIGHT
@@ -6468,6 +6803,56 @@ public class DatabaseManager {
                             BoatUtilsVanillaValues.PER_BLOCK_SETTING
                         )
                     ) modified = true;
+                    if (
+                        rs.getFloat("walltapMultiplier") !=
+                        BoatUtilsVanillaValues.WALLTAP_MULTIPLIER
+                    ) modified = true;
+                    if (
+                        rs.getInt("jumps") !=
+                        BoatUtilsVanillaValues.JUMPS
+                    ) modified = true;
+                    if (
+                        rs.getFloat("scale") !=
+                        BoatUtilsVanillaValues.SCALE
+                    ) modified = true;
+                    if (
+                        rs.getFloat("stepUpSlipperiness") !=
+                        BoatUtilsVanillaValues.STEP_UP_SLIPPERINESS
+                    ) modified = true;
+                    if (
+                        rs.getBoolean("fixDoubleWaterElevation") !=
+                        BoatUtilsVanillaValues.FIX_DOUBLE_WATER_ELEVATION
+                    ) modified = true;
+                    if (
+                        rs.getFloat("lateralSlipperiness") !=
+                        BoatUtilsVanillaValues.LATERAL_SLIPPERINESS
+                    ) modified = true;
+                    if (
+                        rs.getFloat("brakeSlipperiness") !=
+                        BoatUtilsVanillaValues.BRAKE_SLIPPERINESS
+                    ) modified = true;
+                    if (
+                        rs.getBoolean("multiStepping") !=
+                        BoatUtilsVanillaValues.MULTI_STEPPING
+                    ) modified = true;
+                    if (
+                        rs.getFloat("maxSpeed") !=
+                        BoatUtilsVanillaValues.MAX_SPEED
+                    ) modified = true;
+                    if (
+                        rs.getFloat("maxSpeedResistance") !=
+                        BoatUtilsVanillaValues.MAX_SPEED_RESISTANCE
+                    ) modified = true;
+                    if (
+                        rs.getBoolean("honeyCompatibility") !=
+                        BoatUtilsVanillaValues.HONEY_COMPATIBILITY
+                    ) modified = true;
+                    if (
+                        !Objects.equals(
+                            rs.getString("collisionFilter"),
+                            BoatUtilsVanillaValues.COLLISION_FILTER
+                        )
+                    ) modified = true;
 
                     return modified;
                 }
@@ -6523,15 +6908,15 @@ public class DatabaseManager {
     public synchronized int getActiveDuelId(UUID uuid) {
         String uuidTarget = uuid.toString();
 
-        // A query agora verifica se a UUID está no início, no meio (entre vírgulas) ou no fim da string
-        // Isso evita que "uuid1" seja confundido com "uuid10" (se os nomes fossem simples)
+        // The query now checks if the UUID is at the start, middle (between commas) or end of the string
+        // This prevents "uuid1" from being confused with "uuid10" (if the names were simple)
         String sqlFinal =
             "SELECT d.id FROM fr_timetrial_duel_players p " +
             "JOIN fr_timetrial_duels d ON p.duel_id = d.id " +
-            "WHERE (p.players = ? " + // Caso seja a única UUID
-            "OR p.players LIKE ? " + // Caso esteja no início: 'uuid,%'
-            "OR p.players LIKE ? " + // Caso esteja no fim: '%,uuid'
-            "OR p.players LIKE ?) " + // Caso esteja no meio: '%,uuid,%'
+            "WHERE (p.players = ? " + // If it is the only UUID
+            "OR p.players LIKE ? " + // If at the start: 'uuid,%'
+            "OR p.players LIKE ? " + // If at the end: '%,uuid'
+            "OR p.players LIKE ?) " + // If in the middle: '%,uuid,%'
             "AND d.state = 'STARTED' LIMIT 1";
 
         try {
@@ -6690,8 +7075,8 @@ public class DatabaseManager {
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     double x = rs.getDouble("finishAll_x");
-                    // Se x for 0 e todos os outros forem 0 ou null, pode ser que não esteja setado, mas como são coordinates, 0 é valido.
-                    // Porém como inicializamos com NULL, podemos checar com wasNull()
+        // If x is 0 and all others are 0 or null, it might not be set, but since they're coordinates, 0 is valid.
+        // However since we initialize with NULL, we can check with wasNull()
                     if (rs.wasNull()) return null;
 
                     double y = rs.getDouble("finishAll_y");
@@ -6785,6 +7170,7 @@ public class DatabaseManager {
         String trackNameWS,
         Map<String, Float> map
     ) {
+        trackNameWS = trackNameWS.toLowerCase();
         StringBuilder builder = new StringBuilder();
 
         for (var e : map.entrySet()) {
@@ -6907,8 +7293,8 @@ public class DatabaseManager {
                             return Optional.empty();
                         }
 
-                        // ✅ CRÍTICO: Buscar evento do RaceEventManager (memória) ao invés de recarregar do banco
-                        // Isso garante que sempre retornamos a MESMA instância do evento com os mesmos Round e Heat objects
+                        // ✅ CRITICAL: Fetch event from RaceEventManager (memory) instead of reloading from database
+                        // This ensures we always return the SAME event instance with the same Round and Heat objects
                         if (plugin.getRaceEventManager() != null) {
                             Optional<
                                 dev.EfraGroup.formulaRacing.Event.Events
@@ -6931,7 +7317,7 @@ public class DatabaseManager {
                             }
                         }
 
-                        // Fallback: Se não encontrou na memória, carrega do banco (não deveria acontecer normalmente)
+                        // Fallback: If not found in memory, load from database (shouldn't happen normally)
                         plugin
                             .getDebugManager()
                             .logDatabaseOperation(
@@ -6949,7 +7335,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            // Se a coluna não existe, adiciona ela
+            // If the column doesn't exist, add it
             if (
                 e.getMessage().contains("no such column") ||
                 e.getMessage().contains("selected_event_id")
@@ -6976,9 +7362,9 @@ public class DatabaseManager {
             }
         }
 
-        // ✅ NOVO: Fallback para Quick Race ativa
-        // Se o jogador não tem um evento selecionado no banco, mas está participando de uma Quick Race
-        // ou é um admin e existe uma Quick Race ativa, retornamos a Quick Race como contexto.
+        // ✅ NEW: Fallback for active Quick Race
+        // If the player does not have a selected event in the database, but is participating in a Quick Race
+        // or is an admin and there is an active Quick Race, we return the Quick Race as context.
         if (
             plugin.getQuickRaceManager() != null &&
             plugin.getQuickRaceManager().isQuickRaceActive()
@@ -6991,12 +7377,12 @@ public class DatabaseManager {
                     .getCurrentHeat()
                     .orElse(null);
                 if (heat != null) {
-                    // Jogador é piloto na corrida
+                    // Player is a driver in the race
                     if (heat.getDriver(playerUUID) != null) {
                         return quickEvent;
                     }
 
-                    // Jogador é admin (pode gerenciar a corrida ativa)
+                    // Player is an admin (can manage the active race)
                     org.bukkit.entity.Player player =
                         org.bukkit.Bukkit.getPlayer(playerUUID);
                     if (
@@ -7039,7 +7425,7 @@ public class DatabaseManager {
                 ps.executeUpdate();
             }
         } catch (SQLException e) {
-            // Se a coluna não existe, adiciona ela e tenta novamente
+            // If the column doesn't exist, add it and try again
             if (
                 e.getMessage().contains("no such column") ||
                 e.getMessage().contains("selected_event_id")
@@ -7058,7 +7444,7 @@ public class DatabaseManager {
                                 "[FormulaRacing] Coluna selected_event_id adicionada à tabela fr_players"
                             );
                     }
-                    // Tenta novamente
+                    // Try again
                     try (PreparedStatement ps = conn.prepareStatement(sql)) {
                         ps.setString(1, playerUUID.toString());
                         org.bukkit.entity.Player online =
@@ -7094,7 +7480,7 @@ public class DatabaseManager {
                 ps.executeUpdate();
             }
         } catch (SQLException e) {
-            // Se a coluna não existe, não faz nada
+            // If the column doesn't exist, do nothing
             if (
                 !e.getMessage().contains("no such column") &&
                 !e.getMessage().contains("selected_event_id")
@@ -7122,7 +7508,7 @@ public class DatabaseManager {
                     );
             }
         } catch (SQLException e) {
-            // Se a coluna não existe, não faz nada
+            // If the column doesn't exist, do nothing
             if (
                 !e.getMessage().contains("no such column") &&
                 !e.getMessage().contains("selected_event_id")
@@ -7160,7 +7546,7 @@ public class DatabaseManager {
     }
 
     public synchronized boolean createParty(UUID owner) throws SQLException {
-        // Evita criar party duplicada
+        // Prevents creating a duplicate party
         if (hasParty(owner)) {
             return false;
         }
@@ -7303,8 +7689,8 @@ public class DatabaseManager {
                 pstmt.setString(1, playerUUID.toString());
                 pstmt.setInt(2, duelId);
                 pstmt.setDouble(3, lapTime);
-                pstmt.setInt(4, 0); // Checkpoints não são usados em duelos de volta
-                pstmt.setBoolean(5, false); // Marca como não finalizado (é apenas uma volta)
+                pstmt.setInt(4, 0); // Checkpoints are not used in lap duels
+                pstmt.setBoolean(5, false); // Mark as not finished (it's just a lap)
 
                 pstmt.executeUpdate();
             }
@@ -7339,8 +7725,8 @@ public class DatabaseManager {
                 pstmt.setString(1, playerUUID.toString());
                 pstmt.setInt(2, duelId);
                 pstmt.setDouble(3, totalTime);
-                pstmt.setInt(4, 0); // Checkpoints não são usados em duelos
-                pstmt.setBoolean(5, true); // Marca como finalizado (tempo total)
+                pstmt.setInt(4, 0); // Checkpoints are not used in duels
+                pstmt.setBoolean(5, true); // Mark as finished (total time)
 
                 pstmt.executeUpdate();
                 plugin
@@ -7386,7 +7772,7 @@ public class DatabaseManager {
                 ResultSet rs = pstmt.executeQuery();
                 if (rs.next()) {
                     double time = rs.getDouble(1);
-                    // Se retornar 0, significa que não há registros (MIN retorna 0 em vez de NULL em alguns casos)
+                    // If it returns 0, it means there are no records (MIN returns 0 instead of NULL in some cases)
                     return (time > 0) ? time : null;
                 }
             }
@@ -7413,7 +7799,7 @@ public class DatabaseManager {
         int checkpointId,
         double time
     ) {
-        // ✅ Remove apenas espaços, sem toLowerCase
+        // ✅ Remove only spaces, without toLowerCase
         String trackNameWS = trackName.replaceAll("\\s+", "");
         String sql =
             "INSERT OR REPLACE INTO fr_timetrial_duels_checkpoint_times " +
@@ -7512,14 +7898,14 @@ public class DatabaseManager {
     }
 
     private void handleSqlError(SQLException e) {
-        // 1. Log detalhado para o console
+        // 1. Detailed log to console
         String message = e.getMessage();
         plugin
             .getLogger()
             .log(Level.SEVERE, "[FormulaRacing] Erro SQL detectado!", e);
 
-        // 2. Verificação robusta de conexão morta
-        // SQLState que começa com "08" geralmente indica erro de conexão/comunicação
+        // 2. Robust dead connection check
+        // SQLState starting with "08" generally indicates a connection/communication error
         String sqlState = e.getSQLState();
         boolean connectionIssue = false;
 
@@ -7536,7 +7922,7 @@ public class DatabaseManager {
             }
         }
 
-        // 3. Reset da conexão se necessário
+        // 3. Reset the connection if needed
         if (connectionIssue) {
             plugin
                 .getLogger()
@@ -7548,9 +7934,9 @@ public class DatabaseManager {
                     this.connection.close();
                 }
             } catch (SQLException ignored) {
-                // Ignora erro ao fechar uma conexão já morta
+                // Ignore error when closing an already dead connection
             }
-            this.connection = null; // Força o getOrConnect a criar uma nova na próxima chamada
+            this.connection = null; // Forces getOrConnect to create a new one on the next call
         }
     }
 
@@ -7564,7 +7950,7 @@ public class DatabaseManager {
         }
     }
 
-    // ======================== CLASSES INTERNAS ========================
+    // ======================== INNER CLASSES ========================
 
     public class PlayerTime {
 
@@ -7573,7 +7959,7 @@ public class DatabaseManager {
         private final double time;
         private final int checkpointsReached;
         private final int totalCheckpoints;
-        private final boolean finished; // agora explícito
+        private final boolean finished; // now explicit
 
         public PlayerTime(
             UUID playerUUID,
@@ -7613,21 +7999,21 @@ public class DatabaseManager {
 
         public boolean isFinished() {
             return finished || checkpointsReached >= totalCheckpoints;
-        } // fallback automático
+        } // automatic fallback
     }
 
     public static class TrackData {
 
-        // --- Campos principais da pista ---
-        private final String trackName; // Nome ORIGINAL da pista (com formatação)
-        private final Location spawnLocation; // Local de spawn configurado
-        private final String worldName; // Nome do mundo onde está a pista
-        private final String ownerName; // Nome do criador/dono da pista
-        private final String iconName; // Nome do ícone (Material) usado no menu
-        private final int totalCheckpoints; // Número total de checkpoints da pista
-        private final Long gameTime; // Tempo do dia fixado (ticks), null = usar padrão do servidor
+        // --- Main track fields ---
+        private final String trackName; // ORIGINAL track name (with formatting)
+        private final Location spawnLocation; // Configured spawn location
+        private final String worldName; // Name of the world where the track is
+        private final String ownerName; // Creator/owner name
+        private final String iconName; // Icon name (Material) used in menu
+        private final int totalCheckpoints; // Total number of track checkpoints
+        private final Long gameTime; // Fixed day time (ticks), null = use server default
 
-        // --- Construtor ---
+        // --- Constructor ---
         public TrackData(
             String trackName,
             Location spawnLocation,
@@ -7679,8 +8065,8 @@ public class DatabaseManager {
     public static class RegionData {
 
         private final int id;
-        private final String trackName; // Display Name (com espaços)
-        private final String trackNameWS; // Internal Name (sem espaços)
+        private final String trackName; // Display Name (with spaces)
+        private final String trackNameWS; // Internal Name (without spaces)
         private final String type; // START, END, etc.
         private final String world;
         private final String shape; // AABB or POLY
@@ -7871,7 +8257,7 @@ public class DatabaseManager {
         public static final float STEP_HEIGHT = 0f;
         public static final float DEFAULT_SLIPPERINESS = 0.6f;
         public static final boolean FALL_DAMAGE = true;
-        public static final boolean WATER_ELEVATION = true;
+        public static final boolean WATER_ELEVATION = false;
         public static final boolean AIR_CONTROL = false;
         public static final float JUMP_FORCE = 0f;
         public static final double GRAVITY = -0.03999999910593033;
@@ -7892,6 +8278,19 @@ public class DatabaseManager {
 
         public static final String CUSTOM_SLIPPERINESS = null;
         public static final String PER_BLOCK_SETTING = null;
+
+        public static final float WALLTAP_MULTIPLIER = 0f;
+        public static final int JUMPS = 1;
+        public static final float SCALE = 1f;
+        public static final float STEP_UP_SLIPPERINESS = 1f;
+        public static final boolean FIX_DOUBLE_WATER_ELEVATION = false;
+        public static final float LATERAL_SLIPPERINESS = 1f;
+        public static final float BRAKE_SLIPPERINESS = 1f;
+        public static final boolean MULTI_STEPPING = false;
+        public static final float MAX_SPEED = -1f;
+        public static final float MAX_SPEED_RESISTANCE = 0f;
+        public static final boolean HONEY_COMPATIBILITY = false;
+        public static final String COLLISION_FILTER = null;
     }
 
     /**
@@ -7903,7 +8302,7 @@ public class DatabaseManager {
         private final Location entryMin, entryMax;
         private final Location exitMin, exitMax;
         private final Location areaMin, areaMax;
-        // NOVOS CAMPOS
+        // NEW FIELDS
         private final Location startMin, startMax;
 
         public PitStopData(
@@ -7928,7 +8327,7 @@ public class DatabaseManager {
             this.startMax = startMax;
         }
 
-        // Não esqueça de adicionar os Getters para startMin e startMax aqui embaixo
+        // Don't forget to add Getters for startMin and startMax down here
         public Location getStartMin() {
             return startMin;
         }
@@ -7976,7 +8375,7 @@ public class DatabaseManager {
     ) {
         if (trackName == null) return false;
         String trackNameWS = trackName.replaceAll("\\s+", "");
-        // Inclui colunas legadas minX..maxZ (NOT NULL) para compatibilidade
+        // Includes legacy columns minX..maxZ (NOT NULL) for compatibility
         String sql =
             "INSERT INTO fr_pit_stops (trackNameWS, " +
             "minX, minY, minZ, maxX, maxY, maxZ, " +
@@ -7991,7 +8390,7 @@ public class DatabaseManager {
             Connection conn = getOrConnect();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, trackNameWS);
-                // minX..maxZ legadas = valores da entry (garante NOT NULL)
+                // legacy minX..maxZ = entry values (ensures NOT NULL)
                 ps.setDouble(2, min.getX());
                 ps.setDouble(3, min.getY());
                 ps.setDouble(4, min.getZ());
@@ -8145,7 +8544,7 @@ public class DatabaseManager {
                     World world = Bukkit.getWorld(worldName);
                     if (world == null) continue;
 
-                    // Buscando cada Location individualmente (Min e Max de cada região)
+                    // Fetching each Location individually (Min and Max of each region)
                     Location entryMin = createLocation(world, rs, "entryMin");
                     Location entryMax = createLocation(world, rs, "entryMax");
 
@@ -8158,7 +8557,7 @@ public class DatabaseManager {
                     Location startMin = createLocation(world, rs, "startMin");
                     Location startMax = createLocation(world, rs, "startMax");
 
-                    // Agora passamos os 9 argumentos na ordem correta
+                    // Now we pass the 9 arguments in the correct order
                     pitStops.add(
                         new PitStopData(
                             rs.getString("trackNameWS"),
@@ -8194,7 +8593,7 @@ public class DatabaseManager {
         );
     }
 
-    // Helper para criar TrackData a partir do ResultSet (evita duplicação de código)
+    // Helper to create TrackData from ResultSet (prevents code duplication)
     private TrackData createTrackDataFromResultSet(
         ResultSet rs,
         String trackNameWSQuery
@@ -8218,7 +8617,7 @@ public class DatabaseManager {
             String ws = rs.getString("trackNameWS");
             if (ws != null) effectiveTrackWS = ws;
         } catch (SQLException ignored) {
-            // Coluna não existe no result set (fallback query original)
+            // Column does not exist in result set (original fallback query)
         }
 
         return new TrackData(
@@ -8280,5 +8679,31 @@ public class DatabaseManager {
             future.complete(getPlayerRank(playerUUID, trackNameWS));
         });
         return future;
+    }
+
+    public synchronized int getTrackMinObuVersion(String trackNameWS) {
+        String trackNameNormalized = trackNameWS.replaceAll("\\s+", "");
+        String sql = "SELECT minObuVersion FROM fr_boatutils WHERE LOWER(trackNameWS) = LOWER(?)";
+
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackNameNormalized);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt("minObuVersion");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return 1;
+    }
+
+    public synchronized boolean checkPlayerObuVersion(UUID playerUUID, String trackNameWS) {
+        int playerVersion = FormulaRacing.getInstance().getOpenBoatUtilsVersion(playerUUID);
+        int minVersion = getTrackMinObuVersion(trackNameWS);
+        return playerVersion >= minVersion;
     }
 }

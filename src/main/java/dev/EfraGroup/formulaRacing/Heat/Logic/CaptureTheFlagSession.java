@@ -16,9 +16,9 @@ import java.util.*;
 
 /**
  * 🚩 CAPTURE THE FLAG
- * Pilotos devem coletar bandeiras espalhadas pela pista (checkpoints específicos).
- * Cada bandeira coletada vale 1 ponto. Primeiro a coletar 3 bandeiras vence.
- * Se o tempo acabar (2 minutos), quem tem mais pontos vence.
+ * Drivers must collect flags scattered around the track (specific checkpoints).
+ * Each collected flag is worth 1 point. First to collect 3 flags wins.
+ * If time runs out (2 minutes), whoever has the most points wins.
  */
 public class CaptureTheFlagSession implements SessionLogic {
 
@@ -41,13 +41,13 @@ public class CaptureTheFlagSession implements SessionLogic {
         matchFinished = false;
         matchTimeSeconds = 0;
 
-        // Inicializa scores
+        // Initialize scores
         for (Driver d : heat.getDrivers().values()) {
             scores.put(d.getUuid(), 0);
         }
 
-        // Define checkpoints de bandeira (a cada 3 checkpoints, aproximadamente)
-        // Usa os checkpoints do meio da pista
+        // Define flag checkpoints (every 3 checkpoints, approximately)
+        // Uses the middle checkpoints of the track
         int totalCheckpoints = heat.getPlugin().getDatabaseManager().getCheckpointCount(heat.getTrackNameWS());
         if (totalCheckpoints > 0) {
             flagCheckpointIds.add(Math.max(1, totalCheckpoints / 3));
@@ -56,7 +56,7 @@ public class CaptureTheFlagSession implements SessionLogic {
                 flagCheckpointIds.add(Math.max(1, totalCheckpoints / 2));
             }
         } else {
-            // Fallback: checkpoints 1 e 2
+            // Fallback: checkpoints 1 and 2
             flagCheckpointIds.add(1);
             flagCheckpointIds.add(2);
         }
@@ -64,9 +64,9 @@ public class CaptureTheFlagSession implements SessionLogic {
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
         broadcast(heat, ChatColor.GREEN + "  🚩 CAPTURE THE FLAG 🚩");
         broadcast(heat, "");
-        broadcast(heat, ChatColor.YELLOW + "  Colete bandeiras nos checkpoints!");
-        broadcast(heat, ChatColor.RED + "  Primeiro a " + WIN_SCORE + " bandeiras vence!");
-        broadcast(heat, ChatColor.GRAY + "  Tempo limite: 2 minutos");
+        broadcast(heat, ChatColor.YELLOW + "  Collect flags at checkpoints!");
+        broadcast(heat, ChatColor.RED + "  First to " + WIN_SCORE + " flags wins!");
+        broadcast(heat, ChatColor.GRAY + "  Time limit: 2 minutes");
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
 
         startTimeoutTask(heat);
@@ -74,7 +74,7 @@ public class CaptureTheFlagSession implements SessionLogic {
     }
 
     private void startTimeoutTask(Heats heat) {
-        // Timer que conta segundos
+        // Timer that counts seconds
         SchedulerHelper.runTaskTimer(heat.getPlugin(), () -> {
             if (heat.getHeatState() != HeatState.RACING || matchFinished) return;
             matchTimeSeconds++;
@@ -85,9 +85,9 @@ public class CaptureTheFlagSession implements SessionLogic {
             if (matchFinished) return;
             matchFinished = true;
 
-            broadcast(heat, ChatColor.RED + "⏰ TEMPO ESGOTADO!");
+            broadcast(heat, ChatColor.RED + "⏰ TIME'S UP!");
 
-            // Encontra quem tem mais pontos
+            // Find who has the most points
             UUID best = null;
             int bestScore = -1;
             for (Map.Entry<UUID, Integer> entry : scores.entrySet()) {
@@ -100,16 +100,16 @@ public class CaptureTheFlagSession implements SessionLogic {
             if (best != null && bestScore > 0) {
                 Player winner = Bukkit.getPlayer(best);
                 String winnerName = winner != null ? winner.getName() : "Unknown";
-                broadcast(heat, ChatColor.GOLD + "🏆 " + winnerName + " venceu com " + bestScore + " bandeiras!");
+                broadcast(heat, ChatColor.GOLD + "🏆 " + winnerName + " won with " + bestScore + " flags!");
 
                 if (winner != null && winner.isOnline()) {
                     TitleHelper.sendThemedTitle(winner,
-                        ChatColor.GOLD + "🏆 VITÓRIA!",
-                        ChatColor.YELLOW + "" + bestScore + " bandeiras capturadas!",
+                        ChatColor.GOLD + "🏆 VICTORY!",
+                        ChatColor.YELLOW + "" + bestScore + " flags captured!",
                         10, 100, 20);
                 }
             } else {
-                broadcast(heat, ChatColor.GRAY + "Nenhuma bandeira foi capturada!");
+                broadcast(heat, ChatColor.GRAY + "No flags were captured!");
             }
 
             SchedulerHelper.runTaskLater(heat.getPlugin(), () -> heat.finishHeat(), 60L);
@@ -120,12 +120,12 @@ public class CaptureTheFlagSession implements SessionLogic {
         particleTask = SchedulerHelper.runTaskTimer(heat.getPlugin(), () -> {
             if (heat.getHeatState() != HeatState.RACING || matchFinished) return;
 
-            // Partículas de bandeira nos checkpoints de bandeira
+            // Flag particles at flag checkpoints
             for (Driver d : heat.getDrivers().values()) {
                 Player p = Bukkit.getPlayer(d.getUuid());
                 if (p == null || !p.isOnline()) continue;
 
-                // Mostra partículas de glow nos checkpoints próximos
+                // Show glow particles at nearby checkpoints
                 p.getWorld().spawnParticle(Particle.GLOW,
                     p.getLocation().add(0, 2, 0), 2, 1, 1, 1, 0.02);
             }
@@ -133,8 +133,8 @@ public class CaptureTheFlagSession implements SessionLogic {
     }
 
     /**
-     * Chamado quando um driver passa por um checkpoint de bandeira.
-     * Retorna true se o checkpoint foi de bandeira e foi coletado.
+     * Called when a driver passes through a flag checkpoint.
+     * Returns true if the checkpoint was a flag and was collected.
      */
     public boolean tryCaptureFlag(Heats heat, Driver driver, int checkpointId) {
         if (matchFinished) return false;
@@ -142,13 +142,13 @@ public class CaptureTheFlagSession implements SessionLogic {
 
         UUID uuid = driver.getUuid();
 
-        // Cooldown de 5 segundos entre capturas
+        // 5 second cooldown between captures
         long now = System.currentTimeMillis();
         if (stealCooldowns.containsKey(uuid) && now - stealCooldowns.get(uuid) < 5000) {
             return false;
         }
 
-        // Cooldown por checkpoint (não pode coletar o mesmo checkpoint repetidamente)
+        // Per-checkpoint cooldown (cannot collect the same checkpoint repeatedly)
         stealCooldowns.put(uuid, now);
 
         int newScore = scores.getOrDefault(uuid, 0) + 1;
@@ -157,24 +157,24 @@ public class CaptureTheFlagSession implements SessionLogic {
         Player player = Bukkit.getPlayer(uuid);
         String playerName = player != null ? player.getName() : "Unknown";
 
-        // Anuncia captura
-        broadcast(heat, ChatColor.GREEN + "🚩 " + playerName + " capturou uma bandeira! (" + newScore + "/" + WIN_SCORE + ")");
+        // Announce capture
+        broadcast(heat, ChatColor.GREEN + "🚩 " + playerName + " captured a flag! (" + newScore + "/" + WIN_SCORE + ")");
 
         if (player != null && player.isOnline()) {
             player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f);
             player.getWorld().spawnParticle(Particle.FIREWORK,
                 player.getLocation().add(0, 1, 0), 30, 0.5, 0.5, 0.5, 0.1);
 
-            // Efeito de brilho por ter bandeira
+            // Glow effect for having the flag
             player.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 100, 0, false, false));
 
             TitleHelper.sendThemedTitle(player,
-                ChatColor.GREEN + "🚩 BANDEIRA!",
-                ChatColor.YELLOW + "" + newScore + "/" + WIN_SCORE + " capturadas",
+                ChatColor.GREEN + "🚩 FLAG!",
+                ChatColor.YELLOW + "" + newScore + "/" + WIN_SCORE + " captured",
                 5, 40, 10);
         }
 
-        // Verifica vitória
+        // Check victory
         if (newScore >= WIN_SCORE) {
             finishMatch(heat, uuid);
         }
@@ -191,19 +191,19 @@ public class CaptureTheFlagSession implements SessionLogic {
 
         broadcast(heat, "");
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
-        broadcast(heat, ChatColor.GREEN + "  🏆 " + winnerName + " CAPTUREU " + WIN_SCORE + " BANDEIRAS! 🏆");
+        broadcast(heat, ChatColor.GREEN + "  🏆 " + winnerName + " CAPTURED " + WIN_SCORE + " FLAGS! 🏆");
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
         broadcast(heat, "");
 
         if (winner != null && winner.isOnline()) {
             TitleHelper.sendThemedTitle(winner,
-                ChatColor.GOLD + "🏆 VITÓRIA!",
-                ChatColor.YELLOW + "" + WIN_SCORE + " bandeiras capturadas!",
+                ChatColor.GOLD + "🏆 VICTORY!",
+                ChatColor.YELLOW + "" + WIN_SCORE + " flags captured!",
                 10, 100, 20);
             winner.playSound(winner.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
         }
 
-        // Marca todos como finished exceto o vencedor
+        // Mark all as finished except the winner
         for (Driver d : heat.getDrivers().values()) {
             if (!d.getUuid().equals(winnerUuid)) {
                 d.setFinished(true);

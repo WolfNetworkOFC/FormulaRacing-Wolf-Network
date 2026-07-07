@@ -25,6 +25,8 @@ public class TrackLeaderboard {
 
     private final Map<String, Hologram> holograms = new HashMap<>();
     private volatile boolean removed;
+    private boolean javaEnabled = true;
+    private boolean bedrockEnabled = true;
 
     public TrackLeaderboard(JavaPlugin plugin, String trackName, Location defaultLocation, DatabaseManager mySQLManager) {
         this.plugin = plugin;
@@ -32,6 +34,54 @@ public class TrackLeaderboard {
         this.mySQLManager = mySQLManager;
         Location savedLoc = mySQLManager.getHologramLocation(trackName);
         this.location = savedLoc != null ? savedLoc : defaultLocation;
+        this.javaEnabled = mySQLManager.isHologramEnabled(trackName, "java");
+        this.bedrockEnabled = mySQLManager.isHologramEnabled(trackName, "bedrock");
+    }
+
+    public boolean isJavaEnabled() {
+        return javaEnabled;
+    }
+
+    public boolean isBedrockEnabled() {
+        return bedrockEnabled;
+    }
+
+    public void setJavaEnabled(boolean enabled) {
+        this.javaEnabled = enabled;
+        this.mySQLManager.setHologramEnabled(this.trackName, "java", enabled);
+        if (!enabled) {
+            removeHologramByType("java");
+        } else if (this.location != null) {
+            updateJavaLeaderboard();
+        }
+    }
+
+    public void setBedrockEnabled(boolean enabled) {
+        this.bedrockEnabled = enabled;
+        this.mySQLManager.setHologramEnabled(this.trackName, "bedrock", enabled);
+        if (!enabled) {
+            removeHologramByType("bedrock");
+        } else if (this.location != null) {
+            updateBedrockLeaderboard();
+        }
+    }
+
+    private void removeHologramByType(String type) {
+        if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
+            String safeName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
+            String holoName = "lb_" + type + "_" + safeName;
+            try {
+                Hologram holo = DHAPI.getHologram(holoName);
+                if (holo != null) holo.delete();
+            } catch (Exception ignored) {}
+            holograms.remove(type);
+        } else {
+            HologramManager hm = FormulaRacing.getInstance().getHologramManager();
+            if (hm != null) {
+                String safeName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
+                hm.deleteHologram(safeName + "_" + type);
+            }
+        }
     }
 
     public void startAutoUpdate() {
@@ -46,18 +96,18 @@ public class TrackLeaderboard {
     }
 
     public void updateJavaLeaderboard() {
-        if (this.removed) return;
+        if (this.removed || !this.javaEnabled) return;
         SchedulerHelper.runAsync(this.plugin, () -> {
-            if (this.removed) return;
+            if (this.removed || !this.javaEnabled) return;
             List<DatabaseManager.PlayerTime> leaderboard = this.mySQLManager.getLeaderboardJava(this.trackName);
             processAndShow(leaderboard, "java");
         });
     }
 
     public void updateBedrockLeaderboard() {
-        if (this.removed) return;
+        if (this.removed || !this.bedrockEnabled) return;
         SchedulerHelper.runAsync(this.plugin, () -> {
-            if (this.removed) return;
+            if (this.removed || !this.bedrockEnabled) return;
             List<DatabaseManager.PlayerTime> leaderboard = this.mySQLManager.getLeaderboardBedrock(this.trackName);
             processAndShow(leaderboard, "bedrock");
         });
@@ -74,8 +124,7 @@ public class TrackLeaderboard {
                 try {
                     holograms.forEach((type, holo) -> {
                         if (holo != null) {
-                            double xOffset = type.equals("bedrock") ? 3.0 : 0.0;
-                            Location holoLoc = newLocation.clone().add(xOffset, 0.5, 0.0);
+                            Location holoLoc = newLocation.clone();
                             holo.setLocation(holoLoc);
                         }
                     });
@@ -92,6 +141,8 @@ public class TrackLeaderboard {
 
     private void processAndShow(List<DatabaseManager.PlayerTime> leaderboard, String type) {
         if (this.removed) return;
+        if (type.equals("java") && !this.javaEnabled) return;
+        if (type.equals("bedrock") && !this.bedrockEnabled) return;
         int totalCheckpoints = this.mySQLManager.getCheckpointCount(this.trackName);
 
         List<DatabaseManager.PlayerTime> top10 = leaderboard.stream()
@@ -140,8 +191,7 @@ public class TrackLeaderboard {
         }
 
         String safeTrackName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
-        double xOffset = type.equals("bedrock") ? 4.0 : 0.0;
-        Location holoLoc = this.location.clone().add(xOffset, 0.5, 0.0);
+        Location holoLoc = this.location.clone();
 
         if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
             Runnable updateDecentHologram = () -> {

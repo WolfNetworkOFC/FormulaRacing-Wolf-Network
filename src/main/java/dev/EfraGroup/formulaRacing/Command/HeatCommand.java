@@ -53,7 +53,7 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Default
-    @Description("Mostra info do heat atual")
+    @Description("Shows current heat info")
     public void onDefault(Player player) {
         Heats heat = this.resolveHeat(player, (Heats) null);
         if (heat != null) {
@@ -71,21 +71,21 @@ public class HeatCommand extends BaseCommand {
                     String var10001 = String.valueOf(ChatColor.YELLOW);
                     player.sendMessage(
                         var10001 +
-                            "Nenhum heat ativo no round " +
+                            "No active heat in round " +
                             round.getDisplayName()
                     );
                 } else {
                     String var5 = String.valueOf(ChatColor.RED);
                     player.sendMessage(
                         var5 +
-                            "✗ Nenhuma rodada ativa no evento " +
+                            "✗ No active round in event " +
                             event.getDisplayName()
                     );
                 }
             } else {
                 player.sendMessage(
                     String.valueOf(ChatColor.RED) +
-                        "✗ Nenhum evento selecionado!"
+                        "✗ No event selected!"
                 );
             }
         }
@@ -127,21 +127,27 @@ public class HeatCommand extends BaseCommand {
     private Integer resolveHeatIdFromCode(String code, Events event) {
         if (event == null) {
             return null;
-        } else if (!code.matches("(?i)R\\d+[QFEHP]\\d+")) {
+        } else if (!code.matches("(?i)R\\d+(?:SQ|S|P|Q|F|E|H)\\d+")) {
             return null;
         } else {
             try {
                 String upper = code.toUpperCase();
-                String separator = upper.contains("Q")
-                    ? "Q"
-                    : (upper.contains("F")
-                        ? "F"
-                        : (upper.contains("E")
-                            ? "E"
-                            : (upper.contains("H") ? "H" : "P")));
-                String[] parts = upper.split(separator);
-                int roundIdx = Integer.parseInt(parts[0].substring(1)) - 1;
-                int heatNum = Integer.parseInt(parts[1]);
+                int roundEnd = 1;
+                while (roundEnd < upper.length() && Character.isDigit(upper.charAt(roundEnd))) {
+                    roundEnd++;
+                }
+                int roundIdx = Integer.parseInt(upper.substring(1, roundEnd)) - 1;
+                String remaining = upper.substring(roundEnd);
+                String[] typeCodes = {"SQ", "S", "P", "Q", "F", "E", "H"};
+                String foundType = null;
+                for (String tc : typeCodes) {
+                    if (remaining.startsWith(tc)) {
+                        foundType = tc;
+                        break;
+                    }
+                }
+                if (foundType == null) return null;
+                int heatNum = Integer.parseInt(remaining.substring(foundType.length()));
                 List<Rounds> roundsList = event
                     .getEventSchedule()
                     .getRoundsList();
@@ -161,7 +167,7 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("select")
     @CommandCompletion("@heat_codes")
     @CommandPermission("formularacing.event.admin")
-    @Description("Seleciona um heat específico para focar os comandos")
+    @Description("Selects a specific heat to focus commands on")
     public void onSelect(Player player, String heatCodeOrId) {
         if (
             !heatCodeOrId.equalsIgnoreCase("off") &&
@@ -177,7 +183,7 @@ public class HeatCommand extends BaseCommand {
                 if (event == null) {
                     player.sendMessage(
                         String.valueOf(ChatColor.RED) +
-                            "✗ Selecione um evento primeiro para usar códigos de heat (ex: R1F1)."
+                            "✗ Select an event first to use heat codes (ex: R1F1)."
                     );
                     return;
                 }
@@ -188,21 +194,21 @@ public class HeatCommand extends BaseCommand {
             if (heatId == null) {
                 player.sendMessage(
                     String.valueOf(ChatColor.RED) +
-                        "✗ Heat não encontrado ou código inválido."
+                        "✗ Heat not found or invalid code."
                 );
             } else {
                 Optional<Heats> heat = this.eventManager.getHeat(heatId);
                 if (heat.isEmpty()) {
                     String var7 = String.valueOf(ChatColor.RED);
                     player.sendMessage(
-                        var7 + "✗ Heat com ID " + heatId + " não encontrado."
+                        var7 + "✗ Heat with ID " + heatId + " not found."
                     );
                 } else {
                     this.database.setSelectedHeat(player.getUniqueId(), heatId);
                     String var10001 = String.valueOf(ChatColor.GREEN);
                     player.sendMessage(
                         var10001 +
-                            "✓ Heat selecionado: " +
+                            "✓ Heat selected: " +
                             String.valueOf(ChatColor.WHITE) +
                             ((Heats) heat.get()).getName() +
                             String.valueOf(ChatColor.GRAY) +
@@ -216,7 +222,7 @@ public class HeatCommand extends BaseCommand {
             this.database.setSelectedHeat(player.getUniqueId(), (Integer) null);
             player.sendMessage(
                 String.valueOf(ChatColor.YELLOW) +
-                    "Seleção de heat desativada. Comandos usarão o heat ativo."
+                    "Heat selection disabled. Commands will use the active heat."
             );
         }
     }
@@ -224,7 +230,7 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("create|new")
     @CommandCompletion("@round")
     @CommandPermission("formularacing.event.admin")
-    @Description("Cria um novo heat no round")
+    @Description("Creates a new heat in the round")
     public void onCreate(
         Player player,
         @co.aikar.commands.annotation.Optional String roundOrHeatRef
@@ -281,16 +287,12 @@ public class HeatCommand extends BaseCommand {
 
         String ref = roundOrHeatRef.toUpperCase();
 
-        if (ref.matches("R\\d+[QFEHP]\\d+")) {
-            int qPos = ref.indexOf('Q');
-            int hPos = ref.indexOf('H');
-            int fPos = ref.indexOf('F');
-            int ePos = ref.indexOf('E');
-            int pPos = ref.indexOf('P');
-            int splitPos = qPos >= 0 ? qPos : (hPos >= 0 ? hPos : (fPos >= 0 ? fPos : (ePos >= 0 ? ePos : pPos)));
-            if (splitPos > 1) {
-                ref = ref.substring(0, splitPos);
+        if (ref.matches("R\\d+(?:SQ|S|P|Q|F|E|H)\\d+")) {
+            int roundEnd = 1;
+            while (roundEnd < ref.length() && Character.isDigit(ref.charAt(roundEnd))) {
+                roundEnd++;
             }
+            ref = ref.substring(0, roundEnd);
         }
 
         if (!ref.matches("R\\d+")) {
@@ -1522,15 +1524,26 @@ public class HeatCommand extends BaseCommand {
         Heats targetHeat,
         String source
     ) {
-        // Tenta formato R1Q1, R1F1, etc.
-        if (source.toUpperCase().matches("R\\d+[QFEHP]\\d+")) {
+        // Tenta formato R1Q1, R1F1, R1SQ1, etc.
+        if (source.toUpperCase().matches("R\\d+(?:SQ|S|P|Q|F|E|H)\\d+")) {
             try {
-                String separator = source
-                    .toUpperCase()
-                    .replaceAll("[^QFEHP]", "");
-                String[] parts = source.toUpperCase().split(separator);
-                int roundIdx = Integer.parseInt(parts[0].substring(1)) - 1; // Índices costumam ser 0-based
-                int heatIdx = Integer.parseInt(parts[1]) - 1;
+                String upper = source.toUpperCase();
+                int roundEnd = 1;
+                while (roundEnd < upper.length() && Character.isDigit(upper.charAt(roundEnd))) {
+                    roundEnd++;
+                }
+                int roundIdx = Integer.parseInt(upper.substring(1, roundEnd)) - 1;
+                String remaining = upper.substring(roundEnd);
+                String[] typeCodes = {"SQ", "S", "P", "Q", "F", "E", "H"};
+                String foundType = null;
+                for (String tc : typeCodes) {
+                    if (remaining.startsWith(tc)) {
+                        foundType = tc;
+                        break;
+                    }
+                }
+                if (foundType == null) return null;
+                int heatIdx = Integer.parseInt(remaining.substring(foundType.length())) - 1;
 
                 Events event = (targetHeat.getRound() != null)
                     ? targetHeat.getRound().getEvent()

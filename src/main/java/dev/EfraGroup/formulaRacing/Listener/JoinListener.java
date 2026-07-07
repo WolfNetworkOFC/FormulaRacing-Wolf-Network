@@ -5,6 +5,8 @@ import dev.EfraGroup.formulaRacing.PacketSender;
 import dev.EfraGroup.formulaRacing.Controllers.HotbarController;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import dev.EfraGroup.formulaRacing.BoatUtils.OpenBoatUtilsVersion;
+import me.clip.placeholderapi.PlaceholderAPI;
 import java.sql.SQLException;
 import java.util.UUID;
 
@@ -96,18 +98,20 @@ public class JoinListener implements Listener {
                 if (this.plugin.getConfig().getBoolean("message-settings.join.enabled", true)) {
                     String msg;
                     if (isFirstJoin) {
-                        msg = this.plugin.getConfig().getString("message-settings.join.first-join-message", "[+] {rank} {player}").replace("{player}", playerName).replace("{rank}", rank);
+                        msg = this.plugin.applyPapi(player, this.plugin.getConfig().getString("message-settings.join.first-join-message", "[+] {rank} {player}").replace("{player}", playerName).replace("{rank}", rank));
 
                         for(Player onlinePlayer : Bukkit.getOnlinePlayers()) {
                             String playerLang = this.mysql.getPlayerLanguage(onlinePlayer.getUniqueId());
                             String welcomeMsg = "§e" + playerName + " " + this.plugin.getDirectTranslation("welcome_first_time", playerLang).replace("{player}", playerName).replace("{rank}", rank);
+                            welcomeMsg = this.plugin.applyPapi(player, welcomeMsg);
                             onlinePlayer.sendMessage(welcomeMsg);
                         }
                     } else {
-                        msg = this.plugin.getConfig().getString("message-settings.join.message", "[+] {rank} {player}").replace("{player}", playerName).replace("{rank}", rank);
+                        msg = this.plugin.applyPapi(player, this.plugin.getConfig().getString("message-settings.join.message", "[+] {rank} {player}").replace("{player}", playerName).replace("{rank}", rank));
                     }
 
-                    SchedulerHelper.runTask(this.plugin, () -> Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', msg)));
+                    String finalMsg = msg;
+                    SchedulerHelper.runTask(this.plugin, () -> Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', finalMsg)));
                 }
 
                 SchedulerHelper.runTaskLater(this.plugin, () -> {
@@ -131,6 +135,11 @@ public class JoinListener implements Listener {
 
         });
         this.plugin.getLonelyController().updatePlayersVisibility(player);
+
+        if (FormulaRacing.hasOpenBoatUtilsMod(player)) {
+            int version = FormulaRacing.getInstance().getOpenBoatUtilsVersion(uuid);
+            OpenBoatUtilsVersion.setPlayerVersion(uuid, version);
+        }
     }
 
     public boolean isFloodgatePlayer(UUID uuid) {
@@ -198,12 +207,7 @@ public class JoinListener implements Listener {
         String rank = this.getPlayerRank(uuid);
         this.plugin.getTimerUtils().stopTimer(player);
         this.plugin.getTimerUtils().clearTempCheckpoints(uuid);
-        
-        String lastTrack = this.plugin.getLastTimeTrialTrack(uuid);
-        if (lastTrack != null) {
-            this.mysql.resetPlayerTimes(uuid.toString(), lastTrack);
-            this.plugin.setLastTimeTrialTrack(uuid, null);
-        }
+        this.plugin.setLastTimeTrialTrack(uuid, null);
         
         this.plugin.getTranslationUtil().removePlayer(uuid);
         if (this.plugin.getRaceActionBarManager() != null) {
@@ -220,7 +224,7 @@ public class JoinListener implements Listener {
         }
 
         if (this.plugin.getRaceEventManager() != null) {
-            this.plugin.getRaceEventManager().leaveEvent(player);
+            this.plugin.getRaceEventManager().leaveEvent(player, false);
         }
 
         if (this.plugin.getSpectatorManager() != null) {
@@ -248,6 +252,7 @@ public class JoinListener implements Listener {
         });
         if (this.plugin.getConfig().getBoolean("message-settings.quit.enabled", true)) {
             String msg = this.plugin.getConfig().getString("message-settings.quit.message", "[-] {rank} {player}").replace("{player}", playerName).replace("{rank}", rank);
+            msg = this.plugin.applyPapi(player, msg);
             event.setQuitMessage(ChatColor.translateAlternateColorCodes('&', msg));
         } else {
             event.setQuitMessage((String)null);

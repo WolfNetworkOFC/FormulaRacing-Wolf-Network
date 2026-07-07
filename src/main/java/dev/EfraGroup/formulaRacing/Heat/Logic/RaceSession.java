@@ -220,3 +220,4 @@ public class RaceSession implements SessionLogic {
         return completeLap(heat, driver, player, true);
     }
 }
+

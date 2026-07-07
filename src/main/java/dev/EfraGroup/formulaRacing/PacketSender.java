@@ -67,11 +67,14 @@ public class PacketSender {
             return; // não tem boatutils nessa pista
         }
 
-        // VANILLA VALUES
+        // sempre reseta para vanilla antes de aplicar, pra não acumular settings de pistas anteriores
+        sendBoatSetting(player, (short) 0);
+
+        // VANILLA VALUES (alinhados com BoatUtilsVanillaValues)
         float VANILLA_STEP_HEIGHT = 0f;
         float VANILLA_DEFAULT_SLIPPERINESS = 0.6f;
         boolean VANILLA_FALL_DAMAGE = true;
-        boolean VANILLA_WATER_ELEVATION = true;
+        boolean VANILLA_WATER_ELEVATION = false;
         boolean VANILLA_AIR_CONTROL = false;
         float VANILLA_JUMP_FORCE = 0f;
         double VANILLA_GRAVITY = -0.03999999910593033;
@@ -80,15 +83,26 @@ public class PacketSender {
         float VANILLA_BACKWARD_ACCEL = 0.005f;
         float VANILLA_TURN_FORWARD_ACCEL = 0.005f;
         boolean VANILLA_ALLOW_ACCEL_STACKING = true;
-        boolean VANILLA_UNDERWATER_CONTROL = true;
-        boolean VANILLA_SURFACE_WATER_CONTROL = true;
+        boolean VANILLA_UNDERWATER_CONTROL = false;
+        boolean VANILLA_SURFACE_WATER_CONTROL = false;
         int VANILLA_COYOTE_TIME = 0;
-        boolean VANILLA_WATER_JUMPING = true;
+        boolean VANILLA_WATER_JUMPING = false;
         float VANILLA_SWIM_FORCE = 0.0f;
         short VANILLA_COLLISION_MODE = 0;
         boolean VANILLA_AIR_STEPPING = false;
         boolean VANILLA_TEN_STEP_INTERPOLATION = false;
         byte VANILLA_COLLISION_RESOLUTION = 5;
+        float VANILLA_WALLTAP_MULTIPLIER = 0f;
+        int VANILLA_JUMPS = 1;
+        float VANILLA_SCALE = 1f;
+        float VANILLA_STEP_UP_SLIPPERINESS = 1f;
+        boolean VANILLA_FIX_DOUBLE_WATER_ELEVATION = false;
+        float VANILLA_LATERAL_SLIPPERINESS = 1f;
+        float VANILLA_BRAKE_SLIPPERINESS = 1f;
+        boolean VANILLA_MULTI_STEPPING = false;
+        float VANILLA_MAX_SPEED = -1f;
+        float VANILLA_MAX_SPEED_RESISTANCE = 0f;
+        boolean VANILLA_HONEY_COMPATIBILITY = false;
 
         // =============== 1. STEP HEIGHT (1) ===============
         float stepHeight = ((Number)data.get("stepHeight")).floatValue();
@@ -261,6 +275,79 @@ public class PacketSender {
             sendBoatSetting(player, (short)30, resolution);
         }
 
+        // =============== 34. WALLTAP MULTIPLIER (34) ===============
+        float walltap = ((Number)data.get("walltapMultiplier")).floatValue();
+        if (walltap != VANILLA_WALLTAP_MULTIPLIER) {
+            sendBoatSetting(player, (short)34, walltap);
+        }
+
+        // =============== 35. JUMPS (35) ===============
+        int jumps = (Integer) data.get("jumps");
+        if (jumps != VANILLA_JUMPS) {
+            sendBoatSetting(player, (short)35, jumps);
+        }
+
+        // =============== 36. SCALE (36) ===============
+        float scale = ((Number)data.get("scale")).floatValue();
+        if (scale != VANILLA_SCALE) {
+            sendBoatSetting(player, (short)36, scale);
+        }
+
+        // =============== 37. STEP UP SLIPPERINESS (37) ===============
+        float stepUpSlip = ((Number)data.get("stepUpSlipperiness")).floatValue();
+        if (stepUpSlip != VANILLA_STEP_UP_SLIPPERINESS) {
+            sendBoatSetting(player, (short)37, stepUpSlip);
+        }
+
+        // =============== 39. FIX DOUBLE WATER ELEVATION (39) ===============
+        boolean fixDWE = (Boolean) data.get("fixDoubleWaterElevation");
+        if (fixDWE != VANILLA_FIX_DOUBLE_WATER_ELEVATION) {
+            sendBoatSetting(player, (short)39, fixDWE);
+        }
+
+        // =============== 40. LATERAL SLIPPERINESS (40) ===============
+        float lateralSlip = ((Number)data.get("lateralSlipperiness")).floatValue();
+        if (lateralSlip != VANILLA_LATERAL_SLIPPERINESS) {
+            sendBoatSetting(player, (short)40, lateralSlip);
+        }
+
+        // =============== 41. BRAKE SLIPPERINESS (41) ===============
+        float brakeSlip = ((Number)data.get("brakeSlipperiness")).floatValue();
+        if (brakeSlip != VANILLA_BRAKE_SLIPPERINESS) {
+            sendBoatSetting(player, (short)41, brakeSlip);
+        }
+
+        // =============== 44. MULTI STEPPING (44) ===============
+        boolean multiStep = (Boolean) data.get("multiStepping");
+        if (multiStep != VANILLA_MULTI_STEPPING) {
+            sendBoatSetting(player, (short)44, multiStep);
+        }
+
+        // =============== 45. MAX SPEED (45) ===============
+        float maxSpeed = ((Number)data.get("maxSpeed")).floatValue();
+        if (maxSpeed != VANILLA_MAX_SPEED) {
+            sendBoatSetting(player, (short)45, maxSpeed);
+        }
+
+        // =============== 46. MAX SPEED RESISTANCE (46) ===============
+        float maxSpeedRes = ((Number)data.get("maxSpeedResistance")).floatValue();
+        if (maxSpeedRes != VANILLA_MAX_SPEED_RESISTANCE) {
+            sendBoatSetting(player, (short)46, maxSpeedRes);
+        }
+
+        // =============== 47. HONEY COMPATIBILITY (47) ===============
+        boolean honey = (Boolean) data.get("honeyCompatibility");
+        if (honey != VANILLA_HONEY_COMPATIBILITY) {
+            sendBoatSetting(player, (short)47, honey);
+        }
+
+        // =============== 31/32. COLLISION FILTER ===============
+        String collisionFilter = (String) data.get("collisionFilter");
+        if (collisionFilter != null && !collisionFilter.isEmpty()) {
+            sendBoatSetting(player, (short)32); // clear filter first
+            sendBoatSetting(player, (short)31, collisionFilter); // add entities
+        }
+
         // =============== 26. PER BLOCK SETTINGS (26) ===============
         String perBlock = (String) data.get("perBlockSetting");
         if (perBlock != null && !perBlock.isEmpty()) {
@@ -278,27 +365,7 @@ public class PacketSender {
             return;
         }
 
-        sendBoatSetting(player, (short) 1, 0f);
-        sendBoatSetting(player, (short) 2, 0.6f);
-        sendBoatSetting(player, (short) 4, true);
-        sendBoatSetting(player, (short) 5, true);
-        sendBoatSetting(player, (short) 6, false);
-        sendBoatSetting(player, (short) 7, 0f);
-        sendBoatSetting(player, (short) 9, -0.03999999910593033d);
-        sendBoatSetting(player, (short) 10, 1.0f);
-        sendBoatSetting(player, (short) 11, 0.04f);
-        sendBoatSetting(player, (short) 12, 0.005f);
-        sendBoatSetting(player, (short) 13, 0.005f);
-        sendBoatSetting(player, (short) 14, true);
-        sendBoatSetting(player, (short) 16, true);
-        sendBoatSetting(player, (short) 17, true);
-        sendBoatSetting(player, (short) 19, 0);
-        sendBoatSetting(player, (short) 20, true);
-        sendBoatSetting(player, (short) 21, 0.0f);
-        sendBoatSetting(player, (short) 27, (short) 0);
-        sendBoatSetting(player, (short) 28, false);
-        sendBoatSetting(player, (short) 29, false);
-        sendBoatSetting(player, (short) 30, (byte) 5);
+        sendBoatSetting(player, (short) 0);
     }
 
     private final java.util.Set<UUID> lonelyPlayers = new java.util.HashSet<>();

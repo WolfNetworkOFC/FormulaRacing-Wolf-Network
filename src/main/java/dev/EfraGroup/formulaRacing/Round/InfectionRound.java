@@ -32,3 +32,4 @@ public class InfectionRound extends Rounds {
         return new InfectionSession();
     }
 }
+

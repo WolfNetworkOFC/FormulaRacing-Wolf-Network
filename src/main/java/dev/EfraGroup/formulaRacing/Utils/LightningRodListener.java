@@ -214,7 +214,7 @@ public class LightningRodListener implements Listener {
         });
     }
 
-    private void removeRodForPlayer(UUID playerId) {
+    public void removeRodForPlayer(UUID playerId) {
         ItemDisplay rod = playerRods.remove(playerId);
         if (rod != null && rod.isValid()) {
             if (PlatformUtils.isFoliaRuntime()) {

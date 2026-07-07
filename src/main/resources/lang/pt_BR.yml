@@ -23,6 +23,7 @@ timetrial_completed: "&6🏁 &fTempo: &b{time}"
 track_not_found: "&cPista não encontrada com esse nome."
 track_is_closed: "&cEsta pista está fechada e não pode ser usada no momento!"
 obu_mandatory_warning: "&c&l⚠ AVISO: &7A pista &f{track} &7requer o mod &bOpenBoatUtils &7para ser percorrida em condições plenas. Sem ele, você pode ficar travado em elevações!"
+obu_version_warning: "&c&l⚠ MISMATE DE VERSÃO: &7Sua versão do OpenBoatUtils (&f{current}&7) é antiga para a pista &f{track}&7. Versão mínima: &f{required}&7. Por favor, atualize o seu mod!"
 partial_time_saved: "&aTempo parcial da pista anterior &e{track} &afoi salvo: &e{time}"
 timetrial_cancelled: "&cTime trial cancelado."
 

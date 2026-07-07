@@ -19,7 +19,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Gerencia todas as linhas de corrida AI do servidor.
+     * Manages all AI racing lines on the server.
  */
 public class AIRacingLineManager {
 
@@ -35,8 +35,8 @@ public class AIRacingLineManager {
     }
 
     /**
-     * Inicializa o manager: carrega linhas salvas e inicializa o recorder.
-     * Deve ser chamado após o plugin estar totalmente carregado.
+     * Initializes the manager: loads saved lines and initializes the recorder.
+     * Should be called after the plugin is fully loaded.
      */
     public void initialize() {
         loadAllRacingLines();
@@ -89,7 +89,7 @@ public class AIRacingLineManager {
         List<DatabaseManager.RegionData> checkpoints = new ArrayList<>(trackManager.getTrackCheckpoints(normalizedTrack));
 
         if (spawn == null || checkpoints.isEmpty()) {
-            plugin.getDebugManager().logRaceSystem("[AI] Não foi possível gerar linha básica para " + normalizedTrack + ": pista sem spawn ou checkpoints.");
+            plugin.getDebugManager().logRaceSystem("[AI] Could not generate basic line for " + normalizedTrack + ": track has no spawn or checkpoints.");
             return;
         }
 
@@ -125,11 +125,11 @@ public class AIRacingLineManager {
             }
         }
 
-        plugin.getDebugManager().logRaceSystem("[AI] Linha básica gerada para " + normalizedTrack + " com " + line.getIdealLineSize() + " pontos.");
+        plugin.getDebugManager().logRaceSystem("[AI] Basic line generated for " + normalizedTrack + " with " + line.getIdealLineSize() + " points.");
     }
 
     /**
-     * Salva todas as linhas de corrida em um arquivo YAML na pasta do plugin.
+     * Saves all racing lines to a YAML file in the plugin folder.
      */
     public void saveAllRacingLines() {
         File file = new File(plugin.getDataFolder(), LINES_FILE);
@@ -145,7 +145,7 @@ public class AIRacingLineManager {
 
             String basePath = "lines." + trackKey;
 
-            // Salvar pontos ideais
+            // Save ideal points
             List<Location> idealLine = line.getIdealLine();
             for (int i = 0; i < idealLine.size(); i++) {
                 Location loc = idealLine.get(i);
@@ -157,7 +157,7 @@ public class AIRacingLineManager {
                 yaml.set(pointPath + ".speed", line.getIdealSpeedAtIndex(i));
             }
 
-            // Salvar pontos de frenagem
+            // Save braking points
             List<Location> brakingPoints = line.getBrakingPoints();
             for (int i = 0; i < brakingPoints.size(); i++) {
                 Location loc = brakingPoints.get(i);
@@ -168,7 +168,7 @@ public class AIRacingLineManager {
                 yaml.set(pointPath + ".z", loc.getZ());
             }
 
-            // Salvar pontos de aceleração
+            // Save acceleration points
             List<Location> accelPoints = line.getAccelerationPoints();
             for (int i = 0; i < accelPoints.size(); i++) {
                 Location loc = accelPoints.get(i);
@@ -182,19 +182,19 @@ public class AIRacingLineManager {
 
         try {
             yaml.save(file);
-            plugin.getDebugManager().logRaceSystem("[AI] Linhas de corrida salvas em " + LINES_FILE + " (" + racingLines.size() + " pistas).");
+            plugin.getDebugManager().logRaceSystem("[AI] Racing lines saved to " + LINES_FILE + " (" + racingLines.size() + " tracks).");
         } catch (IOException e) {
-            plugin.getLogger().warning("[AI] Erro ao salvar linhas de corrida: " + e.getMessage());
+            plugin.getLogger().warning("[AI] Error saving racing lines: " + e.getMessage());
         }
     }
 
     /**
-     * Carrega todas as linhas de corrida do arquivo YAML.
+     * Loads all racing lines from the YAML file.
      */
     public void loadAllRacingLines() {
         File file = new File(plugin.getDataFolder(), LINES_FILE);
         if (!file.exists()) {
-            plugin.getDebugManager().logRaceSystem("[AI] Arquivo " + LINES_FILE + " não encontrado. Nenhuma linha carregada.");
+            plugin.getDebugManager().logRaceSystem("[AI] File " + LINES_FILE + " not found. No lines loaded.");
             return;
         }
 
@@ -210,10 +210,10 @@ public class AIRacingLineManager {
             AIRacingLine line = getRacingLine(trackKey);
             line.clear();
 
-            // Carregar pontos ideais
+            // Load ideal points
             ConfigurationSection idealSection = yaml.getConfigurationSection(basePath + ".ideal");
             if (idealSection != null) {
-                // Ordenar por índice numérico
+                // Sort by numerical index
                 List<Integer> indices = new ArrayList<>();
                 for (String key : idealSection.getKeys(false)) {
                     try {
@@ -236,7 +236,7 @@ public class AIRacingLineManager {
                 }
             }
 
-            // Carregar pontos de frenagem
+            // Load braking points
             ConfigurationSection brakingSection = yaml.getConfigurationSection(basePath + ".braking");
             if (brakingSection != null) {
                 List<Integer> indices = new ArrayList<>();
@@ -260,7 +260,7 @@ public class AIRacingLineManager {
                 }
             }
 
-            // Carregar pontos de aceleração
+            // Load acceleration points
             ConfigurationSection accelSection = yaml.getConfigurationSection(basePath + ".acceleration");
             if (accelSection != null) {
                 List<Integer> indices = new ArrayList<>();
@@ -289,7 +289,7 @@ public class AIRacingLineManager {
             }
         }
 
-        plugin.getDebugManager().logRaceSystem("[AI] " + loadedCount + " linha(s) de corrida carregada(s) de " + LINES_FILE);
+        plugin.getDebugManager().logRaceSystem("[AI] " + loadedCount + " racing line(s) loaded from " + LINES_FILE);
     }
 
     private String normalizeTrackName(String trackName) {

@@ -33,7 +33,7 @@ public class PitStopConfigManager {
                 this.configFile.getParentFile().mkdirs();
                 this.configFile.createNewFile();
             } catch (IOException e) {
-                this.plugin.getDebugManager().logPitStopSystem("[PitStopConfig] Não foi possível criar pitstop_config.yml: " + e.getMessage());
+                this.plugin.getDebugManager().logPitStopSystem("[PitStopConfig] Could not create pitstop_config.yml: " + e.getMessage());
             }
         }
 
@@ -60,7 +60,7 @@ public class PitStopConfigManager {
         try {
             this.yaml.save(this.configFile);
         } catch (IOException e) {
-            this.plugin.getDebugManager().logPitStopSystem("[PitStopConfig] Falha ao salvar pitstop_config.yml: " + e.getMessage());
+            this.plugin.getDebugManager().logPitStopSystem("[PitStopConfig] Failed to save pitstop_config.yml: " + e.getMessage());
         }
 
     }
@@ -119,7 +119,7 @@ public class PitStopConfigManager {
 
                 PitConfig cfg = new PitConfig(section.getInt("inventory_size", 27), section.getInt("min_targets", 5), section.getInt("max_targets", 9), targetItems, wrongItem, section.getBoolean("shuffle_on_error", true));
                 this.cache.put(key.toLowerCase(), cfg);
-                this.plugin.getDebugManager().logPitStopSystem("[PitConfig] Carregado config para '" + key + "' com " + targetItems.size() + " alvos.");
+                this.plugin.getDebugManager().logPitStopSystem("[PitConfig] Loaded config for '" + key + "' with " + targetItems.size() + " targets.");
             }
         }
 

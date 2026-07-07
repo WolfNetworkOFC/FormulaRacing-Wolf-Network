@@ -122,7 +122,7 @@ public class RegionListener implements Listener {
                     event.setCancelled(true);
                     String langCode = this.database.getPlayerLanguage(player.getUniqueId());
                     player.sendMessage(this.plugin.getDirectTranslation("duel_cannot_teleport", langCode));
-                    this.plugin.getDebugManager().logRegionDetection("§c[TELEPORT] Cancelado pelo RegionListener (Duel Protection). Cause: " + String.valueOf(event.getCause()));
+                    this.plugin.getDebugManager().logRegionDetection("§c[TELEPORT] Canceled by RegionListener (Duel Protection). Cause: " + String.valueOf(event.getCause()));
                 }
             } else {
                 this.lastLocation.remove(player.getUniqueId());
@@ -148,22 +148,22 @@ public class RegionListener implements Listener {
 
     public void reloadRegions() {
         this.loadRegions();
-        this.plugin.getDebugManager().logRegionDetection("§a[RegionListener] Regiões recarregadas manualmente");
+        this.plugin.getDebugManager().logRegionDetection("§a[RegionListener] Regions reloaded manually");
     }
     public void debugListRegions(String worldFilter, String trackFilter) {
-        this.plugin.getDebugManager().logRegionDetection("§6========== REGIÕES CARREGADAS ==========");
+        this.plugin.getDebugManager().logRegionDetection("§6========== LOADED REGIONS ==========");
 
         this.regions.forEach((world, regionList) -> {
-            // Filtro de Mundo
+            // World filter
             if (worldFilter != null && !world.equalsIgnoreCase(worldFilter)) return;
 
-            this.plugin.getDebugManager().logRegionDetection("§e[MUNDO: " + world + "]");
+            this.plugin.getDebugManager().logRegionDetection("§e[WORLD: " + world + "]");
 
             for (DatabaseManager.RegionData region : regionList) {
                 String type = region.getType().toUpperCase();
                 String trackName = region.getTrackName();
 
-                // Filtro de Tipo (START/END) e Nome da Pista
+                // Type (START/END) and Track Name filter
                 boolean matchesType = type.equals("START") || type.equals("END");
                 boolean matchesTrack = trackFilter == null || trackName.toLowerCase().contains(trackFilter.toLowerCase());
 
@@ -178,9 +178,9 @@ public class RegionListener implements Listener {
 
                     this.plugin.getDebugManager().logRegionDetection(String.format("    Dimensões: %.2f x %.2f x %.2f", width, height, depth));
 
-                    // Alerta de colisão/detecção
+                    // Collision/detection alert
                     if (height < 3.0) {
-                        this.plugin.getDebugManager().logRegionDetection("    §c⚠ REGIÃO MUITO FINA! Altura Y < 3 blocos pode falhar na detecção.");
+                        this.plugin.getDebugManager().logRegionDetection("    §c⚠ REGION TOO THIN! Y height < 3 blocks may fail detection.");
                     }
                 }
             }
@@ -201,7 +201,7 @@ public class RegionListener implements Listener {
             Location current = currentRaw;
             Location previous = previousRaw;
 
-            // Se for Bedrock e estiver em barco, usar posição do barco
+            // If Bedrock and in boat, use the boat's position
             if (bedrockBoatDetection) {
                 current = this.normalizeRegionLocation(player.getVehicle().getLocation(), true);
                 if (previous != null) {
@@ -239,7 +239,7 @@ public class RegionListener implements Listener {
                         List<DatabaseManager.RegionData> worldRegions = this.regions.get(worldName);
 
                         if (worldRegions != null && !worldRegions.isEmpty()) {
-                            // DEBUG: região mais próxima
+                            // DEBUG: nearest region
                             DatabaseManager.RegionData nearest = null;
                             double nearestDist = Double.MAX_VALUE;
                             for (DatabaseManager.RegionData region : worldRegions) {
@@ -254,7 +254,7 @@ public class RegionListener implements Listener {
                                 }
                             }
 
-                            // Checar se cruzou região START/END
+                            // Check if crossed START/END region
 DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, current, worldRegions);
                                 if (startEndRegion != null) {
                                     Location finalFrom = previous.clone();
@@ -262,7 +262,7 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                                     SchedulerHelper.runTaskFor(this.plugin, player, () -> this.handleRegion(player, startEndRegion, finalFrom, finalTo));
                                 }
 
-                            // Lógica de checkpoints e duelos
+                            // Checkpoints and duels logic
                             String activeTrack = this.timerUtils.getActiveTrack(player);
                             int activeDuelId = this.timeTrialDuels.getActiveDuelIdCached(uuid);
                             boolean isInDuel = activeDuelId != -1;
@@ -307,7 +307,7 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                                                     this.timerUtils.addCheckpoint(player, cpId);
                                                     this.timerUtils.addTempCheckpoint(uuid, cpId, elapsed, activeTrack);
                                                     player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.5F);
-                                                    this.plugin.getDebugManager().logRegionDetection(player.getName() + " coletou checkpoint na pista " + activeTrack);
+                                                    this.plugin.getDebugManager().logRegionDetection(player.getName() + " collected checkpoint on track " + activeTrack);
                                                 });
                                             }
                                         }
@@ -320,7 +320,7 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                                             long now = System.currentTimeMillis();
                                             Long lastLog = this.lastTimeLimitLog.get(uuid);
                                             if (lastLog == null || now - lastLog >= 2000L) {
-                                                this.plugin.getDebugManager().logRegionDetection("§e[TIME LIMIT] " + player.getName() + " limite de tempo excedido.");
+                                                this.plugin.getDebugManager().logRegionDetection("§e[TIME LIMIT] " + player.getName() + " time limit exceeded.");
                                                 this.lastTimeLimitLog.put(uuid, now);
                                             }
                                             return;
@@ -348,7 +348,7 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                         } else {
                             if (!this.warnedWorlds.contains(worldName)) {
                                 this.warnedWorlds.add(worldName);
-                                this.plugin.getDebugManager().logRegionDetection("[FormulaRacing] Nenhuma região registrada para o mundo " + worldName);
+                                this.plugin.getDebugManager().logRegionDetection("[FormulaRacing] No regions registered for world " + worldName);
                             }
 
                         }
@@ -462,12 +462,12 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                         DebugManager debug = this.plugin.getDebugManager();
                         String worldName = targetLoc.getWorld().getName();
 
-// Log do agendamento do Reset
+// Log of the Reset scheduling
                         debug.logTimeTrialSystem(String.format("[RESET] Scheduled Teleport for %s to: World=%s, X=%d, Y=%d, Z=%d",
                                 player.getName(), worldName, targetLoc.getBlockX(), targetLoc.getBlockY(), targetLoc.getBlockZ()));
 
-// Executa o teleporte e o spawn do barco 1 tick depois para evitar bugs de colisão/NMS
-                        // Criamos referências finais para garantir que a Lambda possa capturá-las sem erro
+// Executes teleport and boat spawn 1 tick later to avoid collision/NMS bugs
+                        // Create final references so the Lambda can capture them without error
                         final DebugManager finalDebug = this.plugin.getDebugManager();
                         final Location finalTargetLoc = targetLoc;
                         final Player finalPlayer = player;
@@ -475,7 +475,7 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                         SchedulerHelper.runTaskLater(this.plugin, () -> {
                             // Verificamos se o jogador ainda está online após o delay de 1 tick
                             if (finalPlayer.isOnline()) {
-                                // Teleporte e efeito sonoro usando as referências finais
+                                // Teleport and sound effect usando as referências finais
                                 SchedulerHelper.teleport(finalPlayer, finalTargetLoc);
                                 finalPlayer.playSound(finalTargetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
 
@@ -537,7 +537,7 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
 
                                     foundInHeat = true;
                                     if (!driver.isFinished() && !driver.isDnf() && (heatState == HeatState.RACING || heatState == HeatState.STARTING || heatState == HeatState.PRACTICE || heatState == HeatState.QUALIFYING)) {
-                                        this.plugin.getDebugManager().logRaceSystem(String.format("[HEAT] %s - Em corrida (Heat %s, Estado: %s, type=%s)", player.getName(), heat.getName(), heatState, type));
+                                        this.plugin.getDebugManager().logRaceSystem(String.format("[HEAT] %s - In race (Heat %s, State: %s, type=%s)", player.getName(), heat.getName(), heatState, type));
                                         if ((type.equals("START") || type.equals("END")) && (heatState == HeatState.RACING || heatState == HeatState.PRACTICE || heatState == HeatState.QUALIFYING)) {
                                             this.plugin.getDebugManager().logRaceSystem(String.format("[HEAT] %s - Chamando handleRaceLapCrossing", player.getName()));
                                             this.handleRaceLapCrossing(player, driver, heat, from, to, region);
@@ -594,12 +594,12 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                     } else if (isRunningDuel) {
                         DebugManager var66 = this.plugin.getDebugManager();
                         String var69 = player.getName();
-                        var66.logTimeTrialSystem(var69 + " está em duelo #" + activeDuelId + ", time trial solo bloqueado");
+                        var66.logTimeTrialSystem(var69 + " is in duel #" + activeDuelId + ", solo time trial blocked");
                     } else if (!ttEnabled && justFinishedDuelOnThisTrack) {
-                        this.plugin.getDebugManager().logTimeTrialSystem(player.getName() + " tinha TT desabilitado antes do duelo, não auto-iniciando");
+                        this.plugin.getDebugManager().logTimeTrialSystem(player.getName() + " had TT disabled before duel, not auto-starting");
                         this.plugin.clearLastDuelTrack(uuid);
                     } else if (!ttEnabled) {
-                        this.plugin.getDebugManager().logTimeTrialSystem(player.getName() + " não tem time trial habilitado");
+                        this.plugin.getDebugManager().logTimeTrialSystem(player.getName() + " does not have time trial enabled");
                         if (type.equals("START") || type.equals("END")) {
                             long now = System.currentTimeMillis();
                             Long lastWarning = (Long)this.lastTTDisabledWarning.get(uuid);
@@ -619,6 +619,17 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
 
     private void handleSoloTimeTrial(Player player, String regionTrackDisplayName, String regionTrackWS, String type, Location from, Location to, DatabaseManager.RegionData region, boolean shouldLoop) {
         UUID uuid = player.getUniqueId();
+
+        if (this.plugin.getDriverLookup().isRacing(uuid)) {
+            return;
+        }
+        if (this.plugin.getQuickRaceManager() != null && this.plugin.getQuickRaceManager().isPlayerInActiveRace(uuid)) {
+            return;
+        }
+        if (this.timeTrialDuels.isPlayerInDuel(uuid)) {
+            return;
+        }
+
         String lang_code = this.database.getPlayerLanguage(uuid);
         long now = System.currentTimeMillis();
         Long lastCross = (Long)this.lastStartEndCross.get(uuid);
@@ -687,7 +698,7 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                                             SchedulerHelper.runTask(this.plugin, () -> this.startSoloTimer(player, regionTrackDisplayName, regionTrackWS, "START", System.currentTimeMillis()));
                                         });
                                     } else {
-                                        this.plugin.getDebugManager().logTimeTrialSystem("[SOLO TT] Sprint finalizado. Timer parado.");
+                                        this.plugin.getDebugManager().logTimeTrialSystem("[SOLO TT] Sprint finished. Timer stopped.");
                                     }
 
                                 }
@@ -753,6 +764,16 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
 
     private void startSoloTimer(Player player, String regionTrackDisplayName, String regionTrackWS, String type, long startTime) {
         UUID uuid = player.getUniqueId();
+
+        if (this.plugin.getDriverLookup().isRacing(uuid)) {
+            return;
+        }
+        if (this.plugin.getQuickRaceManager() != null && this.plugin.getQuickRaceManager().isPlayerInActiveRace(uuid)) {
+            return;
+        }
+        if (this.timeTrialDuels.isPlayerInDuel(uuid)) {
+            return;
+        }
         String ownerName = null;
         DatabaseManager.TrackData td = this.database.getTrackData(regionTrackWS);
         if (td != null) {
@@ -832,7 +853,7 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
         }
     }
 
-    // --- MÉTODOS DE INICIALIZAÇÃO QUE ESTAVAM FALTANDO ---
+    // --- INITIALIZATION METHODS THAT WERE MISSING ---
 
     private void startRegionLoader() {
         SchedulerHelper.runAsyncTimer(this.plugin, () -> {
@@ -866,3 +887,4 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
     }
 
 }
+

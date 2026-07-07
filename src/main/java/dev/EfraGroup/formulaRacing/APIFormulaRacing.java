@@ -79,7 +79,7 @@ public class APIFormulaRacing {
         UUID uuid = player.getUniqueId();
         boolean recovered = this.recoverPlayerBoatState(player);
         if (checkground && !player.isOnGround() && !recovered) {
-            player.sendMessage("§cEsteja no chão para executar este comando.");
+            player.sendMessage("§cYou must be on the ground to execute this command.");
         } else {
             EntityType boatType = this.getPlayerBoatType(uuid);
             Boat boat = null;
@@ -181,6 +181,16 @@ public class APIFormulaRacing {
         if (!(boat instanceof Boat)) return;
         playerBoats.values().remove(boat);
 
+        if (!boat.getPassengers().isEmpty()) {
+            Entity passenger = boat.getPassengers().getFirst();
+            if (passenger instanceof Player p) {
+                FormulaRacing fr = (FormulaRacing) this.plugin;
+                if (fr.getLightningRodListener() != null) {
+                    fr.getLightningRodListener().removeRodForPlayer(p.getUniqueId());
+                }
+            }
+        }
+
         SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
             Entity vehicle = boat.getVehicle();
             if (vehicle instanceof ArmorStand as) {
@@ -199,6 +209,16 @@ public class APIFormulaRacing {
         if (!(boat instanceof Boat)) return;
         playerBoats.values().remove(boat);
 
+        if (!boat.getPassengers().isEmpty()) {
+            Entity passenger = boat.getPassengers().getFirst();
+            if (passenger instanceof Player p) {
+                FormulaRacing fr = (FormulaRacing) this.plugin;
+                if (fr.getLightningRodListener() != null) {
+                    fr.getLightningRodListener().removeRodForPlayer(p.getUniqueId());
+                }
+            }
+        }
+
         SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
             Entity vehicle = boat.getVehicle();
             if (vehicle instanceof ArmorStand as) {
@@ -214,6 +234,11 @@ public class APIFormulaRacing {
     }
 
     public void removePlayerBoat(UUID uuid) {
+        FormulaRacing fr = (FormulaRacing) this.plugin;
+        if (fr.getLightningRodListener() != null) {
+            fr.getLightningRodListener().removeRodForPlayer(uuid);
+        }
+
         ArmorStand anchor = lockedBoats.remove(uuid);
         if (anchor != null) {
             SchedulerHelper.runTaskFor(this.plugin, anchor, () -> {
@@ -229,6 +254,12 @@ public class APIFormulaRacing {
     }
 
     public void clearAllBoats() {
+        FormulaRacing fr = (FormulaRacing) this.plugin;
+        if (fr.getLightningRodListener() != null) {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                fr.getLightningRodListener().removeRodForPlayer(player.getUniqueId());
+            }
+        }
         for (Player player : Bukkit.getOnlinePlayers()) {
             Entity vehicle = player.getVehicle();
             if (vehicle instanceof Boat) {

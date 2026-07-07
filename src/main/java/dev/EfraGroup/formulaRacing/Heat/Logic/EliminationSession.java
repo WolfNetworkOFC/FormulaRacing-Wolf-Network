@@ -82,9 +82,9 @@ public class EliminationSession implements SessionLogic {
         this.secondsUntilNextElimination = eliminationIntervalSeconds;
         this.heatFinished = false;
 
-        plugin.getDebugManager().logRaceSystem(
-            "[ELIMINATION] Sessão de eliminação iniciada para Heat " + heat.getId()
-        );
+            plugin.getDebugManager().logRaceSystem(
+                "[ELIMINATION] Elimination session started for Heat " + heat.getId()
+            );
 
         startEliminationTimer(heat);
         startCountdownTask(heat);
@@ -108,12 +108,12 @@ public class EliminationSession implements SessionLogic {
             int remaining = activeDrivers.size();
 
             plugin.getDebugManager().logRaceSystem(
-                "[ELIMINATION] Ciclo #" + eliminationCount + " - Pilotos restantes: " + remaining
+                "[ELIMINATION] Cycle #" + eliminationCount + " - Remaining drivers: " + remaining
             );
 
             if (remaining <= 1) {
                 plugin.getDebugManager().logRaceSystem(
-                    "[ELIMINATION] Apenas 1 piloto restante! Finalizando heat..."
+                    "[ELIMINATION] Only 1 driver remaining! Finishing heat..."
                 );
                 finishHeatWithWinner(heat, activeDrivers);
                 return;
@@ -121,7 +121,7 @@ public class EliminationSession implements SessionLogic {
 
             if (remaining <= minimumDrivers) {
                 plugin.getDebugManager().logRaceSystem(
-                    "[ELIMINATION] Mínimo de pilotos atingido (" + minimumDrivers + "), finalizando heat..."
+                    "[ELIMINATION] Minimum drivers reached (" + minimumDrivers + "), finishing heat..."
                 );
                 finishHeatWithWinner(heat, activeDrivers);
                 return;
@@ -134,7 +134,7 @@ public class EliminationSession implements SessionLogic {
         }, intervalTicks, intervalTicks);
 
         plugin.getDebugManager().logRaceSystem(
-            "[ELIMINATION] Timer de eliminação iniciado - Intervalo: " + eliminationIntervalSeconds + "s"
+            "[ELIMINATION] Elimination timer started - Interval: " + eliminationIntervalSeconds + "s"
         );
     }
 
@@ -183,16 +183,16 @@ public class EliminationSession implements SessionLogic {
                 Player player = (Player) entity;
 
                 if (isInDanger) {
-                    String title = ChatColor.RED + "⚠ EM PERIGO!";
-                    String subtitle = ChatColor.GRAY + "Eliminação em " + ChatColor.RED + timerStr;
+                    String title = ChatColor.RED + "⚠ IN DANGER!";
+                    String subtitle = ChatColor.GRAY + "Elimination in " + ChatColor.RED + timerStr;
                     TitleHelper.sendThemedTitle(player, title, subtitle, 0, 25, 5);
 
                     if (timer <= 5 && timer > 0) {
                         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 0.5f);
                     }
                 } else {
-                    String title = ChatColor.GREEN + "✓ SEGURO";
-                    String subtitle = ChatColor.GRAY + "Próxima eliminação: " + ChatColor.YELLOW + timerStr;
+                    String title = ChatColor.GREEN + "✓ SAFE";
+                    String subtitle = ChatColor.GRAY + "Next elimination: " + ChatColor.YELLOW + timerStr;
                     TitleHelper.sendThemedTitle(player, title, subtitle, 0, 25, 5);
                 }
             });
@@ -225,16 +225,16 @@ public class EliminationSession implements SessionLogic {
             }
 
             Bukkit.broadcastMessage("");
-            Bukkit.broadcastMessage(ChatColor.GOLD + "🏆 VENCEDOR DA ELIMINAÇÃO 🏆");
-            Bukkit.broadcastMessage(ChatColor.YELLOW + winnerName + ChatColor.GOLD + " venceu a eliminação!");
+            Bukkit.broadcastMessage(ChatColor.GOLD + "🏆 ELIMINATION WINNER 🏆");
+            Bukkit.broadcastMessage(ChatColor.YELLOW + winnerName + ChatColor.GOLD + " won the elimination!");
             Bukkit.broadcastMessage("");
 
             if (winnerPlayer != null && winnerPlayer.isOnline()) {
                 SchedulerHelper.runTaskFor(heat.getPlugin(), winnerPlayer, (entity) -> {
                     Player p = (Player) entity;
                     TitleHelper.sendThemedTitle(p,
-                        ChatColor.GOLD + "🏆 VITÓRIA!",
-                        ChatColor.YELLOW + "Você venceu a eliminação!",
+                        ChatColor.GOLD + "🏆 VICTORY!",
+                        ChatColor.YELLOW + "You won the elimination!",
                         10, 100, 20);
                     p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
                 });
@@ -254,7 +254,7 @@ public class EliminationSession implements SessionLogic {
         Events event = heat.getRound() != null ? heat.getRound().getEvent() : null;
 
         if (activeDrivers.isEmpty()) {
-            plugin.getDebugManager().logRaceSystem("[ELIMINATION] Nenhum piloto ativo para eliminar");
+            plugin.getDebugManager().logRaceSystem("[ELIMINATION] No active drivers to eliminate");
             return;
         }
 
@@ -267,13 +267,13 @@ public class EliminationSession implements SessionLogic {
             Entity vehicle = player.getVehicle();
             if (vehicle != null) {
                 vehicle.remove();
-                plugin.getDebugManager().logRaceSystem("[ELIMINATION] Veículo destruído para " + player.getName());
+                plugin.getDebugManager().logRaceSystem("[ELIMINATION] Vehicle destroyed for " + player.getName());
             }
 
             // Transition to spectator mode
             if (event != null) {
                 plugin.getSpectatorManager().addSpectator(player, event);
-                plugin.getDebugManager().logRaceSystem("[ELIMINATION] " + player.getName() + " enviado para modo espectador");
+                plugin.getDebugManager().logRaceSystem("[ELIMINATION] " + player.getName() + " sent to spectator mode");
             }
         }
 
@@ -287,17 +287,17 @@ public class EliminationSession implements SessionLogic {
         String driverName = (player != null) ? player.getName() : "Unknown";
 
         Bukkit.broadcastMessage("");
-        Bukkit.broadcastMessage(ChatColor.RED + "⚠ ELIMINAÇÃO ⚠");
-        Bukkit.broadcastMessage(ChatColor.YELLOW + driverName + ChatColor.RED + " foi eliminado!");
-        Bukkit.broadcastMessage(ChatColor.GRAY + "Pilotos restantes: " + ChatColor.GREEN + remainingCount);
+        Bukkit.broadcastMessage(ChatColor.RED + "⚠ ELIMINATION ⚠");
+        Bukkit.broadcastMessage(ChatColor.YELLOW + driverName + ChatColor.RED + " was eliminated!");
+        Bukkit.broadcastMessage(ChatColor.GRAY + "Remaining drivers: " + ChatColor.GREEN + remainingCount);
         Bukkit.broadcastMessage("");
 
         if (player != null && player.isOnline()) {
             SchedulerHelper.runTaskFor(heat.getPlugin(), player, (entity) -> {
                 Player p = (Player) entity;
                 TitleHelper.sendThemedTitle(p,
-                    ChatColor.RED + "✗ ELIMINADO!",
-                    ChatColor.GRAY + "Posição final: #" + eliminatedDriver.getPosition(),
+                    ChatColor.RED + "✗ ELIMINATED!",
+                    ChatColor.GRAY + "Final position: #" + eliminatedDriver.getPosition(),
                     10, 80, 20);
                 p.playSound(p.getLocation(), Sound.ENTITY_WITHER_DEATH, 0.8f, 0.5f);
             });
@@ -313,8 +313,8 @@ public class EliminationSession implements SessionLogic {
             SchedulerHelper.runTaskFor(heat.getPlugin(), remainingPlayer, (entity) -> {
                 Player rp = (Player) entity;
                 TitleHelper.sendThemedTitle(rp,
-                    ChatColor.YELLOW + "⚠ " + driverName + " eliminado!",
-                    ChatColor.GRAY + String.valueOf(remainingCount) + " pilotos restantes",
+                    ChatColor.YELLOW + "⚠ " + driverName + " eliminated!",
+                    ChatColor.GRAY + String.valueOf(remainingCount) + " drivers remaining",
                     5, 60, 10);
             });
         }

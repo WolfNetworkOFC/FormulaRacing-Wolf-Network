@@ -12,6 +12,7 @@ import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import dev.EfraGroup.formulaRacing.BoatUtils.OpenBoatUtilsVersion;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -172,6 +173,8 @@ public class DailyRaceManager {
             case NO_EVENT:
                 this.plugin.sendMessage(player, "event_none_selected", new String[0]);
                 return;
+            case OBU_REQUIRED:
+                return;
             case ERROR:
             default:
                 this.plugin.sendMessage(player, "daily_signup_error", new String[0]);
@@ -187,10 +190,18 @@ public class DailyRaceManager {
 
             Location loc = this.plugin.getDatabaseManager().getTrackSpawn(trackName);
             if (loc == null) {
-                player.sendMessage(String.valueOf(ChatColor.RED) + "Local de spawn da pista não encontrado.");
+                player.sendMessage(String.valueOf(ChatColor.RED) + "Track spawn location not found.");
             } else {
-                if (this.plugin.getDatabaseManager().trackHaveBoatUtils(trackName) && !FormulaRacing.hasOpenBoatUtilsMod(player)) {
-                    this.plugin.sendMessage(player, "obu_mandatory_warning", new String[]{"{track}", trackName});
+                if (this.plugin.getDatabaseManager().trackHaveBoatUtils(trackName)) {
+                    if (!FormulaRacing.hasOpenBoatUtilsMod(player)) {
+                        this.plugin.sendMessage(player, "obu_mandatory_warning", new String[]{"{track}", trackName});
+                        return;
+                    }
+                    int minVersion = this.plugin.getDatabaseManager().getTrackMinObuVersion(trackName);
+                    if (!OpenBoatUtilsVersion.hasMinVersion(player.getUniqueId(), minVersion)) {
+                        this.plugin.sendMessage(player, "obu_version_warning", new String[]{"{track}", trackName, "{required}", String.valueOf(minVersion), "{current}", String.valueOf(OpenBoatUtilsVersion.getPlayerVersion(player.getUniqueId()))});
+                        return;
+                    }
                 }
 
                 this.plugin.getAPI().recoverPlayerBoatState(player);
@@ -201,7 +212,7 @@ public class DailyRaceManager {
                 this.notifyPlayerJoinPractice(player);
             }
         } else {
-            player.sendMessage(String.valueOf(ChatColor.RED) + "Pista não configurada para este evento.");
+            player.sendMessage(String.valueOf(ChatColor.RED) + "Track not configured for this event.");
         }
     }
 
@@ -236,7 +247,7 @@ public class DailyRaceManager {
         List<String> tracks = getEligibleTracks();
 
         if (tracks.isEmpty()) {
-            plugin.getDebugManager().logRaceSystem("[DailyRace] Nenhuma pista elegível encontrada.");
+            plugin.getDebugManager().logRaceSystem("[DailyRace] No eligible tracks found.");
             finalizeFailedStart(date);
             return;
         }
@@ -245,34 +256,34 @@ public class DailyRaceManager {
         String trackNameWS = chooseTrack(tracks, lastTrack);
 
         if (trackNameWS == null) {
-            plugin.getDebugManager().logRaceSystem("[DailyRace] Falha ao escolher pista.");
+            plugin.getDebugManager().logRaceSystem("[DailyRace] Failed to choose track.");
             finalizeFailedStart(date);
             return;
         }
 
-        // Gerar nome do evento e evitar duplicatas
+        // Generate event name and avoid duplicates
         String eventName = formatEventName(date);
         if (plugin.getRaceEventManager().getEventByName(eventName).isPresent()) {
             eventName += "-" + (1000 + random.nextInt(9000));
         }
 
-        // Configurações baseadas no arquivo de config
+        // Settings based on config file
         int practiceMinutes = readPracticeMinutes();
         int qualMinutes = readQualifyingMinutes();
         int raceMinutes = readRaceMinutes();
         int pits = readPitStops();
 
-        // Lógica de cálculo de voltas (Estimativa baseada no Recorde da Pista)
+        // Lap calculation logic (Estimate based on Track Record)
         Double bestLap = plugin.getDatabaseManager().getBestTime(trackNameWS);
         double referenceLap = (bestLap != null && bestLap > 0) ? bestLap : 60.0;
 
-        // Cálculo dinâmico: (Tempo desejado em segundos / Tempo da volta de referência)
+        // Dynamic calculation: (Desired time in seconds / Reference lap time)
         int qualLaps = Math.max(1, (int) Math.ceil((qualMinutes * 60.0) / referenceLap));
         int raceLaps = Math.max(1, (int) Math.ceil((raceMinutes * 60.0) / referenceLap));
 
-        // Validação para pistas Point-to-Point (Sprint)
+        // Validation for Point-to-Point (Sprint) tracks
         if (!plugin.getDatabaseManager().isCircuit(trackNameWS)) {
-            plugin.getDebugManager().logRaceSystem("[DailyRace] Pista " + trackNameWS + " é Sprint. Forçando modo linear.");
+            plugin.getDebugManager().logRaceSystem("[DailyRace] Track " + trackNameWS + " is Sprint. Forcing linear mode.");
             qualLaps = 1;
             raceLaps = 1;
             pits = 0;
@@ -293,7 +304,7 @@ public class DailyRaceManager {
         });
     }
 
-    // Métodos auxiliares para limpar o código principal
+    // Helper methods to clean up the main code
     private void finalizeFailedStart(LocalDate date) {
         writeLastRunDate(date);
         this.phase = DailyRaceManager.Phase.IDLE;
@@ -357,7 +368,7 @@ public class DailyRaceManager {
             if (this.phase == DailyRaceManager.Phase.PRACTICE) {
                 this.phase = DailyRaceManager.Phase.QUALIFICATION;
                 this.writeRuntime(event.getId(), this.phase);
-                this.plugin.getDebugManager().logRaceSystem("[DailyRace] Encerrando treino. Aguardando automação do Round System.");
+                this.plugin.getDebugManager().logRaceSystem("[DailyRace] Ending practice. Waiting for Round System automation.");
                 Rounds practiceRound = event.getSchedule().getRound(1).orElse(null);
                 if (practiceRound != null) {
                     for(Heats heat : practiceRound.getHeats().values()) {
@@ -430,7 +441,7 @@ public class DailyRaceManager {
     private void checkQualificationTimeout(Events event) {
         event.getSchedule().getRound(2).ifPresent((round) -> round.getHeat(1).ifPresent((heat) -> {
             if (heat.getSessionTimeRemaining() <= 0L) {
-                this.plugin.getDebugManager().logRaceSystem("[DailyRace] Tempo de qualificação esgotado (Timeout Check). Avançando.");
+                this.plugin.getDebugManager().logRaceSystem("[DailyRace] Qualification time expired (Timeout Check). Advancing.");
                 this.advanceToFinal(event);
             }
 
@@ -440,7 +451,7 @@ public class DailyRaceManager {
     private void checkFinalTimeout(Events event) {
         event.getSchedule().getRound(3).ifPresent((round) -> round.getHeat(1).ifPresent((heat) -> {
             if (heat.getSessionTimeRemaining() <= 0L) {
-                this.plugin.getDebugManager().logRaceSystem("[DailyRace] Tempo de corrida esgotado (Timeout Check). Finalizando.");
+                this.plugin.getDebugManager().logRaceSystem("[DailyRace] Race time expired (Timeout Check). Finishing.");
                 this.finishDaily(event);
             }
 
@@ -461,13 +472,13 @@ public class DailyRaceManager {
                     this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, event.getTrackNameWS());
                     DebugManager var10000 = this.plugin.getDebugManager();
                     String var10001 = player.getName();
-                    var10000.logRaceSystem("§a[DailyRace] OBU aplicado para " + var10001 + " na pista " + event.getTrackNameWS());
+                    var10000.logRaceSystem("§a[DailyRace] OBU applied for " + var10001 + " on track " + event.getTrackNameWS());
                 }
 
                 event.getSchedule().getRound(1).ifPresent((round) -> round.getHeat(1).ifPresent((heat) -> {
                     if (heat.getDriver(player.getUniqueId()) == null) {
                         heat.addDriver(player.getUniqueId(), heat.getDriverCount() + 1);
-                        this.plugin.getDebugManager().logRaceSystem("§a[DailyRace] Piloto " + player.getName() + " adicionado ao Heat de Treino.");
+                        this.plugin.getDebugManager().logRaceSystem("§a[DailyRace] Driver " + player.getName() + " added to Practice Heat.");
                     }
 
                     if (heat.getActionBarManager() != null) {
@@ -512,7 +523,7 @@ public class DailyRaceManager {
         if (this.phase == DailyRaceManager.Phase.QUALIFICATION) {
             this.phase = DailyRaceManager.Phase.FINAL;
             this.writeRuntime(event.getId(), this.phase);
-            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Encerrando qualificatória. Aguardando automação do Round System.");
+            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Ending qualification. Waiting for Round System automation.");
             Rounds qualRound = (Rounds)event.getSchedule().getRound(2).orElse(null);
             if (qualRound != null) {
                 for(Heats heat : qualRound.getHeats().values()) {
@@ -541,19 +552,19 @@ public class DailyRaceManager {
         }
 
         for(Events event : eventsToStop) {
-            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Parando evento: " + event.getDisplayName() + " (Ghost Cleanup)");
+            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Stopping event: " + event.getDisplayName() + " (Ghost Cleanup)");
             event.setState(EventState.FINISHED);
 
             try {
                 this.finishAllActiveHeats(event);
             } catch (Exception e) {
-                this.plugin.getDebugManager().logRaceSystem("[DailyRace] Erro ao finalizar heats em stopDaily: " + e.getMessage());
+                this.plugin.getDebugManager().logRaceSystem("[DailyRace] Error finishing heats in stopDaily: " + e.getMessage());
             }
 
             try {
                 event.finish();
             } catch (Exception e) {
-                this.plugin.getDebugManager().logRaceSystem("[DailyRace] Erro ao finalizar evento em stopDaily: " + e.getMessage());
+                this.plugin.getDebugManager().logRaceSystem("[DailyRace] Error finishing event in stopDaily: " + e.getMessage());
             }
 
             this.unloadFromMemory(event);
@@ -562,7 +573,7 @@ public class DailyRaceManager {
         this.resetRuntime();
 
         for(Player player : Bukkit.getOnlinePlayers()) {
-            player.sendMessage(String.valueOf(ChatColor.RED) + "\ud83d\uded1 Daily Race encerrada forçadamente por um administrador.");
+            player.sendMessage(String.valueOf(ChatColor.RED) + "\ud83d\uded1 Daily Race forcefully ended by an administrator.");
         }
 
     }
@@ -573,13 +584,13 @@ public class DailyRaceManager {
         try {
             this.finishAllActiveHeats(event);
         } catch (Exception e) {
-            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Erro ao finalizar heats: " + e.getMessage());
+            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Error finishing heats: " + e.getMessage());
         }
 
         try {
             event.finish();
         } catch (Exception e) {
-            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Erro ao finalizar evento: " + e.getMessage());
+            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Error finishing event: " + e.getMessage());
         }
 
         this.unloadFromMemory(event);
@@ -597,7 +608,7 @@ public class DailyRaceManager {
                             } catch (Exception e) {
                                 DebugManager var10000 = this.plugin.getDebugManager();
                                 int var10001 = heat.getId();
-                                var10000.logRaceSystem("[DailyRace] Erro ao finalizar heat " + var10001 + ": " + e.getMessage());
+                                var10000.logRaceSystem("[DailyRace] Error finishing heat " + var10001 + ": " + e.getMessage());
                             }
                         }
                     }
@@ -608,7 +619,7 @@ public class DailyRaceManager {
                         } catch (Exception e) {
                             DebugManager var7 = this.plugin.getDebugManager();
                             int var8 = round.getId();
-                            var7.logRaceSystem("[DailyRace] Erro ao finalizar round " + var8 + ": " + e.getMessage());
+                            var7.logRaceSystem("[DailyRace] Error finishing round " + var8 + ": " + e.getMessage());
                         }
                     }
 
@@ -622,7 +633,7 @@ public class DailyRaceManager {
         try {
             this.plugin.getRaceEventManager().unloadEvent(event.getId());
         } catch (Throwable t) {
-            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Falha ao descarregar evento da memória: " + t.getMessage());
+            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Failed to unload event from memory: " + t.getMessage());
         }
 
     }
@@ -635,12 +646,18 @@ public class DailyRaceManager {
     private String getOBUWarning(Player player, String track) {
         if (track == null) {
             return null;
-        } else if (this.plugin.getDatabaseManager().trackHaveBoatUtils(track) && !FormulaRacing.hasOpenBoatUtilsMod(player)) {
-            String lang = this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
-            return this.plugin.getTranslation("obu_mandatory_warning", lang, new String[]{"{track}", track});
-        } else {
-            return null;
+        } else if (this.plugin.getDatabaseManager().trackHaveBoatUtils(track)) {
+            if (!FormulaRacing.hasOpenBoatUtilsMod(player)) {
+                String lang = this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
+                return this.plugin.getTranslation("obu_mandatory_warning", lang, new String[]{"{track}", track});
+            }
+            int minVersion = this.plugin.getDatabaseManager().getTrackMinObuVersion(track);
+            if (!OpenBoatUtilsVersion.hasMinVersion(player.getUniqueId(), minVersion)) {
+                String lang = this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
+                return this.plugin.getTranslation("obu_version_warning", lang, new String[]{"{track}", track, "{required}", String.valueOf(minVersion), "{current}", String.valueOf(OpenBoatUtilsVersion.getPlayerVersion(player.getUniqueId()))});
+            }
         }
+        return null;
     }
 
     private void notifyDailyRace(Player player) {
@@ -649,7 +666,7 @@ public class DailyRaceManager {
             Events event = (Events)eventOpt.get();
             if (event.getState() != EventState.RUNNING) {
                 if (this.activeEventId != null && this.activeEventId == event.getId()) {
-                    this.plugin.getDebugManager().logRaceSystem("[DailyRace] Auto-Correction: Resetando Daily inexistente/finalizada.");
+                    this.plugin.getDebugManager().logRaceSystem("[DailyRace] Auto-Correction: Resetting non-existent/finished Daily.");
 
                     try {
                         this.resetRuntime();
@@ -670,7 +687,7 @@ public class DailyRaceManager {
                 if (this.phase == DailyRaceManager.Phase.PRACTICE) {
                     player.sendMessage(this.plugin.getTranslation("daily_msg_header", lang));
                     player.sendMessage(this.plugin.getTranslation("daily_msg_track", lang, "{track}", track));
-                    player.sendMessage(this.plugin.getTranslation("daily_msg_phase", lang, "{phase}", "Treino Livre"));
+                    player.sendMessage(this.plugin.getTranslation("daily_msg_phase", lang, "{phase}", "Free Practice"));
                     String obuWarning = this.getOBUWarning(player, track);
                     if (obuWarning != null) {
                         player.sendMessage("");
@@ -681,7 +698,7 @@ public class DailyRaceManager {
                 } else if (this.phase == DailyRaceManager.Phase.QUALIFICATION) {
                     player.sendMessage(this.plugin.getTranslation("daily_qual_header", lang));
                     player.sendMessage(this.plugin.getTranslation("daily_msg_track", lang, "{track}", track));
-                    player.sendMessage(this.plugin.getTranslation("daily_msg_phase", lang, "{phase}", "Qualificação"));
+                    player.sendMessage(this.plugin.getTranslation("daily_msg_phase", lang, "{phase}", "Qualification"));
                     String obuWarning = this.getOBUWarning(player, track);
                     if (obuWarning != null) {
                         player.sendMessage("");
@@ -846,17 +863,17 @@ public class DailyRaceManager {
         List<String> excluded = this.readExcludedTracks();
 
         return allTracks.stream()
-                // 1. Verifica se a pista está aberta no banco
+                // 1. Check if track is open in database
                 .filter(db::isTrackOpen)
-                // 2. Remove espaços em branco (Sanitização)
+                // 2. Remove whitespace (Sanitization)
                 .map(t -> t.replaceAll("\\s+", ""))
-                // 3. Garante que não ficou vazia após o map
+                // 3. Ensure it didn't become empty after the map
                 .filter(t -> !t.isBlank())
-                // 4. Filtra se não estiver na lista de exclusão (ignoring case)
+                // 4. Filter if not in exclusion list (ignoring case)
                 .filter(t -> excluded.stream().noneMatch(ex -> ex.equalsIgnoreCase(t)))
-                // 5. Valida a integração técnica da pista (checkpoints, sinais, etc)
+                // 5. Validate track technical integration (checkpoints, signs, etc)
                 .filter(t -> this.plugin.getTrackIntegrationManager().validateTrack(t).isValid())
-                // 6. Remove duplicatas e coleta
+                // 6. Remove duplicates and collect
                 .distinct()
                 .collect(Collectors.toList());
     }
@@ -1004,10 +1021,10 @@ public class DailyRaceManager {
                     LocalDate eventDate = Instant.ofEpochMilli(event.getDate()).atZone(this.readZoneId()).toLocalDate();
                     LocalDate today = LocalDate.now(this.readZoneId());
                     if (!eventDate.equals(today) && nowSeconds - createdSeconds > 43200L) {
-                        this.plugin.getDebugManager().logRaceSystem("[DailyRace] Evento retomado é de dia anterior (" + String.valueOf(eventDate) + "). Finalizando.");
+                        this.plugin.getDebugManager().logRaceSystem("[DailyRace] Resumed event is from previous day (" + String.valueOf(eventDate) + "). Finishing.");
                         this.finishDaily(event);
                     } else if (nowSeconds - createdSeconds > 86400L) {
-                        this.plugin.getDebugManager().logRaceSystem("[DailyRace] Evento retomado é muito antigo (>24h). Finalizando.");
+                        this.plugin.getDebugManager().logRaceSystem("[DailyRace] Resumed event is too old (>24h). Finishing.");
                         this.finishDaily(event);
                     } else {
                         this.activeEventId = event.getId();
@@ -1117,7 +1134,7 @@ public class DailyRaceManager {
         }
 
         for(Events event : eventsToStop) {
-            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Ghost Cleanup: Finalizando evento antigo " + event.getDisplayName());
+            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Ghost Cleanup: Finishing old event " + event.getDisplayName());
             this.finishDaily(event);
         }
 

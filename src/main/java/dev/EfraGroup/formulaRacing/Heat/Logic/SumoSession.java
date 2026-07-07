@@ -18,9 +18,9 @@ import java.util.*;
 
 /**
  * 🥊 SUMO
- * Todos os pilotos em uma arena circular. Quem sai da arena é eliminado.
- * A arena diminui a cada 30 segundos. Empurrões são mais fortes.
- * Último dentro da arena vence.
+ * All drivers in a circular arena. Anyone who leaves the arena is eliminated.
+ * The arena shrinks every 30 seconds. Pushes are stronger.
+ * Last one inside the arena wins.
  */
 public class SumoSession implements SessionLogic {
 
@@ -40,7 +40,7 @@ public class SumoSession implements SessionLogic {
         heat.setHeatState(HeatState.RACING);
         heat.startOfflineMonitoring();
 
-        // Define o centro da arena baseado na posição do primeiro piloto
+        // Define the arena center based on the first driver's position
         for (Driver driver : heat.getDrivers().values()) {
             Player player = Bukkit.getPlayer(driver.getUuid());
             if (player != null && player.isOnline()) {
@@ -54,7 +54,7 @@ public class SumoSession implements SessionLogic {
             arenaCenter = new Location(Bukkit.getWorlds().get(0), 0, 64, 0);
         }
 
-        // Teleporta todos para a arena
+        // Teleport everyone to the arena
         for (Driver driver : heat.getDrivers().values()) {
             Player player = Bukkit.getPlayer(driver.getUuid());
             if (player != null && player.isOnline()) {
@@ -69,11 +69,11 @@ public class SumoSession implements SessionLogic {
         }
 
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
-        broadcast(heat, ChatColor.RED + "  🥊 MODO SUMO 🥊");
+        broadcast(heat, ChatColor.RED + "  🥊 SUMO MODE 🥊");
         broadcast(heat, "");
-        broadcast(heat, ChatColor.YELLOW + "  Empurre os outros para fora da arena!");
-        broadcast(heat, ChatColor.RED + "  A arena vai ENCOLHER a cada 30 segundos!");
-        broadcast(heat, ChatColor.GREEN + "  Último dentro VENCE!");
+        broadcast(heat, ChatColor.YELLOW + "  Push others out of the arena!");
+        broadcast(heat, ChatColor.RED + "  The arena will SHRINK every 30 seconds!");
+        broadcast(heat, ChatColor.GREEN + "  Last one inside WINS!");
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
 
         startArenaShrink(heat);
@@ -90,7 +90,7 @@ public class SumoSession implements SessionLogic {
             round++;
             arenaRadius = Math.max(minRadius, arenaRadius - 2.0);
 
-            broadcast(heat, ChatColor.RED + "🔻 Arena encolheu! Raio: " + String.format("%.0f", arenaRadius) + " blocos");
+            broadcast(heat, ChatColor.RED + "🔻 Arena shrunk! Radius: " + String.format("%.0f", arenaRadius) + " blocks");
 
             // Efeito visual da borda
             for (int i = 0; i < 360; i += 5) {
@@ -128,13 +128,13 @@ public class SumoSession implements SessionLogic {
 
                 double dist = player.getLocation().distance(arenaCenter);
 
-                // Se está fora da arena
+                // If outside the arena
                 if (dist > arenaRadius) {
-                    eliminatePlayer(heat, driver, "Caiu da arena!");
+                    eliminatePlayer(heat, driver, "Fell out of the arena!");
                     continue;
                 }
 
-                // Se está perto da borda, empurra para dentro
+                // If near the edge, push inward
                 if (dist > arenaRadius - 3) {
                     Vector push = arenaCenter.toVector().subtract(player.getLocation().toVector());
                     push.setY(0);
@@ -142,18 +142,18 @@ public class SumoSession implements SessionLogic {
                         push = push.normalize().multiply(0.3);
                         player.setVelocity(player.getVelocity().add(push));
                     }
-                    player.sendMessage(ChatColor.RED + "⚠ Perto da borda!");
+                    player.sendMessage(ChatColor.RED + "⚠ Near the edge!");
                     player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 0.5f);
                 }
             }
 
-            // Verifica se sobrou apenas um
+            // Check if only one remains
             long remaining = heat.getDrivers().values().stream()
                     .filter(d -> !d.isFinished() && !d.isDnf())
                     .count();
 
             if (remaining <= 1) {
-                broadcast(heat, ChatColor.GOLD + "🏆 Fim do Sumo!");
+                broadcast(heat, ChatColor.GOLD + "🏆 Sumo Over!");
             }
 
         }, 0L, CHECK_INTERVAL_TICKS);
@@ -162,7 +162,7 @@ public class SumoSession implements SessionLogic {
     private void eliminatePlayer(Heats heat, Driver driver, String reason) {
         Player player = Bukkit.getPlayer(driver.getUuid());
         if (player != null && player.isOnline()) {
-            player.sendMessage(ChatColor.RED + "✗ Você foi eliminado do Sumo!");
+            player.sendMessage(ChatColor.RED + "✗ You were eliminated from Sumo!");
             player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0f, 0.5f);
             player.getWorld().spawnParticle(Particle.EXPLOSION, player.getLocation().add(0, 1, 0), 3, 0.3, 0.3, 0.3, 0.05);
         }
@@ -170,7 +170,7 @@ public class SumoSession implements SessionLogic {
         heat.handleDriverDNF(driver, reason);
 
         if (player != null) {
-            broadcast(heat, ChatColor.RED + "🥊 " + player.getName() + " foi eliminado do Sumo!");
+            broadcast(heat, ChatColor.RED + "🥊 " + player.getName() + " was eliminated from Sumo!");
         }
     }
 

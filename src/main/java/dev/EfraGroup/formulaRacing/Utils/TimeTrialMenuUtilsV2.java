@@ -66,57 +66,57 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     public void open(Player player) {
         SchedulerHelper.runAsync(plugin, () -> {
             try {
-                // Corrigido: Definindo os tipos para o Map retornado pelo MySQL
+                // Fixed: Defining types for the Map returned by MySQL
                 Map<String, DatabaseManager.TrackData> tracksData =
                     mysql.getAllTracksWithData();
                 List<TrackMenuInfo> loadedTracks = new ArrayList<>();
 
-                // Agora o loop consegue iterar corretamente com tipos definidos
+                // Now the loop can iterate correctly with defined types
                 for (Map.Entry<
                     String,
                     DatabaseManager.TrackData
                 > entry : tracksData.entrySet()) {
                     String trackName = entry.getKey();
 
-                    // Pula pistas que não estão abertas
+                    // Skip tracks that are not open
                     if (!this.mysql.isTrackOpen(trackName)) continue;
 
                     DatabaseManager.TrackData data = entry.getValue();
                     String icon = mysql.getIcon(trackName);
                     Double wr = mysql.getBestTime(trackName);
 
-                    // Busca o Personal Best (PB) do jogador
+                    // Fetch the player's Personal Best (PB)
                     Object[] pbData = this.mysql.getPlayerBestTime(
                         player.getName(),
                         trackName
                     );
                     Double pb = (pbData != null) ? (Double) pbData[0] : null;
 
-                    int pos = -1; // Posição padrão (pode ser calculada depois no sort)
+                    int pos = -1; // Default position (can be calculated later in sort)
 
                     loadedTracks.add(
                         new TrackMenuInfo(trackName, data, icon, wr, pb, pos)
                     );
                 }
 
-                // Configuração da sessão do menu
+                // Menu session setup
                 PlayerMenuSession session = new PlayerMenuSession();
                 session.allTracksRaw = loadedTracks;
                 this.applySortAndFilter(session);
 
-                // Volta para a Thread Principal (Sync) para abrir o inventário
+                // Back to the main thread (Sync) to open the inventory
                 SchedulerHelper.runTask(this.plugin, () -> {
                     this.sessions.put(player.getUniqueId(), session);
                     this.openPage(player);
                 });
             } catch (Exception e) {
                 this.plugin.getDebugManager().logRaceSystem(
-                    "Erro ao carregar menu para " +
+                    "Error loading menu for " +
                         player.getName() +
                         ": " +
                         e.getMessage()
                 );
-                player.sendMessage("§cErro ao carregar os dados das pistas.");
+                player.sendMessage("§cError loading track data.");
             }
         });
     }
@@ -166,33 +166,33 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                 45,
                 this.createControlItem(
                     Material.ARROW,
-                    "\u00a7a\u25c4 P\u00e1gina Anterior"
+                    "\u00a7a\u25c4 Previous Page"
                 )
             );
         }
         List<String> sortLore = Arrays.asList(
-            "\u00a77Atual: \u00a7e" + session.sort.label,
+            "\u00a77Current: \u00a7e" + session.sort.label,
             "",
-            "\u00a7eClique para alterar!"
+            "\u00a7eClick to change!"
         );
         inv.setItem(
             48,
             this.createControlItem(
                 session.sort.icon,
-                "\u00a76Ordena\u00e7\u00e3o",
+                "\u00a76Sorting",
                 sortLore
             )
         );
         List<String> filterLore = Arrays.asList(
-            "\u00a77Mostrando: \u00a7e" + session.filter.label,
+            "\u00a77Showing: \u00a7e" + session.filter.label,
             "",
-            "\u00a7eClique para alterar!"
+            "\u00a7eClick to change!"
         );
         inv.setItem(
             50,
             this.createControlItem(
                 session.filter.icon,
-                "\u00a7bFiltro",
+                "\u00a7bFilter",
                 filterLore
             )
         );
@@ -201,7 +201,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                 53,
                 this.createControlItem(
                     Material.ARROW,
-                    "\u00a7aPr\u00f3xima P\u00e1gina \u25ba"
+                    "\u00a7aNext Page \u25ba"
                 )
             );
         }
@@ -209,7 +209,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     }
 
     private void applySortAndFilter(PlayerMenuSession session) {
-        // 1. Filtragem
+        // 1. Filtering
         session.currentView = session.allTracksRaw
             .stream()
             .filter(t -> {
@@ -223,29 +223,29 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             })
             .collect(Collectors.toList());
 
-        // 2. Ordenação (Refatorada para clareza e compatibilidade)
+        // 2. Sorting (Refactored for clarity and compatibility)
         Comparator<TrackMenuInfo> comparator;
 
         switch (session.sort.ordinal()) {
-            case 1: // Nome Z-A
+            case 1: // Name Z-A
                 comparator = (t1, t2) ->
                     t2.trackName.compareToIgnoreCase(t1.trackName);
                 break;
-            case 2: // Melhor Tempo Pessoal (PB)
+            case 2: // Best Personal Time (PB)
                 comparator = Comparator.comparingDouble(t ->
                     t.playerBestTime == null
                         ? Double.MAX_VALUE
                         : t.playerBestTime
                 );
                 break;
-            case 3: // Recorde Mundial (WR)
+            case 3: // World Record (WR)
                 comparator = Comparator.comparingDouble(t ->
                     t.worldRecordTime == null
                         ? Double.MAX_VALUE
                         : t.worldRecordTime
                 );
                 break;
-            default: // Nome A-Z (Padrão)
+            default: // Name A-Z (Default)
                 comparator = (t1, t2) ->
                     t1.trackName.compareToIgnoreCase(t2.trackName);
                 break;
@@ -253,14 +253,14 @@ public class TimeTrialMenuUtilsV2 implements Listener {
 
         session.currentView.sort(comparator);
 
-        // 3. Resetar para a primeira página após mudar o filtro/sort
+        // 3. Reset to the first page after changing filter/sort
         session.page = 0;
     }
 
     private ItemStack createTrackItem(TrackMenuInfo info, String langCode) {
         Material mat;
         try {
-            // Removido o cast (String) desnecessário
+            // Removed the unnecessary (String) cast
             mat = Material.valueOf(info.iconName.toUpperCase());
         } catch (Exception e) {
             mat = Material.PAPER;
@@ -272,10 +272,10 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         if (meta != null) {
             meta.setDisplayName("§f§l" + info.trackName);
 
-            // CORREÇÃO: Usando List<String> em vez de ArrayList<Object>
+            // FIX: Using List<String> instead of ArrayList<Object>
             List<String> lore = new ArrayList<>();
 
-            lore.add("§7Dono: §e" + info.trackData.getOwnerName());
+            lore.add("§7Owner: §e" + info.trackData.getOwnerName());
             lore.add("");
 
             String pb = (info.playerBestTime == null)
@@ -286,12 +286,12 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             String wr = (info.worldRecordTime == null)
                 ? "§c---"
                 : "§6" + this.formatTime(info.worldRecordTime);
-            lore.add("§fRecorde Mundial: " + wr);
+            lore.add("§fWorld Record: " + wr);
 
             lore.add("");
-            lore.add("§eClique para correr!");
+            lore.add("§eClick to race!");
 
-            // Agora o compilador aceita o lore corretamente
+            // Now the compiler accepts the lore correctly
             meta.setLore(lore);
             item.setItemMeta(meta);
         }
@@ -408,6 +408,22 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     private void startTrackFromMenu(Player player, String trackName) {
         UUID uuid = player.getUniqueId();
 
+        if (this.plugin.getTimeTrialDuels() != null && this.plugin.getTimeTrialDuels().isPlayerInDuel(uuid)) {
+            this.plugin.sendMessage(player, "tt_error_duel_active");
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0F, 1.0F);
+            return;
+        }
+        if (this.plugin.getQuickRaceManager() != null && this.plugin.getQuickRaceManager().isPlayerInActiveRace(uuid)) {
+            this.plugin.sendMessage(player, "tt_error_quickrace");
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0F, 1.0F);
+            return;
+        }
+        if (this.plugin.getRaceEventManager() != null && this.plugin.getRaceEventManager().getPlayerActiveHeat(uuid).isPresent()) {
+            this.plugin.sendMessage(player, "tt_error_event");
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0F, 1.0F);
+            return;
+        }
+
         String lastTrack = this.plugin.getLastTimeTrialTrack(uuid);
         if (lastTrack != null) {
             TimerUtils.PlayerTimerData data = this.timerUtils.getTimerData(
@@ -433,12 +449,6 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             }
         }
 
-        Location loc = this.mysql.getTrackSpawn(trackName);
-        if (loc == null) {
-            player.sendMessage("\u00a7cSpawn n\u00e3o encontrado.");
-            return;
-        }
-
         if (
             this.mysql.trackHaveBoatUtils(trackName) &&
             !FormulaRacing.hasOpenBoatUtilsMod(player)
@@ -455,6 +465,12 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         this.ps.sendBoatSetting(player, 0, new Object[0]);
         this.ps.applyBoatUtilsToPlayer(player, trackName);
 
+        Location loc = this.mysql.getTrackSpawn(trackName);
+        if (loc == null) {
+            player.sendMessage("\u00a7cSpawn not found.");
+            return;
+        }
+
         if (!this.mysql.getTimeTrialEnabled(uuid)) {
             this.mysql.setTimeTrialEnabled(uuid, true);
             this.plugin.sendMessage(player, "tt_auto_enabled", new String[0]);
@@ -465,7 +481,6 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             this.plugin.getTimeTrialController().endSession(player);
         }
 
-        SchedulerHelper.teleport(player, loc);
         this.plugin.setLastTimeTrialTrack(uuid, trackName);
         this.plugin.getDebugManager().logTimeTrialSystem(
             "[TT] Starting track '" +
@@ -479,10 +494,19 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             new String[] { "{track}", trackName }
         );
 
-        String ownerName = this.mysql.getTrackOwner(trackName);
-        this.stt.setPlayerTrack(player, trackName, ownerName);
+        try {
+            String ownerName = this.mysql.getTrackOwner(trackName);
+            this.stt.setPlayerTrack(player, trackName, ownerName);
+        } catch (Exception e) {
+            this.plugin.getDebugManager().logTimeTrialSystem("[ERROR] Failed to set player track for scoreboard: " + e.getMessage());
+        }
 
-        this.api.queueSpawnBoat(player, false, false, false);
+        this.api.recoverPlayerBoatState(player);
+        SchedulerHelper.teleportAsync(player, loc).thenAccept(success -> {
+            if (Boolean.TRUE.equals(success)) {
+                this.api.spawnBoatAt(player, loc, false, false, false);
+            }
+        });
     }
 
     private String formatTime(double time) {
@@ -523,8 +547,8 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     public static enum SortType {
         NAME_AZ("A-Z", Material.NAME_TAG),
         NAME_ZA("Z-A", Material.NAME_TAG),
-        BEST_TIME("Melhor Tempo (PB)", Material.CLOCK),
-        WORLD_RECORD("Recorde Mundial (WR)", Material.GOLDEN_APPLE);
+        BEST_TIME("Best Time (PB)", Material.CLOCK),
+        WORLD_RECORD("World Record (WR)", Material.GOLDEN_APPLE);
 
         final String label;
         final Material icon;
@@ -541,9 +565,9 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     }
 
     public static enum FilterType {
-        ALL("Todas", Material.COMPASS),
-        COMPLETED("Com Tempo (PB)", Material.WRITTEN_BOOK),
-        NOT_PLAYED("Sem Tempo", Material.MAP);
+        ALL("All", Material.COMPASS),
+        COMPLETED("With Time (PB)", Material.WRITTEN_BOOK),
+        NOT_PLAYED("No Time", Material.MAP);
 
         final String label;
         final Material icon;
@@ -559,3 +583,4 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         }
     }
 }
+

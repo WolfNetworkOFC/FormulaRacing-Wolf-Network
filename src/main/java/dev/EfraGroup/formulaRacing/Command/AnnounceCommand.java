@@ -5,19 +5,19 @@ import co.aikar.commands.BaseCommand;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 
-@CommandAlias("announce|anuncio") // Define o comando e um alias opcional
+@CommandAlias("announce|anuncio") // Defines the command and an optional alias
 public class AnnounceCommand extends BaseCommand {
 
-    @Default // Define que este método será executado ao usar /announce diretamente
-    @CommandPermission("formularacing.admin") // ACF cuida da permissão automaticamente
-    @Description("Envia um anúncio global para todo o servidor.")
-    @Syntax("<mensagem>") // Mensagem de erro automática se o argumento estiver faltando
-    public void onAnnounce(CommandSender sender, String mensagem) {
+    @Default // Defines that this method will run when using /announce directly
+    @CommandPermission("formularacing.admin") // ACF handles permission automatically
+    @Description("Sends a global announcement to the entire server.")
+    @Syntax("<message>") // Automatic error message if the argument is missing
+    public void onAnnounce(CommandSender sender, String message) {
 
-        // O ACF já faz o "String.join" automaticamente se o último parâmetro for String
+        // ACF already does String.join automatically if the last parameter is String
 
-        Bukkit.broadcastMessage("§6=============== §c§lAnuncio §6===============");
-        Bukkit.broadcastMessage("§f" + mensagem.replace("&", "§")); // Permite cores no anúncio
+        Bukkit.broadcastMessage("§6=============== §c§lAnnouncement §6===============");
+        Bukkit.broadcastMessage("§f" + message.replace("&", "§")); // Allows colors in the announcement
         Bukkit.broadcastMessage("§6=======================================");
     }
 }

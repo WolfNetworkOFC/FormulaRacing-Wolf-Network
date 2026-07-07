@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Gerencia a linha ideal de corrida para uma pista.
+ * Manages the ideal racing line for a track.
  */
 public class AIRacingLine {
 

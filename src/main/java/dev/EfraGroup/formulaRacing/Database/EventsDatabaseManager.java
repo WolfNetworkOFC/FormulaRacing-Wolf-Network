@@ -67,7 +67,7 @@ public class EventsDatabaseManager {
                 }
             } catch (SQLException e) {
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "[EventsDB] Erro assíncrono em " +
+                    "[EventsDB] Async error in " +
                         operationName +
                         ": " +
                         e.getMessage()
@@ -102,7 +102,7 @@ public class EventsDatabaseManager {
                         if (rs.next()) {
                             int eventId = rs.getInt(1);
                             this.plugin.getDebugManager().logDatabaseOperation(
-                                "[EventsDB] Evento criado (Assíncrono): ID=" +
+                                "[EventsDB] Event created (Async): ID=" +
                                     eventId +
                                     ", Nome=" +
                                     sanitizedName
@@ -115,7 +115,7 @@ public class EventsDatabaseManager {
                 }
             } catch (SQLException e) {
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "[EventsDB] Erro ao criar evento (Assíncrono): " +
+                    "[EventsDB] Error creating event (Async): " +
                         e.getMessage()
                 );
                 future.complete(-1);
@@ -187,7 +187,7 @@ public class EventsDatabaseManager {
                         if (rs.next()) {
                             int roundId = rs.getInt(1);
                             this.plugin.getDebugManager().logDatabaseOperation(
-                                "[EventsDB] Round criado (Assíncrono): ID=" +
+                                "[EventsDB] Round created (Async): ID=" +
                                     roundId +
                                     ", EventID=" +
                                     eventId
@@ -200,7 +200,7 @@ public class EventsDatabaseManager {
                 }
             } catch (SQLException e) {
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "[EventsDB] Erro ao criar round (Assíncrono): " +
+                    "[EventsDB] Error creating round (Async): " +
                         e.getMessage()
                 );
                 future.complete(-1);
@@ -270,7 +270,7 @@ public class EventsDatabaseManager {
                         if (rs.next()) {
                             int heatId = rs.getInt(1);
                             this.plugin.getDebugManager().logDatabaseOperation(
-                                "[EventsDB] Heat criado (Assíncrono): ID=" +
+                                "[EventsDB] Heat created (Async): ID=" +
                                     heatId +
                                     ", RoundID=" +
                                     roundId
@@ -283,7 +283,7 @@ public class EventsDatabaseManager {
                 }
             } catch (SQLException e) {
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "[EventsDB] Erro ao criar heat (Assíncrono): " +
+                    "[EventsDB] Error creating heat (Async): " +
                         e.getMessage()
                 );
                 future.complete(-1);
@@ -370,7 +370,7 @@ public class EventsDatabaseManager {
             }
         } catch (SQLException e) {
             this.plugin.getDebugManager().logDatabaseOperation(
-                "[EventsDB] Erro ao carregar signups: " + e.getMessage()
+                "[EventsDB] Error loading signups: " + e.getMessage()
             );
         }
         return signups;
@@ -419,7 +419,7 @@ public class EventsDatabaseManager {
             )
         ) {
             this.plugin.getDebugManager().logDatabaseOperation(
-                "Tentativa de update em coluna inválida ou não permitida em heatSet: " +
+                "Attempted update on invalid or not allowed column in heatSet: " +
                     column
             );
         } else {
@@ -430,7 +430,7 @@ public class EventsDatabaseManager {
                     stmt.setInt(2, heatId);
                 } catch (SQLException e) {
                     this.plugin.getDebugManager().logDatabaseOperation(
-                        "Erro ao atualizar heat (" +
+                        "Error updating heat (" +
                             column +
                             "): " +
                             e.getMessage()
@@ -646,7 +646,7 @@ public class EventsDatabaseManager {
             return event;
         } catch (SQLException e) {
             this.plugin.getDebugManager().logDatabaseOperation(
-                "[EventsDB] Erro ao carregar evento: " + e.getMessage()
+                "[EventsDB] Error loading event: " + e.getMessage()
             );
             return null;
         }
@@ -675,7 +675,7 @@ public class EventsDatabaseManager {
             return var7;
         } catch (SQLException e) {
             this.plugin.getDebugManager().logDatabaseOperation(
-                "[EventsDB] Erro ao carregar evento por nome: " + e.getMessage()
+                "[EventsDB] Error loading event by name: " + e.getMessage()
             );
             return null;
         }
@@ -940,7 +940,7 @@ public class EventsDatabaseManager {
             }
         } catch (SQLException e) {
             this.plugin.getDebugManager().logDatabaseOperation(
-                "[EventsDB] Erro ao carregar eventos ativos: " + e.getMessage()
+                "[EventsDB] Error loading active events: " + e.getMessage()
             );
         }
 
@@ -1124,7 +1124,7 @@ public class EventsDatabaseManager {
 
                     conn.commit();
                     this.plugin.getDebugManager().logDatabaseOperation(
-                        "[EventsDB] Evento deletado (Assíncrono): ID=" + eventId
+                        "[EventsDB] Event deleted (Async): ID=" + eventId
                     );
                 } catch (SQLException e) {
                     conn.rollback();
@@ -1134,7 +1134,7 @@ public class EventsDatabaseManager {
                 }
             } catch (SQLException e) {
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "[EventsDB] Erro assíncrono ao deletar evento: " +
+                    "[EventsDB] Async error deleting event: " +
                         e.getMessage()
                 );
             }
@@ -1242,7 +1242,7 @@ public class EventsDatabaseManager {
 
                     conn.commit();
                     this.plugin.getDebugManager().logDatabaseOperation(
-                        "[EventsDB] Round deletado (Assíncrono): ID=" + roundId
+                        "[EventsDB] Round deleted (Async): ID=" + roundId
                     );
                 } catch (SQLException e) {
                     conn.rollback();
@@ -1252,7 +1252,7 @@ public class EventsDatabaseManager {
                 }
             } catch (SQLException e) {
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "[EventsDB] Erro assíncrono ao deletar round: " +
+                    "[EventsDB] Async error deleting round: " +
                         e.getMessage()
                 );
             }
@@ -1337,7 +1337,7 @@ public class EventsDatabaseManager {
 
                     conn.commit();
                     this.plugin.getDebugManager().logDatabaseOperation(
-                        "[EventsDB] Heat deletado (Assíncrono): ID=" + heatId
+                        "[EventsDB] Heat deleted (Async): ID=" + heatId
                     );
                 } catch (SQLException e) {
                     conn.rollback();
@@ -1347,7 +1347,7 @@ public class EventsDatabaseManager {
                 }
             } catch (SQLException e) {
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "[EventsDB] Erro assíncrono ao deletar heat: " +
+                    "[EventsDB] Async error deleting heat: " +
                         e.getMessage()
                 );
             }
@@ -1417,7 +1417,7 @@ public class EventsDatabaseManager {
             }
         } catch (SQLException e) {
             this.plugin.getDebugManager().logDatabaseOperation(
-                "[EventsDB] Erro ao carregar rounds: " + e.getMessage()
+                "[EventsDB] Error loading rounds: " + e.getMessage()
             );
         }
 
@@ -1522,7 +1522,7 @@ public class EventsDatabaseManager {
             }
         } catch (SQLException exception) {
             this.plugin.getDebugManager().logDatabaseOperation(
-                "[EventsDB] Falha sync ao limpar pilotos do heat " +
+                "[EventsDB] Sync failure clearing drivers from heat " +
                     heatId +
                     ": " +
                     exception.getMessage()
@@ -1659,7 +1659,7 @@ public class EventsDatabaseManager {
             }
         } catch (SQLException e) {
             this.plugin.getDebugManager().logDatabaseOperation(
-                "[EventsDB] Erro ao carregar heats: " + e.getMessage()
+                "[EventsDB] Error loading heats: " + e.getMessage()
             );
         }
 
@@ -1811,9 +1811,9 @@ public class EventsDatabaseManager {
                     this.plugin.getDebugManager().logDatabaseOperation(
                         "[EventsDB] Player " +
                             String.valueOf(uuid) +
-                            " adicionado ao heat " +
+                            " added to heat " +
                             heatId +
-                            " na posição " +
+                            " at position " +
                             position
                     );
                 } catch (SQLException e) {
@@ -1824,7 +1824,7 @@ public class EventsDatabaseManager {
                 }
             } catch (SQLException e) {
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "[EventsDB] Erro ao adicionar player ao heat com shift: " +
+                    "[EventsDB] Error adding player to heat with shift: " +
                         e.getMessage()
                 );
             }
@@ -1879,7 +1879,7 @@ public class EventsDatabaseManager {
             } catch (SQLException exception) {
                 conn.rollback();
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "[EventsDB] Erro sync ao adicionar piloto com shift: " +
+                    "[EventsDB] Sync error adding driver with shift: " +
                         exception.getMessage()
                 );
                 return false;
@@ -1888,7 +1888,7 @@ public class EventsDatabaseManager {
             }
         } catch (SQLException exception) {
             this.plugin.getDebugManager().logDatabaseOperation(
-                "[EventsDB] Falha sync ao adicionar piloto com shift: " +
+                "[EventsDB] Sync failure adding driver with shift: " +
                     exception.getMessage()
             );
             return false;
@@ -2005,7 +2005,7 @@ public class EventsDatabaseManager {
                             var10000.logDatabaseOperation(
                                 "[EventsDB] Player " +
                                     var10001 +
-                                    " removido e posições reajustadas no heat " +
+                                    " removed and positions readjusted in heat " +
                                     heatId
                             );
                             return;
@@ -2021,7 +2021,7 @@ public class EventsDatabaseManager {
                 }
             } catch (SQLException e) {
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "[EventsDB] Erro ao remover player do heat com shift: " +
+                    "[EventsDB] Error removing player from heat with shift: " +
                         e.getMessage()
                 );
             }
@@ -2090,7 +2090,7 @@ public class EventsDatabaseManager {
             } catch (SQLException exception) {
                 conn.rollback();
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "[EventsDB] Erro sync ao remover piloto com shift: " +
+                    "[EventsDB] Sync error removing driver with shift: " +
                         exception.getMessage()
                 );
                 return false;
@@ -2099,7 +2099,7 @@ public class EventsDatabaseManager {
             }
         } catch (SQLException exception) {
             this.plugin.getDebugManager().logDatabaseOperation(
-                "[EventsDB] Falha sync ao remover piloto com shift: " +
+                "[EventsDB] Sync failure removing driver with shift: " +
                     exception.getMessage()
             );
             return false;
@@ -2143,7 +2143,7 @@ public class EventsDatabaseManager {
                         stmt.executeBatch();
                         conn.commit();
                         this.plugin.getDebugManager().logDatabaseOperation(
-                            "[EventsDB] Grid do heat " + heatId + " atualizado."
+                            "[EventsDB] Heat " + heatId + " grid updated."
                         );
                     } catch (Throwable var16) {
                         if (stmt != null) {
@@ -2168,7 +2168,7 @@ public class EventsDatabaseManager {
                 }
             } catch (SQLException e) {
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "[EventsDB] Erro ao atualizar grid do heat: " +
+                    "[EventsDB] Error updating heat grid: " +
                         e.getMessage()
                 );
             }
@@ -2198,7 +2198,7 @@ public class EventsDatabaseManager {
                             int driverId = rs.getInt(1);
                             driver.setId(driverId);
                             this.plugin.getDebugManager().logDatabaseOperation(
-                                "[EventsDB] Driver criado (Assíncrono): ID=" +
+                                "[EventsDB] Driver created (Async): ID=" +
                                     driverId +
                                     ", UUID=" +
                                     String.valueOf(driver.getUuid())
@@ -2208,7 +2208,7 @@ public class EventsDatabaseManager {
                 }
             } catch (SQLException e) {
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "[EventsDB] Erro assíncrono ao criar driver: " +
+                    "[EventsDB] Async error creating driver: " +
                         e.getMessage()
                 );
             }
@@ -2294,7 +2294,7 @@ public class EventsDatabaseManager {
             }
         } catch (SQLException e) {
             this.plugin.getDebugManager().logDatabaseOperation(
-                "[EventsDB] Erro ao carregar drivers: " + e.getMessage()
+                "[EventsDB] Error loading drivers: " + e.getMessage()
             );
         }
 
@@ -2385,7 +2385,7 @@ public class EventsDatabaseManager {
             }
         } catch (SQLException e) {
             this.plugin.getDebugManager().logDatabaseOperation(
-                "[EventsDB] Erro ao carregar laps: " + e.getMessage()
+                "[EventsDB] Error loading laps: " + e.getMessage()
             );
         }
 
@@ -2396,7 +2396,7 @@ public class EventsDatabaseManager {
         Map<String, Location> regions = new HashMap<>();
         trackNameWS = trackNameWS.replace(" ", "").toLowerCase();
 
-        // SQL busca todas as linhas daquela pista específica
+        // SQL fetches all rows for that specific track
         String sql = "SELECT * FROM fr_drs WHERE trackNameWS = ?";
 
         try (Connection conn = this.databaseManager.getOrConnect();
@@ -2405,7 +2405,7 @@ public class EventsDatabaseManager {
             stmt.setString(1, trackNameWS);
             ResultSet rs = stmt.executeQuery();
 
-            // Usamos WHILE em vez de IF para percorrer todas as zonas (detect, drs, end)
+            // Use WHILE instead of IF to iterate through all zones (detect, drs, end)
             while (rs.next()) {
                 String worldName = rs.getString("world");
                 World world = Bukkit.getWorld(worldName);
@@ -2414,7 +2414,7 @@ public class EventsDatabaseManager {
 
                 String type = rs.getString("type").toLowerCase();
 
-                // Mapeamos o "type" da tabela para as chaves que seu plugin espera
+                // Maps the table "type" to the keys expected by the plugin
                 String minKey, maxKey;
                 switch (type) {
                     case "detect":
@@ -2430,10 +2430,10 @@ public class EventsDatabaseManager {
                         maxKey = "finishMax";
                         break;
                     default:
-                        continue; // Pula tipos desconhecidos
+                        continue; // Skip unknown types
                 }
 
-                // Adiciona a localização mínima
+                // Add the minimum location
                 regions.put(minKey, new Location(
                         world,
                         rs.getDouble("regionMinX"),
@@ -2441,7 +2441,7 @@ public class EventsDatabaseManager {
                         rs.getDouble("regionMinZ")
                 ));
 
-                // Adiciona a localização máxima
+                // Add the maximum location
                 regions.put(maxKey, new Location(
                         world,
                         rs.getDouble("regionMaxX"),
@@ -2510,7 +2510,7 @@ public class EventsDatabaseManager {
             }
         } catch (SQLException e) {
             this.plugin.getDebugManager().logDatabaseOperation(
-                "[EventsDB] Erro ao buscar fastest lap: " + e.getMessage()
+                "[EventsDB] Error fetching fastest lap: " + e.getMessage()
             );
             return null;
         }

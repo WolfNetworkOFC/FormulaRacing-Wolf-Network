@@ -35,7 +35,7 @@ public class ERSManager {
                     if (player != null && player.isOnline()) {
                         ERSManager.this.updateERS(player, driver, heat);
                     } else {
-                        // Limpeza automática se o player deslogar
+                        // Automatic cleanup if the player disconnects
                         ERSManager.this.removePlayer(driver.getUuid());
                     }
                 }
@@ -55,17 +55,17 @@ public class ERSManager {
         String mode = driver.getErsMode(); // "Disabled", "Recharging", "Deploy"
 
         if (mode.equalsIgnoreCase("Deploy")) {
-            energy -= 0.6; // Gasto de bateria no modo Deploy
+            energy -= 0.6; // Battery drain in Deploy mode
             if (energy <= 0.0) {
                 energy = 0.0;
                 driver.setErsMode("Disabled");
                 this.applyErsPacket(player, 0.04F);
             }
         } else if (mode.equalsIgnoreCase("Recharging")) {
-            energy += 0.4; // Recuperação rápida
+            energy += 0.4; // Fast recharge
             if (energy > 100.0) energy = 100.0;
         } else {
-            // Disabled - Recuperação passiva lenta
+            // Disabled - Slow passive recovery
             energy += 0.05;
             if (energy > 100.0) energy = 100.0;
         }
@@ -97,7 +97,7 @@ public class ERSManager {
 
         if (currentMode.equalsIgnoreCase("Disabled")) {
             driver.setErsMode("Recharging");
-            this.applyErsPacket(player, 0.037F); // Simula o "arrasto" da recarga
+            this.applyErsPacket(player, 0.037F); // Simulates the "drag" of recharging
             player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HARP, 1.0F, 1.0F);
         } else if (currentMode.equalsIgnoreCase("Recharging")) {
             if (driver.getErsEnergy() > 5.0) {
@@ -122,7 +122,7 @@ public class ERSManager {
             this.ersBars.remove(uuid);
         }
 
-        // Resetar velocidade para o padrão se o player estiver online
+        // Reset speed to default if the player is online
         Player player = Bukkit.getPlayer(uuid);
         if (player != null && player.isOnline()) {
             this.applyErsPacket(player, 0.04F);

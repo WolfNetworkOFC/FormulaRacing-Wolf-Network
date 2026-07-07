@@ -21,10 +21,10 @@ public class AdminCommand extends BaseCommand {
     private final FormulaRacing plugin;
     private final Random random = new Random();
     private final List<String> debugMessages = Arrays.asList(
-            "§e[Debug] §fSincronização de pacotes Bedrock está estável.",
-            "§e[Debug] §fGeyser detectou sua conexão como Pocket Edition/Console.",
-            "§e[Debug] §fTeste de renderização de UI customizada para Bedrock iniciado.",
-            "§e[Debug] §fVerificando latência do protocolo Floodgate..."
+            "§e[Debug] §fBedrock packet sync is stable.",
+            "§e[Debug] §fGeyser detected your connection as Pocket Edition/Console.",
+            "§e[Debug] §fCustom Bedrock UI rendering test started.",
+            "§e[Debug] §fChecking Floodgate protocol latency..."
     );
 
     public AdminCommand(FormulaRacing plugin) {
@@ -32,9 +32,9 @@ public class AdminCommand extends BaseCommand {
     }
 
     @CommandAlias("frdebug")
-    @Description("Comandos de debug exclusivos para Bedrock")
+    @Description("Debug commands exclusive to Bedrock")
     public void onDebug(CommandSender sender) {
-        // Envia mensagem de tradução se configurada no plugin
+        // Sends translation message if configured in the plugin
         this.plugin.sendMessage(sender, "admin_debug_active");
 
         String randomMsg = debugMessages.get(random.nextInt(debugMessages.size()));
@@ -42,11 +42,11 @@ public class AdminCommand extends BaseCommand {
 
 
 
-        // Logs no console
-        Bukkit.getLogger().info("[FormulaRacing] Debug enviado para " + count + " jogadores Bedrock.");
-        Bukkit.getLogger().info("[FormulaRacing] Mensagem enviada: " + randomMsg);
+        // Console logs
+        Bukkit.getLogger().info("[FormulaRacing] Debug sent to " + count + " Bedrock players.");
+        Bukkit.getLogger().info("[FormulaRacing] Message sent: " + randomMsg);
 
-        // Feedback para o executor do comando
-        sender.sendMessage(ChatColor.GREEN + "Debug enviado para " + ChatColor.WHITE + count + ChatColor.GREEN + " jogadores Bedrock.");
+        // Feedback for the command sender
+        sender.sendMessage(ChatColor.GREEN + "Debug sent to " + ChatColor.WHITE + count + ChatColor.GREEN + " Bedrock players.");
     }
 }

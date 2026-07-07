@@ -97,7 +97,7 @@ public class Driver {
     }
 
     public void setErsMode(String id) {
-        this.ersmode = ersmode;
+        this.ersmode = id;
     }
 
     public String getErsMode() {

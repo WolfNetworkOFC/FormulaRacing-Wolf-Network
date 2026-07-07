@@ -1,5 +1,6 @@
 package dev.EfraGroup.formulaRacing.Listener;
 
+import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Controllers.RaceEventManager;
 import dev.EfraGroup.formulaRacing.Database.Track;
@@ -9,13 +10,24 @@ import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Heat.PitStopManager;
 import dev.EfraGroup.formulaRacing.Heat.PitStopMinigame;
+import dev.EfraGroup.formulaRacing.Heat.PitStopRegion;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.RegionBox;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
+import dev.EfraGroup.formulaRacing.TimeTrial.TimeTrialSession;
+import dev.EfraGroup.formulaRacing.TimeTrial.Events.TimeTrialFinishEvent;
+import dev.EfraGroup.formulaRacing.TimeTrial.Events.TimeTrialStartEvent;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.RegionMathUtils;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Sound;
 import org.bukkit.entity.Boat;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
@@ -36,6 +48,7 @@ public class PitStopListener implements Listener {
     private final Map<UUID, Boolean> wasInPitStopExit;
     private final Map<UUID, Boolean> wasInMinigameArea;
     private final Map<UUID, Long> pitAreaExitTime;
+    private final Map<UUID, Long> lastPitStartCross;
     private static final long REGION_EXIT_GRACE_MS = 400L;
 
     public PitStopListener(FormulaRacing plugin, RaceEventManager raceEventManager, PitStopManager pitStopManager) {
@@ -47,6 +60,7 @@ public class PitStopListener implements Listener {
         this.wasInMinigameArea = new HashMap();
         this.pitAreaExitTime = new HashMap();
         this.wasInPitStopStart = new HashMap();
+        this.lastPitStartCross = new HashMap();
     }
 
     private Heats findActiveHeat(UUID playerId) {
@@ -71,58 +85,242 @@ public class PitStopListener implements Listener {
     )
     public void onVehicleMove(VehicleMoveEvent event) {
         Vehicle vehicle = event.getVehicle();
-        if (vehicle instanceof Boat) {
-            if (!vehicle.getPassengers().isEmpty()) {
-                Object var4 = vehicle.getPassengers().get(0);
-                if (var4 instanceof Player) {
-                    Player player = (Player)var4;
-                    UUID var12 = player.getUniqueId();
-                    Heats heat = this.findActiveHeat(var12);
-                    if (heat == null) {
-                        return;
-                    }
+        if (!(vehicle instanceof Boat)) return;
+        if (vehicle.getPassengers().isEmpty()) return;
 
-                    Location location = vehicle.getLocation();
-                    String trackNameWS = heat.getTrackNameWS();
-                    boolean isInEntry = this.pitStopManager.getPitStopEntryAtLocation(location) != null;
-                    boolean isInStart = this.pitStopManager.getPitStopStartAtLocation(location) != null;
-                    boolean isInExit = this.pitStopManager.getPitStopExitAtLocation(location) != null;
-                    boolean isInMinigameArea = this.pitStopManager.isValidPitStopLocation(location, trackNameWS);
-                    if (isInEntry && !(Boolean)this.wasInPitStopEntry.getOrDefault(var12, false)) {
-                        this.onEnterPitStopEntry(player, heat);
-                        this.wasInPitStopEntry.put(var12, true);
-                    } else if (!isInEntry) {
-                        this.wasInPitStopEntry.put(var12, false);
-                    }
+        Object passenger = vehicle.getPassengers().get(0);
+        if (!(passenger instanceof Player player)) return;
 
-                    this.processMinigameLogic(player, heat, isInMinigameArea, trackNameWS);
-                    if (isInStart && !(Boolean)this.wasInPitStopStart.getOrDefault(var12, false)) {
-                        this.onPitLapTrigger(player, heat);
-                        this.wasInPitStopStart.put(var12, true);
-                    } else if (!isInStart) {
-                        this.wasInPitStopStart.put(var12, false);
-                    }
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        if (from.getBlockX() == to.getBlockX() && from.getBlockZ() == to.getBlockZ()) {
+            return;
+        }
 
-                    if (isInExit && !(Boolean)this.wasInPitStopExit.getOrDefault(var12, false)) {
-                        this.onEnterPitStopExit(player, heat);
-                        this.wasInPitStopExit.put(var12, true);
-                    } else if (!isInExit) {
-                        this.wasInPitStopExit.put(var12, false);
-                    }
+        UUID uuid = player.getUniqueId();
+        Heats heat = this.findActiveHeat(uuid);
 
-                    return;
-                }
-            }
+        Location location = vehicle.getLocation();
+        boolean isInEntry = false;
+        boolean isInStart = this.pitStopManager.getPitStopStartAtLocation(location) != null;
+        boolean isInExit = false;
+        boolean isInMinigameArea = false;
+        String trackNameWS = null;
 
+        if (heat != null) {
+            trackNameWS = heat.getTrackNameWS();
+            isInEntry = this.pitStopManager.getPitStopEntryAtLocation(location) != null;
+            isInExit = this.pitStopManager.getPitStopExitAtLocation(location) != null;
+            isInMinigameArea = this.pitStopManager.isValidPitStopLocation(location, trackNameWS);
+        }
+
+        if (isInStart && !(Boolean)this.wasInPitStopStart.getOrDefault(uuid, false)) {
+            this.onPitLapTrigger(player, heat, from, to);
+            this.wasInPitStopStart.put(uuid, true);
+        } else if (!isInStart) {
+            this.wasInPitStopStart.put(uuid, false);
+        }
+
+        if (heat == null) {
+            return; // entry/exit/minigame only apply to race heats
+        }
+
+        if (isInEntry && !(Boolean)this.wasInPitStopEntry.getOrDefault(uuid, false)) {
+            this.onEnterPitStopEntry(player, heat);
+            this.wasInPitStopEntry.put(uuid, true);
+        } else if (!isInEntry) {
+            this.wasInPitStopEntry.put(uuid, false);
+        }
+
+        this.processMinigameLogic(player, heat, isInMinigameArea, trackNameWS);
+
+        if (isInExit && !(Boolean)this.wasInPitStopExit.getOrDefault(uuid, false)) {
+            this.onEnterPitStopExit(player, heat);
+            this.wasInPitStopExit.put(uuid, true);
+        } else if (!isInExit) {
+            this.wasInPitStopExit.put(uuid, false);
         }
     }
 
-    private void onPitLapTrigger(Player player, Heats heat) {
+    private void onPitLapTrigger(Player player, Heats heat, Location from, Location to) {
+        UUID uuid = player.getUniqueId();
         this.plugin.getDebugManager().logPitStopSystem("[PIT] " + player.getName() + " passou pela linha de START do pit.");
-        Driver driver = heat.getDriver(player.getUniqueId());
-        if (driver != null) {
+
+        String trackNameWS;
+        RegionBox regionBox;
+
+        if (heat != null) {
+            // --- Race heat logic ---
+            Driver driver = heat.getDriver(uuid);
+            if (driver == null) return;
+
+            long now = System.currentTimeMillis();
+            Long lastCross = this.lastPitStartCross.get(uuid);
+            if (lastCross != null && now - lastCross < 2000L) return;
+            this.lastPitStartCross.put(uuid, now);
+
+            if (driver.isFinished() || driver.isDnf()) return;
+
+            trackNameWS = heat.getTrackNameWS();
+            PitStopRegion pitStopRegion = this.pitStopManager.getPitStop(trackNameWS);
+            if (pitStopRegion == null || !pitStopRegion.hasStart()) return;
+            regionBox = pitStopRegion.getStartRegion();
+            if (regionBox == null) return;
+
+            driver.setResetCount(0);
+            this.plugin.getDebugManager().logPitStopSystem("[PIT] " + player.getName() + " a completar volta (heat) via START do pit.");
+            heat.passLap(driver, from, to, regionBox);
+            return;
         }
 
+        // --- Time Trial logic ---
+        TimerUtils timerUtils = this.plugin.getTimerUtils();
+        trackNameWS = timerUtils.getActiveTrack(player);
+        if (trackNameWS == null) return;
+
+        DatabaseManager db = this.plugin.getDatabaseManager();
+        if (!db.getTimeTrialEnabled(uuid)) return;
+
+        PitStopRegion pitStopRegion = this.pitStopManager.getPitStop(trackNameWS);
+        if (pitStopRegion == null || !pitStopRegion.hasStart()) return;
+        regionBox = pitStopRegion.getStartRegion();
+        if (regionBox == null) return;
+
+        long now = System.currentTimeMillis();
+        Long lastCross = this.lastPitStartCross.get(uuid);
+        if (lastCross != null && now - lastCross < 2000L) return;
+        this.lastPitStartCross.put(uuid, now);
+
+        double proportion = RegionMathUtils.calculateRegionEntryProportion(from, to, regionBox);
+        long adjustmentMs = (long) ((1.0 - proportion) * 50.0);
+        long preciseTime = now - adjustmentMs;
+
+        boolean isRunning = timerUtils.isTimerRunning(player, trackNameWS);
+        this.plugin.getDebugManager().logPitStopSystem("[PIT TT] " + player.getName() + " - isRunning=" + isRunning);
+
+        if (!isRunning) {
+            // Start timer (begin lap)
+            this.startTimeTrialTimer(player, trackNameWS, preciseTime);
+            return;
+        }
+
+        // Timer is running — finish lap or incomplete
+        TimerUtils.PlayerTimerData data = timerUtils.getTimerData(player, trackNameWS);
+        if (data == null) return;
+
+        int checkpoints = data.getCheckpointsReached();
+        int totalCheckpoints = db.getCheckpointCount(trackNameWS);
+
+        if (checkpoints >= totalCheckpoints) {
+            // Complete lap with precise timing
+            double rawElapsed = timerUtils.getPlayerElapsedTime(player, trackNameWS);
+            TimeTrialSession session = this.plugin.getTimeTrialController().getSession(player);
+            long totalTimeMillis = session != null
+                    ? preciseTime - session.getStartTime().toEpochMilli()
+                    : (long) (rawElapsed * 1000.0);
+            double preciseElapsedSeconds = (double) totalTimeMillis / 1000.0;
+            String langCode = db.getPlayerLanguage(uuid);
+
+            SchedulerHelper.runAsync(this.plugin, () -> {
+                Object[] pb = db.getPlayerBestTime(player.getName(), trackNameWS);
+                double bestTime = pb != null && pb[0] != null ? (Double) pb[0] : Double.MAX_VALUE;
+                boolean isPB = preciseElapsedSeconds < bestTime;
+
+                SchedulerHelper.runTask(this.plugin, () -> {
+                    if (session != null) {
+                        TimeTrialFinishEvent event = new TimeTrialFinishEvent(player, session, totalTimeMillis, isPB);
+                        Bukkit.getPluginManager().callEvent(event);
+                    }
+                });
+
+                int oldRank = db.getPlayerRank(uuid, trackNameWS);
+                db.saveFullTime(uuid, player.getName(), trackNameWS, preciseElapsedSeconds, checkpoints);
+                int newRank = db.getPlayerRank(uuid, trackNameWS);
+
+                SchedulerHelper.runTask(this.plugin, () -> {
+                    if (!player.isOnline()) return;
+
+                    String msg = this.plugin.getTranslation("timetrial_completed", langCode,
+                            new String[]{"{time}", this.formatTimeTrialTime(preciseElapsedSeconds)});
+                    player.sendMessage(msg);
+                    if (isPB) {
+                        player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0F, 1.2F);
+                        String rankMessage;
+                        if (oldRank == 0) {
+                            rankMessage = this.plugin.getTranslation("timetrial_new_pb_new_rank", langCode,
+                                    new String[]{"{rank}", String.valueOf(newRank)});
+                        } else if (newRank < oldRank) {
+                            rankMessage = this.plugin.getTranslation("timetrial_new_pb_improved_rank", langCode,
+                                    new String[]{"{old}", String.valueOf(oldRank), "{new}", String.valueOf(newRank)});
+                        } else {
+                            rankMessage = this.plugin.getTranslation("timetrial_new_pb_same_rank", langCode,
+                                    new String[]{"{rank}", String.valueOf(newRank)});
+                        }
+                        player.sendMessage(rankMessage);
+                    }
+
+                    this.plugin.getDebugManager().logPitStopSystem(
+                            "[PIT TT] " + player.getName() + " completou volta na pista " + trackNameWS
+                                    + " em " + this.formatTimeTrialTime(preciseElapsedSeconds));
+                    timerUtils.stopTimer(player, trackNameWS);
+
+                    // Auto-loop (pit start behaves like START region — always loop)
+                    SchedulerHelper.runAsync(this.plugin, () -> {
+                        timerUtils.reloadCacheAsync(player, trackNameWS);
+                        SchedulerHelper.runTask(this.plugin, () ->
+                                this.startTimeTrialTimer(player, trackNameWS, System.currentTimeMillis()));
+                    });
+                });
+            });
+        } else {
+            // Incomplete lap
+            if (totalCheckpoints <= 0) return;
+
+            String langCode = db.getPlayerLanguage(uuid);
+            this.plugin.sendMessage(player, "timetrial_incomplete_lap",
+                    new String[]{"{count}", String.valueOf(checkpoints), "{total}", String.valueOf(totalCheckpoints)});
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5F, 1.0F);
+            timerUtils.stopTimer(player, trackNameWS);
+
+            // Restart fresh attempt (auto-loop)
+            double restartProportion = RegionMathUtils.calculateRegionEntryProportion(from, to, regionBox);
+            long restartAdjustmentMs = (long) ((1.0 - restartProportion) * 50.0);
+            long restartTime = System.currentTimeMillis() - restartAdjustmentMs;
+            this.startTimeTrialTimer(player, trackNameWS, restartTime);
+        }
+    }
+
+    private void startTimeTrialTimer(Player player, String trackNameWS, long startTime) {
+        UUID uuid = player.getUniqueId();
+        this.plugin.getDebugManager().logPitStopSystem(
+                "[PIT TT] " + player.getName() + " a iniciar timer na pista " + trackNameWS);
+
+        TimeTrialSession session = new TimeTrialSession(uuid, trackNameWS, Instant.ofEpochMilli(startTime));
+        TimeTrialStartEvent event = new TimeTrialStartEvent(player, session);
+        Bukkit.getPluginManager().callEvent(event);
+        if (event.isCancelled()) return;
+
+        this.plugin.getTimerUtils().startTimer(player, trackNameWS, startTime);
+        this.plugin.getTimeTrialController().startSession(player, trackNameWS, session.getStartTime());
+        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0F, 1.2F);
+
+        if (this.plugin.getLonelyController() != null) {
+            this.plugin.getLonelyController().updatePlayersVisibility(player);
+            this.plugin.getLonelyController().updatePlayerVisibility(player);
+        }
+
+        this.plugin.getDebugManager().logPitStopSystem(
+                "[PIT TT] " + player.getName() + " iniciou timer na pista " + trackNameWS);
+    }
+
+    private String formatTimeTrialTime(double elapsed) {
+        long totalMillis = Math.round(elapsed * 1000.0);
+        long minutes = totalMillis / 60000L;
+        long seconds = totalMillis % 60000L / 1000L;
+        long millis = totalMillis % 1000L;
+        return minutes > 0L
+                ? String.format("%02d:%02d.%03d", minutes, seconds, millis)
+                : String.format("%02d.%03d", seconds, millis);
     }
 
     private void processMinigameLogic(Player player, Heats heat, boolean isInArea, String track) {
@@ -154,6 +352,8 @@ public class PitStopListener implements Listener {
             if (track != null) {
                 totalCheckpoints = track.getTotalCheckpoints();
             }
+
+            this.plugin.getPTP().handlePitEntry(player, driver);
 
             if (totalCheckpoints > 0) {
                 double threshold = (double)totalCheckpoints * (double)0.5F;
@@ -254,6 +454,7 @@ public class PitStopListener implements Listener {
         this.wasInPitStopExit.remove(playerId);
         this.wasInMinigameArea.remove(playerId);
         this.wasInPitStopStart.remove(playerId);
+        this.lastPitStartCross.remove(playerId);
     }
 
     public void clearAll() {
@@ -261,5 +462,6 @@ public class PitStopListener implements Listener {
         this.wasInPitStopExit.clear();
         this.wasInMinigameArea.clear();
         this.wasInPitStopStart.clear();
+        this.lastPitStartCross.clear();
     }
 }

@@ -17,40 +17,40 @@ public class VoteRaceCommand extends BaseCommand {
     }
 
     @CommandAlias("voterace|vr")
-    @Description("Inicia uma votação ou vota em uma corrida ativa.")
+    @Description("Starts a vote or votes on an active race.")
     @CommandPermission("formularacing.voterace")
     @CommandCompletion("@tracks <laps> <pits>")
     public void onVoteRace(Player player, @Optional String trackName, @Optional Integer laps, @Optional Integer pits) {
 
-        // 1. Se já existe uma votação ativa, o comando serve apenas para votar "Sim"
+        // 1. If a vote is already active, the command just votes "Yes"
         if (voteManager.isProposalActive()) {
             voteManager.vote(player);
             return;
         }
 
-        // 2. Se não tem votação ativa e ele não passou a pista, mostra o uso correto
+        // 2. No active vote and no track specified - show correct usage
         if (trackName == null || trackName.isEmpty()) {
-            player.sendMessage("§cUse: /voterace <pista> [voltas] [pits]");
+            player.sendMessage("§cUse: /voterace <track> [laps] [pits]");
             return;
         }
 
-        // --- VALIDAÇÃO DA PISTA ---
-        // Checamos no DatabaseManager se a pista existe antes de continuar
+        // --- TRACK VALIDATION ---
+        // Check in DatabaseManager if the track exists before proceeding
         if (plugin.getDatabaseManager().getTrackData(trackName) == null) {
-            player.sendMessage("§c§lERRO: §7A pista §f" + trackName + " §7não existe no sistema!");
+            player.sendMessage("§c§lERROR: §7The track §f" + trackName + " §7does not exist in the system!");
             return;
         }
 
-        // --- Lógica de Argumentos Dinâmicos ---
+        // --- Dynamic Argument Logic ---
         int finalLaps = (laps == null) ? 3 : laps;
         int finalPits = (pits == null) ? 0 : pits;
 
-        // Envia a proposta para o manager com os valores calculados
-        // O propose() agora só será chamado se a pista for válida
+        // Send the proposal to the manager with the calculated values
+        // propose() will only be called if the track is valid
         boolean success = voteManager.propose(player, trackName, finalLaps, finalPits);
 
         if (success) {
-            player.sendMessage(String.format("§a§lVOTAÇÃO INICIADA: §f%s §7(%d voltas, %d pits)", trackName, finalLaps, finalPits));
+            player.sendMessage(String.format("§a§lVOTE STARTED: §f%s §7(%d laps, %d pits)", trackName, finalLaps, finalPits));
         }
     }
 }

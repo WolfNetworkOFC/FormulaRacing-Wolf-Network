@@ -30,7 +30,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 @CommandAlias("party")
-@Description("Comandos de party")
+@Description("Party commands")
 public class PartyCommand extends BaseCommand {
     private final FormulaRacing plugin;
     private final DatabaseManager dm;
@@ -48,68 +48,68 @@ public class PartyCommand extends BaseCommand {
     }
 
     @Subcommand("help|ajuda|?")
-    @Description("Mostra a ajuda do comando party")
+    @Description("Shows the party command help")
     public void onHelp(Player player) {
         this.sendHelp(player);
     }
 
     @Subcommand("create")
-    @Description("Cria uma nova party")
+    @Description("Creates a new party")
     public void onCreate(Player player) {
         try {
             if (this.dm.hasParty(player.getUniqueId())) {
-                player.sendMessage("§cVocê já está em uma party.");
+                player.sendMessage("§cYou are already in a party.");
                 return;
             }
 
             this.dm.createParty(player.getUniqueId());
-            player.sendMessage("§aParty criada com sucesso!");
+            player.sendMessage("§aParty created successfully!");
         } catch (SQLException var3) {
-            player.sendMessage("§cErro ao criar party.");
+            player.sendMessage("§cError creating party.");
         }
 
     }
 
     @Subcommand("invite")
-    @Description("Convida um jogador para a party")
+    @Description("Invites a player to the party")
     @CommandCompletion("@players")
     public void onInvite(Player player, String targetName) {
         try {
             if (!this.dm.hasParty(player.getUniqueId())) {
-                player.sendMessage("§cVocê não tem uma party.");
+                player.sendMessage("§cYou do not have a party.");
                 return;
             }
 
             UUID owner = this.dm.getOwner(player.getUniqueId());
             if (!owner.equals(player.getUniqueId())) {
-                player.sendMessage("§cApenas o líder pode convidar jogadores.");
+                player.sendMessage("§cOnly the leader can invite players.");
                 return;
             }
 
             Player target = Bukkit.getPlayerExact(targetName);
             if (target == null || !target.isOnline()) {
-                player.sendMessage("§cJogador não encontrado.");
+                player.sendMessage("§cPlayer not found.");
                 return;
             }
 
             if (this.dm.hasParty(target.getUniqueId())) {
-                player.sendMessage("§cEsse jogador já está em uma party.");
+                player.sendMessage("§cThat player is already in a party.");
                 return;
             }
 
             String var10002 = String.valueOf(ChatColor.YELLOW);
-            TextComponent base = new TextComponent(var10002 + player.getName() + String.valueOf(ChatColor.GREEN) + " convidou você para uma party!\n" + String.valueOf(ChatColor.DARK_GRAY) + "---=        ");
-            TextComponent accept = new TextComponent("ACEITAR");
+            TextComponent base = new TextComponent(var10002 + player.getName() + String.valueOf(ChatColor.GREEN) + " invited you to a party!\n" + String.valueOf(ChatColor.DARK_GRAY) + "---=        ");
+            TextComponent accept = new TextComponent("ACCEPT");
             accept.setColor(ChatColor.GREEN);
             accept.setBold(true);
             accept.setClickEvent(new ClickEvent(Action.RUN_COMMAND, "/party accept " + player.getName()));
-            accept.setHoverEvent(new HoverEvent(net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT, new Content[]{new Text(String.valueOf(ChatColor.GRAY) + "Clique para aceitar o convite")}));
+            accept.setHoverEvent(new HoverEvent(net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT, new Content[]{new Text(String.valueOf(ChatColor.GRAY) + "Click to accept invite")}));
             TextComponent space = new TextComponent("  ");
-            TextComponent deny = new TextComponent("NEGAR");
+            TextComponent deny = new TextComponent("DENY");
             deny.setColor(ChatColor.GREEN);
             deny.setBold(true);
             deny.setClickEvent(new ClickEvent(Action.RUN_COMMAND, "/party deny " + player.getName()));
-            deny.setHoverEvent(new HoverEvent(net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT, new Content[]{new Text(String.valueOf(ChatColor.GRAY) + "Clique para negar o convite")}));
+            deny.setHoverEvent(new HoverEvent(net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT, new Content[]{new Text(String.valueOf(ChatColor.GRAY) + "Click to deny invite")}));
             TextComponent end = new TextComponent("        =---");
             end.setColor(ChatColor.DARK_GRAY);
             base.addExtra(accept);
@@ -118,39 +118,39 @@ public class PartyCommand extends BaseCommand {
             base.addExtra(end);
             target.spigot().sendMessage(base);
             this.pendingInvites.put(target.getUniqueId(), player.getUniqueId());
-            player.sendMessage("§aConvite enviado para §e" + target.getName() + "§a.");
+            player.sendMessage("§aInvite sent to §e" + target.getName() + "§a.");
         } catch (SQLException var10) {
-            player.sendMessage("§cErro ao enviar convite.");
+            player.sendMessage("§cError sending invite.");
         }
 
     }
 
     @Subcommand("accept")
-    @Description("Aceita um convite de party")
+    @Description("Accepts a party invite")
     @CommandCompletion("@players")
     public void onAccept(Player player, String ownerName) {
         try {
             UUID invited = player.getUniqueId();
             if (!this.pendingInvites.containsKey(invited)) {
-                player.sendMessage("§cVocê não tem convites pendentes.");
+                player.sendMessage("§cYou have no pending invites.");
                 return;
             }
 
             UUID owner = (UUID)this.pendingInvites.get(invited);
             Player ownerPlayer = Bukkit.getPlayer(owner);
             if (ownerPlayer == null || !ownerPlayer.isOnline()) {
-                player.sendMessage("§cO líder da party não está mais online.");
+                player.sendMessage("§cThe party leader is no longer online.");
                 this.pendingInvites.remove(invited);
                 return;
             }
 
             if (!ownerPlayer.getName().equalsIgnoreCase(ownerName)) {
-                player.sendMessage("§cEsse convite não é desse jogador.");
+                player.sendMessage("§cThis invite is not from that player.");
                 return;
             }
 
             if (!this.dm.hasParty(owner)) {
-                player.sendMessage("§cEssa party não existe mais.");
+                player.sendMessage("§cThis party no longer exists.");
                 this.pendingInvites.remove(invited);
                 return;
             }
@@ -163,16 +163,16 @@ public class PartyCommand extends BaseCommand {
 
             this.dm.addMember(owner, invited);
             this.pendingInvites.remove(invited);
-            player.sendMessage("§aVocê entrou na party de §e" + ownerPlayer.getName() + "§a.");
-            ownerPlayer.sendMessage("§a" + player.getName() + " entrou na sua party.");
+            player.sendMessage("§aYou joined the party of §e" + ownerPlayer.getName() + "§a.");
+            ownerPlayer.sendMessage("§a" + player.getName() + " joined your party.");
         } catch (SQLException var6) {
-            player.sendMessage("§cErro ao aceitar convite.");
+            player.sendMessage("§cError accepting invite.");
         }
 
     }
 
     @Subcommand("deny")
-    @Description("Recusa um convite de party")
+    @Description("Denies a party invite")
     @CommandCompletion("@players")
     public void onDeny(Player player, String ownerName) {
         UUID invited = player.getUniqueId();
@@ -183,19 +183,19 @@ public class PartyCommand extends BaseCommand {
             Player ownerPlayer = Bukkit.getPlayer(owner);
             if (ownerPlayer != null && ownerPlayer.getName().equalsIgnoreCase(ownerName)) {
                 this.pendingInvites.remove(invited);
-                player.sendMessage("§cVocê recusou o convite de §e" + ownerPlayer.getName() + ".");
+                player.sendMessage("§cYou denied the invite from §e" + ownerPlayer.getName() + ".");
                 if (ownerPlayer.isOnline()) {
-                    ownerPlayer.sendMessage("§c" + player.getName() + " recusou o convite para a party.");
+                    ownerPlayer.sendMessage("§c" + player.getName() + " denied the party invite.");
                 }
 
             } else {
-                player.sendMessage("§cEsse convite não é desse jogador.");
+                player.sendMessage("§cThis invite is not from that player.");
             }
         }
     }
 
     @Subcommand("remove")
-    @Description("Remove um jogador da party")
+    @Description("Removes a player from the party")
     @CommandCompletion("@players")
     public void onRemove(Player player, String targetName) {
         try {
@@ -206,55 +206,55 @@ public class PartyCommand extends BaseCommand {
 
             UUID owner = this.dm.getOwner(player.getUniqueId());
             if (!owner.equals(player.getUniqueId())) {
-                player.sendMessage("§cApenas o líder pode remover jogadores.");
+                player.sendMessage("§cOnly the leader can remove players.");
                 return;
             }
 
             Player target = Bukkit.getPlayerExact(targetName);
             if (target == null) {
-                player.sendMessage("§cJogador não encontrado.");
+                player.sendMessage("§cPlayer not found.");
                 return;
             }
 
             if (target.getUniqueId().equals(owner)) {
-                player.sendMessage("§cVocê não pode remover o líder.");
+                player.sendMessage("§cYou cannot remove the leader.");
                 return;
             }
 
             this.dm.removeMember(owner, target.getUniqueId());
-            player.sendMessage("§cJogador §e" + target.getName() + " §cremovido da party.");
-            target.sendMessage("§cVocê foi removido da party.");
+            player.sendMessage("§cJogador §e" + target.getName() + " §cremoved from party.");
+            target.sendMessage("§cYou were removed from the party.");
         } catch (SQLException var5) {
-            player.sendMessage("§cErro ao remover jogador.");
+            player.sendMessage("§cError removing player.");
         }
 
     }
 
     @Subcommand("leave")
-    @Description("Sai da party atual")
+    @Description("Leaves the current party")
     public void onLeave(Player player) {
         try {
             if (!this.dm.hasParty(player.getUniqueId())) {
-                player.sendMessage("§cVocê não está em uma party.");
+                player.sendMessage("§cYou are not in a party.");
                 return;
             }
 
             UUID owner = this.dm.getOwner(player.getUniqueId());
             if (owner.equals(player.getUniqueId())) {
                 this.dm.disbandParty(owner);
-                player.sendMessage("§cVocê dissolveu a party.");
+                player.sendMessage("§cYou disbanded the party.");
             } else {
                 this.dm.removeMember(owner, player.getUniqueId());
-                player.sendMessage("§cVocê saiu da party.");
+                player.sendMessage("§cYou left the party.");
             }
         } catch (SQLException var3) {
-            player.sendMessage("§cErro ao sair da party.");
+            player.sendMessage("§cError leaving party.");
         }
 
     }
 
     @Subcommand("disband")
-    @Description("Dissolve a party atual")
+    @Description("Disbands the current party")
     public void onDisband(Player player) {
         try {
             if (!this.dm.hasParty(player.getUniqueId())) {
@@ -264,24 +264,24 @@ public class PartyCommand extends BaseCommand {
 
             UUID owner = this.dm.getOwner(player.getUniqueId());
             if (!owner.equals(player.getUniqueId())) {
-                player.sendMessage("§cApenas o líder pode dissolver a party.");
+                player.sendMessage("§cOnly the leader can disband the party.");
                 return;
             }
 
             this.dm.disbandParty(owner);
-            player.sendMessage("§cParty dissolvida.");
+            player.sendMessage("§cParty disbanded.");
         } catch (SQLException var3) {
-            player.sendMessage("§cErro ao dissolver party.");
+            player.sendMessage("§cError disbanding party.");
         }
 
     }
 
     @Subcommand("info")
-    @Description("Mostra informações da party")
+    @Description("Shows party information")
     public void onInfo(Player player) {
         try {
             if (!this.dm.hasParty(player.getUniqueId())) {
-                player.sendMessage("§cVocê não está em uma party.");
+                player.sendMessage("§cYou are not in a party.");
                 return;
             }
 
@@ -290,8 +290,8 @@ public class PartyCommand extends BaseCommand {
             player.sendMessage("§6§lParty Info");
             Player ownerP = Bukkit.getPlayer(owner);
             String var10001 = ownerP != null ? ownerP.getName() : "Offline (" + String.valueOf(owner) + ")";
-            player.sendMessage("§eLíder: §f" + var10001);
-            player.sendMessage("§eMembros:");
+            player.sendMessage("§eLeader: §f" + var10001);
+            player.sendMessage("§eMembers:");
             Arrays.stream(membersRaw.split(",")).forEach((uuidStr) -> {
                 if (!uuidStr.isEmpty()) {
                     UUID uuid = UUID.fromString(uuidStr);
@@ -305,26 +305,26 @@ public class PartyCommand extends BaseCommand {
                 }
             });
         } catch (SQLException var5) {
-            player.sendMessage("§cErro ao buscar informações da party.");
+            player.sendMessage("§cError fetching party information.");
         }
 
     }
 
     @Subcommand("race")
-    @Description("Inicia uma corrida privada para a party")
+    @Description("Starts a private race for the party")
     @Syntax("<track> [laps] [pits]")
     @CommandCompletion("@tracks")
     public void onRace(Player player, String trackName, @Flags("default:3") int laps, @Flags("default:0") int pits) {
         PartyRaceManager prm = plugin.getPartyRaceManager();
         if (prm == null) {
-            player.sendMessage("§cParty races não estão disponíveis.");
+            player.sendMessage("§cParty races are not available.");
             return;
         }
         prm.createPartyRace(player, trackName, laps, pits);
     }
 
     @Subcommand("promote")
-    @Description("Transfere a liderança da party para outro membro")
+    @Description("Transfers party leadership to another member")
     @CommandCompletion("@partyMembers")
     public void onPromote(Player player, @Flags("other") Player target) {
         try {
@@ -335,12 +335,12 @@ public class PartyCommand extends BaseCommand {
 
             UUID owner = dm.getOwner(player.getUniqueId());
             if (!owner.equals(player.getUniqueId())) {
-                player.sendMessage("§cApenas o líder pode promover outro membro.");
+                player.sendMessage("§cOnly the leader can promote another member.");
                 return;
             }
 
             if (target.getUniqueId().equals(owner)) {
-                player.sendMessage("§cVocê já é o líder da party.");
+                player.sendMessage("§cYou are already the party leader.");
                 return;
             }
 
@@ -348,7 +348,7 @@ public class PartyCommand extends BaseCommand {
             boolean isMember = Arrays.stream(membersRaw.split(","))
                     .anyMatch(s -> !s.isEmpty() && UUID.fromString(s).equals(target.getUniqueId()));
             if (!isMember) {
-                player.sendMessage("§cEsse jogador não está na sua party.");
+                player.sendMessage("§cThat player is not in your party.");
                 return;
             }
 
@@ -364,10 +364,10 @@ public class PartyCommand extends BaseCommand {
                 }
             }
 
-            player.sendMessage("§e" + target.getName() + " §aé o novo líder da party.");
-            target.sendMessage("§aVocê agora é o líder da party.");
+            player.sendMessage("§e" + target.getName() + " §ais the new party leader.");
+            target.sendMessage("§aYou are now the party leader.");
         } catch (SQLException e) {
-            player.sendMessage("§cErro ao promover jogador.");
+            player.sendMessage("§cError promoting player.");
         }
     }
 
@@ -375,3 +375,10 @@ public class PartyCommand extends BaseCommand {
         CommandHelpService.sendHelp(player, this, "/party");
     }
 }
+
+
+
+
+
+
+

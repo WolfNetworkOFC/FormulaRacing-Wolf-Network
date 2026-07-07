@@ -49,9 +49,9 @@ public class RaceEventManager {
             "§6========== CARREGAMENTO DE EVENTOS =========="
         );
         this.plugin.getDebugManager().logRaceSystem(
-            "§eCarregados " +
+            "§eLoaded " +
                 events.size() +
-                " eventos ativos do banco de dados"
+                " active events from database"
         );
 
         for (Events event : events) {
@@ -106,12 +106,12 @@ public class RaceEventManager {
             trackManager.validateTrack(trackNameWS);
         if (!validation.isValid()) {
             this.plugin.getDebugManager().logRaceSystem(
-                "Falha ao criar QuickRace: " + validation.getMessage()
+                "Failed to create QuickRace: " + validation.getMessage()
             );
             return CompletableFuture.completedFuture(null);
         } else {
             this.plugin.getDebugManager().logRaceSystem(
-                "Pista validada: " +
+                "Track validated: " +
                     trackNameWS +
                     " (" +
                     validation.getTrackData().getTotalCheckpoints() +
@@ -124,7 +124,7 @@ public class RaceEventManager {
             ).thenCompose(eventId -> {
                 if (eventId == -1) {
                     this.plugin.getDebugManager().logRaceSystem(
-                        "Falha ao criar evento no banco de dados: " + eventName
+                        "Failed to create event in database: " + eventName
                     );
                     return CompletableFuture.completedFuture((Object) null);
                 } else {
@@ -143,7 +143,7 @@ public class RaceEventManager {
                     ).thenCompose(roundId -> {
                         if (roundId == -1) {
                             this.plugin.getDebugManager().logRaceSystem(
-                                "Falha ao criar round no banco de dados"
+                                "Failed to create round in database"
                             );
                             return CompletableFuture.completedFuture(event);
                         } else {
@@ -187,7 +187,7 @@ public class RaceEventManager {
                                     heat.setPushtopass(false);
                                 } else {
                                     this.plugin.getDebugManager().logRaceSystem(
-                                        "Falha ao criar heat no banco de dados"
+                                        "Failed to create heat in database"
                                     );
                                 }
 
@@ -197,7 +197,7 @@ public class RaceEventManager {
                                     event
                                 );
                                 this.plugin.getDebugManager().logRaceSystem(
-                                    "QuickRace criado e salvo: " +
+                                    "QuickRace created and saved: " +
                                         eventName +
                                         " (ID=" +
                                         eventId +
@@ -229,7 +229,7 @@ public class RaceEventManager {
             trackManager.validateTrack(trackNameWS);
         if (!validation.isValid()) {
             this.plugin.getDebugManager().logRaceSystem(
-                "Falha ao criar DailyEvent: " + validation.getMessage()
+                "Failed to create DailyEvent: " + validation.getMessage()
             );
             return CompletableFuture.completedFuture(null);
         } else {
@@ -435,7 +435,7 @@ public class RaceEventManager {
                                                             );
                                                         } else {
                                                             this.plugin.getDebugManager().logRaceSystem(
-                                                                "Erro: Falha ao gerar HeatID no banco."
+                                                                "Error: Failed to generate HeatID in database."
                                                             );
                                                         }
 
@@ -452,7 +452,7 @@ public class RaceEventManager {
                                                                 eventName +
                                                                 "' (ID=" +
                                                                 eventId +
-                                                                ") criado com sucesso!"
+                                                                 ") created successfully!"
                                                         );
                                                         return event;
                                                     });
@@ -486,14 +486,14 @@ public class RaceEventManager {
 
         if (!validation.isValid()) {
             this.plugin.getDebugManager().logRaceSystem(
-                "Falha ao criar FullEvent: " + validation.getMessage()
+                "Failed to create FullEvent: " + validation.getMessage()
             );
-            // Forçamos o tipo genérico <Events> para evitar conflito de inferência
+            // Force generic type <Events> to avoid inference conflict
             return CompletableFuture.completedFuture(null);
         }
 
         this.plugin.getDebugManager().logRaceSystem(
-            "Pista validada: " + trackNameWS
+            "Track validated: " + trackNameWS
         );
 
         return this.dbManager.createEvent(
@@ -503,7 +503,7 @@ public class RaceEventManager {
         ).thenCompose(eventId -> {
             if (eventId == -1) {
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "Falha ao criar evento no banco: " + eventName
+                    "Failed to create event in database: " + eventName
                 );
                 return CompletableFuture.completedFuture(null);
             }
@@ -518,7 +518,7 @@ public class RaceEventManager {
             event.setTrackNameWS(trackNameWS);
             AtomicInteger nextRoundIndex = new AtomicInteger(1);
 
-            // --- CADEIA DE PRACTICE ---
+            // --- PRACTICE CHAIN ---
             CompletableFuture<Void> practiceFuture =
                 CompletableFuture.completedFuture(null);
             if (practiceTimeLimit > 0) {
@@ -574,7 +574,7 @@ public class RaceEventManager {
                 });
             }
 
-            // --- CADEIA DE QUALY E FINAL ---
+            // --- QUALY AND FINAL CHAIN ---
             return practiceFuture.thenCompose(v -> {
                 int qIndex = nextRoundIndex.getAndIncrement();
                 return this.dbManager.createRound(
@@ -699,7 +699,7 @@ public class RaceEventManager {
                 DebugManager var10000 = this.plugin.getDebugManager();
                 String var10001 = event.getDisplayName();
                 var10000.logRaceSystem(
-                    "Evento carregado do banco: " +
+                    "Event loaded from database: " +
                         var10001 +
                         " (ID=" +
                         eventId +
@@ -783,15 +783,18 @@ public class RaceEventManager {
         Events event = (Events) this.activeEvents.get(eventId);
         if (event == null) {
             return false;
-        } else if (event.addSubscriber(playerUUID)) {
-            this.playerActiveEvent.put(playerUUID, event);
+        } else {
             Player player = Bukkit.getPlayer(playerUUID);
-            if (player != null) {
-                this.plugin.checkAndWarnOBU(player, event.getTrackNameWS());
+            if (player != null && this.plugin.getDatabaseManager().trackHaveBoatUtils(event.getTrackNameWS()) && !FormulaRacing.hasOpenBoatUtilsMod(player)) {
+                this.plugin.sendMessage(player, "obu_mandatory_warning", new String[]{"{track}", event.getTrackNameWS()});
+                return false;
             }
 
-            return true;
-        } else {
+            if (event.addSubscriber(playerUUID)) {
+                this.playerActiveEvent.put(playerUUID, event);
+                return true;
+            }
+
             return false;
         }
     }
@@ -807,6 +810,10 @@ public class RaceEventManager {
     }
 
     public boolean leaveEvent(Player player) {
+        return this.leaveEvent(player, true);
+    }
+
+    public boolean leaveEvent(Player player, boolean markDNF) {
         UUID uuid = player.getUniqueId();
         this.plugin.getLonelyController().clearGhost(uuid);
         if (
@@ -828,30 +835,32 @@ public class RaceEventManager {
                         boolean isRacing =
                             heat.getHeatState() == HeatState.RACING ||
                             heat.getHeatState() == HeatState.STARTING;
-                        if (
-                            isRacing && !driver.isFinished() && !driver.isDnf()
-                        ) {
-                            driver.setDnf(true);
-                            if (this.plugin.getPTP() != null) {
-                                this.plugin.getPTP().disablePTP(player, driver);
+                        if (isRacing && !driver.isFinished() && !driver.isDnf()) {
+                            if (markDNF) {
+                                driver.setDnf(true);
+                                if (this.plugin.getPTP() != null) {
+                                    this.plugin.getPTP().disablePTP(player, driver);
+                                }
+                                EventAnnouncements announcements =
+                                    heat.getRound() != null &&
+                                    heat.getRound().getEvent() != null
+                                        ? heat
+                                              .getRound()
+                                              .getEvent()
+                                              .getAnnouncements()
+                                        : this.plugin.getEventAnnouncements();
+                                announcements.broadcastDNF(
+                                    heat,
+                                    driver,
+                                    "Left event"
+                                );
+                                heat.removeDriver(uuid);
+                                player.sendMessage(
+                                    "§e⚠ Você saiu da corrida e foi desqualificado."
+                                );
+                            } else {
+                                heat.removeDriver(uuid);
                             }
-                            EventAnnouncements announcements =
-                                heat.getRound() != null &&
-                                heat.getRound().getEvent() != null
-                                    ? heat
-                                          .getRound()
-                                          .getEvent()
-                                          .getAnnouncements()
-                                    : this.plugin.getEventAnnouncements();
-                            announcements.broadcastDNF(
-                                heat,
-                                driver,
-                                "Left event"
-                            );
-                            heat.removeDriver(uuid);
-                            player.sendMessage(
-                                "§e⚠ Você saiu da corrida e foi desqualificado."
-                            );
                         } else if (!isRacing) {
                             heat.removeDriver(uuid);
                             player.sendMessage("§e⚠ Você saiu da corrida.");
@@ -868,9 +877,9 @@ public class RaceEventManager {
                                     this.plugin.getDebugManager();
                                 String var10001 = player.getName();
                                 var10000.logRaceSystem(
-                                    "Fallback: Removendo ghost driver " +
+                                    "Fallback: Removing ghost driver " +
                                         var10001 +
-                                        " do Heat " +
+                                        " from Heat " +
                                         h.getId()
                                 );
                                 h.removeDriver(uuid);
@@ -910,10 +919,7 @@ public class RaceEventManager {
                     player.getVehicle().remove();
                 }
 
-                Location respawn = player.getRespawnLocation();
-                if (respawn == null) {
-                    respawn = player.getWorld().getSpawnLocation();
-                }
+                Location respawn = player.getWorld().getSpawnLocation();
 
                 SchedulerHelper.teleport(player, respawn);
                 event.removeSubscriber(uuid);
@@ -942,9 +948,25 @@ public class RaceEventManager {
 
         this.dbManager.deleteEvent(eventId);
         this.plugin.getDebugManager().logRaceSystem(
-            "Evento removido: " + event.getDisplayName() + " (ID=" + eventId + ")"
+                "Event removed: " + event.getDisplayName() + " (ID=" + eventId + ")"
         );
         return true;
+    }
+
+    public void tryDeleteEventForHeat(Heats heat) {
+        Rounds round = heat.getRound();
+        if (round == null) return;
+        Events event = round.getEvent();
+        if (event == null) return;
+        if (heat.getDrivers().isEmpty()) return;
+        boolean allDnf = heat.getDrivers().values().stream()
+            .allMatch(Driver::isDnf);
+        if (allDnf) {
+            this.plugin.getDebugManager().logRaceSystem(
+                "All drivers DNF in heat " + heat.getId() + " - deleting event " + event.getId()
+            );
+            this.removeEvent(event.getId());
+        }
     }
 
     private void cleanupEventInMemory(Events event) {
@@ -988,7 +1010,7 @@ public class RaceEventManager {
             DebugManager var10000 = this.plugin.getDebugManager();
             String var10001 = event.getDisplayName();
             var10000.logRaceSystem(
-                "Evento descarregado da memória: " +
+                "Event unloaded from memory: " +
                     var10001 +
                     " (ID=" +
                     eventId +
@@ -1030,7 +1052,7 @@ public class RaceEventManager {
         ).thenApply(eventId -> {
             if (eventId == -1) {
                 this.plugin.getDebugManager().logDatabaseOperation(
-                    "Falha ao criar evento no banco de dados: " + eventName
+                    "Failed to create event in database: " + eventName
                 );
                 return null;
             } else {
@@ -1074,7 +1096,7 @@ public class RaceEventManager {
                 round.setId(roundId);
                 round.setEventId(event.getId());
                 this.plugin.getDebugManager().logRaceSystem(
-                    "Rodada criada: R" +
+                    "Round created: R" +
                         roundNumber +
                         " (" +
                         String.valueOf(roundType) +
@@ -1166,7 +1188,7 @@ public class RaceEventManager {
                 }
 
                 this.plugin.getDebugManager().logRaceSystem(
-                    "Heat criado no round R" + round.getRoundNumber()
+                    "Heat created in round R" + round.getRoundNumber()
                 );
                 return heat;
             }
@@ -1184,7 +1206,7 @@ public class RaceEventManager {
 
             event.getEventSchedule().removeRound(round.getRoundNumber());
             this.plugin.getDebugManager().logRaceSystem(
-                "Rodada removida: R" + round.getRoundNumber()
+                "Round removed: R" + round.getRoundNumber()
             );
             return true;
         }
@@ -1201,7 +1223,7 @@ public class RaceEventManager {
 
             round.removeHeat(heat.getHeatNumber());
             this.plugin.getDebugManager().logRaceSystem(
-                "Heat removido do round R" + round.getRoundNumber()
+                "Heat removed from round R" + round.getRoundNumber()
             );
             return true;
         }
@@ -1223,7 +1245,7 @@ public class RaceEventManager {
         this.eventsByName.clear();
         this.playerActiveEvent.clear();
         this.plugin.getDebugManager().logRaceSystem(
-            "RaceEventManager desligado."
+            "RaceEventManager shut down."
         );
     }
 }

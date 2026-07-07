@@ -43,13 +43,13 @@ public class NocolManager {
             player.sendPluginMessage(FormulaRacing.getInstance(), CHANNEL, byteStream.toByteArray());
 
             FormulaRacing.getInstance().getDebugManager().logBoatUtils(
-                    String.format("[NocolManager] Pacote enviado para %s | Colisao=%b | Valor=%d",
+                    String.format("[NocolManager] Packet sent to %s | Collision=%b | Value=%d",
                             player.getName(), shouldCollide, value)
             );
 
         } catch (IOException e) {
             FormulaRacing.getInstance().getDebugManager().logBoatUtils(
-                    "Erro ao enviar pacote NoCol para " + player.getName() + ": " + e.getMessage()
+                    "Error sending NoCol packet to " + player.getName() + ": " + e.getMessage()
             );
         }
     }

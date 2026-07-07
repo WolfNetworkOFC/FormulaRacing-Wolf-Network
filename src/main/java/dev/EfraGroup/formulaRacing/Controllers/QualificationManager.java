@@ -21,17 +21,17 @@ public class QualificationManager {
     }
 
     public void processQualificationResults(Events event, Rounds qualificationRound) {
-        this.debug.logQualificationSystem("Processando resultados da qualificação...");
+        this.debug.logQualificationSystem("Processing qualification results...");
         Rounds finalRound = (Rounds)event.getEventSchedule().getRound(qualificationRound.getRoundIndex() + 1).orElse(null);
         if (finalRound == null) {
-            this.debug.logQualificationSystem("ERRO: Round final não encontrado!");
+            this.debug.logQualificationSystem("ERROR: Final round not found!");
         } else {
             List<QualificationResult> results = this.collectQualificationResults(qualificationRound);
             if (results.isEmpty()) {
-                this.debug.logQualificationSystem("AVISO: Nenhum resultado de qualificação encontrado!");
+                this.debug.logQualificationSystem("WARNING: No qualification results found!");
             } else {
                 results.sort(Comparator.comparingLong(QualificationResult::getBestLapTime));
-                this.debug.logQualificationSystem("Resultados da qualificação:");
+                this.debug.logQualificationSystem("Qualification results:");
 
                 for(int i = 0; i < results.size(); ++i) {
                     QualificationResult result = (QualificationResult)results.get(i);
@@ -40,7 +40,7 @@ public class QualificationManager {
 
                 this.applyGridToFinalRound(finalRound, results);
                 event.getAnnouncements().broadcastQualificationResults(event, results);
-                this.debug.logQualificationSystem("Grid de largada definido com sucesso!");
+                this.debug.logQualificationSystem("Starting grid set successfully!");
             }
         }
     }
@@ -55,7 +55,7 @@ public class QualificationManager {
                 if (driver.getFastestLap() != null && driver.getFastestLap().getLapTime() > 0L) {
                     bestTime = driver.getFastestLap().getLapTime();
                 } else {
-                    this.debug.logQualificationSystem(String.format("AVISO: Driver %s não completou nenhuma volta válida - será colocado no fim do grid", driver.getUuid()));
+                    this.debug.logQualificationSystem(String.format("WARNING: Driver %s did not complete any valid lap - will be placed at the back of the grid", driver.getUuid()));
                 }
 
                 results.add(new QualificationResult(driver.getUuid(), bestTime, laps));
@@ -68,7 +68,7 @@ public class QualificationManager {
     private void applyGridToFinalRound(Rounds finalRound, List<QualificationResult> results) {
         Heats finalHeat = (Heats)finalRound.getHeat(1).orElse(null);
         if (finalHeat == null) {
-            this.debug.logQualificationSystem("ERRO: Heat final não encontrado!");
+            this.debug.logQualificationSystem("ERROR: Final heat not found!");
         } else {
             if (finalHeat.getId() > 0) {
                 this.plugin.getRaceEventManager().getDatabaseManager().clearHeatDriversSync(finalHeat.getId());
@@ -82,11 +82,11 @@ public class QualificationManager {
                 if (added) {
                     this.debug.logQualificationSystem(String.format("Grid P%d: %s (Quali: %s, %d voltas)", gridPosition, result.getDriverUUID(), this.formatTime(result.getBestLapTime()), result.getTotalLaps()));
                 } else {
-                    this.debug.logQualificationSystem(String.format("AVISO: Não foi possível adicionar %s ao grid (limite atingido ou driver já existe)", result.getDriverUUID()));
+                    this.debug.logQualificationSystem(String.format("WARNING: Could not add %s to grid (limit reached or driver already exists)", result.getDriverUUID()));
                 }
             }
 
-            this.debug.logQualificationSystem(String.format("%d pilotos adicionados ao grid final", results.size()));
+            this.debug.logQualificationSystem(String.format("%d drivers added to final grid", results.size()));
         }
     }
 
@@ -125,3 +125,4 @@ public class QualificationManager {
         }
     }
 }
+

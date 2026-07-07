@@ -94,7 +94,7 @@ public class RoundCommand extends BaseCommand {
     }
 
     @Subcommand("create|new")
-    @CommandCompletion("PRACTICE|QUALIFICATION|ELIMINATION|FINAL|SPRINT_QUALIFICATION|SPRINT_RACE @event")
+    @CommandCompletion("PRACTICE|QUALIFICATION|ELIMINATION|FINAL|SPRINT_QUALIFICATION|SPRINT_RACE|HOT_POTATO|MUSICAL_CHAIR|CAPTURE_THE_FLAG|INFECTION|TEAM_ELIMINATION|OBSTACLE_RACE|SUMO|BLIND_RACE|MOVING_TARGET|TOTAL_CHAOS|ROULETTE @event")
     @CommandPermission("formularacing.event.admin")
     @Description("Cria um novo round no evento")
     public void onCreate(

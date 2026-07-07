@@ -32,24 +32,24 @@ public class ResetCommand implements CommandExecutor {
             return true;
         }
 
-        // Obtém última pista em que o jogador estava
+        // Get the last track the player was on
         String lastTrack = plugin.getLastTimeTrialTrack(player.getUniqueId());
         if (lastTrack == null) {
             player.sendMessage("§cYou aren't in any Time Trial.");
             return true;
         }
 
-        // Ponto de spawn da pista
+        // Track spawn point
         Location spawn = mysql.getTrackSpawn(lastTrack);
         if (spawn == null) {
-            player.sendMessage("§cNão foi possível encontrar o ponto de spawn da pista: " + lastTrack);
+            player.sendMessage("§cCould not find the spawn point for track: " + lastTrack);
             return true;
         }
 
 
 
         // =========================
-        // Salva tempo parcial até último checkpoint (opcional)
+        // Save partial time up to last checkpoint (optional)
         // =========================
         TimerUtils.PlayerTimerData data = timerUtils.getTimerData(player, lastTrack);
         if (data != null) {
@@ -58,19 +58,19 @@ public class ResetCommand implements CommandExecutor {
                 double elapsedTime = timerUtils.getPlayerElapsedTimeUntilLastCheckpoint(player, lastTrack);
                 mysql.savePartialTime(player.getUniqueId(), player.getName(), lastTrack, elapsedTime, lastCheckpointIndex);
 
-                player.sendMessage("§aSeu tempo parcial até o checkpoint §e" + lastCheckpointIndex +
-                        " §afoi salvo: §e" + timerUtils.formatTime(elapsedTime, true, false));
+                player.sendMessage("§aYour partial time up to checkpoint §e" + lastCheckpointIndex +
+                        " §awas saved: §e" + timerUtils.formatTime(elapsedTime, true, false));
                 timerUtils.resetTempCheckpoints(player.getUniqueId());
             }
         }
 
         // =========================
-        // Reseta timer
+        // Reset timer
         // =========================
         timerUtils.stopTimer(player, lastTrack);
 
         // =========================
-        // Teleporte e cria barco
+        // Teleport and create boat
         // =========================
         SchedulerHelper.teleport(player, spawn);
         api.spawnBoat(player, false, false, false);

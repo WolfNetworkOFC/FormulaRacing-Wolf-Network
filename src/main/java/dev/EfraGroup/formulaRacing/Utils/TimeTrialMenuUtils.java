@@ -33,7 +33,7 @@ import org.bukkit.inventory.meta.ItemMeta;
      private final APIFormulaRacing api;
      private final TimerUtils timerUtils;
      private final ScoreboardTimeTrialUtils stt;
-     private final String INVENTORY_TITLE = String.valueOf(ChatColor.GREEN) + "Escolha uma pista";
+     private final String INVENTORY_TITLE = String.valueOf(ChatColor.GREEN) + "Choose a track";
      private final Map<UUID, Long> lastClickTime = new ConcurrentHashMap<UUID, Long>();
 
      public TimeTrialMenuUtils(FormulaRacing plugin, DatabaseManager mysql, APIFormulaRacing api, PacketSender ps, TimerUtils timerUtils, ScoreboardTimeTrialUtils stt) {
@@ -46,15 +46,15 @@ import org.bukkit.inventory.meta.ItemMeta;
      }
 
      public void open(Player player) {
-         // 1. Tipagem correta do Map para evitar casts manuais no loop
+          // 1. Correctly typed Map to avoid manual casts in the loop
          Map<String, DatabaseManager.TrackData> tracksData = this.mysql.getAllTracksWithData();
-         this.plugin.getDebugManager().logGuiSystem("DEBUG TT: Encontradas " + tracksData.size() + " pistas.");
+          this.plugin.getDebugManager().logGuiSystem("DEBUG TT: Found " + tracksData.size() + " tracks.");
 
          Inventory inv = Bukkit.createInventory(null, 54, this.INVENTORY_TITLE);
          int slot = 0;
 
          for (Map.Entry<String, DatabaseManager.TrackData> entry : tracksData.entrySet()) {
-             // Trava de segurança para não ultrapassar o tamanho do inventário (54 slots)
+              // Safety lock to not exceed inventory size (54 slots)
              if (slot >= 54) break;
 
              String trackName = entry.getKey();
@@ -68,7 +68,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 
              Double playerBestTime = (playerBestData != null) ? (Double) playerBestData[0] : null;
 
-             // 2. Tipagem correta da Leaderboard para o loop de posição
+              // 2. Correctly typed Leaderboard for the position loop
              List<DatabaseManager.PlayerTime> leaderboard = this.mysql.getLeaderboard(trackName);
              int playerPos = -1;
              for (int i = 0; i < leaderboard.size(); ++i) {
@@ -90,7 +90,7 @@ import org.bukkit.inventory.meta.ItemMeta;
              if (meta != null) {
                  meta.setDisplayName(ChatColor.WHITE + "" + ChatColor.ITALIC + trackName);
 
-                 // CORREÇÃO: List de String, não de Object
+                  // FIX: List of String, not Object
                  List<String> loreList = new ArrayList<>();
                  loreList.add(ChatColor.YELLOW + "Owner: " + ChatColor.WHITE + trackData.getOwnerName());
                  loreList.add("");
@@ -136,7 +136,7 @@ import org.bukkit.inventory.meta.ItemMeta;
          String trackName = ChatColor.stripColor(clicked.getItemMeta().getDisplayName()).trim();
          if (trackName.isEmpty()) {
              this.plugin.getDebugManager().logGuiSystem("Track name is empty after strip colors! Display name was: " + clicked.getItemMeta().getDisplayName());
-             player.sendMessage("\u00a7cErro: Nome da pista inv\u00e1lido.");
+              player.sendMessage("\u00a7cError: Invalid track name.");
              return;
          }
          if (!this.mysql.isTrackOpen(trackName)) {
@@ -181,7 +181,7 @@ import org.bukkit.inventory.meta.ItemMeta;
                      this.mysql.savePartialTime(player.getUniqueId(), player.getName(), lastTrack, currentTime, checkpoints);
                      String langCode = this.mysql.getPlayerLanguage(player.getUniqueId());
                      String formattedTime = this.formatTime(currentTime);
-                     player.sendMessage(this.plugin.getTranslation("partial_time_saved", langCode, "{track}", lastTrack, "{time}", formattedTime + " com " + checkpoints + " checkpoints"));
+                      player.sendMessage(this.plugin.getTranslation("partial_time_saved", langCode, "{track}", lastTrack, "{time}", formattedTime + " with " + checkpoints + " checkpoints"));
                  }
              }
              this.timerUtils.stopTimer(player, lastTrack);

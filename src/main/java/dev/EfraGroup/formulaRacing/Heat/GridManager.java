@@ -34,29 +34,29 @@ public class GridManager {
             this.gridPositions.clear();
             this.gridPositions.addAll(trackManager.generateGridPositions(trackNameWS, maxDrivers));
             if (this.gridPositions.isEmpty()) {
-                this.plugin.getDebugManager().logRaceSystem("Não foi possível gerar grid para pista: " + trackNameWS);
+                this.plugin.getDebugManager().logRaceSystem("Could not generate grid for track: " + trackNameWS);
                 return false;
             } else {
                 this.heat.setMaxDrivers(this.gridPositions.size());
                 DebugManager var10000 = this.plugin.getDebugManager();
                 int var10001 = this.heat.getId();
-                var10000.logRaceSystem("Grid gerado para Heat " + var10001 + ": " + this.gridPositions.size() + " posições");
+                var10000.logRaceSystem("Grid generated for Heat " + var10001 + ": " + this.gridPositions.size() + " positions");
                 return true;
             }
         } else {
-            this.plugin.getDebugManager().logRaceSystem("Heat " + this.heat.getId() + " não tem pista configurada!");
+            this.plugin.getDebugManager().logRaceSystem("Heat " + this.heat.getId() + " has no track configured!");
             return false;
         }
     }
 
     public int teleportDriversToGrid() {
         if (this.gridPositions.isEmpty() && !this.generateGrid()) {
-            this.plugin.getDebugManager().logRaceSystem("Não foi possível teleportar pilotos: grid não gerado");
+            this.plugin.getDebugManager().logRaceSystem("Could not teleport drivers: grid not generated");
             return 0;
         } else {
             List<Driver> drivers = this.heat.getStartPositions();
             if (drivers.isEmpty()) {
-                this.plugin.getDebugManager().logRaceSystem("Nenhum piloto para teleportar no Heat " + this.heat.getId());
+                this.plugin.getDebugManager().logRaceSystem("No drivers to teleport in Heat " + this.heat.getId());
                 return 0;
             } else {
                 int teleported = 0;
@@ -65,8 +65,8 @@ public class GridManager {
                     if (driver.getStartPosition() < 1) {
                         DebugManager var10000 = this.plugin.getDebugManager();
                         String var10001 = String.valueOf(driver.getUuid());
-                        var10000.logRaceSystem("ERRO CRÍTICO: Piloto " + var10001 + " tem startPosition inválida: " + driver.getStartPosition());
-                        this.plugin.getDebugManager().logRaceSystem("Corrigindo para posição 1...");
+                        var10000.logRaceSystem("CRITICAL ERROR: Driver " + var10001 + " has invalid startPosition: " + driver.getStartPosition());
+                        this.plugin.getDebugManager().logRaceSystem("Fixing to position 1...");
                         driver.setStartPosition(1);
                     }
 
@@ -80,29 +80,22 @@ public class GridManager {
                                 this.plugin.getAPI().recoverPlayerBoatState(player);
                             });
 
-                            SchedulerHelper.runTaskLater(this.plugin, () -> {
-                                if (player.isOnline()) {
-                                    SchedulerHelper.teleport(player, gridLoc);
-                                    this.removePlayerFromTimeTrial(player);
-                                    this.spawnBoatWithTrackConfig(player, gridLoc, driver);
-                                    DebugManager var10000 = this.plugin.getDebugManager();
-                                    String var10001 = player.getName();
-                                    var10000.logRaceSystem("Piloto " + var10001 + " teleportado para P" + (gridPosition + 1));
-                                }
-
-                            }, 2L);
+                            this.spawnBoatWithTrackConfig(player, gridLoc, driver);
+                            DebugManager var10000 = this.plugin.getDebugManager();
+                            String var10001 = player.getName();
+                            var10000.logRaceSystem("Driver " + var10001 + " teleported to P" + (gridPosition + 1));
                             ++teleported;
                         } else {
-                            this.plugin.getDebugManager().logRaceSystem("Piloto offline não pode ser teleportado: " + String.valueOf(driver.getUuid()));
+                            this.plugin.getDebugManager().logRaceSystem("Offline driver cannot be teleported: " + String.valueOf(driver.getUuid()));
                         }
                     } else {
                         DebugManager var8 = this.plugin.getDebugManager();
                         String var9 = String.valueOf(driver.getUuid());
-                        var8.logRaceSystem("Posição de grid inválida para piloto " + var9 + ": P" + (gridPosition + 1) + " (índice: " + gridPosition + ")");
+                        var8.logRaceSystem("Invalid grid position for driver " + var9 + ": P" + (gridPosition + 1) + " (index: " + gridPosition + ")");
                     }
                 }
 
-                this.plugin.getDebugManager().logRaceSystem("Teleportados " + teleported + "/" + drivers.size() + " pilotos para o grid");
+                this.plugin.getDebugManager().logRaceSystem("Teleported " + teleported + "/" + drivers.size() + " drivers to grid");
                 return teleported;
             }
         }
@@ -117,7 +110,7 @@ public class GridManager {
             }
         }
 
-        this.plugin.getDebugManager().logRaceSystem("Pilotos congelados no grid: " + this.frozenPlayers.size());
+        this.plugin.getDebugManager().logRaceSystem("Drivers frozen on grid: " + this.frozenPlayers.size());
     }
 
     public void unfreezePlayers() {
@@ -129,7 +122,7 @@ public class GridManager {
         }
 
         this.frozenPlayers.clear();
-        this.plugin.getDebugManager().logRaceSystem("Pilotos liberados do grid");
+        this.plugin.getDebugManager().logRaceSystem("Drivers released from grid");
     }
 
     public boolean teleportDriver(Driver driver) {
@@ -146,28 +139,21 @@ public class GridManager {
                         this.plugin.getAPI().recoverPlayerBoatState(player);
                     });
 
-                    SchedulerHelper.runTaskLater(this.plugin, () -> {
-                        if (player.isOnline()) {
-                            SchedulerHelper.teleport(player, gridLoc);
-                            this.removePlayerFromTimeTrial(player);
-                            this.spawnBoatWithTrackConfig(player, gridLoc, driver);
-                            HeatState state = this.heat.getHeatState();
-                            if (state == HeatState.LOADED || state == HeatState.STARTING) {
-                                this.frozenPlayers.add(driver.getUuid());
-                            }
+                    this.spawnBoatWithTrackConfig(player, gridLoc, driver);
+                    HeatState state = this.heat.getHeatState();
+                    if (state == HeatState.LOADED || state == HeatState.STARTING) {
+                        this.frozenPlayers.add(driver.getUuid());
+                    }
 
-                            DebugManager var10000 = this.plugin.getDebugManager();
-                            String var10001 = player.getName();
-                            var10000.logRaceSystem("Piloto " + var10001 + " teleportado para P" + (gridPosition + 1));
-                        }
-
-                    }, 2L);
+                    DebugManager var10000 = this.plugin.getDebugManager();
+                    String var10001 = player.getName();
+                    var10000.logRaceSystem("Driver " + var10001 + " teleported to P" + (gridPosition + 1));
                     return true;
                 } else {
                     return false;
                 }
             } else {
-                this.plugin.getDebugManager().logRaceSystem("Posição de grid inválida: " + gridPosition);
+                this.plugin.getDebugManager().logRaceSystem("Invalid grid position: " + gridPosition);
                 return false;
             }
         }
@@ -186,7 +172,7 @@ public class GridManager {
             Player player = this.plugin.getServer().getPlayer(driver.getUuid());
             if (player != null && player.isOnline()) {
                 this.plugin.getAPI().releaseBoat(player);
-                this.plugin.getDebugManager().logRaceSystem("Barco liberado para " + player.getName() + " (clear)");
+                this.plugin.getDebugManager().logRaceSystem("Boat released for " + player.getName() + " (clear)");
             }
         }
 
@@ -197,22 +183,23 @@ public class GridManager {
 
     private void removePlayerFromTimeTrial(Player player) {
         this.plugin.getScoreboardTimeTrialUtils().clearPlayerTrack(player);
-        this.plugin.getDebugManager().logRaceSystem("Player " + player.getName() + " removido do time trial");
+        this.plugin.getDebugManager().logRaceSystem("Player " + player.getName() + " removed from time trial");
     }
 
     private void spawnBoatWithTrackConfig(final Player player, Location location, Driver driver) {
         final String trackNameWS = this.heat.getTrackNameWS();
-        this.plugin.getAPI().releaseBoat(player);
+        final Location gridLoc = location.clone();
         SchedulerHelper.runTaskLater(this.plugin, () -> {
             if (player.isOnline()) {
+                SchedulerHelper.teleport(player, gridLoc);
                 GridManager.this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackNameWS);
                 GridManager.this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
                 GridManager.this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, trackNameWS);
                 HeatState state = GridManager.this.heat.getHeatState();
                 boolean locked = state == HeatState.LOADED || state == HeatState.STARTING;
                 boolean collidable = GridManager.this.heat.getCollisionMode() != CollisionMode.DISABLED;
-                GridManager.this.plugin.getAPI().spawnBoat(player, false, locked, false, collidable);
-                GridManager.this.plugin.getDebugManager().logRaceSystem("Barco spawnado para " + player.getName() + " no grid (pista: " + trackNameWS + ", locked: " + locked + ", collidable: " + collidable + ")");
+                GridManager.this.plugin.getAPI().spawnBoatAt(player, gridLoc, false, locked, false, collidable);
+                GridManager.this.plugin.getDebugManager().logRaceSystem("Boat spawned for " + player.getName() + " on grid (track: " + trackNameWS + ", locked: " + locked + ", collidable: " + collidable + ", yaw: " + gridLoc.getYaw() + ")");
             }
         }, 10L);
     }

@@ -14,8 +14,8 @@ import org.bukkit.entity.Player;
 import java.util.Optional;
 
 /**
- * Gerenciador de Checkered Flag (Bandeira Quadriculada)
- * Controla o fluxo de finalização quando o primeiro colocado cruza a linha
+ * Checkered Flag Manager
+ * Controls the finishing flow when the first place crosses the line
  */
 public class CheckeredFlagManager {
 
@@ -28,7 +28,7 @@ public class CheckeredFlagManager {
     }
 
     /**
-     * Verifica se deve mostrar a bandeira quadriculada
+     * Checks if the checkered flag should be shown
      */
     public boolean shouldShowCheckeredFlag(Heats heat, Driver driver) {
         HeatConfig config = heat.getHeatConfig();
@@ -41,12 +41,12 @@ public class CheckeredFlagManager {
             return false;
         }
 
-        // Verificar se o piloto completou os requisitos de vitória
+        // Check if the driver has completed the race requirements
         if (!hasCompletedRaceRequirements(heat, driver)) {
             return false;
         }
 
-        // Verificar se é o primeiro a completar
+        // Check if they are the first to complete
         Optional<Driver> firstFinisher = getFirstFinisher(heat);
 
         if (firstFinisher.isPresent() && firstFinisher.get().getUuid().equals(driver.getUuid())) {
@@ -57,7 +57,7 @@ public class CheckeredFlagManager {
     }
 
     /**
-     * Mostra a bandeira quadriculada e finaliza a corrida para todos
+     * Shows the checkered flag and finishes the race for everyone
      */
     public void showCheckeredFlag(Heats heat, Driver driver) {
         HeatConfig config = heat.getHeatConfig();
@@ -69,23 +69,23 @@ public class CheckeredFlagManager {
         checkeredFlagShown = true;
         winner = driver;
 
-        // Anunciar vitória
+        // Announce victory
         announceWinner(heat, driver);
 
-        // Marcar corrida como finalizada para todos
+        // Mark race as finished for everyone
         config.setRaceFinishedForAll(true);
 
         plugin.getDebugManager().logRaceSystem(
-            "[CHECKERED FLAG] Bandeira quadriculada mostrada para " + driver.getUuid() +
-            " - Corrida finalizada para todos"
+            "[CHECKERED FLAG] Checkered flag shown for " + driver.getUuid() +
+            " - Race finished for everyone"
         );
 
-        // Finalizar todos os pilotos que já completaram a corrida
+        // Finalize all drivers who have completed the race
         finalizeAllDrivers(heat);
     }
 
     /**
-     * Verifica se um piloto deve ser finalizado após a bandeira quadriculada
+     * Checks if a driver should be finalized after the checkered flag
      */
     public boolean shouldFinalizeDriver(Heats heat, Driver driver) {
         HeatConfig config = heat.getHeatConfig();
@@ -98,54 +98,54 @@ public class CheckeredFlagManager {
             return false;
         }
 
-        // Verificar se o piloto cruzou a linha de chegada
+        // Check if the driver crossed the finish line
         return hasCrossedFinishLine(heat, driver);
     }
 
     /**
-     * Finaliza um piloto após a bandeira quadriculada
+     * Finalizes a driver after the checkered flag
      */
     public void finalizeDriver(Heats heat, Driver driver) {
         if (driver.isFinished() || driver.isDnf()) {
             return;
         }
 
-        // Marcar como finalizado
+        // Mark as finished
         driver.setFinished(true);
 
-        // Travar posição atual
+        // Lock current position
         int currentPosition = driver.getPosition();
         driver.setPosition(currentPosition);
 
-        // Remover do barco
+        // Remove from boat
         Player player = Bukkit.getPlayer(driver.getUuid());
         if (player != null && player.isOnline()) {
             if (player.getVehicle() != null) {
                 player.getVehicle().remove();
             }
 
-            // Teleportar para spawn
+            // Teleport to spawn
             Location spawnLoc = plugin.getDatabaseManager().getTrackSpawn(heat.getTrackNameWS());
             if (spawnLoc != null) {
                 SchedulerHelper.teleport(player,spawnLoc);
             }
 
             plugin.getDebugManager().logRaceSystem(
-                "[CHECKERED FLAG] Piloto " + player.getName() + " finalizado na posição " + currentPosition
+                "[CHECKERED FLAG] Driver " + player.getName() + " finished at position " + currentPosition
             );
         }
     }
 
     /**
-     * Verifica se o piloto completou os requisitos de vitória
+     * Checks if the driver has completed the race requirements
      */
     private boolean hasCompletedRaceRequirements(Heats heat, Driver driver) {
-        // Verificar se completou o número de voltas necessário
+        // Check if the required lap count has been completed
         if (heat.getTotalLaps() != null && driver.getLapCount() < heat.getTotalLaps()) {
             return false;
         }
 
-        // Verificar se completou pits obrigatórios
+        // Check if mandatory pits have been completed
         if (heat.getTotalPits() != null && heat.getTotalPits() > 0) {
             if (!driver.hasCompletedMandatoryPits(heat.getTotalPits())) {
                 return false;
@@ -156,10 +156,10 @@ public class CheckeredFlagManager {
     }
 
     /**
-     * Obtém o primeiro piloto a completar a corrida
+     * Gets the first driver to complete the race
      */
     private Optional<Driver> getFirstFinisher(Heats heat) {
-        // Otimização: Usar stream eficiente para encontrar o primeiro finalizador
+        // Optimization: Use efficient stream to find the first finisher
         return heat.getDrivers().values().stream()
             .filter(d -> !d.isFinished() && !d.isDnf())
             .filter(d -> hasCompletedRaceRequirements(heat, d))
@@ -167,15 +167,15 @@ public class CheckeredFlagManager {
     }
 
     /**
-     * Verifica se o piloto cruzou a linha de chegada
+     * Checks if the driver crossed the finish line
      */
     private boolean hasCrossedFinishLine(Heats heat, Driver driver) {
-        // Verificar se completou pelo menos uma volta
+        // Check if at least one lap has been completed
         return driver.getLapCount() > 0;
     }
 
     /**
-     * Anuncia o vencedor
+     * Announces the winner
      */
     private void announceWinner(Heats heat, Driver driver) {
         String winnerName = "Unknown";
@@ -186,18 +186,18 @@ public class CheckeredFlagManager {
         }
 
         Bukkit.broadcastMessage("");
-        Bukkit.broadcastMessage(ChatColor.GOLD + "🏁 BANDEIRA QUADRICULADA! 🏁");
-        Bukkit.broadcastMessage(ChatColor.GREEN + "🏆 VENCEDOR: " + ChatColor.WHITE + winnerName);
-        Bukkit.broadcastMessage(ChatColor.GRAY + "Posição final: " + ChatColor.YELLOW + "#" + driver.getPosition());
+        Bukkit.broadcastMessage(ChatColor.GOLD + "🏁 CHECKERED FLAG! 🏁");
+        Bukkit.broadcastMessage(ChatColor.GREEN + "🏆 WINNER: " + ChatColor.WHITE + winnerName);
+        Bukkit.broadcastMessage(ChatColor.GRAY + "Final position: " + ChatColor.YELLOW + "#" + driver.getPosition());
         Bukkit.broadcastMessage(ChatColor.GRAY + "Tempo: " + ChatColor.YELLOW + formatTime(driver.getTotalTime()));
         Bukkit.broadcastMessage("");
     }
 
     /**
-     * Finaliza todos os pilotos que completaram a corrida
+     * Finalizes all drivers who completed the race
      */
     private void finalizeAllDrivers(Heats heat) {
-        // Otimização: Processar apenas pilotos que completaram requisitos
+        // Optimization: Process only drivers who completed requirements
         heat.getDrivers().values().stream()
             .filter(d -> !d.isFinished() && !d.isDnf())
             .filter(d -> hasCompletedRaceRequirements(heat, d))
@@ -205,7 +205,7 @@ public class CheckeredFlagManager {
     }
 
     /**
-     * Formata tempo em milissegundos para formato legível
+     * Formats time from milliseconds to a readable format
      */
     private String formatTime(long milliseconds) {
         long seconds = milliseconds / 1000;
@@ -217,7 +217,7 @@ public class CheckeredFlagManager {
     }
 
     /**
-     * Reseta o gerenciador
+     * Resets the manager
      */
     public void reset() {
         checkeredFlagShown = false;
@@ -225,16 +225,17 @@ public class CheckeredFlagManager {
     }
 
     /**
-     * Verifica se a bandeira quadriculada foi mostrada
+     * Checks if the checkered flag was shown
      */
     public boolean isCheckeredFlagShown() {
         return checkeredFlagShown;
     }
 
     /**
-     * Obtém o vencedor
+     * Gets the winner
      */
     public Optional<Driver> getWinner() {
         return Optional.ofNullable(winner);
     }
 }
+

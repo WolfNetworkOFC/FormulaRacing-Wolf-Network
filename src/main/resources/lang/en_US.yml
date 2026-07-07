@@ -23,6 +23,7 @@ timetrial_completed: "&6🏁 &fTime: &b{time}"
 track_not_found: "&cTrack not found with that name."
 track_is_closed: "&cThis track is closed and cannot be used at the moment!"
 obu_mandatory_warning: "&c&l⚠ WARNING: &7The track &f{track} &7requires the &bOpenBoatUtils &7mod for full racing conditions. Without it, you may get stuck on elevations!"
+obu_version_warning: "&c&l⚠ VERSION MISMATCH: &7Your OpenBoatUtils version (&f{current}&7) is outdated for track &f{track}&7. Minimum required: &f{required}&7. Please update your mod!"
 partial_time_saved: "&aPartial time from previous track &e{track} &awas saved: &e{time}"
 timetrial_cancelled: "&cTime trial cancelled."
 

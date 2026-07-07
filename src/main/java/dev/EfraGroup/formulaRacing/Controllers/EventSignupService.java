@@ -3,6 +3,7 @@ package dev.EfraGroup.formulaRacing.Controllers;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Event.EventState;
 import dev.EfraGroup.formulaRacing.Event.Events;
+import dev.EfraGroup.formulaRacing.BoatUtils.OpenBoatUtilsVersion;
 import java.util.UUID;
 import org.bukkit.entity.Player;
 
@@ -20,7 +21,18 @@ public class EventSignupService {
         }
 
         UUID playerUUID = player.getUniqueId();
-        this.plugin.checkAndWarnOBU(player, event.getTrackNameWS());
+
+        if (this.plugin.getDatabaseManager().trackHaveBoatUtils(event.getTrackNameWS())) {
+            if (!FormulaRacing.hasOpenBoatUtilsMod(player)) {
+                this.plugin.sendMessage(player, "obu_mandatory_warning", new String[]{"{track}", event.getTrackNameWS()});
+                return SignupResult.obuRequired();
+            }
+            int minVersion = this.plugin.getDatabaseManager().getTrackMinObuVersion(event.getTrackNameWS());
+            if (!OpenBoatUtilsVersion.hasMinVersion(playerUUID, minVersion)) {
+                this.plugin.sendMessage(player, "obu_version_warning", new String[]{"{track}", event.getTrackNameWS(), "{required}", String.valueOf(minVersion), "{current}", String.valueOf(OpenBoatUtilsVersion.getPlayerVersion(playerUUID))});
+                return SignupResult.obuVersionMismatch();
+            }
+        }
 
         if (event.isSubscriber(playerUUID)) {
             if (DAILY_CREATOR_UUID.equals(event.getCreatorUUID())) {
@@ -59,7 +71,9 @@ public class EventSignupService {
         SIGN_CLOSED,
         FINISHED,
         SIGNED,
-        ERROR
+        ERROR,
+        OBU_REQUIRED,
+        OBU_VERSION_MISMATCH
     }
 
     public static final class SignupResult {
@@ -97,6 +111,14 @@ public class EventSignupService {
 
         public static SignupResult error() {
             return new SignupResult(Status.ERROR, false);
+        }
+
+        public static SignupResult obuRequired() {
+            return new SignupResult(Status.OBU_REQUIRED, false);
+        }
+
+        public static SignupResult obuVersionMismatch() {
+            return new SignupResult(Status.OBU_VERSION_MISMATCH, false);
         }
 
         public Status getStatus() {

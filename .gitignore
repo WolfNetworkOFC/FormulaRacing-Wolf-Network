@@ -95,3 +95,45 @@ test-output/
 # Build artifacts - keep only source
 original-formularacing-*.jar
 formularacing-*.jar
+plugins/
+
+# Logs
+logs/
+
+# Deployment & secrets
+cp.txt
+deploy.ps1
+*.token
+secrets.yml
+credentials.yml
+
+# MinGW / MSYS2 toolchain (not project files)
+include/
+lib/
+libexec/
+mingw32/
+msys/
+share/
+var/
+
+# 3D assets (models & textures at root)
+*.obj
+*.mtl
+*_diff.png
+*_nmap.png
+*_spec.png
+
+# Root-level config/generated files
+gen_wolfang.py
+wolfang_fr_config.yml
+.factorypath
+compile.log
+compile.log - Atalho.lnk
+compile2.log
+
+# Editor configs
+.zed/
+.kilo/
+.vscode/
+.idea/
+.editorconfig

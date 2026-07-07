@@ -421,6 +421,8 @@ public class EventCommand extends BaseCommand {
                     new String[0]
                 );
                 return;
+            case OBU_REQUIRED:
+                return;
             case ERROR:
                 this.plugin.sendMessage(
                     player,

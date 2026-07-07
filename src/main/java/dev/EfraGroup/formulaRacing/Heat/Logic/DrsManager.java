@@ -36,13 +36,13 @@ public class DrsManager {
     }
 
     public void startDrsTask(final Heats heat) {
-        // Agora pegamos a lista de regiões (DrsRegion é o objeto que criamos com type, min e max)
+        // Now we get the list of regions (DrsRegion is the object we created with type, min and max)
         final List<Heats.DrsRegion> regions = heat.getPlugin().getRaceEventManager().getDatabaseManager().getDrsRegionsList(heat.getTrackNameWS());
 
-        // Verifica se existe ao menos uma região de desativação configurada na pista
+        // Check if there is at least one deactivation region configured on the track
         final boolean hasFinishRegion = regions.stream().anyMatch(r -> r.getType().equalsIgnoreCase("end"));
 
-        this.plugin.getLogger().info("§e[DRS-Debug] Task iniciada. Processando " + regions.size() + " regiões para: §f" + heat.getTrackNameWS());
+        this.plugin.getLogger().info("§e[DRS-Debug] Task started. Processing " + regions.size() + " regions for: §f" + heat.getTrackNameWS());
 
         SchedulerHelper.runTaskTimer(heat.getPlugin(), (scheduledTask) -> {
             if (heat.getHeatState() != HeatState.RACING) {
@@ -60,11 +60,11 @@ public class DrsManager {
                 Location loc = player.getLocation();
                 FRTheme theme = FRThemeResolver.resolveTheme(player);
 
-                // Percorre todas as regiões cadastradas para esta pista
+                // Iterate through all registered regions for this track
                 for (Heats.DrsRegion region : regions) {
                     String type = region.getType();
 
-                    // 1. LÓGICA DE DETECÇÃO
+                    // 1. DETECTION LOGIC
                     switch (type) {
                         case "detect" -> {
                             if (DrsManager.this.rs.isInside(loc, region.getMin(), region.getMax())) {
@@ -76,32 +76,32 @@ public class DrsManager {
                                         if (gapValue >= 0.01 && gapValue <= 1.3) {
                                             driver.setDrsPermission(true);
                                             DrsManager.this.showDrsAvailableBar(player, driver);
-                                            sendThemedMessage(player, theme, "&a[DRS] Permissão concedida! Gap: &f" + String.format("%.3f", gapValue) + "s");
+                                            sendThemedMessage(player, theme, "&a[DRS] Permission granted! Gap: &f" + String.format("%.3f", gapValue) + "s");
                                         }
                                     } else if (player.getTicksLived() % 40 == 0) {
-                                        sendThemedMessage(player, theme, "&a[DRS] Na zona de detecção, mas sem alvo à frente.");
+                                        sendThemedMessage(player, theme, "&a[DRS] In detection zone, but no target ahead.");
                                     }
                                 }
                             }
                         }
 
-                        // 2. LÓGICA DE ATIVAÇÃO
+                        // 2. ACTIVATION LOGIC
                         case "drs" -> {
                             if (driver.hasDrsPermission() && !driver.isDrsActive()) {
                                 if (DrsManager.this.rs.isInside(loc, region.getMin(), region.getMax())) {
                                     driver.setDrsPermission(false);
                                     DrsManager.this.applyDrsBoost(player, heat, driver, hasFinishRegion);
-                                    sendThemedMessage(player, theme, "&a[DRS] Asa Aberta!");
+                                    sendThemedMessage(player, theme, "&a[DRS] Wing Open!");
                                 }
                             }
                         }
 
-                        // 3. LÓGICA DE DESATIVAÇÃO
+                        // 3. DEACTIVATION LOGIC
                         case "end" -> {
                             if (driver.isDrsActive()) {
                                 if (DrsManager.this.rs.isInside(loc, region.getMin(), region.getMax())) {
                                     DrsManager.this.stopDrsBoost(player, driver, heat);
-                                    sendThemedMessage(player, theme, "&c[DRS] Asa Fechada.");
+                                    sendThemedMessage(player, theme, "&c[DRS] Wing Closed.");
                                 }
                             }
                         }
@@ -112,7 +112,7 @@ public class DrsManager {
     }
 
 
-    // Método auxiliar para limpar o código de mensagens repetitivas
+    // Helper method to clean up repetitive message code
     private void sendThemedMessage(Player player, FRTheme theme, String rawMsg) {
         String themed = LegacyComponentSerializer.legacySection()
                 .serialize(FRThemeParser.parseWithLegacy(rawMsg, theme));
@@ -169,3 +169,4 @@ public class DrsManager {
         player.sendMessage(plugin.getTranslation("drs_finished", plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId())));
     }
 }
+

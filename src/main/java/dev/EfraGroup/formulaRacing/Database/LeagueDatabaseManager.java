@@ -195,7 +195,7 @@ public class LeagueDatabaseManager {
             }
         } catch (SQLException e) {
             plugin.getDebugManager().logDatabaseOperation(
-                "[LeagueDB] Erro ao verificar vínculo do evento: " + e.getMessage()
+                "[LeagueDB] Error checking event link: " + e.getMessage()
             );
             return false;
         }

@@ -32,3 +32,4 @@ public class TeamEliminationRound extends Rounds {
         return new RaceSession(this.plugin);
     }
 }
+

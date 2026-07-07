@@ -48,7 +48,7 @@ public class DebugManager {
         this.spectatorSystem = config.getBoolean("debug.spectator-system", false);
         this.guiSystem = config.getBoolean("debug.gui-system", false);
         this.fileSystem = config.getBoolean("debug.file-system", false);
-        this.plugin.getLogger().info("[DebugManager] Configurações de debug recarregadas:");
+        this.plugin.getLogger().info("[DebugManager] Debug settings reloaded:");
         this.plugin.getLogger().info("  - Region Detection: " + (this.regionDetection ? "ON" : "OFF"));
         this.plugin.getLogger().info("  - Duel System: " + (this.duelSystem ? "ON" : "OFF"));
         this.plugin.getLogger().info("  - Duel System Verbose: " + (this.duelSystemVerbose ? "ON" : "OFF"));

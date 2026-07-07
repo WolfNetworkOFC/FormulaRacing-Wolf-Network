@@ -16,10 +16,10 @@ import org.bukkit.potion.PotionEffectType;
 import java.util.*;
 
 /**
- * 🔥 BATATA QUENTE
- * Um jogador recebe a "batata" (item brilhante). A cada X segundos a batata
- * passa para o jogador mais próximo. Quem segurar a batata por muito tempo
- * acumula calor e explode (DNF). O último sobrevivente vence.
+ * 🔥 HOT POTATO
+ * One player receives the "potato" (glowing item). Every X seconds the potato
+ * passes to the nearest player. Whoever holds the potato for too long
+ * accumulates heat and explodes (DNF). The last survivor wins.
  */
 public class HotPotatoSession implements SessionLogic {
 
@@ -38,12 +38,12 @@ public class HotPotatoSession implements SessionLogic {
         heat.setHeatState(HeatState.RACING);
         heat.startOfflineMonitoring();
 
-        // Inicializa calor de todos os pilotos
+        // Initialize heat for all drivers
         for (Driver driver : heat.getDrivers().values()) {
             heatLevels.put(driver.getUuid(), 0);
         }
 
-        // Sorteia o primeiro jogador com a batata
+        // Draw the first player with the potato
         List<UUID> drivers = new ArrayList<>(heatLevels.keySet());
         if (!drivers.isEmpty()) {
             currentPotatoHolder = drivers.get(new Random().nextInt(drivers.size()));
@@ -53,10 +53,10 @@ public class HotPotatoSession implements SessionLogic {
         startPotatoTask(heat);
 
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
-        broadcast(heat, ChatColor.RED + "  🔥 MODO BATATA QUENTE 🔥");
+        broadcast(heat, ChatColor.RED + "  🔥 HOT POTATO MODE 🔥");
         broadcast(heat, "");
-        broadcast(heat, ChatColor.YELLOW + "  A batata será passada entre pilotos!");
-        broadcast(heat, ChatColor.RED + "  Quem segurar por muito tempo EXPLODE!");
+        broadcast(heat, ChatColor.YELLOW + "  The potato will be passed between drivers!");
+        broadcast(heat, ChatColor.RED + "  Whoever holds it too long EXPLODES!");
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
 
         announcePotatoHolder(heat);
@@ -71,7 +71,7 @@ public class HotPotatoSession implements SessionLogic {
 
             tickCounter++;
 
-            // Aumenta calor de quem está com a batata
+            // Increase heat for whoever has the potato
             if (currentPotatoHolder != null) {
                 int currentHeat = heatLevels.getOrDefault(currentPotatoHolder, 0);
                 currentHeat = Math.min(MAX_HEAT, currentHeat + HEAT_PER_TICK);
@@ -90,7 +90,7 @@ public class HotPotatoSession implements SessionLogic {
                     if (currentHeat > 80) {
                         holder.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 2, false, false));
                         holder.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 40, 0, false, false));
-                        // Partículas de fogo
+                        // Fire particles
                         holder.getWorld().spawnParticle(Particle.FLAME, holder.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.05);
                     }
                     if (currentHeat >= MAX_HEAT) {
@@ -109,7 +109,7 @@ public class HotPotatoSession implements SessionLogic {
                 return;
             }
 
-            // Passa a batata para o jogador mais próximo
+            // Pass the potato to the nearest player
             passPotato(heat);
         }, POTATO_INTERVAL_TICKS, POTATO_INTERVAL_TICKS);
     }
@@ -120,7 +120,7 @@ public class HotPotatoSession implements SessionLogic {
         Player currentPlayer = Bukkit.getPlayer(currentPotatoHolder);
         if (currentPlayer == null || !currentPlayer.isOnline()) return;
 
-        // Encontra o jogador mais próximo que ainda está na corrida
+        // Find the nearest player still in the race
         UUID nearest = null;
         double nearestDist = Double.MAX_VALUE;
 
@@ -139,11 +139,11 @@ public class HotPotatoSession implements SessionLogic {
         }
 
         if (nearest != null) {
-            // Reseta calor do antigo holder
+            // Reset heat of the old holder
             heatLevels.put(currentPotatoHolder, 0);
             currentPotatoHolder = nearest;
 
-            // Efeito de passagem
+            // Passing effect
             Player newHolder = Bukkit.getPlayer(nearest);
             if (newHolder != null) {
                 newHolder.playSound(newHolder.getLocation(), Sound.ENTITY_ITEM_PICKUP, 2.0f, 0.5f);
@@ -166,24 +166,24 @@ public class HotPotatoSession implements SessionLogic {
             });
         }
 
-        // Marca como DNF
+        // Mark as DNF
         Driver driver = heat.getDriver(uuid);
         if (driver != null) {
-            heat.handleDriverDNF(driver, "Explodiu na Batata Quente!");
+            heat.handleDriverDNF(driver, "Exploded in Hot Potato!");
         }
 
-        broadcast(heat, ChatColor.RED + "💥 " + (player != null ? player.getName() : "Um piloto") + " EXPLODIU com a batata!");
+        broadcast(heat, ChatColor.RED + "💥 " + (player != null ? player.getName() : "A driver") + " EXPLODED with the potato!");
 
-        // Verifica se sobrou apenas um
+        // Check if only one remains
         long remaining = heat.getDrivers().values().stream()
                 .filter(d -> !d.isFinished() && !d.isDnf())
                 .count();
 
         if (remaining <= 1) {
-            // Passa a batata para null
+            // Pass the potato to null
             currentPotatoHolder = null;
         } else {
-            // Sorteia novo holder entre os restantes
+            // Draw new holder among the remaining
             List<UUID> remainingIds = new ArrayList<>();
             for (Driver d : heat.getDrivers().values()) {
                 if (!d.isFinished() && !d.isDnf()) {
@@ -202,8 +202,8 @@ public class HotPotatoSession implements SessionLogic {
         Player holder = Bukkit.getPlayer(currentPotatoHolder);
         if (holder == null) return;
 
-        broadcast(heat, ChatColor.RED + "🔥 " + holder.getName() + " está com a BATATA QUENTE!");
-        holder.sendMessage(ChatColor.RED + "⚠ VOCÊ ESTÁ COM A BATATA! Passe para alguém rápido!");
+        broadcast(heat, ChatColor.RED + "🔥 " + holder.getName() + " has the HOT POTATO!");
+        holder.sendMessage(ChatColor.RED + "⚠ YOU HAVE THE POTATO! Pass it to someone fast!");
     }
 
     private void broadcast(Heats heat, String message) {
@@ -217,7 +217,7 @@ public class HotPotatoSession implements SessionLogic {
 
     @Override
     public boolean passLap(Heats heat, Driver driver) {
-        // Em batata quente, voltas não importam — apenas sobreviver
+        // In hot potato, laps don't matter — only surviving
         return true;
     }
 
@@ -243,3 +243,4 @@ public class HotPotatoSession implements SessionLogic {
         return heatLevels.getOrDefault(uuid, 0);
     }
 }
+

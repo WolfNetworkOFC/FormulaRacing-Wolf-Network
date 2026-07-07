@@ -15,9 +15,9 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Gerencia a gravação de linhas de corrida baseada no timer do heat.
- * A gravação inicia quando o heat transiciona para RACING e finaliza
- * quando o heat termina (FINISHED).
+ * Manages racing line recording based on the heat timer.
+ * Recording starts when the heat transitions to RACING and ends
+ * when the heat finishes (FINISHED).
  */
 public class AIRacingLineRecorder {
 
@@ -34,13 +34,13 @@ public class AIRacingLineRecorder {
     }
 
     /**
-     * Registrador: marca o jogador como pronto para gravar na próxima corrida.
-     * A gravação real começa quando o heat vai para RACING.
+     * Registers the player as ready to record in the next race.
+     * The actual recording starts when the heat goes to RACING.
      */
     public boolean startRecording(Player player, String trackName) {
         UUID uuid = player.getUniqueId();
         if (activeSessions.containsKey(uuid)) {
-            player.sendMessage("§cVocê já está gravando uma linha de corrida!");
+            player.sendMessage("§cYou are already recording a racing line!");
             return false;
         }
 
@@ -49,40 +49,40 @@ public class AIRacingLineRecorder {
 
         player.sendMessage("");
         player.sendMessage("§a═══════════════════════════════");
-        player.sendMessage("§e  Gravação de Linha Registrada");
+        player.sendMessage("§e  Recording Line Registered");
         player.sendMessage("");
-        player.sendMessage("§f  Pista: §b" + trackName);
-        player.sendMessage("§f  A gravação iniciará quando a corrida começar");
-        player.sendMessage("§f  e terminará automaticamente ao final");
+        player.sendMessage("§f  Track: §b" + trackName);
+        player.sendMessage("§f  Recording will start when the race begins");
+        player.sendMessage("§f  and will end automatically upon completion");
         player.sendMessage("");
-        player.sendMessage("§c  Use /ai record stop para cancelar");
+        player.sendMessage("§c  Use /ai record stop to cancel");
         player.sendMessage("§a═══════════════════════════════");
 
-        plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Registro de gravação para " + player.getName() + " na pista " + trackName);
+        plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Recording registration for " + player.getName() + " on track " + trackName);
         return true;
     }
 
     /**
-     * Cancela a gravação registrada (antes ou durante a corrida).
+     * Cancels the registered recording (before or during the race).
      */
     public boolean stopRecording(Player player) {
         UUID uuid = player.getUniqueId();
         RecordingSession session = activeSessions.remove(uuid);
 
         if (session == null) {
-            player.sendMessage("§cVocê não está gravando nenhuma linha de corrida!");
+            player.sendMessage("§cYou are not recording any racing line!");
             return false;
         }
 
         session.cancel();
-        player.sendMessage("§eGravação cancelada!");
-        plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Gravação cancelada para " + player.getName());
+        player.sendMessage("§eRecording cancelled!");
+        plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Recording cancelled for " + player.getName());
         return true;
     }
 
     /**
-     * Chamado pelo listener quando um heat transiciona para RACING.
-     * Inicia a gravação para todos os jogadores registrados que estão nesse heat.
+     * Called by the listener when a heat transitions to RACING.
+     * Starts recording for all registered players who are in this heat.
      */
     public void onHeatRacing(Heats heat) {
         if (heat == null) return;
@@ -93,7 +93,7 @@ public class AIRacingLineRecorder {
             Player player = session.getPlayer();
             if (player == null || !player.isOnline()) continue;
 
-            // Verifica se o jogador está nesse heat
+            // Checks if the player is in this heat
             if (heat.getDriver(player.getUniqueId()) == null) continue;
 
             session.startRecording();
@@ -101,8 +101,8 @@ public class AIRacingLineRecorder {
     }
 
     /**
-     * Chamado pelo listener quando um heat transiciona para FINISHED.
-     * Finaliza e salva a gravação de todos os jogadores registrados.
+     * Called by the listener when a heat transitions to FINISHED.
+     * Finalizes and saves the recording for all registered players.
      */
     public void onHeatFinished(Heats heat) {
         if (heat == null) return;
@@ -114,7 +114,7 @@ public class AIRacingLineRecorder {
             Player player = session.getPlayer();
             if (player == null) continue;
 
-            // Verifica se o jogador estava nesse heat
+            // Checks if the player was in this heat
             if (heat.getDriver(player.getUniqueId()) != null) {
                 session.complete();
             }
@@ -189,22 +189,22 @@ public class AIRacingLineRecorder {
         }
 
         /**
-         * Inicia a gravação real (chamado quando o heat vai para RACING).
+         * Starts the actual recording (called when the heat goes to RACING).
          */
         public void startRecording() {
             if (recording || cancelled || completed) return;
             this.recording = true;
             this.recordingStartTime = System.currentTimeMillis();
 
-            // Mensagem no chat para o jogador
+            // Chat message for the player
             Player p = getPlayer();
             if (p != null && p.isOnline()) {
                 p.sendMessage("");
                 p.sendMessage("§a═══════════════════════════════");
-                p.sendMessage("§e  ▶ Gravação Iniciada!");
+                p.sendMessage("§e  ▶ Recording Started!");
                 p.sendMessage("");
-                p.sendMessage("§f  A corrida começou — gravando linha de corrida");
-                p.sendMessage("§f  A linha será salva ao final da corrida");
+                p.sendMessage("§f  The race has started — recording racing line");
+                p.sendMessage("§f  The line will be saved at the end of the race");
                 p.sendMessage("§a═══════════════════════════════");
             }
 
@@ -226,7 +226,7 @@ public class AIRacingLineRecorder {
                 }
             }, 1L, 2L);
 
-            plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Gravação iniciada para " + player.getName() + " na pista " + trackName);
+            plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Recording started for " + player.getName() + " on track " + trackName);
         }
 
         private boolean shouldAddPoint(Location newLoc) {
@@ -264,7 +264,7 @@ public class AIRacingLineRecorder {
         }
 
         /**
-         * Finaliza a gravação e salva a linha (chamado quando o heat termina).
+         * Finalizes the recording and saves the line (called when the heat ends).
          */
         public void complete() {
             if (completed || cancelled) return;
@@ -280,9 +280,9 @@ public class AIRacingLineRecorder {
             if (recordedPoints.size() < 5) {
                 activeSessions.remove(player.getUniqueId());
                 if (p != null && p.isOnline()) {
-                    p.sendMessage("§cGravação descartada — poucos pontos registrados.");
+                    p.sendMessage("§cRecording discarded — too few points recorded.");
                 }
-                plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Gravação descartada para " + player.getName() + " — poucos pontos (" + recordedPoints.size() + ")");
+                plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Recording discarded for " + player.getName() + " — too few points (" + recordedPoints.size() + ")");
                 return;
             }
 
@@ -302,26 +302,26 @@ public class AIRacingLineRecorder {
                 line.addAccelerationPoint(accelPoint);
             }
 
-            // Salvar no arquivo
+            // Save to file
             racingLineManager.saveAllRacingLines();
 
             activeSessions.remove(player.getUniqueId());
 
-            // Mensagem no chat para o jogador
+            // Chat message for the player
             if (p != null && p.isOnline()) {
                 p.sendMessage("");
                 p.sendMessage("§a═══════════════════════════════");
-                p.sendMessage("§e  ■ Gravação Finalizada!");
+                p.sendMessage("§e  ■ Recording Finished!");
                 p.sendMessage("");
-                p.sendMessage("§f  Pista: §b" + trackName);
-                p.sendMessage("§f  Pontos gravados: §a" + recordedPoints.size());
-                p.sendMessage("§f  Pontos de frenagem: §c" + brakingPoints.size());
-                p.sendMessage("§f  Pontos de aceleração: §e" + accelerationPoints.size());
-                p.sendMessage("§f  Linha salva em §b" + trackName);
+                p.sendMessage("§f  Track: §b" + trackName);
+                p.sendMessage("§f  Recorded points: §a" + recordedPoints.size());
+                p.sendMessage("§f  Braking points: §c" + brakingPoints.size());
+                p.sendMessage("§f  Acceleration points: §e" + accelerationPoints.size());
+                p.sendMessage("§f  Line saved as §b" + trackName);
                 p.sendMessage("§a═══════════════════════════════");
             }
 
-            plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Linha salva para " + trackName + " com " + recordedPoints.size() + " pontos");
+            plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Line saved for " + trackName + " with " + recordedPoints.size() + " points");
         }
 
         private double calculateSpeedForPoint(int index, int totalPoints) {
@@ -342,7 +342,7 @@ public class AIRacingLineRecorder {
         }
 
         public boolean isInactiveTooLong() {
-            // 5 minutos sem atividade
+            // 5 minutes without activity
             return System.currentTimeMillis() - lastUpdateTime > 300000L;
         }
 

@@ -15,6 +15,7 @@ import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
+import dev.EfraGroup.formulaRacing.BoatUtils.OpenBoatUtilsVersion;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,12 +58,12 @@ public class QuickRaceManager {
     public synchronized boolean createQuickRace(Player creator, String trackName, int laps, int pits) {
         this.cleanupFinishedQuickRaces();
 
-        // 1. Limpeza de estados antigos
+        // 1. Clean up old states
         if (currentHeat != null && currentHeat.getHeatState() == HeatState.FINISHED) {
             deleteQuickRace();
         }
 
-        // 2. Verificações de segurança (Early Returns)
+        // 2. Safety checks (Early Returns)
         if (currentQuickRace != null) {
             plugin.sendMessage(creator, "quickrace_already_active", "{track}", currentQuickRace.getTrackNameWS());
             plugin.sendMessage(creator, "quickrace_end_instruction");
@@ -80,49 +81,49 @@ public class QuickRaceManager {
             return false;
         }
 
-        // 3. Preparação dos dados da pista
+        // 3. Prepare track data
         creating = true;
         String finalTrackName = trackData.getTrackName();
         String trackNameWS = finalTrackName.replaceAll("\\s+", "").toLowerCase();
 
-        // Validação de Circuito vs Point-to-Point
+        // Circuit vs Point-to-Point validation
         if (!database.isCircuit(trackNameWS) && (laps > 1 || pits > 0)) {
-            plugin.getDebugManager().logRaceSystem("[QuickRace] Pista " + finalTrackName + " não é circuito. Ajustando parâmetros.");
+            plugin.getDebugManager().logRaceSystem("[QuickRace] Track " + finalTrackName + " is not a circuit. Adjusting parameters.");
             String creatorLang = database.getPlayerLanguage(creator.getUniqueId());
             creator.sendMessage(plugin.getTranslation("quickrace_ptp_adjustment", creatorLang));
             laps = 1;
             pits = 0;
         }
 
-        // Normalização de valores
+        // Value normalization
         int finalLaps = Math.max(1, laps);
         int finalPits = Math.min(Math.max(0, pits), finalLaps - 1);
         String eventName = "QuickRace_" + System.currentTimeMillis();
 
-        // 1. Recebemos como Object, já que é o que o método fornece
+        // 1. Received as Object, as that's what the method provides
         java.util.concurrent.CompletableFuture<Object> future = eventManager.createQuickRace(
                 creator.getUniqueId(), eventName, finalTrackName, finalLaps, finalPits
         );
 
-// 2. Processamos o resultado fazendo o cast manual
+// 2. Process the result with manual cast
         future.thenAccept(obj -> {
             creating = false;
 
-            // Verificamos se o retorno é nulo ou se não é do tipo Events
+            // Check if return is null or not Events type
             if (obj == null || !(obj instanceof Events)) {
                 plugin.sendMessage(creator, "quickrace_create_error");
                 return;
             }
 
-            // Cast manual seguro
+            // Safe manual cast
             Events event = (Events) obj;
             this.currentQuickRace = event;
 
-            // 3. Atribuição de referências (Rounds e Heats)
-            // Buscamos o primeiro round do cronograma
+            // 3. Reference assignment (Rounds and Heats)
+            // Get the first round from schedule
             this.currentRound = event.getEventSchedule().getRounds().values().stream()
                     .findFirst()
-                    .map(r -> (Rounds) r) // Cast para garantir o tipo correto
+                    .map(r -> (Rounds) r) // Cast to ensure correct type
                     .orElse(null);
 
             if (currentRound == null) {
@@ -131,7 +132,7 @@ public class QuickRaceManager {
                 return;
             }
 
-            // Buscamos a primeira bateria (Heat) do round
+            // Get the first heat from the round
             this.currentHeat = currentRound.getHeats().values().stream()
                     .findFirst()
                     .map(h -> (Heats) h) // Cast para garantir o tipo correto
@@ -143,16 +144,16 @@ public class QuickRaceManager {
                 return;
             }
 
-            // 5. Validação de grid
+            // 5. Grid validation
             int gridCount = plugin.getTrackIntegrationManager().getGridPositionCount(trackNameWS);
             if (gridCount <= 0) {
-                plugin.getDebugManager().logRaceSystem("[QuickRace] Pista " + finalTrackName + " não possui grid definido!");
-                creator.sendMessage("§c✗ A pista §e" + finalTrackName + " §cnão possui posições de grid definidas!");
+                plugin.getDebugManager().logRaceSystem("[QuickRace] Track " + finalTrackName + " has no grid positions defined!");
+                creator.sendMessage("§c✗ Track §e" + finalTrackName + " §chas no grid positions defined!");
                 deleteQuickRace();
                 return;
             }
 
-            // 6. Finalização e Logs
+            // 6. Finalization and Logs
             database.setPlayerSelectedEvent(creator.getUniqueId(), currentQuickRace);
             startLobbyTimer();
 
@@ -276,14 +277,25 @@ public class QuickRaceManager {
                             this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
                         }
 
-                        this.plugin.getDebugManager().logRaceSystem("[QuickRace] Time Trial interrompido para " + player.getName() + " entrar na corrida.");
+                        this.plugin.getDebugManager().logRaceSystem("[QuickRace] Time Trial interrupted for " + player.getName() + " to join the race.");
                     }
 
                     if (this.plugin.getPitStopManager() != null) {
                         this.plugin.getPitStopManager().clearPitStopState(player.getUniqueId());
                     }
 
-                    this.plugin.checkAndWarnOBU(player, this.currentHeat.getTrackNameWS());
+                    if (this.plugin.getDatabaseManager().trackHaveBoatUtils(this.currentHeat.getTrackNameWS())) {
+                        if (!FormulaRacing.hasOpenBoatUtilsMod(player)) {
+                            this.plugin.sendMessage(player, "obu_mandatory_warning", new String[]{"{track}", this.currentHeat.getTrackNameWS()});
+                            return false;
+                        }
+                        int minVersion = this.plugin.getDatabaseManager().getTrackMinObuVersion(this.currentHeat.getTrackNameWS());
+                        if (!OpenBoatUtilsVersion.hasMinVersion(player.getUniqueId(), minVersion)) {
+                            this.plugin.sendMessage(player, "obu_version_warning", new String[]{"{track}", this.currentHeat.getTrackNameWS(), "{required}", String.valueOf(minVersion), "{current}", String.valueOf(OpenBoatUtilsVersion.getPlayerVersion(player.getUniqueId()))});
+                            return false;
+                        }
+                    }
+
                     if (player.isInsideVehicle() && player.getVehicle() != null) {
                         Entity vehicle = player.getVehicle();
                         if (vehicle instanceof Boat) {
@@ -571,7 +583,7 @@ public class QuickRaceManager {
             boolean finishedHeat = this.currentHeat.getHeatState() == HeatState.FINISHED;
             boolean finishedEvent = this.currentQuickRace.getState() == dev.EfraGroup.formulaRacing.Event.EventState.FINISHED;
             if (finishedHeat || finishedEvent) {
-                this.plugin.getDebugManager().logRaceSystem("[QuickRace] Corrida finalizada, removendo evento temporário " + this.currentQuickRace.getDisplayName());
+                this.plugin.getDebugManager().logRaceSystem("[QuickRace] Race finished, removing temporary event " + this.currentQuickRace.getDisplayName());
                 this.deleteQuickRace();
             }
 
@@ -599,7 +611,7 @@ public class QuickRaceManager {
                 continue;
             }
 
-            this.plugin.getDebugManager().logRaceSystem("[QuickRace] Removendo QuickRace finalizada acumulada: " + name);
+            this.plugin.getDebugManager().logRaceSystem("[QuickRace] Removing accumulated finished QuickRace: " + name);
             this.eventManager.unloadEvent(event.getId());
             this.eventsDb.deleteEvent(event.getId());
         }

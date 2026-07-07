@@ -1,19 +1,19 @@
 package dev.EfraGroup.formulaRacing.Heat.Logic;
 
 /**
- * Tipos de pneus disponíveis
- * Cada tipo tem características diferentes de grip e durabilidade
+ * Available tire types
+ * Each type has different grip and durability characteristics
  */
 public enum TireCompound {
-    // Pneus secos
+    // Dry tires
     SOFT("SOFT", "&cS", 1.08D, 0.42D, 0.28D, 2800L, 1.0, 0.6),
     MEDIUM("MEDIUM", "&eM", 1.00D, 0.25D, 0.19D, 3200L, 0.9, 0.7),
     HARD("HARD", "&fH", 0.95D, 0.16D, 0.13D, 3600L, 0.8, 0.8),
 
-    // Pneus intermediários
+    // Intermediate tires
     INTERMEDIATE("INTERMEDIATE", "&bI", 0.96D, 0.20D, 0.17D, 3400L, 0.7, 0.9),
 
-    // Pneus molhados
+    // Wet tires
     WET("WET", "&3W", 0.88D, 0.16D, 0.14D, 3800L, 0.5, 1.0),
     WET_SOFT("WET_SOFT", "&dWS", 0.92D, 0.22D, 0.17D, 3500L, 0.6, 0.95);
 
@@ -79,28 +79,28 @@ public enum TireCompound {
     }
 
     /**
-     * Verifica se é um pneu seco
+     * Checks if it is a dry tire
      */
     public boolean isDry() {
         return this == SOFT || this == MEDIUM || this == HARD;
     }
 
     /**
-     * Verifica se é um pneu intermediário
+     * Checks if it is an intermediate tire
      */
     public boolean isIntermediate() {
         return this == INTERMEDIATE;
     }
 
     /**
-     * Verifica se é um pneu molhado
+     * Checks if it is a wet tire
      */
     public boolean isWet() {
         return this == WET || this == WET_SOFT;
     }
 
     /**
-     * Obtém o modificador de grip baseado no desgaste
+     * Gets the grip modifier based on wear
      */
     public double getGripMultiplier(int wearPercent) {
         double wearFraction = Math.max(0.0D, Math.min(1.0D, wearPercent / 100.0D));
@@ -109,51 +109,51 @@ public enum TireCompound {
     }
 
     /**
-     * Obtém o modificador de grip baseado no desgaste e umidade da pista
+     * Gets the grip modifier based on wear and track wetness
      */
     public double getGripMultiplier(int wearPercent, int trackWetness) {
         double baseGrip = getGripMultiplier(wearPercent);
 
-        // Ajusta grip baseado na umidade da pista
+        // Adjust grip based on track wetness
         double wetnessFraction = trackWetness / 100.0;
 
         if (isWet()) {
-            // Pneus molhados funcionam melhor em pista molhada
-            double wetBonus = wetnessFraction * 0.15; // Até 15% de bônus
+            // Wet tires perform better on wet tracks
+            double wetBonus = wetnessFraction * 0.15; // Up to 15% bonus
             return Math.min(1.0, baseGrip + wetBonus);
         } else if (isIntermediate()) {
-            // Pneus intermediários têm performance moderada
-            double wetPenalty = wetnessFraction * 0.20; // Até 20% de penalidade
+            // Intermediate tires have moderate performance
+            double wetPenalty = wetnessFraction * 0.20; // Up to 20% penalty
             return Math.max(0.70, baseGrip - wetPenalty);
         } else {
-            // Pneus secos sofrem muito em pista molhada
-            double wetPenalty = wetnessFraction * 0.50; // Até 50% de penalidade
+            // Dry tires suffer greatly on wet tracks
+            double wetPenalty = wetnessFraction * 0.50; // Up to 50% penalty
             return Math.max(0.50, baseGrip - wetPenalty);
         }
     }
 
     /**
-     * Obtém o desgaste por segundo baseado na umidade da pista
+     * Gets the wear per second based on track wetness
      */
     public double getWearPerSecond(int trackWetness) {
         double wetnessFraction = trackWetness / 100.0;
 
         if (isWet()) {
-            // Pneus molhados desgastam menos em pista seca
-            double dryPenalty = (1.0 - wetnessFraction) * 0.30; // Até 30% mais desgaste em seco
+            // Wet tires wear less on dry tracks
+            double dryPenalty = (1.0 - wetnessFraction) * 0.30; // Up to 30% more wear on dry
             return wearPerSecond * (1.0 + dryPenalty);
         } else if (isIntermediate()) {
-            // Pneus intermediários têm desgaste moderado
+            // Intermediate tires have moderate wear
             return wearPerSecond;
         } else {
-            // Pneus secos desgastam mais em pista molhada
-            double wetBonus = wetnessFraction * 0.50; // Até 50% mais desgaste em molhado
+            // Dry tires wear more on wet tracks
+            double wetBonus = wetnessFraction * 0.50; // Up to 50% more wear on wet
             return wearPerSecond * (1.0 + wetBonus);
         }
     }
 
     /**
-     * Obtém o índice de performance para uma condição específica
+     * Gets the performance index for a specific condition
      */
     public double getPerformanceIndex(int trackWetness) {
         double wetnessFraction = trackWetness / 100.0;
@@ -161,7 +161,7 @@ public enum TireCompound {
         if (isWet()) {
             return wetPerformance;
         } else if (isIntermediate()) {
-            // Interpola entre performance seca e molhada
+            // Interpolates between dry and wet performance
             return dryPerformance + (wetPerformance - dryPerformance) * wetnessFraction;
         } else {
             return dryPerformance;
@@ -169,7 +169,7 @@ public enum TireCompound {
     }
 
     /**
-     * Obtém o pneu recomendado baseado na umidade da pista
+     * Gets the recommended tire based on track wetness
      */
     public static TireCompound getRecommendedTire(int trackWetness) {
         if (trackWetness >= 60) {
@@ -182,7 +182,7 @@ public enum TireCompound {
     }
 
     /**
-     * Obtém o pneu a partir do slot do hotbar
+     * Gets the tire from the hotbar slot
      */
     public static TireCompound fromHotbarSlot(int slot) {
         return switch (slot) {
@@ -197,7 +197,7 @@ public enum TireCompound {
     }
 
     /**
-     * Obtém o slot do hotbar para este pneu
+     * Gets the hotbar slot for this tire
      */
     public int getHotbarSlot() {
         return switch (this) {

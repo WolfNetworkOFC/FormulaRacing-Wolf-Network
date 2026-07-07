@@ -16,14 +16,13 @@ Minecraft Paper/Folia plugin for ice boat racing (F1-style). Built with Maven, J
 
 **Hard dependency:** WorldEdit ≥ 7.3.0 (7.2.x does not support Folia).
 
-## Build & Deploy
+## Build
 
 ```bash
-mvn package                      # Build shaded JAR + auto-upload to server + git auto-commit
-mvn package -DskipAutoGitCommit  # Build only, skip deploy+commit
+mvn package  # Build shaded JAR
 ```
 
-Output: `target/formularacing-${project.version}.jar`. The `package` phase bundles shade → SFTP upload → PowerShell git auto-commit in sequence. Do not run `mvn package` casually — it deploys to production.
+Output: `target/formularacing-${project.version}.jar`.
 
 No tests exist. There is no `test` directory and no test runner configured.
 
@@ -60,7 +59,7 @@ Root files (`FormulaRacing.java`, `APIFormulaRacing.java`, `NMSHandler.java`, `R
 
 ## Dependencies
 
-- **Hard dependency:** WorldEdit ≥ 7.3.0 (track region selection; 7.2.x não suporta Folia)
+- **Hard dependency:** WorldEdit ≥ 7.3.0 (track region selection; 7.2.x does not support Folia)
 - **Soft dependencies:** DecentHolograms, PlayerPoints, HeadDatabase, LuckPerms, Geyser/Floodgate (Bedrock support)
 - **Shaded (relocated):** ACF → `dev.efragroup.libs.acf`, TaskChain → `dev.efragroup.libs.taskchain`
 - **Scoreboard:** Megavex scoreboard-library v2.4.4 (the unified v2 system; `ScoreboardTimeTrialUtils` is legacy v1)
@@ -81,11 +80,7 @@ Config chooses SQLite (default, `formula_racing.db`) or MySQL. `DatabaseManager`
 
 ## Git Conventions
 
-Nearly all commits are auto-generated from the Maven deploy cycle (`auto: deploy formularacing-0.2`). Manual commits exist (`manual changes`) but are rare. The branch is `master`.
-
-## Reference Implementation
-
-When implementing or modifying features, always use **TimingSystem** source code as the reference base. Its code lives at `C:\Users\vitor\OneDrive\Documentos\Git Repos\TimingSystem`. Read the relevant TimingSystem classes first to understand patterns, conventions, and architecture before writing FormulaRacing code.
+The branch is `master`.
 
 ## Key Config Files
 

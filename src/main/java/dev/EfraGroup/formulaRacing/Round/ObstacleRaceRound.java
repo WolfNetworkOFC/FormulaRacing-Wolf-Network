@@ -32,3 +32,4 @@ public class ObstacleRaceRound extends Rounds {
         return new RaceSession(this.plugin);
     }
 }
+

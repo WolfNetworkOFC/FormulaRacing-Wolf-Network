@@ -111,7 +111,7 @@ public class ApiManager {
     }
 
     private void setupAuthentication() {
-        // Autenticação desabilitada - API pública
+        // Authentication disabled - Public API
     }
 
     private void setupRateLimiting() {
@@ -149,12 +149,12 @@ public class ApiManager {
         driverObj.addProperty("finished", driver.isFinished());
         driverObj.addProperty("dnf", driver.isDnf());
 
-        // Tempo total em formato legível
+        // Total time in readable format
         long totalTime = driver.getTotalTime();
         driverObj.addProperty("total_time_ms", totalTime);
         driverObj.addProperty("total_time", totalTime > 0 ? formatTime(totalTime) : "--:--:---");
 
-        // Melhor volta
+        // Fastest lap
         if (driver.getFastestLap() != null) {
             driverObj.addProperty("fastest_lap_ms", driver.getFastestLap().getLapTime());
             driverObj.addProperty("fastest_lap", formatTime(driver.getFastestLap().getLapTime()));
@@ -162,7 +162,7 @@ public class ApiManager {
             driverObj.addProperty("fastest_lap", "--:--:---");
         }
 
-        // Posição atual se estiver online
+        // Current position if online
         Player onlinePlayer = Bukkit.getPlayer(driver.getUuid());
         if (onlinePlayer != null && onlinePlayer.isOnline()) {
             Location loc = onlinePlayer.getLocation();
@@ -192,7 +192,7 @@ public class ApiManager {
     }
 
     private void setupEndpoints() {
-        // GET /api/v1/readonly/tracks - Lista todas as pistas
+        // GET /api/v1/readonly/tracks - List all tracks
         get("/api/v1/readonly/tracks", (request, response) -> {
             try {
                 Map<String, DatabaseManager.TrackData> tracks = plugin.getDatabaseManager().getAllTracksWithData();
@@ -225,7 +225,7 @@ public class ApiManager {
             }
         });
 
-        // GET /api/v1/readonly/tracks/:trackname - Detalhes de uma pista específica
+        // GET /api/v1/readonly/tracks/:trackname - Details of a specific track
         get("/api/v1/readonly/tracks/:trackname", (request, response) -> {
             try {
                 String trackName = request.params("trackname");
@@ -257,7 +257,7 @@ public class ApiManager {
                 }
                 responseObject.add("spawn", spawnObj);
 
-                // Medalhas/Ranks
+                // Medals/Ranks
                 Map<String, String> rankTimes = plugin.getDatabaseManager().getTrackRankTimes(trackName.replaceAll("\\s+", ""));
                 JsonObject medalsObj = new JsonObject();
                 for (Map.Entry<String, String> entry : rankTimes.entrySet()) {
@@ -265,7 +265,7 @@ public class ApiManager {
                 }
                 responseObject.add("medals", medalsObj);
 
-                // Record da pista
+                // Track record
                 Double trackRecord = plugin.getDatabaseManager().getTrackRecord(trackName);
                 responseObject.addProperty("record", trackRecord != null ? trackRecord : 0);
 
@@ -281,7 +281,7 @@ public class ApiManager {
             }
         });
 
-        // GET /api/v1/readonly/players - Lista todos os jogadores online
+        // GET /api/v1/readonly/players - List all online players
         get("/api/v1/readonly/players", (request, response) -> {
             try {
                 JsonArray playersArray = new JsonArray();
@@ -292,7 +292,7 @@ public class ApiManager {
                     playerObj.addProperty("name", player.getName());
                     playerObj.addProperty("online", true);
 
-                    // Configurações do jogador
+                    // Player settings
                     String language = plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
                     playerObj.addProperty("language", language != null ? language : "en");
 
@@ -330,19 +330,19 @@ public class ApiManager {
             }
         });
 
-        // GET /api/v1/readonly/players/all - Lista todos os jogadores (incluindo offline)
+        // GET /api/v1/readonly/players/all - List all players (including offline)
         get("/api/v1/readonly/players/all", (request, response) -> {
             JsonArray playersArray = new JsonArray();
 
             try {
-                // Adicionar jogadores online
+                // Add online players
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     JsonObject playerObj = new JsonObject();
                     playerObj.addProperty("uuid", player.getUniqueId().toString());
                     playerObj.addProperty("name", player.getName());
                     playerObj.addProperty("online", true);
 
-                    // Configurações do jogador
+                    // Player settings
                     String language = plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
                     playerObj.addProperty("language", language != null ? language : "en");
 
@@ -364,8 +364,8 @@ public class ApiManager {
                     playersArray.add(playerObj);
                 }
 
-                // Nota: Para adicionar jogadores offline, seria necessário ter acesso ao banco de dados
-                // Isso pode ser implementado posteriormente se necessário
+                // Note: Adding offline players would require database access
+                // This can be implemented later if needed
 
                 JsonObject responseObject = new JsonObject();
                 responseObject.addProperty("total", playersArray.size());
@@ -379,7 +379,7 @@ public class ApiManager {
             }
         });
 
-        // GET /api/v1/readonly/players/:uuidorusername - Informações de um jogador
+        // GET /api/v1/readonly/players/:uuidorusername - Player information
         get("/api/v1/readonly/players/:uuidorusername", (request, response) -> {
             try {
                 String uuidOrUsername = request.params("uuidorusername");
@@ -408,7 +408,7 @@ public class ApiManager {
                 responseObject.addProperty("name", player.getName());
                 responseObject.addProperty("online", player.isOnline());
 
-                // Configurações do jogador
+                // Player settings
                 String language = plugin.getDatabaseManager().getPlayerLanguage(uuid);
                 responseObject.addProperty("language", language != null ? language : "en");
 
@@ -439,7 +439,7 @@ public class ApiManager {
             }
         });
 
-        // GET /api/v1/readonly/players/:uuid/timetrials/:trackname - Melhor tempo de um jogador em uma pista
+        // GET /api/v1/readonly/players/:uuid/timetrials/:trackname - Player's best time on a track
         get("/api/v1/readonly/players/:uuid/timetrials/:trackname", (request, response) -> {
             try {
                 String uuidString = request.params("uuid");
@@ -477,7 +477,7 @@ public class ApiManager {
             }
         });
 
-        // GET /api/v1/readonly/leaderboard/:trackname - Leaderboard de uma pista
+        // GET /api/v1/readonly/leaderboard/:trackname - Track leaderboard
         get("/api/v1/readonly/leaderboard/:trackname", (request, response) -> {
             try {
                 String trackName = request.params("trackname");
@@ -512,7 +512,7 @@ public class ApiManager {
             }
         });
 
-        // GET /api/v1/readonly/status - Status da API
+        // GET /api/v1/readonly/status - API status
         get("/api/v1/readonly/status", (request, response) -> {
             try {
                 JsonObject responseObject = new JsonObject();
@@ -525,7 +525,7 @@ public class ApiManager {
                 Map<String, DatabaseManager.TrackData> tracks = plugin.getDatabaseManager().getAllTracksWithData();
                 responseObject.addProperty("total_tracks", tracks.size());
 
-                // Contar heats ativos
+                // Count active heats
                 int activeHeats = 0;
                 for (var event : plugin.getRaceEventManager().getAllEvents()) {
                     if (!event.isActive()) continue;
@@ -540,7 +540,7 @@ public class ApiManager {
                 }
                 responseObject.addProperty("active_heats", activeHeats);
 
-                // Contar eventos totais
+                // Count total events
                 responseObject.addProperty("total_events", plugin.getRaceEventManager().getAllEvents().size());
 
                 if (logRequests) {
@@ -556,7 +556,7 @@ public class ApiManager {
             }
         });
 
-        // GET /api/v1/readonly/live/positions - Posições em tempo real
+        // GET /api/v1/readonly/live/positions - Real-time positions
         get("/api/v1/readonly/live/positions", (request, response) -> {
             try {
                 String heatId = request.queryParams("heat_id");
@@ -581,7 +581,7 @@ public class ApiManager {
                         }
                     } catch (NumberFormatException ignored) {}
                 } else {
-                    // Todos os heats ativos
+                    // All active heats
                     for (var event : plugin.getRaceEventManager().getAllEvents()) {
                         if (!event.isActive()) continue;
                         for (var round : event.getSchedule().getRoundsList()) {
@@ -615,7 +615,7 @@ public class ApiManager {
             }
         });
 
-        // GET /api/v1/readonly/live/events - Eventos ativos
+        // GET /api/v1/readonly/live/events - Active events
         get("/api/v1/readonly/live/events", (request, response) -> {
             try {
                 JsonObject responseObj = new JsonObject();
@@ -657,7 +657,7 @@ public class ApiManager {
             }
         });
 
-        // GET /api/v1/readonly/tracks/:trackname/times - Tempos de uma pista
+        // GET /api/v1/readonly/tracks/:trackname/times - Track times
         get("/api/v1/readonly/tracks/:trackname/times", (request, response) -> {
             try {
                 String trackName = request.params("trackname");
@@ -696,7 +696,7 @@ public class ApiManager {
             }
         });
 
-        // GET /api/v1/readonly/activity/stats - Estatísticas de atividade
+        // GET /api/v1/readonly/activity/stats - Activity statistics
         get("/api/v1/readonly/activity/stats", (request, response) -> {
             try {
                 String period = request.queryParams("period");
@@ -705,7 +705,7 @@ public class ApiManager {
                 JsonObject responseObject = new JsonObject();
                 responseObject.addProperty("period", period);
 
-                // Dados de exemplo para atividade do servidor
+                // Example data for server activity
                 JsonArray labels = new JsonArray();
                 JsonArray values = new JsonArray();
 
@@ -714,7 +714,7 @@ public class ApiManager {
 
                 switch (period) {
                     case "1h":
-                        interval = 10 * 60 * 1000; // 10 minutos
+                        interval = 10 * 60 * 1000; // 10 minutes
                         for (int i = 6; i >= 0; i--) {
                             long time = now - (i * interval);
                             labels.add(formatTimeLabel(time, "HH:mm"));
@@ -722,7 +722,7 @@ public class ApiManager {
                         }
                         break;
                     case "24h":
-                        interval = 60 * 60 * 1000; // 1 hora
+                        interval = 60 * 60 * 1000; // 1 hour
                         for (int i = 24; i >= 0; i--) {
                             long time = now - (i * interval);
                             labels.add(formatTimeLabel(time, "HH:mm"));
@@ -730,7 +730,7 @@ public class ApiManager {
                         }
                         break;
                     case "7d":
-                        interval = 24 * 60 * 60 * 1000; // 1 dia
+                        interval = 24 * 60 * 60 * 1000; // 1 day
                         for (int i = 7; i >= 0; i--) {
                             long time = now - (i * interval);
                             labels.add(formatTimeLabel(time, "dd/MM"));
@@ -738,7 +738,7 @@ public class ApiManager {
                         }
                         break;
                     case "30d":
-                        interval = 24 * 60 * 60 * 1000; // 1 dia
+                        interval = 24 * 60 * 60 * 1000; // 1 day
                         for (int i = 30; i >= 0; i--) {
                             long time = now - (i * interval);
                             labels.add(formatTimeLabel(time, "dd/MM"));
@@ -746,7 +746,7 @@ public class ApiManager {
                         }
                         break;
                     default:
-                        interval = 60 * 60 * 1000; // 1 hora
+                        interval = 60 * 60 * 1000; // 1 hour
                         for (int i = 24; i >= 0; i--) {
                             long time = now - (i * interval);
                             labels.add(formatTimeLabel(time, "HH:mm"));
@@ -769,13 +769,13 @@ public class ApiManager {
             }
         });
 
-        // GET /api/v1/readonly/activity/recent - Atividade recente
+        // GET /api/v1/readonly/activity/recent - Recent activity
         get("/api/v1/readonly/activity/recent", (request, response) -> {
             try {
                 JsonObject responseObject = new JsonObject();
                 JsonArray activities = new JsonArray();
 
-                // Adicionar atividades de exemplo (em produção, isso viria do banco de dados)
+                // Add example activities (in production, this would come from the database)
                 int onlineCount = Bukkit.getServer().getOnlinePlayers().size();
                 if (onlineCount > 0) {
                     JsonObject activity = new JsonObject();
@@ -786,7 +786,7 @@ public class ApiManager {
                     activities.add(activity);
                 }
 
-                // Adicionar atividades de heats ativos
+                // Add activities from active heats
                 for (var event : plugin.getRaceEventManager().getAllEvents()) {
                     if (!event.isActive()) continue;
                     for (var round : event.getSchedule().getRoundsList()) {
@@ -817,7 +817,7 @@ public class ApiManager {
             }
         });
 
-        // GET /api/v1/readonly/events - Todos os eventos
+        // GET /api/v1/readonly/events - All events
         get("/api/v1/readonly/events", (request, response) -> {
             try {
                 JsonObject responseObject = new JsonObject();
@@ -864,7 +864,7 @@ public class ApiManager {
             }
         });
 
-        // GET /api/v1/readonly/logs - Logs do sistema
+        // GET /api/v1/readonly/logs - System logs
         get("/api/v1/readonly/logs", (request, response) -> {
             try {
                 String level = request.queryParams("level");
@@ -887,7 +887,7 @@ public class ApiManager {
                     for (int i = systemLogs.size() - 1; i >= 0 && count < limit; i--) {
                         JsonObject log = systemLogs.get(i);
 
-                        // Filtrar por nível
+                        // Filter by level
                         if (level != null && !level.isEmpty() && !level.equalsIgnoreCase("all")) {
                             String logLevel = log.get("level").getAsString();
                             if (!logLevel.equalsIgnoreCase(level)) {
@@ -895,7 +895,7 @@ public class ApiManager {
                             }
                         }
 
-                        // Filtrar por busca
+                        // Filter by search
                         if (search != null && !search.isEmpty()) {
                             String message = log.get("message").getAsString().toLowerCase();
                             if (!message.contains(search.toLowerCase())) {
@@ -935,13 +935,13 @@ public class ApiManager {
     private void setupFiles() {
         File dataFolder = plugin.getDataFolder();
 
-        // Criar pasta do dashboard se não existir
+        // Create dashboard folder if it doesn't exist
         File dashboardDir = new File(dataFolder, "dashboard");
         if (!dashboardDir.exists()) {
             dashboardDir.mkdirs();
             plugin.getLogger().info("Created dashboard folder: " + dashboardDir.getAbsolutePath());
 
-            // Copiar arquivos do dashboard do JAR
+            // Copy dashboard files from JAR
             copyResourceFromJar("/dashboard/index.html", new File(dashboardDir, "index.html"));
             copyResourceFromJar("/dashboard/css/dashboard.css", new File(dashboardDir, "css/dashboard.css"));
             copyResourceFromJar("/dashboard/js/dashboard.js", new File(dashboardDir, "js/dashboard.js"));
@@ -949,7 +949,7 @@ public class ApiManager {
             copyResourceFromJar("/dashboard/CONFIG_EXAMPLES.md", new File(dashboardDir, "CONFIG_EXAMPLES.md"));
         }
 
-        // Criar arquivo api_config.yml se não existir
+        // Create api_config.yml if it doesn't exist
         File apiConfigFile = new File(dataFolder, "api_config.yml");
         if (!apiConfigFile.exists()) {
             YamlConfiguration apiConfig = new YamlConfiguration();
@@ -972,17 +972,17 @@ public class ApiManager {
                 plugin.getLogger().info("No authentication required!");
                 plugin.getLogger().info("========================================");
 
-                // Criar arquivo DASHBOARD_SETUP.md
+                // Create DASHBOARD_SETUP.md file
                 createDashboardSetupFile(dataFolder);
             } catch (IOException e) {
                 plugin.getLogger().severe("Failed to create api_config.yml: " + e.getMessage());
             }
         } else {
-            // Arquivo já existe, apenas informar
+            // File already exists, just notify
             plugin.getLogger().info("api_config.yml already exists, using existing configuration");
         }
 
-        // Verificar se config.yml tem a seção de API
+        // Check if config.yml has the API section
         File configFile = new File(dataFolder, "config.yml");
         if (configFile.exists()) {
             try {
@@ -1048,7 +1048,7 @@ public class ApiManager {
 
     private void loadConfig() {
         try {
-            // Tentar ler do api_config.yml primeiro
+            // Try reading from api_config.yml first
             File apiConfigFile = new File(plugin.getDataFolder(), "api_config.yml");
             if (apiConfigFile.exists()) {
                 config = YamlConfiguration.loadConfiguration(apiConfigFile);
@@ -1060,7 +1060,7 @@ public class ApiManager {
                 logErrors = config.getBoolean("log_errors", true);
                 plugin.getLogger().info("Loaded API config from api_config.yml");
             } else if (plugin.getConfig().getConfigurationSection("api") != null) {
-                // Fallback para config.yml
+                // Fallback to config.yml
                 config = plugin.getConfig();
                 port = config.getInt("api.port", 8080);
                 corsEnabled = config.getBoolean("api.enable_cors", true);
@@ -1070,7 +1070,7 @@ public class ApiManager {
                 logErrors = config.getBoolean("api.log_errors", true);
                 plugin.getLogger().info("Loaded API config from config.yml");
             } else {
-                // Usar valores padrão
+                // Use default values
                 port = 8080;
                 corsEnabled = true;
                 rateLimitEnabled = true;
@@ -1104,9 +1104,9 @@ public class ApiManager {
     }
 
     /**
-     * Adiciona um log ao sistema de logs
-     * @param level Nível do log (info, warning, error)
-     * @param message Mensagem do log
+     * Adds a log to the log system
+     * @param level Log level (info, warning, error)
+     * @param message Log message
      */
     public void addLog(String level, String message) {
         JsonObject log = new JsonObject();
@@ -1117,7 +1117,7 @@ public class ApiManager {
 
         synchronized (systemLogs) {
             systemLogs.add(log);
-            // Manter apenas os últimos MAX_LOGS logs
+            // Keep only the last MAX_LOGS logs
             if (systemLogs.size() > MAX_LOGS) {
                 systemLogs.remove(0);
             }
@@ -1125,21 +1125,21 @@ public class ApiManager {
     }
 
     /**
-     * Adiciona um log de informação
+     * Adds an info log
      */
     public void logInfo(String message) {
         addLog("info", message);
     }
 
     /**
-     * Adiciona um log de aviso
+     * Adds a warning log
      */
     public void logWarning(String message) {
         addLog("warning", message);
     }
 
     /**
-     * Adiciona um log de erro
+     * Adds an error log
      */
     public void logError(String message) {
         addLog("error", message);

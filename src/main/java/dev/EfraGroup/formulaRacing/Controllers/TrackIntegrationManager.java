@@ -54,18 +54,18 @@ public class TrackIntegrationManager {
         if (trackNameWS != null && !trackNameWS.isEmpty()) {
             DatabaseManager.TrackData trackData = this.databaseManager.getTrackData(trackNameWS);
             if (trackData == null) {
-                return new TrackValidationResult(false, "Pista não encontrada: " + trackNameWS);
+                return new TrackValidationResult(false, "Track not found: " + trackNameWS);
             } else {
                 Location spawnLocation = trackData.getSpawnLocation();
                 if (spawnLocation != null && spawnLocation.getWorld() != null) {
                     int checkpointCount = trackData.getTotalCheckpoints();
-                    return checkpointCount == 0 ? new TrackValidationResult(false, "Pista sem checkpoints configurados") : new TrackValidationResult(true, "Pista válida", trackData);
+                    return checkpointCount == 0 ? new TrackValidationResult(false, "Track has no checkpoints configured") : new TrackValidationResult(true, "Valid track", trackData);
                 } else {
-                    return new TrackValidationResult(false, "Pista sem spawn point válido");
+                    return new TrackValidationResult(false, "Track has no valid spawn point");
                 }
             }
         } else {
-            return new TrackValidationResult(false, "Nome da pista não pode ser vazio");
+            return new TrackValidationResult(false, "Track name cannot be empty");
         }
     }
 
@@ -174,18 +174,18 @@ public class TrackIntegrationManager {
     public List<Location> generateGridPositions(String trackNameWS, int maxPositions) {
         List<Location> gridLocations = this.getTrackGridLocations(trackNameWS);
         if (gridLocations.isEmpty()) {
-            this.plugin.getDebugManager().logRaceSystem("Nenhuma posição GRID definida - gerando automaticamente para " + trackNameWS);
+            this.plugin.getDebugManager().logRaceSystem("No GRID positions defined - generating automatically for " + trackNameWS);
             return this.generateGridPositionsFromSpawn(trackNameWS, maxPositions);
         } else {
             DebugManager var10000 = this.plugin.getDebugManager();
             int var10001 = gridLocations.size();
-            var10000.logRaceSystem("Usando " + var10001 + " posições GRID definidas no /trackedit para " + trackNameWS);
+            var10000.logRaceSystem("Using " + var10001 + " GRID positions defined in /trackedit for " + trackNameWS);
             if (gridLocations.size() >= maxPositions) {
                 return gridLocations.subList(0, maxPositions);
             } else {
                 var10000 = this.plugin.getDebugManager();
                 var10001 = gridLocations.size();
-                var10000.logRaceSystem("A pista possui apenas " + var10001 + " posições de grid. Gerando mais " + (maxPositions - gridLocations.size()) + " automaticamente.");
+                var10000.logRaceSystem("Track only has " + var10001 + " grid positions. Generating " + (maxPositions - gridLocations.size()) + " more automatically.");
                 List<Location> auto = this.generateGridPositionsFromSpawn(trackNameWS, maxPositions);
                 List<Location> combined = new ArrayList(maxPositions);
                 combined.addAll(gridLocations);
@@ -220,7 +220,7 @@ public class TrackIntegrationManager {
     private List<Location> generateGridPositionsFromSpawn(String trackNameWS, int maxPositions) {
         Location spawnPoint = this.getTrackSpawn(trackNameWS);
         if (spawnPoint == null) {
-            this.plugin.getDebugManager().logRaceSystem("Não foi possível gerar grid: spawn point não encontrado para " + trackNameWS);
+            this.plugin.getDebugManager().logRaceSystem("Could not generate grid: spawn point not found for " + trackNameWS);
             return List.of();
         } else {
             List<Location> gridPositions = new ArrayList();
@@ -245,7 +245,7 @@ public class TrackIntegrationManager {
                 gridPositions.add(gridPos);
             }
 
-            this.plugin.getDebugManager().logRaceSystem("Grid de largada gerado para " + trackNameWS + ": " + gridPositions.size() + " posições");
+            this.plugin.getDebugManager().logRaceSystem("Starting grid generated for " + trackNameWS + ": " + gridPositions.size() + " positions");
             return gridPositions;
         }
     }

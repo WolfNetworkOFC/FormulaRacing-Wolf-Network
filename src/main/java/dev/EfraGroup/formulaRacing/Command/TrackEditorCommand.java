@@ -14,6 +14,7 @@ import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
+import dev.EfraGroup.formulaRacing.Utils.trackexchange.TrackExchangeManager;
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.CatchUnknown;
 import co.aikar.commands.annotation.CommandAlias;
@@ -38,19 +39,21 @@ import org.bukkit.inventory.ItemStack;
 
 @CommandAlias("trackedit|te")
 @CommandPermission("formularacing.admin")
-@Description("Comandos de edição de pistas")
+@Description("Track editing commands")
 public class TrackEditorCommand extends BaseCommand {
     private final FormulaRacing plugin;
     private final DatabaseManager mysql;
     private final PacketSender packetSender;
     private final WorldEditSelect worldEditSelect;
+    private final TrackExchangeManager trackExchange;
     private final Map<UUID, String> selectedTracks = new HashMap();
 
-    public TrackEditorCommand(FormulaRacing plugin, DatabaseManager mysql, PacketSender packetSender, WorldEditSelect worldEditSelect) {
+    public TrackEditorCommand(FormulaRacing plugin, DatabaseManager mysql, PacketSender packetSender, WorldEditSelect worldEditSelect, TrackExchangeManager trackExchange) {
         this.plugin = plugin;
         this.mysql = mysql;
         this.packetSender = packetSender;
         this.worldEditSelect = worldEditSelect;
+        this.trackExchange = trackExchange;
     }
 
     @Default
@@ -60,7 +63,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("help|ajuda|?")
-    @Description("Mostra a ajuda do comando trackedit")
+    @Description("Shows help for the trackedit command")
     public void onHelp(Player player) {
         CommandHelpService.sendHelp(player, this, "/trackedit");
     }
@@ -94,7 +97,7 @@ public class TrackEditorCommand extends BaseCommand {
         } else {
             String selected = this.getSelectedTrack(player.getUniqueId());
             if (selected == null) {
-                player.sendMessage("§cVocê não selecionou nenhuma pista e não forneceu um nome.");
+                player.sendMessage("§cYou did not select any track and did not provide a name.");
                 return null;
             } else {
                 return selected;
@@ -107,7 +110,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("create")
-    @Description("Cria uma nova pista")
+    @Description("Creates a new track")
     @CommandCompletion("@nothing")
     public void onCreate(Player player, String trackName) {
         if (trackName.length() > 30) {
@@ -130,7 +133,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("select")
-    @Description("Seleciona uma pista para edição (ou detecta a atual)")
+    @Description("Selects a track for editing (or detects the current one)")
     @CommandCompletion("@tracks")
     public void onSelect(Player player, @Optional String trackName) {
         if (trackName == null) {
@@ -156,30 +159,30 @@ public class TrackEditorCommand extends BaseCommand {
             }
 
             if (detectedTrack == null) {
-                player.sendMessage("§cVocê não especificou uma pista e não foi possível detectar nenhuma próxima.");
+                player.sendMessage("§cYou did not specify a track and none could be detected nearby.");
                 return;
             }
 
             trackName = detectedTrack;
-            player.sendMessage("§e[Auto-Detect] Pista detectada: §f" + detectedTrack);
+            player.sendMessage("§e[Auto-Detect] Track detected: §f" + detectedTrack);
         }
 
         if (!this.mysql.isTrackExists(trackName)) {
-            player.sendMessage("§cEssa pista não existe.");
-        } else {
-            this.setSelectedTrack(player.getUniqueId(), trackName);
+                player.sendMessage("§cThat track does not exist.");
+            } else {
+                this.setSelectedTrack(player.getUniqueId(), trackName);
             this.plugin.sendMessage(player, "te_selected", new String[]{"{track}", trackName});
         }
     }
 
     @Subcommand("view")
-    @Description("Visualiza as regiões da pista com partículas")
+    @Description("Views track regions with particles")
     @CommandCompletion("@tracks")
     public void onView(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             if (!this.mysql.isTrackExists(trackName)) {
-                player.sendMessage("§cEssa pista não existe.");
+                player.sendMessage("§cThat track does not exist.");
             } else {
                 boolean isViewing = this.plugin.getTrackVisualizer().isViewing(player.getUniqueId(), trackName);
                 if (!isViewing) {
@@ -198,13 +201,13 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("delete")
-    @Description("Deleta uma pista")
+    @Description("Deletes a track")
     @CommandCompletion("@tracks")
     public void onDelete(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             if (!this.mysql.isTrackExists(trackName)) {
-                player.sendMessage("§cPista '" + trackName + "' não encontrada.");
+                player.sendMessage("§cTrack '" + trackName + "' not found.");
             } else {
                 this.mysql.deleteTrack(trackName);
                 this.plugin.sendMessage(player, "te_deleted", new String[]{"{track}", trackName});
@@ -213,18 +216,18 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("broadcast newtrack")
-    @Description("Envia mensagem de nova pista para o Discord")
+    @Description("Sends new track message to Discord")
     @CommandCompletion("@nothing @tracks")
     public void onBroadcastNewTrack(Player player, @Optional String imageUrl, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             DiscordUtils.sendNewTrackEmbed(this.plugin, trackName, this.mysql.getTrackOwner(trackName), (String)null, imageUrl);
-            player.sendMessage("§a✅ Mensagem de teste enviada para o Discord!");
+            player.sendMessage("§a✅ Test message sent to Discord!");
         }
     }
 
     @Subcommand("setowner")
-    @Description("Define o dono de uma pista")
+    @Description("Sets the owner of a track")
     @CommandCompletion("@players @tracks")
     public void onSetOwner(Player player, String newOwnerName, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -233,14 +236,14 @@ public class TrackEditorCommand extends BaseCommand {
             if (success) {
                 this.plugin.sendMessage(player, "te_owner_set", new String[]{"{track}", trackName, "{owner}", newOwnerName});
             } else {
-                player.sendMessage("§c❌ Erro ao atualizar o dono da pista. Veja o console para mais detalhes.");
+                player.sendMessage("§c❌ Error updating track owner. Check console for details.");
             }
 
         }
     }
 
     @Subcommand("cam set|s")
-    @Description("Adiciona uma câmera na pista")
+    @Description("Adds a camera to the track")
     @CommandCompletion("@nothing @tracks")
     public void onCamSet(Player player, int id, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -252,7 +255,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("cam delete|d")
-    @Description("Remove uma câmera da pista")
+    @Description("Removes a camera from the track")
     @CommandCompletion("@nothing @tracks")
     public void onCamDelete(Player player, int id, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -263,7 +266,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("cam list|l")
-    @Description("Lista as câmeras de uma pista")
+    @Description("Lists cameras of a track")
     @CommandCompletion("@tracks")
     public void onCamList(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -274,7 +277,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("resetalltimes")
-    @Description("Reseta todos os tempos de uma pista")
+    @Description("Resets all times of a track")
     @CommandCompletion("@tracks")
     public void onResetAllTimes(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -285,7 +288,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("region start")
-    @Description("Define a região de largada (START)")
+    @Description("Sets the start region (START)")
     @CommandCompletion("@tracks")
     public void onRegionStart(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -311,7 +314,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("region reset")
-    @Description("Define a região de reset (RESET)")
+    @Description("Sets the reset region (RESET)")
     @CommandCompletion("@tracks")
     public void onRegionReset(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -326,7 +329,7 @@ public class TrackEditorCommand extends BaseCommand {
                 }
                 int savedId = this.mysql.saveRegion(trackName, data.getMin(), data.getMax(), "RESET", data.getShape(), data.getPoints());
                 if (savedId >= 0) {
-                    player.sendMessage("§aRegião de RESET definida com sucesso! ID: " + savedId);
+                    player.sendMessage("§aRESET region set successfully! ID: " + savedId);
                     this.plugin.getRegionListener().reloadRegions();
                 } else {
                     this.plugin.sendMessage(player, "te_region_error", new String[]{"{type}", "RESET"});
@@ -337,7 +340,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("region end")
-    @Description("Define a região de chegada (END)")
+    @Description("Sets the finish region (END)")
     @CommandCompletion("@tracks")
     public void onRegionEnd(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -363,28 +366,28 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("region remove|delete")
-    @Description("Remove uma região específica pelo ID")
+    @Description("Removes a specific region by ID")
     @CommandCompletion("@nothing")
     public void onRegionRemove(Player player, int regionId) {
         boolean deleted = this.mysql.deleteRegionById(regionId);
         if (deleted) {
-            player.sendMessage("§aRegião #" + regionId + " removida com sucesso!");
+            player.sendMessage("§aRegion #" + regionId + " removed successfully!");
             this.plugin.getRegionListener().reloadRegions();
         } else {
-            player.sendMessage("§cNão foi possível remover a região TEM ID: " + regionId);
+            player.sendMessage("§cCould not remove region with ID: " + regionId);
         }
 
     }
 
     @Subcommand("region clear")
-    @Description("Limpa todas as regiões de um tipo específico na pista")
+    @Description("Clears all regions of a specific type on the track")
     @CommandCompletion("@tracks @nothing")
     public void onRegionClear(Player player, @Optional String trackNameArg, String type) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             String trackWS = trackName.replaceAll("\\s+", "").toLowerCase();
             if (!type.equalsIgnoreCase("START") && !type.equalsIgnoreCase("END") && !type.equalsIgnoreCase("RESET")) {
-                player.sendMessage("§cTipo inválido. Use: START, END ou RESET");
+                player.sendMessage("§cInvalid type. Use: START, END or RESET");
             } else {
                 int count = 0;
 
@@ -395,10 +398,10 @@ public class TrackEditorCommand extends BaseCommand {
                 }
 
                 if (count > 0) {
-                    player.sendMessage("§aRemovidas " + count + " regiões do tipo " + type.toUpperCase() + " da pista " + trackName);
+                    player.sendMessage("§aRemoved " + count + " regions of type " + type.toUpperCase() + " from track " + trackName);
                     this.plugin.getRegionListener().reloadRegions();
                 } else {
-                    player.sendMessage("§cNenhuma região do tipo " + type.toUpperCase() + " encontrada para remover.");
+                    player.sendMessage("§cNo region of type " + type.toUpperCase() + " found to remove.");
                 }
 
             }
@@ -406,10 +409,10 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("region expand")
-    @Description("Expandir regiões muito finas automaticamente")
+    @Description("Automatically expands very thin regions")
     @CommandCompletion("@tracks")
     public void onRegionExpand(Player player, @Optional String trackFilter) {
-        player.sendMessage("§e[REGION EXPAND] Expandindo regiões muito finas...");
+        player.sendMessage("§e[REGION EXPAND] Expanding very thin regions...");
         List<DatabaseManager.RegionData> allRegions = this.mysql.getAllRegions();
         int expanded = 0;
 
@@ -448,31 +451,31 @@ public class TrackEditorCommand extends BaseCommand {
         }
 
         if (expanded > 0) {
-            player.sendMessage(String.format("§a[REGION EXPAND] %d região(ões) expandida(s)!", expanded));
+            player.sendMessage(String.format("§a[REGION EXPAND] %d region(s) expanded!", expanded));
             this.plugin.getRegionListener().reloadRegions();
-            player.sendMessage("§aRegiões recarregadas! Teste agora o time trial.");
+            player.sendMessage("§aRegions reloaded! Test the time trial now.");
         } else {
-            player.sendMessage("§a[REGION EXPAND] Nenhuma região precisa ser expandida.");
+            player.sendMessage("§a[REGION EXPAND] No regions need expanding.");
         }
 
     }
 
     @Subcommand("region debug")
-    @Description("Lista regiões carregadas na memória")
+    @Description("Lists regions loaded in memory")
     @CommandCompletion("@tracks")
     public void onRegionDebug(Player player, @Optional String trackFilter) {
         this.plugin.getRegionListener().debugListRegions("world", trackFilter);
-        player.sendMessage("§aVerifique o console do servidor para ver as regiões carregadas!");
+        player.sendMessage("§aCheck the server console to see loaded regions!");
     }
 
     @Subcommand("region cleanup")
-    @Description("Limpa regiões duplicadas")
+    @Description("Cleans up duplicate regions")
     @CommandCompletion("@tracks")
     public void onRegionCleanup(Player player, @Optional String specificTrack) {
         if (specificTrack != null) {
-            player.sendMessage("§e[REGION CLEANUP] Limpando regiões duplicadas da pista: §f" + specificTrack);
+            player.sendMessage("§e[REGION CLEANUP] Cleaning duplicate regions for track: §f" + specificTrack);
         } else {
-            player.sendMessage("§e[REGION CLEANUP] Limpando regiões duplicadas de §cTODAS§e as pistas...");
+            player.sendMessage("§e[REGION CLEANUP] Cleaning duplicate regions for §cALL§e tracks...");
         }
 
         List<DatabaseManager.RegionData> allRegions = this.mysql.getAllRegions();
@@ -496,7 +499,7 @@ public class TrackEditorCommand extends BaseCommand {
             if (regions.size() > 1) {
                 regions.sort(Comparator.comparingInt(DatabaseManager.RegionData::getId).reversed());
                 DatabaseManager.RegionData newest = (DatabaseManager.RegionData)regions.get(0);
-                player.sendMessage(String.format("§e  Pista §f%s §e(%s): Mantendo região ID %d, deletando %d antiga(s)...", newest.getTrackName(), newest.getType(), newest.getId(), regions.size() - 1));
+                player.sendMessage(String.format("§e  Track §f%s §e(%s): Keeping region ID %d, deleting %d old one(s)...", newest.getTrackName(), newest.getType(), newest.getId(), regions.size() - 1));
 
                 for(int i = 1; i < regions.size(); ++i) {
                     DatabaseManager.RegionData old = (DatabaseManager.RegionData)regions.get(i);
@@ -509,31 +512,31 @@ public class TrackEditorCommand extends BaseCommand {
         }
 
         if (totalDeleted > 0) {
-            player.sendMessage(String.format("§a[REGION CLEANUP] Concluído! %d região(ões) duplicada(s) removida(s) de %d pista(s).", totalDeleted, tracksProcessed));
+            player.sendMessage(String.format("§a[REGION CLEANUP] Completed! %d duplicate region(s) removed from %d track(s).", totalDeleted, tracksProcessed));
         } else if (specificTrack != null) {
-            player.sendMessage("§a[REGION CLEANUP] Nenhuma região duplicada encontrada na pista §f" + specificTrack);
+            player.sendMessage("§a[REGION CLEANUP] No duplicate regions found in track §f" + specificTrack);
         } else {
-            player.sendMessage("§a[REGION CLEANUP] Nenhuma região duplicada encontrada!");
+            player.sendMessage("§a[REGION CLEANUP] No duplicate regions found!");
         }
 
         this.plugin.getRegionListener().reloadRegions();
     }
 
     @Subcommand("info")
-    @Description("Mostra informações de uma pista")
+    @Description("Shows track information")
     @CommandCompletion("@tracks")
     public void onInfo(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             String trackNameWS = this.normalizeTrackName(trackName);
-            player.sendMessage("§6§l========== Informações da Pista ==========");
-            player.sendMessage("§e Nome: §f" + trackName);
-            player.sendMessage("§e Nome Normalizado: §f" + trackNameWS);
+            player.sendMessage("§6§l========== Track Information ==========");
+            player.sendMessage("§e Name: §f" + trackName);
+            player.sendMessage("§e Normalized Name: §f" + trackNameWS);
             player.sendMessage("");
             List<DatabaseManager.RegionData> allRegions = this.mysql.getAllRegions();
             boolean foundStart = false;
             boolean foundEnd = false;
-            player.sendMessage("§6§l[Regiões START/END]");
+            player.sendMessage("§6§l[START/END Regions]");
 
             for(DatabaseManager.RegionData region : allRegions) {
                 if (region.getTrackName().equalsIgnoreCase(trackNameWS)) {
@@ -551,20 +554,20 @@ public class TrackEditorCommand extends BaseCommand {
             }
 
             if (!foundStart) {
-                player.sendMessage("§c✗ START: Não configurada");
+                player.sendMessage("§c✗ START: Not configured");
             }
 
             if (!foundEnd) {
-                player.sendMessage("§c✗ END: Não configurada");
+                player.sendMessage("§c✗ END: Not configured");
             }
 
             player.sendMessage("");
             List<DatabaseManager.RegionData> checkpoints = this.mysql.getCheckpoints(trackNameWS);
             player.sendMessage("§6§l[Checkpoints]");
             if (checkpoints.isEmpty()) {
-                player.sendMessage("§c✗ Nenhum checkpoint configurado");
+                player.sendMessage("§c✗ No checkpoint configured");
             } else {
-                player.sendMessage("§a✓ Total de checkpoints: §f" + checkpoints.size());
+                player.sendMessage("§a✓ Total checkpoints: §f" + checkpoints.size());
 
                 for(int i = 0; i < checkpoints.size(); ++i) {
                     DatabaseManager.RegionData cp = (DatabaseManager.RegionData)checkpoints.get(i);
@@ -576,7 +579,7 @@ public class TrackEditorCommand extends BaseCommand {
             }
 
             player.sendMessage("");
-            player.sendMessage("§6§l[Diagnóstico]");
+            player.sendMessage("§6§l[Diagnostic]");
             if (foundStart && foundEnd) {
                 DatabaseManager.RegionData startRegion = null;
                 DatabaseManager.RegionData endRegion = null;
@@ -596,16 +599,16 @@ public class TrackEditorCommand extends BaseCommand {
                 if (startRegion != null && endRegion != null) {
                     boolean sameRegion = Math.abs(startRegion.getMinX() - endRegion.getMinX()) < 0.1 && Math.abs(startRegion.getMinY() - endRegion.getMinY()) < 0.1 && Math.abs(startRegion.getMinZ() - endRegion.getMinZ()) < 0.1 && Math.abs(startRegion.getMaxX() - endRegion.getMaxX()) < 0.1 && Math.abs(startRegion.getMaxY() - endRegion.getMaxY()) < 0.1 && Math.abs(startRegion.getMaxZ() - endRegion.getMaxZ()) < 0.1;
                     if (sameRegion) {
-                        player.sendMessage("§a✓ START e END são a mesma região (correto para circuitos)");
+                        player.sendMessage("§a✓ START and END are the same region (correct for circuits)");
                     } else {
-                        player.sendMessage("§e⚠ START e END são regiões diferentes");
+                        player.sendMessage("§e⚠ START and END are different regions");
                     }
                 }
             }
 
             if (checkpoints.isEmpty()) {
-                player.sendMessage("§c✗ ERRO: Pista sem checkpoints!");
-                player.sendMessage("§7   Use: /trackedit checkpoint add <id> para adicionar");
+                player.sendMessage("§c✗ ERROR: Track without checkpoints!");
+                player.sendMessage("§7   Use: /trackedit checkpoint add <id> to add");
             }
 
             player.sendMessage("§6§l==========================================");
@@ -613,45 +616,45 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("location tp_finish_all")
-    @Description("Define o local de teleporte para TODOS ao fim da corrida")
+    @Description("Sets the teleport location for ALL at race end")
     @CommandCompletion("@tracks")
     public void onTpFinishAll(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             String trackNameWS = this.normalizeTrackName(trackName);
             this.mysql.setTrackFinishAll(trackNameWS, player.getLocation());
-            player.sendMessage("§aLocal de teleporte final (ALL) definido para a pista " + trackName);
+            player.sendMessage("§aFinal teleport location (ALL) set for track " + trackName);
         }
     }
 
     @Subcommand("location tp_finish_pos")
-    @Description("Define o local de teleporte para uma posição específica")
+    @Description("Sets the teleport location for a specific position")
     @CommandCompletion("@nothing @tracks")
     public void onTpFinishPos(Player player, int position, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             String trackNameWS = this.normalizeTrackName(trackName);
             this.mysql.setTrackFinishPos(trackNameWS, position, player.getLocation());
-            player.sendMessage("§aLocal de teleporte para a Posição #" + position + " definido para a pista " + trackName);
+            player.sendMessage("§aTeleport location for Position #" + position + " set for track " + trackName);
         }
     }
 
     @Subcommand("spawn")
-    @Description("Define o spawn de uma pista")
+    @Description("Sets the track spawn")
     @CommandCompletion("@tracks")
     public void onSpawn(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             String trackNameWS = this.normalizeTrackName(trackName);
-            this.plugin.getDebugManager().logRaceSystem("Salvando spawn da pista '" + trackName + "' (trackNameWS='" + trackNameWS + "') para o jogador " + player.getName());
-            player.sendMessage("§eSalvando spawn da pista: §f" + trackName + " §7(normalizado: §f" + trackNameWS + "§7)");
+            this.plugin.getDebugManager().logRaceSystem("Saving track spawn '" + trackName + "' (trackNameWS='" + trackNameWS + "') for player " + player.getName());
+            player.sendMessage("§eSaving track spawn: §f" + trackName + " §7(normalized: §f" + trackNameWS + "§7)");
             this.mysql.setTrackSpawn(trackName, player.getLocation());
             this.plugin.sendMessage(player, "te_spawn_saved", new String[0]);
         }
     }
 
     @Subcommand("checkpoint add")
-    @Description("Adiciona um checkpoint")
+    @Description("Adds a checkpoint")
     @CommandCompletion("@nothing @tracks")
     public void onCheckpointAdd(Player player, int id, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -659,7 +662,7 @@ public class TrackEditorCommand extends BaseCommand {
             String trackNameWS = this.normalizeTrackName(trackName);
             WorldEditSelect var10000 = this.worldEditSelect;
             if (!WorldEditSelect.hasSelection(player)) {
-                player.sendMessage("§cVocê precisa fazer uma seleção com o WorldEdit para adicionar o checkpoint.");
+                player.sendMessage("§cYou need to make a WorldEdit selection to add the checkpoint.");
             } else {
                 Location min = WorldEditSelect.getMin(player);
                 Location max = WorldEditSelect.getMax(player);
@@ -667,10 +670,10 @@ public class TrackEditorCommand extends BaseCommand {
                 boolean success = this.mysql.addCheckpoint(id, trackNameWS, player);
                 if (success) {
                     this.plugin.sendMessage(player, "te_checkpoint_added", new String[]{"{id}", String.valueOf(id), "{track}", trackName});
-                    this.plugin.getDebugManager().logDatabaseOperations("[FormulaRacing] === Salvando Checkpoint ===");
+                    this.plugin.getDebugManager().logDatabaseOperations("[FormulaRacing] === Saving Checkpoint ===");
                     this.plugin.getDebugManager().logDatabaseOperations("[FormulaRacing] Track: " + trackName);
                     this.plugin.getDebugManager().logDatabaseOperations("[FormulaRacing] ID: " + id);
-                    this.plugin.getDebugManager().logDatabaseOperations("[FormulaRacing] Mundo: " + worldName);
+                    this.plugin.getDebugManager().logDatabaseOperations("[FormulaRacing] World: " + worldName);
                     DebugManager var10 = this.plugin.getDebugManager();
                     double var10001 = min.getX();
                     var10.logDatabaseOperations("[FormulaRacing] Min: X=" + var10001 + " Y=" + min.getY() + " Z=" + min.getZ());
@@ -679,7 +682,7 @@ public class TrackEditorCommand extends BaseCommand {
                     var10.logDatabaseOperations("[FormulaRacing] Max: X=" + var10001 + " Y=" + max.getY() + " Z=" + max.getZ());
                     this.plugin.getDebugManager().logDatabaseOperations("[FormulaRacing] =======================");
                 } else {
-                    player.sendMessage("§cErro ao adicionar o checkpoint " + id);
+                    player.sendMessage("§cError adding checkpoint " + id);
                 }
 
             }
@@ -687,7 +690,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("checkpoint remove")
-    @Description("Remove um checkpoint por checkpointId")
+    @Description("Removes a checkpoint by checkpointId")
     @CommandCompletion("@nothing @tracks")
     public void onCheckpointRemove(Player player, int id, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -704,7 +707,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("checkpoint removeid")
-    @Description("Remove um checkpoint por ID da base de dados (para remover duplicados)")
+    @Description("Removes a checkpoint by database ID (to remove duplicates)")
     @CommandCompletion("@nothing")
     public void onCheckpointRemoveById(Player player, int dbId) {
         boolean success = this.mysql.removeCheckpointById(dbId);
@@ -717,7 +720,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("time")
-    @Description("Define o tempo de uma pista (Ticks)")
+    @Description("Sets the track time (Ticks)")
     @CommandCompletion("@nothing @tracks")
     public void onTime(Player player, long ticks, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -727,14 +730,14 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("icon")
-    @Description("Define o ícone de uma pista")
+    @Description("Sets the track icon")
     @CommandCompletion("@nothing @tracks")
     public void onIcon(Player player, String materialName, @Optional String trackNameArg) {
         Material iconMat;
         try {
             iconMat = Material.valueOf(materialName.toUpperCase());
         } catch (IllegalArgumentException var6) {
-            player.sendMessage("§cMaterial inválido: " + materialName);
+            player.sendMessage("§cInvalid material: " + materialName);
             return;
         }
 
@@ -743,14 +746,14 @@ public class TrackEditorCommand extends BaseCommand {
             if (this.mysql.setTrackIcon(trackName, iconMat.name())) {
                 this.plugin.sendMessage(player, "te_icon_updated", new String[]{"{track}", trackName, "{icon}", iconMat.name()});
             } else {
-                player.sendMessage("§cErro ao atualizar ícone da pista.");
+                player.sendMessage("§cError updating track icon.");
             }
 
         }
     }
 
     @Subcommand("open")
-    @Description("Abre uma pista para uso")
+    @Description("Opens a track for use")
     @CommandCompletion("@tracks")
     public void onOpen(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -765,7 +768,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("close")
-    @Description("Fecha uma pista para uso")
+    @Description("Closes a track for use")
     @CommandCompletion("@tracks")
     public void onClose(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -780,7 +783,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("pitstop")
-    @Description("Configurações de Pit Stop")
+    @Description("Pit Stop settings")
     @CommandCompletion("addentry|addexit|remove|info|edit|list|check @tracks")
     public void onPitStop(Player player, String action, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -801,7 +804,7 @@ public class TrackEditorCommand extends BaseCommand {
                 case "addentry":
                     WorldEditSelect var19 = this.worldEditSelect;
                     if (!WorldEditSelect.hasSelection(player)) {
-                        player.sendMessage("§cFaça uma seleção com WorldEdit.");
+                        player.sendMessage("§cMake a WorldEdit selection.");
                         return;
                     }
 
@@ -815,7 +818,7 @@ public class TrackEditorCommand extends BaseCommand {
                 case "addexit":
                     WorldEditSelect var10000 = this.worldEditSelect;
                     if (!WorldEditSelect.hasSelection(player)) {
-                        player.sendMessage("§cFaça uma seleção com WorldEdit.");
+                        player.sendMessage("§cMake a WorldEdit selection.");
                         return;
                     }
 
@@ -844,22 +847,22 @@ public class TrackEditorCommand extends BaseCommand {
                 case "check":
                     Location loc = player.getLocation();
                     int var10001 = loc.getBlockX();
-                    player.sendMessage("§eVerificando localização: " + var10001 + ", " + loc.getBlockY() + ", " + loc.getBlockZ() + " (" + loc.getWorld().getName() + ")");
+                    player.sendMessage("§eChecking location: " + var10001 + ", " + loc.getBlockY() + ", " + loc.getBlockZ() + " (" + loc.getWorld().getName() + ")");
                     String entry = this.plugin.getPitStopManager().getPitStopEntryAtLocation(loc);
-                    String var21 = entry == null ? "§cNenhuma" : "§a" + entry;
+                    String var21 = entry == null ? "§cNone" : "§a" + entry;
                     player.sendMessage("§7Entry Region: " + var21);
                     String exit = this.plugin.getPitStopManager().getPitStopExitAtLocation(loc);
-                    var21 = exit == null ? "§cNenhuma" : "§a" + exit;
+                    var21 = exit == null ? "§cNone" : "§a" + exit;
                     player.sendMessage("§7Exit Region: " + var21);
                     String area = this.plugin.getPitStopManager().getPitAreaAtLocation(loc);
-                    var21 = area == null ? "§cNenhuma" : "§a" + area;
+                    var21 = area == null ? "§cNone" : "§a" + area;
                     player.sendMessage("§7Pit Area: " + var21);
                     boolean overBlock = this.plugin.getPitStopManager().isOverPitBlock(loc);
-                    player.sendMessage("§7Pit Block: " + (overBlock ? "§aSIM (TERRACOTTA)" : "§cNÃO"));
+                    player.sendMessage("§7Pit Block: " + (overBlock ? "§aYES (TERRACOTTA)" : "§cNO"));
                     if (trackName != null) {
                         PitStopRegion region1 = this.plugin.getPitStopManager().getPitStop(trackNameWS);
                         if (region1 != null) {
-                            player.sendMessage("§eRegião " + trackName + " (Entry):");
+                            player.sendMessage("§eRegion " + trackName + " (Entry):");
                             if (region1.hasEntry()) {
                                 Location min = region1.getEntryRegion().getMin();
                                 Location max = region1.getEntryRegion().getMax();
@@ -868,44 +871,53 @@ public class TrackEditorCommand extends BaseCommand {
                                 var24 = max.getBlockX();
                                 player.sendMessage("  §7Max: " + var24 + "," + max.getBlockY() + "," + max.getBlockZ());
                             } else {
-                                player.sendMessage("  §cNão definida.");
+                                player.sendMessage("  §cNot set.");
                             }
                         }
                     }
                     break;
                 default:
-                    player.sendMessage("§cAção desconhecida. Use addentry, addexit, remove, info, edit, list ou check.");
+                    player.sendMessage("§cUnknown action. Use addentry, addexit, remove, info, edit, list or check.");
             }
 
         }
     }
 
     @Subcommand("boatutils reset")
-    @Description("Reseta todas as configurações BoatUtils de uma pista para o padrão")
+    @Description("Resets all BoatUtils settings of a track to default")
     @CommandCompletion("@tracks")
     public void onBoatUtilsReset(Player player, String track) {
-        String trackName = track.replace(" ", "");
-        this.mysql.resetBoatUtilsSettings(trackName);
-        player.sendMessage("§a✔ Configurações BoatUtils resetadas para §fVanilla §ana pista §e" + trackName);
-    }
-
-    @Subcommand("boatutils set group")
-    @Description("Aplica um preset de configurações (modo de grupo)")
-    @CommandCompletion("@boatutils_groups @tracks")
-    public void onBoatUtilsSetGroup(Player player, BoatUtilsGroupMode mode, String track) {
         String trackName = track.replace(" ", "").toLowerCase();
-        this.applyGroupMode(trackName, mode);
-        String var10001 = mode.name();
-        player.sendMessage("§a✔ Modo de grupo §b" + var10001 + " §aplicado com sucesso na pista §e" + trackName);
+        this.mysql.resetBoatUtilsSettings(trackName);
+        player.sendMessage("§a✔ BoatUtils settings reset to §fVanilla §aon track §e" + trackName);
     }
 
-    @Subcommand("boatutils set config")
-    @Description("Configura um valor específico do BoatUtils")
+    @Subcommand("boatutils group set")
+    @Description("Resets to vanilla and applies a full settings preset")
+    @CommandCompletion("@boatutils_group_modes @tracks")
+    public void onBoatUtilsGroupSet(Player player, BoatUtilsGroupMode mode, String track) {
+        String trackName = track.replace(" ", "").toLowerCase();
+        this.mysql.resetBoatUtilsSettings(trackName);
+        this.applyGroupMode(trackName, mode);
+        player.sendMessage("§a✔ Mode §b" + mode.name() + " §aapplied (reset + mode) on track §e" + trackName);
+    }
+
+    @Subcommand("boatutils group add")
+    @Description("Applies only preset values without resetting existing settings")
+    @CommandCompletion("@boatutils_group_modes @tracks")
+    public void onBoatUtilsGroupAdd(Player player, BoatUtilsGroupMode mode, String track) {
+        String trackName = track.replace(" ", "").toLowerCase();
+        this.mysql.applyGroupModeValues(trackName, mode.stepHeight, mode.slipperiness, !mode.noFallDamage, mode.waterElevation, mode.airControl, mode.jumpForce);
+        player.sendMessage("§a✔ Mode §b" + mode.name() + " §aapplied (without reset) on track §e" + trackName);
+    }
+
+    @Subcommand("boatutils config")
+    @Description("Configures a specific BoatUtils value")
     @CommandCompletion("@boatutils_settings @nothing @tracks")
     public void onBoatUtilsSetConfig(Player player, String setting, String value, @Optional String trackArg) {
         String trackName = this.getTargetTrack(player, trackArg);
         if (trackName != null) {
-            trackName = trackName.replace(" ", "");
+            trackName = trackName.replace(" ", "").toLowerCase();
             String key = setting.toLowerCase();
 
             try {
@@ -973,21 +985,82 @@ public class TrackEditorCommand extends BaseCommand {
                     case "coyotetime":
                         this.mysql.setCoyoteTime(trackName, Integer.parseInt(value));
                         break;
+                    case "walltapmultiplier":
+                        this.mysql.setWalltapMultiplier(trackName, Float.parseFloat(value));
+                        break;
+                    case "jumps":
+                        this.mysql.setJumps(trackName, Integer.parseInt(value));
+                        break;
+                    case "scale":
+                        this.mysql.setScale(trackName, Float.parseFloat(value));
+                        break;
+                    case "stepupslipperiness":
+                        this.mysql.setStepUpSlipperiness(trackName, Float.parseFloat(value));
+                        break;
+                    case "fixdoublewaterelevation":
+                        this.mysql.setFixDoubleWaterElevation(trackName, this.parseBoolean(value));
+                        break;
+                    case "lateralslipperiness":
+                        this.mysql.setLateralSlipperiness(trackName, Float.parseFloat(value));
+                        break;
+                    case "brakeslipperiness":
+                        this.mysql.setBrakeSlipperiness(trackName, Float.parseFloat(value));
+                        break;
+                    case "multistepping":
+                        this.mysql.setMultiStepping(trackName, this.parseBoolean(value));
+                        break;
+                    case "maxspeed":
+                        this.mysql.setMaxSpeed(trackName, Float.parseFloat(value));
+                        break;
+                    case "maxspeedresistance":
+                        this.mysql.setMaxSpeedResistance(trackName, Float.parseFloat(value));
+                        break;
+                    case "honeycompatibility":
+                        this.mysql.setHoneyCompatibility(trackName, this.parseBoolean(value));
+                        break;
+                    case "collisionfilter":
+                        this.mysql.setCollisionFilter(trackName, value);
+                        break;
+                    case "customslipperiness":
+                        String[] entries = value.split(",");
+                        for (String entry : entries) {
+                            String[] parts = entry.split(";");
+                            if (parts.length == 2) {
+                                this.mysql.addCustomSlipperiness(trackName, parts[0], Float.parseFloat(parts[1]));
+                            } else {
+                                player.sendMessage("§c✘ Invalid format: §f" + entry + " §c(expected: material;value)");
+                                return;
+                            }
+                        }
+                        break;
+                    case "perblocksetting":
+                        // format: settingId:value:block1,block2
+                        String[] perBlockParts = value.split(":", 3);
+                        if (perBlockParts.length < 2) {
+                            player.sendMessage("§c✘ Invalid format. Use: §f<settingId>:<value>[:blocks]");
+                            player.sendMessage("§7Setting IDs: 0=JUMP_FORCE, 1=FORWARDS_ACCEL, 2=BACKWARDS_ACCEL, 3=YAW_ACCEL, 4=TURN_FORWARDS_ACCEL, 5=WALLTAP_MULTIPLIER, 6=JUMPS, 7=COYOTE_TIME, 8=STEP_UP_SLIPPERINESS, 9=LATERAL_SLIPPERINESS, 10=BRAKE_SLIPPERINESS, 11=MAX_SPEED, 12=MAX_SPEED_RESISTANCE");
+                            return;
+                        }
+                        String settingId = perBlockParts[0];
+                        float perBlockValue = Float.parseFloat(perBlockParts[1]);
+                        String blocks = perBlockParts.length > 2 ? perBlockParts[2] : "";
+                        this.mysql.setPerBlockSetting(trackName, settingId + ":" + perBlockValue + ":" + blocks);
+                        break;
                     default:
-                        player.sendMessage("§c✘ Configuração desconhecida: §f" + setting);
+                        player.sendMessage("§c✘ Unknown setting: §f" + setting);
                         return;
                 }
 
-                player.sendMessage("§a✔ Configuração §e" + setting + " §adefinida para §b" + value + " §ana pista §f" + trackName);
+                player.sendMessage("§a✔ Configuração §e" + setting + " §aset to §b" + value + " §aon track §f" + trackName);
             } catch (NumberFormatException var9) {
-                player.sendMessage("§c✘ O valor '§f" + value + "§c' não é válido para §f" + setting);
+                player.sendMessage("§c✘ The value '§f" + value + "§c' is not valid for §f" + setting);
             }
 
         }
     }
 
     @Subcommand("boatutils set customslipperiness add")
-    @Description("Define a aderência personalizada para um tipo de bloco")
+    @Description("Sets custom slipperiness for a block type")
     @CommandCompletion("@materials @nothing @tracks")
     public void onBoatUtilsAddSlipperiness(Player player, String materialName, float value, @Optional String trackArg) {
         String trackName = this.getTargetTrack(player, trackArg);
@@ -995,24 +1068,24 @@ public class TrackEditorCommand extends BaseCommand {
             trackName = trackName.replace(" ", "");
             Material mat = Material.matchMaterial(materialName);
             if (mat == null) {
-                player.sendMessage("§c✘ Bloco inválido: §f" + materialName);
+                player.sendMessage("§c✘ Invalid block: §f" + materialName);
             } else {
                 String blockId = mat.getKey().toString();
                 this.mysql.addCustomSlipperiness(trackName, blockId, value);
-                player.sendMessage("§a✔ Slipperiness de §e" + mat.name() + " §adefinido para §b" + value + " §ana pista §f" + trackName);
+                player.sendMessage("§a✔ Slipperiness of §e" + mat.name() + " §aset to §b" + value + " §aon track §f" + trackName);
             }
         }
     }
 
     @Subcommand("boatutils set customslipperiness reset")
-    @Description("Remove todas as customizações de aderência de blocos")
+    @Description("Removes all block slipperiness customizations")
     @CommandCompletion("@tracks")
     public void onBoatUtilsResetSlipperiness(Player player, @Optional String trackArg) {
         String trackName = this.getTargetTrack(player, trackArg);
         if (trackName != null) {
             trackName = trackName.replace(" ", "");
             this.mysql.resetCustomSlipperiness(trackName);
-            player.sendMessage("§a✔ Custom Slipperiness resetado na pista §e" + trackName);
+            player.sendMessage("§a✔ Custom Slipperiness reset on track §e" + trackName);
         }
     }
 
@@ -1021,74 +1094,74 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("grid add")
-    @Description("Adiciona uma posição de grid")
+    @Description("Adds a grid position")
     @CommandCompletion("@nothing @tracks")
     public void onGridAdd(Player player, int id, @Optional String trackNameArg) {
         if (id >= 1 && id <= 200) {
             String trackName = this.getTargetTrack(player, trackNameArg);
             if (trackName != null) {
                 if (this.mysql.addGridPosition(trackName, id, player.getLocation())) {
-                    player.sendMessage("§a✓ Posição de grid P" + id + " adicionada em §e" + trackName);
+                    player.sendMessage("§a✓ Grid position P" + id + " added at §e" + trackName);
                     String var10001 = this.formatLocation(player.getLocation());
-                    player.sendMessage("§7Localização: " + var10001);
+                    player.sendMessage("§7Location: " + var10001);
                 } else {
-                    player.sendMessage("§c✗ Erro ao adicionar a posição de grid.");
+                    player.sendMessage("§c✗ Error adding grid position.");
                 }
 
             }
         } else {
-            player.sendMessage("§cPosição deve estar entre 1 e 200.");
+            player.sendMessage("§cPosition must be between 1 and 200.");
         }
     }
 
     @Subcommand("grid remove")
-    @Description("Remove uma posição de grid")
+    @Description("Removes a grid position")
     @CommandCompletion("@nothing @tracks")
     public void onGridRemove(Player player, int id, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             if (this.mysql.removeGridPosition(trackName, id)) {
-                player.sendMessage("§a✓ Posição de grid P" + id + " removida de §e" + trackName);
+                player.sendMessage("§a✓ Grid position P" + id + " removed from §e" + trackName);
             } else {
-                player.sendMessage("§c✗ Erro ao remover a posição de grid.");
+                player.sendMessage("§c✗ Error removing grid position.");
             }
 
         }
     }
 
     @Subcommand("grid clear")
-    @Description("Limpa todas as posições de grid")
+    @Description("Clears all grid positions")
     @CommandCompletion("@tracks confirm")
     public void onGridClear(Player player, String trackName, @Optional String confirm) {
         if (confirm != null && confirm.equalsIgnoreCase("confirm")) {
             if (this.mysql.clearGridPositions(trackName)) {
-                player.sendMessage("§a✓ Todas as posições de grid foram removidas de §e" + trackName);
+                player.sendMessage("§a✓ All grid positions removed from §e" + trackName);
             } else {
-                player.sendMessage("§c✗ Erro ao limpar o grid.");
+                player.sendMessage("§c✗ Error clearing grid.");
             }
 
         } else {
             int count = this.mysql.getGridPositions(trackName).size();
-            player.sendMessage("§e⚠ Isso removerá §c" + count + " posições §ede grid!");
-            player.sendMessage("§7Use §f/trackedit grid clear " + trackName + " confirm §7para confirmar.");
+            player.sendMessage("§e⚠ This will remove §c" + count + " positions §efrom grid!");
+            player.sendMessage("§7Use §f/trackedit grid clear " + trackName + " confirm §7to confirm.");
         }
     }
 
     @Subcommand("grid list")
-    @Description("Lista as posições de grid")
+    @Description("Lists grid positions")
     @CommandCompletion("@tracks")
     public void onGridList(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             List<GridPosition> positions = this.mysql.getGridPositions(trackName);
             player.sendMessage("§e═══════════════════════════════════");
-            player.sendMessage("§6§lGrid de §f" + trackName);
+            player.sendMessage("§6§lGrid of §f" + trackName);
             player.sendMessage("§e═══════════════════════════════════");
             if (positions.isEmpty()) {
-                player.sendMessage("§7Nenhuma posição configurada.");
-                player.sendMessage("§7Use §f/trackedit grid add <id> " + trackName + " §7para adicionar.");
+                player.sendMessage("§7No positions configured.");
+                player.sendMessage("§7Use §f/trackedit grid add <id> " + trackName + " §7to add.");
             } else {
-                player.sendMessage("§7Total: §f" + positions.size() + " posições");
+                player.sendMessage("§7Total: §f" + positions.size() + " positions");
                 player.sendMessage("");
 
                 for(GridPosition pos : positions) {
@@ -1105,17 +1178,17 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("grid test")
-    @Description("Testa o grid de uma pista")
+    @Description("Tests the grid of a track")
     @CommandCompletion("@tracks")
     public void onGridTest(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             List<GridPosition> positions = this.mysql.getGridPositions(trackName);
             if (positions.isEmpty()) {
-                player.sendMessage("§cNenhuma posição de grid configurada para esta pista.");
+                player.sendMessage("§cNo grid positions configured for this track.");
             } else {
-                player.sendMessage("§a✓ Testando grid de §e" + trackName + "§a...");
-                player.sendMessage("§7Você será teleportado para cada posição (1 segundo entre cada).");
+                player.sendMessage("§a✓ Testing grid of §e" + trackName + "§a...");
+                player.sendMessage("§7You will be teleported to each position (1 second between each).");
 
                 for(int i = 0; i < positions.size(); ++i) {
                     GridPosition pos = (GridPosition)positions.get(i);
@@ -1135,7 +1208,7 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("grid info")
-    @Description("Mostra informações do grid")
+    @Description("Shows grid information")
     @CommandCompletion("@tracks")
     public void onGridInfo(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -1143,24 +1216,24 @@ public class TrackEditorCommand extends BaseCommand {
             List<GridPosition> positions = this.mysql.getGridPositions(trackName);
             DatabaseManager.TrackData trackData = this.mysql.getTrackData(trackName);
             player.sendMessage("§e═══════════════════════════════════");
-            player.sendMessage("§6§lInformações de Grid: §f" + trackName);
+            player.sendMessage("§6§lGrid Information: §f" + trackName);
             player.sendMessage("§e═══════════════════════════════════");
             player.sendMessage("");
-            player.sendMessage("§7Pista: §f" + trackName);
+            player.sendMessage("§7Track: §f" + trackName);
             if (trackData != null) {
                 player.sendMessage("§7Checkpoints: §f" + trackData.getTotalCheckpoints());
             }
 
-            player.sendMessage("§7Posições configuradas: §f" + positions.size());
+            player.sendMessage("§7Configured positions: §f" + positions.size());
             player.sendMessage("");
             if (positions.isEmpty()) {
-                player.sendMessage("§e⚠ Grid não configurado");
-                player.sendMessage("§7O sistema usará geração automática.");
-                player.sendMessage("§7Use §f/trackedit grid add <id> " + trackName + " §7para configurar.");
+                player.sendMessage("§e⚠ Grid not configured");
+                player.sendMessage("§7The system will use automatic generation.");
+                player.sendMessage("§7Use §f/trackedit grid add <id> " + trackName + " §7to configure.");
             } else {
-                player.sendMessage("§a✓ Grid configurado manualmente");
-                player.sendMessage("§7Use §f/trackedit grid list " + trackName + " §7para ver posições.");
-                player.sendMessage("§7Use §f/trackedit grid test " + trackName + " §7para testar.");
+                player.sendMessage("§a✓ Grid configured manually");
+                player.sendMessage("§7Use §f/trackedit grid list " + trackName + " §7to view positions.");
+                player.sendMessage("§7Use §f/trackedit grid test " + trackName + " §7to test.");
             }
 
             player.sendMessage("§e═══════════════════════════════════");
@@ -1168,66 +1241,66 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("location qualigrid")
-    @Description("Adiciona/atualiza uma posição do qualigrid (grid da qualificatória)")
+    @Description("Adds/updates a qualifying grid position")
     @CommandCompletion("@nothing @tracks")
     public void onLocationQualiGrid(Player player, int id, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             if (this.mysql.addQualiGridPosition(trackName, id, player.getLocation())) {
-                player.sendMessage("§a✓ Posição Q" + id + " do qualigrid adicionada em §e" + trackName);
-                player.sendMessage("§7Localização: " + this.formatLocation(player.getLocation()));
+                player.sendMessage("§a✓ Quali position Q" + id + " added at §e" + trackName);
+                player.sendMessage("§7Location: " + this.formatLocation(player.getLocation()));
             } else {
-                player.sendMessage("§c✗ Erro ao adicionar posição do qualigrid.");
+                player.sendMessage("§c✗ Error adding qualifying grid position.");
             }
         }
     }
 
     @Subcommand("qualigrid remove")
-    @Description("Remove uma posição do qualigrid")
+    @Description("Removes a qualifying grid position")
     @CommandCompletion("@nothing @tracks")
     public void onQualiGridRemove(Player player, int id, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             if (this.mysql.removeQualiGridPosition(trackName, id)) {
-                player.sendMessage("§a✓ Posição Q" + id + " do qualigrid removida de §e" + trackName);
+                player.sendMessage("§a✓ Quali position Q" + id + " removed from §e" + trackName);
             } else {
-                player.sendMessage("§c✗ Erro ao remover posição do qualigrid.");
+                player.sendMessage("§c✗ Error removing qualifying grid position.");
             }
         }
     }
 
     @Subcommand("qualigrid clear")
-    @Description("Limpa todas as posições do qualigrid")
+    @Description("Clears all qualifying grid positions")
     @CommandCompletion("@tracks confirm")
     public void onQualiGridClear(Player player, String trackName, @Optional String confirm) {
         if (confirm != null && confirm.equalsIgnoreCase("confirm")) {
             if (this.mysql.clearQualiGridPositions(trackName)) {
-                player.sendMessage("§a✓ Todas as posições do qualigrid foram removidas de §e" + trackName);
+                player.sendMessage("§a✓ All qualifying grid positions removed from §e" + trackName);
             } else {
-                player.sendMessage("§c✗ Erro ao limpar o qualigrid.");
+                player.sendMessage("§c✗ Error clearing qualifying grid.");
             }
         } else {
             int count = this.mysql.getQualiGridPositions(trackName).size();
-            player.sendMessage("§e⚠ Isso removerá §c" + count + " posições §edo qualigrid!");
-            player.sendMessage("§7Use §f/trackedit qualigrid clear " + trackName + " confirm §7para confirmar.");
+            player.sendMessage("§e⚠ This will remove §c" + count + " positions §efrom qualifying grid!");
+            player.sendMessage("§7Use §f/trackedit qualigrid clear " + trackName + " confirm §7to confirm.");
         }
     }
 
     @Subcommand("qualigrid list")
-    @Description("Lista as posições do qualigrid")
+    @Description("Lists qualifying grid positions")
     @CommandCompletion("@tracks")
     public void onQualiGridList(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             List<GridPosition> positions = this.mysql.getQualiGridPositions(trackName);
             player.sendMessage("§e═══════════════════════════════════");
-            player.sendMessage("§6§lQualigrid de §f" + trackName);
+            player.sendMessage("§6§lQualifying grid of §f" + trackName);
             player.sendMessage("§e═══════════════════════════════════");
             if (positions.isEmpty()) {
-                player.sendMessage("§7Nenhuma posição configurada.");
-                player.sendMessage("§7Use §f/trackedit location qualigrid <id> " + trackName + " §7para adicionar.");
+                player.sendMessage("§7No positions configured.");
+                player.sendMessage("§7Use §f/trackedit location qualigrid <id> " + trackName + " §7to add.");
             } else {
-                player.sendMessage("§7Total: §f" + positions.size() + " posições");
+                player.sendMessage("§7Total: §f" + positions.size() + " positions");
                 player.sendMessage("");
                 for (GridPosition pos : positions) {
                     Location loc = pos.toLocation(this.plugin.getServer());
@@ -1241,16 +1314,16 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("qualigrid test")
-    @Description("Testa as posições do qualigrid")
+    @Description("Tests qualifying grid positions")
     @CommandCompletion("@tracks")
     public void onQualiGridTest(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             List<GridPosition> positions = this.mysql.getQualiGridPositions(trackName);
             if (positions.isEmpty()) {
-                player.sendMessage("§cNenhuma posição do qualigrid configurada para esta pista.");
+                player.sendMessage("§cNo qualifying grid positions configured for this track.");
             } else {
-                player.sendMessage("§a✓ Testando qualigrid de §e" + trackName + "§a...");
+                player.sendMessage("§a✓ Testing qualifying grid of §e" + trackName + "§a...");
                 for (int i = 0; i < positions.size(); ++i) {
                     GridPosition pos = positions.get(i);
                     int delay = i * 20;
@@ -1267,124 +1340,124 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("qualigrid info")
-    @Description("Mostra informações do qualigrid")
+    @Description("Shows qualifying grid information")
     @CommandCompletion("@tracks")
     public void onQualiGridInfo(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             List<GridPosition> positions = this.mysql.getQualiGridPositions(trackName);
             player.sendMessage("§e═══════════════════════════════════");
-            player.sendMessage("§6§lInformações do Qualigrid: §f" + trackName);
+            player.sendMessage("§6§lQualifying Grid Information: §f" + trackName);
             player.sendMessage("§e═══════════════════════════════════");
-            player.sendMessage("§7Posições configuradas: §f" + positions.size());
+            player.sendMessage("§7Configured positions: §f" + positions.size());
             if (positions.isEmpty()) {
-                player.sendMessage("§e⚠ Qualigrid não configurado");
-                player.sendMessage("§7A qualificatória usará o spawn da pista.");
-                player.sendMessage("§7Use §f/trackedit location qualigrid <id> " + trackName + " §7para configurar.");
+                player.sendMessage("§e⚠ Qualifying grid not configured");
+                player.sendMessage("§7Qualifying will use the track spawn.");
+                player.sendMessage("§7Use §f/trackedit location qualigrid <id> " + trackName + " §7to configure.");
             } else {
-                player.sendMessage("§a✓ Qualigrid configurado manualmente");
-                player.sendMessage("§7Use §f/trackedit qualigrid list " + trackName + " §7para ver posições.");
-                player.sendMessage("§7Use §f/trackedit qualigrid test " + trackName + " §7para testar.");
+                player.sendMessage("§a✓ Qualifying grid configured manually");
+                player.sendMessage("§7Use §f/trackedit qualigrid list " + trackName + " §7to view positions.");
+                player.sendMessage("§7Use §f/trackedit qualigrid test " + trackName + " §7to test.");
             }
             player.sendMessage("§e═══════════════════════════════════");
         }
     }
 
     @Subcommand("pitstop entry")
-    @Description("Adiciona a entrada do pit stop")
+    @Description("Adds the pit stop entry")
     @CommandCompletion("@tracks")
     public void onPitStopEntry(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             WorldEditSelect var10000 = this.worldEditSelect;
             if (!WorldEditSelect.hasSelection(player)) {
-                player.sendMessage("§c✗ Faça uma seleção com WorldEdit primeiro!");
+                player.sendMessage("§c✗ Make a WorldEdit selection first!");
             } else {
                 Location min = WorldEditSelect.getMin(player);
                 Location max = WorldEditSelect.getMax(player);
                 this.plugin.getPitStopManager().addPitStopEntry(trackName, min, max);
-                player.sendMessage("§a✓ Entrada do pit stop definida para §e" + trackName + "§a!");
+                player.sendMessage("§a✓ Pit stop entry set for §e" + trackName + "§a!");
                 String var10001 = this.formatLocation(min);
-                player.sendMessage("§7Região: " + var10001 + " §7→ " + this.formatLocation(max));
+                player.sendMessage("§7Region: " + var10001 + " §7→ " + this.formatLocation(max));
             }
         }
     }
 
     @Subcommand("pitstop exit")
-    @Description("Adiciona a saída do pit stop")
+    @Description("Adds the pit stop exit")
     @CommandCompletion("@tracks")
     public void onPitStopExit(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             WorldEditSelect var10000 = this.worldEditSelect;
             if (!WorldEditSelect.hasSelection(player)) {
-                player.sendMessage("§c✗ Faça uma seleção com WorldEdit primeiro!");
+                player.sendMessage("§c✗ Make a WorldEdit selection first!");
             } else {
                 Location min = WorldEditSelect.getMin(player);
                 Location max = WorldEditSelect.getMax(player);
                 this.plugin.getPitStopManager().addPitStopExit(trackName, min, max);
-                player.sendMessage("§a✓ Saída do pit stop definida para §e" + trackName + "§a!");
+                player.sendMessage("§a✓ Pit stop exit set for §e" + trackName + "§a!");
                 String var10001 = this.formatLocation(min);
-                player.sendMessage("§7Região: " + var10001 + " §7→ " + this.formatLocation(max));
+                player.sendMessage("§7Region: " + var10001 + " §7→ " + this.formatLocation(max));
             }
         }
     }
 
     @Subcommand("pitstop area")
-    @Description("Adiciona a AREA do pit stop (Minigame Zone)")
+    @Description("Adds the pit stop AREA (Minigame Zone)")
     @CommandCompletion("@tracks")
     public void onPitStopArea(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             WorldEditSelect var10000 = this.worldEditSelect;
             if (!WorldEditSelect.hasSelection(player)) {
-                player.sendMessage("§c✗ Faça uma seleção com WorldEdit primeiro!");
+                player.sendMessage("§c✗ Make a WorldEdit selection first!");
             } else {
                 Location min = WorldEditSelect.getMin(player);
                 Location max = WorldEditSelect.getMax(player);
                 this.plugin.getPitStopManager().addPitStopArea(trackName, min, max);
-                player.sendMessage("§a✓ Área do pit stop (Minigame) definida para §e" + trackName + "§a!");
+                player.sendMessage("§a✓ Pit stop area (Minigame) set for §e" + trackName + "§a!");
                 String var10001 = this.formatLocation(min);
-                player.sendMessage("§7Região: " + var10001 + " §7→ " + this.formatLocation(max));
-                player.sendMessage("§eℹ Coloque blocos de YELLOW_GLAZED_TERRACOTTA dentro desta área para ativar o minigame.");
+                player.sendMessage("§7Region: " + var10001 + " §7→ " + this.formatLocation(max));
+                player.sendMessage("§eℹ Place YELLOW_GLAZED_TERRACOTTA blocks inside this area to activate the minigame.");
             }
         }
     }
 
     @Subcommand("pitstop start")
-    @Description("Define a linha de contagem de volta (START) dentro do corredor do pit")
+    @Description("Sets the lap validation line (START) inside the pit lane")
     @CommandCompletion("@tracks")
     public void onPitStopStart(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             WorldEditSelect var10000 = this.worldEditSelect;
             if (!WorldEditSelect.hasSelection(player)) {
-                player.sendMessage("§c✗ Faça uma seleção com WorldEdit primeiro!");
+                player.sendMessage("§c✗ Make a WorldEdit selection first!");
             } else {
                 Location min = WorldEditSelect.getMin(player);
                 Location max = WorldEditSelect.getMax(player);
                 this.plugin.getPitStopManager().addPitStopStart(trackName, min, max);
-                player.sendMessage("§a✓ Linha de contagem de volta (§eSTART§a) definida para §e" + trackName + "§a!");
+                player.sendMessage("§a✓ Lap validation line (§eSTART§a) set for §e" + trackName + "§a!");
                 String var10001 = this.formatLocation(min);
-                player.sendMessage("§7Localização: " + var10001 + " §7→ " + this.formatLocation(max));
-                player.sendMessage("§bℹ Esta região validará a volta do piloto quando ele passar por ela dentro do pit.");
+                player.sendMessage("§7Location: " + var10001 + " §7→ " + this.formatLocation(max));
+                player.sendMessage("§bℹ This region will validate the driver's lap when they pass through it inside the pit.");
             }
         }
     }
 
     @Subcommand("pitstop remove")
-    @Description("Remove o pit stop de uma pista")
+    @Description("Removes the pit stop from a track")
     @CommandCompletion("@tracks")
     public void onPitStopRemove(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             if (!this.plugin.getPitStopManager().hasPitStop(trackName)) {
-                player.sendMessage("§c✗ A pista §f" + trackName + " §cnão tem pit stop region configurada.");
+                player.sendMessage("§c✗ Track §f" + trackName + " §cdoes not have a pit stop region configured.");
             } else {
                 if (this.plugin.getPitStopManager().removePitStop(trackName)) {
-                    player.sendMessage("§a✓ Pit stop region removida de §e" + trackName + "§a!");
+                    player.sendMessage("§a✓ Pit stop region removed from §e" + trackName + "§a!");
                 } else {
-                    player.sendMessage("§c✗ Erro ao remover pit stop region.");
+                    player.sendMessage("§c✗ Error removing pit stop region.");
                 }
 
             }
@@ -1392,51 +1465,51 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("drs detect")
-    @Description("Define a região de detecção do DRS")
+    @Description("Sets the DRS detection region")
     @CommandCompletion("@tracks")
     public void onDrsDetect(Player player, @Optional String trackNameArg) {
         this.saveDrsPart(player, "DETECT", trackNameArg);
     }
 
     @Subcommand("drs startdrs")
-    @Description("Define a região de ativação do DRS")
+    @Description("Sets the DRS activation region")
     @CommandCompletion("@tracks")
     public void onDrsStart(Player player, @Optional String trackNameArg) {
-        this.saveDrsPart(player, "START", trackNameArg);
+        this.saveDrsPart(player, "DRS", trackNameArg);
     }
 
     @Subcommand("drs finishdrs")
-    @Description("Define a região de desativação do DRS")
+    @Description("Sets the DRS deactivation region")
     @CommandCompletion("@tracks")
     public void onDrsFinish(Player player, @Optional String trackNameArg) {
-        this.saveDrsPart(player, "FINISH", trackNameArg);
+        this.saveDrsPart(player, "END", trackNameArg);
     }
 
     @Subcommand("drs delete detect")
-    @Description("Remove uma região de detecção pelo ID")
+    @Description("Removes a detection region by ID")
     public void onDeleteDetect(Player player, Integer id) {
         this.deleteDrsById(player, id, "DETECT");
     }
 
     @Subcommand("drs delete startdrs")
-    @Description("Remove uma região de ativação pelo ID")
+    @Description("Removes an activation region by ID")
     public void onDeleteStart(Player player, Integer id) {
-        this.deleteDrsById(player, id, "START");
+        this.deleteDrsById(player, id, "DRS");
     }
 
     @Subcommand("drs delete finishdrs")
-    @Description("Remove uma região de desativação pelo ID")
+    @Description("Removes a deactivation region by ID")
     public void onDeleteFinish(Player player, Integer id) {
-        this.deleteDrsById(player, id, "FINISH");
+        this.deleteDrsById(player, id, "END");
     }
 
     private void deleteDrsById(Player player, int id, String type) {
-        // Chamamos o MySQL passando o ID único da linha
+        // Call MySQL passing the unique row ID
         if (this.mysql.deleteDRSRegionByID(id)) {
-            player.sendMessage("§a[DRS] Região ID §f#" + id + " (§e" + type + "§a) removida com sucesso!");
+            player.sendMessage("§a[DRS] Region ID §f#" + id + " (§e" + type + "§a) removida com sucesso!");
             player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 1.0F, 2.0F);
         } else {
-            player.sendMessage("§c[DRS] Não foi possível encontrar uma região com o ID §f#" + id);
+            player.sendMessage("§c[DRS] Could not find a region with ID §f#" + id);
         }
     }
 
@@ -1452,25 +1525,25 @@ public class TrackEditorCommand extends BaseCommand {
         Location min = WorldEditSelect.getMin(player);
         Location max = WorldEditSelect.getMax(player);
 
-        // Agora enviamos para o MySQL os dados para a nova tabela fr_drs
-        // Note que passamos o 'type' para o banco saber qual parte da linha atualizar/inserir
+        // Now send the data to MySQL for the new fr_drs table
+        // Note that we pass 'type' so the database knows which part to update/insert
         if (this.mysql.saveDrsZone(trackName, type, min, max)) {
-            player.sendMessage("§a[DRS] Parte §f" + type.toUpperCase() + " §adefinida para a pista: §e" + trackName);
+            player.sendMessage("§a[DRS] Part §f" + type.toUpperCase() + " §aset for track: §e" + trackName);
             player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.0F);
         } else {
-            player.sendMessage("§cErro ao salvar a região de DRS no banco de dados.");
+            player.sendMessage("§cError saving DRS region to database.");
         }
     }
 
     @Subcommand("pitstop list")
-    @Description("Lista pistas com pit stop")
+    @Description("Lists tracks with pit stop")
     public void onPitStopList(Player player) {
         Set<String> tracks = this.plugin.getPitStopManager().getTracksWithPitStop();
         if (tracks.isEmpty()) {
-            player.sendMessage("§e⚠ Nenhuma pista tem pit stop region configurada.");
+            player.sendMessage("§e⚠ No track has a pit stop region configured.");
         } else {
             player.sendMessage("§e═══════════════════════════════════");
-            player.sendMessage("§6§lPistas com Pit Stop Region (" + tracks.size() + ")");
+            player.sendMessage("§6§lTracks with Pit Stop Region (" + tracks.size() + ")");
             player.sendMessage("§e═══════════════════════════════════");
 
             for(String track : tracks) {
@@ -1484,26 +1557,26 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("pitstop info")
-    @Description("Mostra informações do pit stop")
+    @Description("Shows pit stop information")
     @CommandCompletion("@tracks")
     public void onPitStopInfo(Player player, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             if (!this.plugin.getPitStopManager().hasPitStop(trackName)) {
-                player.sendMessage("§c✗ A pista §f" + trackName + " §cnão tem pit stop region configurada.");
+                player.sendMessage("§c✗ Track §f" + trackName + " §cdoes not have a pit stop region configured.");
             } else {
                 PitStopRegion pitStop = this.plugin.getPitStopManager().getPitStop(trackName);
                 player.sendMessage("§e═══════════════════════════════════");
                 player.sendMessage("§6§lPit Stop Region: §f" + trackName);
                 player.sendMessage("§e═══════════════════════════════════");
-                player.sendMessage(pitStop.hasEntry() ? "§a✓ ENTRADA: " + this.formatLocation(pitStop.getEntryCenter()) : "§c✗ ENTRADA: não configurada");
-                player.sendMessage(pitStop.hasExit() ? "§a✓ SAÍDA: " + this.formatLocation(pitStop.getExitCenter()) : "§c✗ SAÍDA: não configurada");
+                player.sendMessage(pitStop.hasEntry() ? "§a✓ ENTRY: " + this.formatLocation(pitStop.getEntryCenter()) : "§c✗ ENTRY: not configured");
+                player.sendMessage(pitStop.hasExit() ? "§a✓ EXIT: " + this.formatLocation(pitStop.getExitCenter()) : "§c✗ EXIT: not configured");
                 player.sendMessage("");
                 if (pitStop.hasArea()) {
                     String var10001 = this.formatLocation(pitStop.getAreaRegion().getMin());
                     player.sendMessage("§a✓ AREA: " + var10001);
                 } else {
-                    player.sendMessage("§c✗ AREA: não configurada");
+                    player.sendMessage("§c✗ AREA: not configured");
                 }
 
                 player.sendMessage("§e═══════════════════════════════════");
@@ -1512,69 +1585,114 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("pitstop test")
-    @Description("Testa sua posição no pit stop")
+    @Description("Tests your position in the pit stop")
     public void onPitStopTest(Player player) {
         Location loc = player.getLocation();
         String entry = this.plugin.getPitStopManager().getPitStopEntryAtLocation(loc);
         String exit = this.plugin.getPitStopManager().getPitStopExitAtLocation(loc);
         if (entry != null) {
-            player.sendMessage("§a✓ Você está na ENTRADA do pit stop da pista §e" + entry + "§a!");
+            player.sendMessage("§a✓ You are in the ENTRY of pit stop for track §e" + entry + "§a!");
         } else if (exit != null) {
-            player.sendMessage("§a✓ Você está na SAÍDA do pit stop da pista §e" + exit + "§a!");
+            player.sendMessage("§a✓ You are in the EXIT of pit stop for track §e" + exit + "§a!");
         } else {
-            player.sendMessage("§c✗ Você NÃO está em nenhuma região de pit stop.");
+            player.sendMessage("§c✗ You are NOT in any pit stop region.");
         }
 
     }
 
     @Subcommand("location leaderboard java")
-    @Description("Teleporta o holograma do leaderboard Java")
+    @Description("Teleports the Java leaderboard hologram")
     @CommandCompletion("@tracks @nothing")
     public void onLocationLeaderboardJava(Player player, String trackName, @Optional Double x, @Optional Double y, @Optional Double z) {
         Location targetLocation = (x != null && y != null && z != null)
                 ? new Location(player.getWorld(), x, y + 1.5, z)
                 : player.getLocation();
 
-        // Usa o método unificado que retorna a instância única da pista
+        // Uses the unified method that returns the track's unique instance
         TrackLeaderboard leaderboard = this.plugin.getOrCreateLeaderboard(trackName, targetLocation);
 
         leaderboard.setLocation(targetLocation);
-        leaderboard.updateJavaLeaderboard(); // Atualiza especificamente o lado Java
+        leaderboard.updateJavaLeaderboard(); // Updates specifically the Java side
 
-        player.sendMessage("§aHolograma JAVA da pista §e" + trackName + " §ateleportado!");
+        player.sendMessage("§aJAVA hologram for track §e" + trackName + " §ateleported!");
     }
 
     @Subcommand("location leaderboard bedrock")
-    @Description("Teleporta o holograma do leaderboard Bedrock")
+    @Description("Teleports the Bedrock leaderboard hologram")
     @CommandCompletion("@tracks @nothing")
     public void onLocationLeaderboardBedrock(Player player, String trackName, @Optional Double x, @Optional Double y, @Optional Double z) {
         Location targetLocation = (x != null && y != null && z != null)
                 ? new Location(player.getWorld(), x, y + 1.5, z)
                 : player.getLocation();
 
-        // Usa a MESMA instância que o Java usaria
+        // Uses the SAME instance that Java would use
         TrackLeaderboard leaderboard = this.plugin.getOrCreateLeaderboard(trackName, targetLocation);
 
         leaderboard.setLocation(targetLocation);
-        leaderboard.updateBedrockLeaderboard(); // Atualiza especificamente o lado Bedrock
+        leaderboard.updateBedrockLeaderboard(); // Updates specifically the Bedrock side
 
-        player.sendMessage("§aHolograma BEDROCK da pista §e" + trackName + " §ateleportado!");
+        player.sendMessage("§aBEDROCK hologram for track §e" + trackName + " §ateleported!");
     }
+
+    @Subcommand("togglehologram java")
+    @Description("Toggles the Java leaderboard hologram on/off for a track")
+    @CommandCompletion("@tracks")
+    public void onToggleHologramJava(Player player, String trackName) {
+        String targetTrack = getTargetTrack(player, trackName);
+        if (targetTrack == null) return;
+
+        TrackLeaderboard leaderboard = this.plugin.getOrCreateLeaderboard(targetTrack, player.getLocation());
+        boolean newState = !leaderboard.isJavaEnabled();
+        leaderboard.setJavaEnabled(newState);
+        player.sendMessage("§aJava hologram for track §e" + targetTrack + " §a" + (newState ? "enabled" : "disabled") + "!");
+    }
+
+    @Subcommand("togglehologram bedrock")
+    @Description("Toggles the Bedrock leaderboard hologram on/off for a track")
+    @CommandCompletion("@tracks")
+    public void onToggleHologramBedrock(Player player, String trackName) {
+        String targetTrack = getTargetTrack(player, trackName);
+        if (targetTrack == null) return;
+
+        TrackLeaderboard leaderboard = this.plugin.getOrCreateLeaderboard(targetTrack, player.getLocation());
+        boolean newState = !leaderboard.isBedrockEnabled();
+        leaderboard.setBedrockEnabled(newState);
+        player.sendMessage("§aBedrock hologram for track §e" + targetTrack + " §a" + (newState ? "enabled" : "disabled") + "!");
+    }
+
     @Subcommand("location startline")
-    @Description("Define a linha de largada")
+    @Description("Sets the start line")
     public void onLocationStartLine(Player player) {
-        player.sendMessage("§eFunção de 'startline' ainda não implementada.");
+        player.sendMessage("§e'startline' function not yet implemented.");
+    }
+
+    @Subcommand("export")
+    @Description("Exports a track to .trackexchange format")
+    @CommandCompletion("@tracks")
+    public void onExport(Player player, String trackName, @Optional String fileName) {
+        String targetTrack = getTargetTrack(player, trackName);
+        if (targetTrack == null) return;
+        player.sendMessage("§eExporting track '" + targetTrack + "'...");
+        trackExchange.exportTrack(player, targetTrack, fileName);
+    }
+
+    @Subcommand("import")
+    @Description("Imports a track from a .trackexchange file")
+    @CommandCompletion("@trackexchangeFiles")
+    public void onImport(Player player, String fileName, @Optional String newName) {
+        player.sendMessage("§eImporting track from '" + fileName + "'...");
+        trackExchange.importTrack(player, fileName, newName);
     }
 
     public void applyGroupMode(String track, BoatUtilsGroupMode mode) {
         if (mode != TrackEditorCommand.BoatUtilsGroupMode.BA && mode != TrackEditorCommand.BoatUtilsGroupMode.BA_NOFD) {
             if (mode != TrackEditorCommand.BoatUtilsGroupMode.BA_BLUE_NOFD && mode != TrackEditorCommand.BoatUtilsGroupMode.BA_BLUE) {
-                this.mysql.replaceAllBoatUtilsSettings(track, mode.stepHeight, mode.slipperiness, !mode.noFallDamage, mode.waterElevation, mode.airControl, mode.jumpForce == null ? 0.0F : mode.jumpForce, (double)-0.04F, 1.0F, 0.04F, 0.005F, 0.005F, true, true, true, 0, true, 0.0F, 0, false, false, 5, (String)null, (String)null);
+                this.mysql.replaceAllBoatUtilsSettings(track, mode.stepHeight, mode.slipperiness, !mode.noFallDamage, mode.waterElevation, mode.airControl, mode.jumpForce == null ? 0.0F : mode.jumpForce, (double)-0.04F, 1.0F, 0.04F, 0.005F, 0.005F, true, true, true, 0, true, 0.0F, 0, false, false, 5, (String)null, (String)null, 0.0F, 1, 1.0F, 1.0F, false, 1.0F, 1.0F, false, -1.0F, 0.0F, false);
             } else {
-                this.mysql.replaceAllBoatUtilsSettings(track, mode.stepHeight, mode.slipperiness, !mode.noFallDamage, mode.waterElevation, mode.airControl, mode.jumpForce == null ? 0.0F : mode.jumpForce, (double)-0.04F, 1.0F, 0.04F, 0.005F, 0.005F, true, true, true, 0, true, 0.0F, 0, false, false, 5, "minecraft:air;0.989", (String)null);
+                this.mysql.replaceAllBoatUtilsSettings(track, mode.stepHeight, mode.slipperiness, !mode.noFallDamage, mode.waterElevation, mode.airControl, mode.jumpForce == null ? 0.0F : mode.jumpForce, (double)-0.04F, 1.0F, 0.04F, 0.005F, 0.005F, true, true, true, 0, true, 0.0F, 0, false, false, 5, "minecraft:air;0.989", (String)null, 0.0F, 1, 1.0F, 1.0F, false, 1.0F, 1.0F, false, -1.0F, 0.0F, false);
             }
         } else {
-            this.mysql.replaceAllBoatUtilsSettings(track, mode.stepHeight, mode.slipperiness, !mode.noFallDamage, mode.waterElevation, mode.airControl, mode.jumpForce == null ? 0.0F : mode.jumpForce, (double)-0.04F, 1.0F, 0.04F, 0.005F, 0.005F, true, true, true, 0, true, 0.0F, 0, false, false, 5, "minecraft:air;0.98", (String)null);
+            this.mysql.replaceAllBoatUtilsSettings(track, mode.stepHeight, mode.slipperiness, !mode.noFallDamage, mode.waterElevation, mode.airControl, mode.jumpForce == null ? 0.0F : mode.jumpForce, (double)-0.04F, 1.0F, 0.04F, 0.005F, 0.005F, true, true, true, 0, true, 0.0F, 0, false, false, 5, "minecraft:air;0.98", (String)null, 0.0F, 1, 1.0F, 1.0F, false, 1.0F, 1.0F, false, -1.0F, 0.0F, false);
         }
 
     }
@@ -1628,3 +1746,6 @@ public class TrackEditorCommand extends BaseCommand {
         }
     }
 }
+
+
+

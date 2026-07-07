@@ -16,15 +16,15 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 🔄 REVERSÃO
- * A cada 20 segundos, as posições são invertidas — quem estava em 1º vai para último
- * e vice-versa. Pontos são atribuídos baseado na posição a cada inversão.
- * Quem tiver mais pontos ao final vence.
+ * 🔄 REVERSAL
+ * Every 20 seconds, positions are reversed — whoever was 1st goes to last
+ * and vice versa. Points are awarded based on position at each reversal.
+ * Whoever has the most points at the end wins.
  */
 public class ReversalSession implements SessionLogic {
 
     private static final int REVERSAL_INTERVAL_TICKS = 400; // 20 segundos
-    private static final int TOTAL_REVERSALS = 6; // 6 reversões = 2 minutos
+    private static final int TOTAL_REVERSALS = 6; // 6 reversals = 2 minutes
 
     private FRTask reversalTask;
     private int reversalCount = 0;
@@ -39,19 +39,19 @@ public class ReversalSession implements SessionLogic {
         matchFinished = false;
         reversalCount = 0;
 
-        // Inicializa pontos
+        // Initialize points
         for (Driver d : heat.getDrivers().values()) {
             points.put(d.getUuid(), 0);
             lastKnownPosition.put(d.getUuid(), d.getPosition());
         }
 
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
-        broadcast(heat, ChatColor.AQUA + "  🔄 MODO REVERSÃO 🔄");
+        broadcast(heat, ChatColor.AQUA + "  🔄 REVERSAL MODE 🔄");
         broadcast(heat, "");
-        broadcast(heat, ChatColor.YELLOW + "  A cada 20 segundos, a classificação inverte!");
-        broadcast(heat, ChatColor.RED + "  1º lugar ↔ Último lugar");
-        broadcast(heat, ChatColor.GREEN + "  Mais pontos ao final vence!");
-        broadcast(heat, ChatColor.GRAY + "  " + TOTAL_REVERSALS + " reversões no total");
+        broadcast(heat, ChatColor.YELLOW + "  Every 20 seconds, the standings invert!");
+        broadcast(heat, ChatColor.RED + "  1st place ↔ Last place");
+        broadcast(heat, ChatColor.GREEN + "  Most points at the end wins!");
+        broadcast(heat, ChatColor.GRAY + "  " + TOTAL_REVERSALS + " reversals total");
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
 
         startReversalTask(heat);
@@ -66,7 +66,7 @@ public class ReversalSession implements SessionLogic {
 
             reversalCount++;
 
-            // Obtém pilotos ativos ordenados por posição
+            // Get active drivers sorted by position
             List<Driver> activeDrivers = heat.getDrivers().values().stream()
                 .filter(d -> !d.isFinished() && !d.isDnf())
                 .sorted(Comparator.comparingInt(Driver::getPosition))
@@ -75,11 +75,11 @@ public class ReversalSession implements SessionLogic {
             int totalActive = activeDrivers.size();
             if (totalActive == 0) return;
 
-            // Inverte as posições: 1º vira último, último vira 1º
+            // Reverse positions: 1st becomes last, last becomes 1st
             List<Driver> reversed = new ArrayList<>(activeDrivers);
             Collections.reverse(reversed);
 
-            // Atribui novas posições
+            // Assign new positions
             for (int i = 0; i < reversed.size(); i++) {
                 Driver driver = reversed.get(i);
                 int newPosition = i + 1;
@@ -87,22 +87,22 @@ public class ReversalSession implements SessionLogic {
                 lastKnownPosition.put(driver.getUuid(), newPosition);
             }
 
-            // Atribui pontos baseado na NOVA posição (1º lugar = mais pontos)
+            // Award points based on the NEW position (1st place = most points)
             int maxPoints = totalActive;
             for (int i = 0; i < reversed.size(); i++) {
                 Driver driver = reversed.get(i);
-                int pts = maxPoints - i; // 1º = totalActive pts, último = 1 pt
+                int pts = maxPoints - i; // 1st = totalActive pts, last = 1 pt
                 points.merge(driver.getUuid(), pts, Integer::sum);
             }
 
-            // Anuncia reversão
+            // Announce reversal
             broadcast(heat, "");
             broadcast(heat, ChatColor.AQUA + "═══════════════════════════════");
-            broadcast(heat, ChatColor.RED + "  🔄 REVERSÃO #" + reversalCount + " 🔄");
-            broadcast(heat, ChatColor.YELLOW + "  Posições invertidas!");
+            broadcast(heat, ChatColor.RED + "  🔄 REVERSAL #" + reversalCount + " 🔄");
+            broadcast(heat, ChatColor.YELLOW + "  Positions reversed!");
             broadcast(heat, ChatColor.AQUA + "═══════════════════════════════");
 
-            // Mostra nova classificação
+            // Show new standings
             for (int i = 0; i < reversed.size(); i++) {
                 Driver driver = reversed.get(i);
                 Player p = Bukkit.getPlayer(driver.getUuid());
@@ -118,26 +118,26 @@ public class ReversalSession implements SessionLogic {
                 p.sendMessage(posColor + "  #" + pos + " " + p.getName() +
                     ChatColor.GRAY + " (+" + pts + " pts = " + totalPts + " total)");
 
-                // Title para o novo líder
+                // Title for the new leader
                 if (pos == 1) {
                     TitleHelper.sendThemedTitle(p,
-                        ChatColor.GOLD + "👑 LÍDER!",
+                        ChatColor.GOLD + "👑 LEADER!",
                         ChatColor.YELLOW + "+" + pts + " pontos | Total: " + totalPts,
                         5, 60, 10);
                     p.playSound(p.getLocation(), Sound.BLOCK_END_PORTAL_SPAWN, 0.5f, 1.5f);
                 } else {
                     TitleHelper.sendThemedTitle(p,
-                        ChatColor.AQUA + "🔄 REVERSÃO!",
+                        ChatColor.AQUA + "🔄 REVERSAL!",
                         posColor + "#" + pos + ChatColor.GRAY + " | +" + pts + " pts",
                         5, 40, 5);
                 }
             }
             broadcast(heat, "");
 
-            // Atualiza scoreboard
+            // Update scoreboard
             heat.updateLivePositions();
 
-            // Verifica se acabaram as reversões
+            // Check if reversals are done
             if (reversalCount >= TOTAL_REVERSALS) {
                 finishMatch(heat);
             }
@@ -149,7 +149,7 @@ public class ReversalSession implements SessionLogic {
         matchFinished = true;
         cleanup();
 
-        // Encontra vencedor por pontos
+        // Find winner by points
         UUID winner = null;
         int bestPoints = -1;
         List<Map.Entry<UUID, Integer>> sorted = points.entrySet().stream()
@@ -163,10 +163,10 @@ public class ReversalSession implements SessionLogic {
 
         broadcast(heat, "");
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
-        broadcast(heat, ChatColor.AQUA + "  🏆 RESULTADO FINAL — REVERSÃO 🏆");
+        broadcast(heat, ChatColor.AQUA + "  🏆 FINAL RESULT — REVERSAL 🏆");
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
 
-        // Mostra ranking final
+        // Show final ranking
         int rank = 1;
         for (Map.Entry<UUID, Integer> entry : sorted) {
             Player p = Bukkit.getPlayer(entry.getKey());
@@ -177,7 +177,7 @@ public class ReversalSession implements SessionLogic {
                 rank == 2 ? ChatColor.GRAY :
                 rank == 3 ? ChatColor.DARK_RED : ChatColor.WHITE;
 
-            broadcast(heat, color + "  #" + rank + " " + name + " — " + pts + " pontos");
+            broadcast(heat, color + "  #" + rank + " " + name + " — " + pts + " points");
 
             rank++;
         }
@@ -188,12 +188,12 @@ public class ReversalSession implements SessionLogic {
             Player winnerPlayer = Bukkit.getPlayer(winner);
             String winnerName = winnerPlayer != null ? winnerPlayer.getName() : "Unknown";
 
-            broadcast(heat, ChatColor.GOLD + "🏆 " + winnerName + " venceu com " + bestPoints + " pontos!");
+            broadcast(heat, ChatColor.GOLD + "🏆 " + winnerName + " won with " + bestPoints + " points!");
 
             if (winnerPlayer != null && winnerPlayer.isOnline()) {
                 TitleHelper.sendThemedTitle(winnerPlayer,
-                    ChatColor.GOLD + "🏆 VITÓRIA!",
-                    ChatColor.YELLOW + "" + bestPoints + " pontos totais!",
+                    ChatColor.GOLD + "🏆 VICTORY!",
+                    ChatColor.YELLOW + "" + bestPoints + " total points!",
                     10, 100, 20);
                 winnerPlayer.playSound(winnerPlayer.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
             }

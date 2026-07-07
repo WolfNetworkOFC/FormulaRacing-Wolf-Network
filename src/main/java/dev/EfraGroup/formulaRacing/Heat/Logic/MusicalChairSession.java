@@ -17,11 +17,11 @@ import org.bukkit.potion.PotionEffectType;
 import java.util.*;
 
 /**
- * 🪑 CADEIRAS MUSICAIS
- * A cada rodada, o número de "cadeiras" (safe zones) diminui.
- * Quando a música para, quem não estiver em uma safe zone é eliminado.
- * Safe zones são áreas brilhantes que aparecem na pista.
- * O último sobrevivente vence.
+ * 🪑 MUSICAL CHAIRS
+ * Each round, the number of "chairs" (safe zones) decreases.
+ * When the music stops, whoever is not in a safe zone is eliminated.
+ * Safe zones are glowing areas that appear on the track.
+ * The last survivor wins.
  */
 public class MusicalChairSession implements SessionLogic {
 
@@ -45,11 +45,11 @@ public class MusicalChairSession implements SessionLogic {
         safeZones = Math.max(1, totalDrivers - 1);
 
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
-        broadcast(heat, ChatColor.LIGHT_PURPLE + "  🪑 MODO CADEIRAS MUSICAIS 🪑");
+        broadcast(heat, ChatColor.LIGHT_PURPLE + "  🪑 MUSICAL CHAIRS MODE 🪑");
         broadcast(heat, "");
-        broadcast(heat, ChatColor.YELLOW + "  A música vai tocar e parar!");
-        broadcast(heat, ChatColor.RED + "  Quando parar, entre em uma ZONA SEGURA!");
-        broadcast(heat, ChatColor.GRAY + "  Zonas seguras: " + safeZones);
+        broadcast(heat, ChatColor.YELLOW + "  The music will play and stop!");
+        broadcast(heat, ChatColor.RED + "  When it stops, get into a SAFE ZONE!");
+        broadcast(heat, ChatColor.GRAY + "  Safe zones: " + safeZones);
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
 
         startRoundTask(heat);
@@ -64,11 +64,11 @@ public class MusicalChairSession implements SessionLogic {
 
             round++;
 
-            // Fase 1: Música tocando — jogadores correm pela pista
+            // Phase 1: Music playing — players race around the track
             musicPlaying = true;
-            broadcast(heat, ChatColor.LIGHT_PURPLE + "🎵 Música tocando! Corram pela pista!");
+            broadcast(heat, ChatColor.LIGHT_PURPLE + "🎵 Music playing! Race around the track!");
 
-            // Efeito de velocidade para todos durante a música
+            // Speed effect for everyone during the music
             for (Driver driver : heat.getDrivers().values()) {
                 if (driver.isFinished() || driver.isDnf()) continue;
                 Player player = Bukkit.getPlayer(driver.getUuid());
@@ -78,23 +78,23 @@ public class MusicalChairSession implements SessionLogic {
                 }
             }
 
-            // Fase 2: Música para — zonas seguras aparecem
+            // Phase 2: Music stops — safe zones appear
             SchedulerHelper.runTaskLater(heat.getPlugin(), () -> {
                 if (heat.getHeatState() != HeatState.RACING) return;
 
                 musicPlaying = false;
 
-                // Calcula zonas seguras (diminui a cada rodada)
+                // Calculate safe zones (decreases each round)
                 int activeDrivers = (int) heat.getDrivers().values().stream()
                         .filter(d -> !d.isFinished() && !d.isDnf())
                         .count();
                 safeZones = Math.max(1, activeDrivers - round);
                 if (safeZones < 1) safeZones = 1;
 
-                broadcast(heat, ChatColor.RED + "🛑 MÚSICA PAROU! Corram para as zonas seguras!");
-                broadcast(heat, ChatColor.YELLOW + "Zonas seguras: " + safeZones + " | Vocês têm 5 segundos!");
+                broadcast(heat, ChatColor.RED + "🛑 MUSIC STOPPED! Run to the safe zones!");
+                broadcast(heat, ChatColor.YELLOW + "Safe zones: " + safeZones + " | You have 5 seconds!");
 
-                // Marca jogadores em safe zones (baseado na posição — zonas são áreas do mapa)
+                // Mark players in safe zones (based on position — zones are map areas)
                 markSafePlayers(heat);
 
                 // Som de alerta
@@ -106,13 +106,13 @@ public class MusicalChairSession implements SessionLogic {
                     }
                 }
 
-                // Após 5 segundos, elimina quem não está em zona segura
+                // After 5 seconds, eliminate those not in a safe zone
                 SchedulerHelper.runTaskLater(heat.getPlugin(), () -> {
                     if (heat.getHeatState() != HeatState.RACING) return;
                     eliminateUnsafePlayers(heat);
                 }, 100L); // 5 segundos
 
-            }, ROUND_INTERVAL_TICKS - 100); // 25 segundos de música, 5 de reação
+            }, ROUND_INTERVAL_TICKS - 100); // 25 seconds of music, 5 of reaction
 
         }, 40L, ROUND_INTERVAL_TICKS + 140); // Intervalo entre rodadas
     }
@@ -120,8 +120,8 @@ public class MusicalChairSession implements SessionLogic {
     private void markSafePlayers(Heats heat) {
         safePlayers.clear();
 
-        // Safe zones são baseadas na posição — os N primeiros pilotos mais próximos
-        // de pontos aleatórios da pista ficam seguros
+        // Safe zones are based on position — the N closest drivers
+        // to random track points are safe
         List<Driver> activeDrivers = new ArrayList<>();
         for (Driver driver : heat.getDrivers().values()) {
             if (!driver.isFinished() && !driver.isDnf()) {
@@ -129,7 +129,7 @@ public class MusicalChairSession implements SessionLogic {
             }
         }
 
-        // Sorteia posições de safe zones no mundo
+        // Draw safe zone positions in the world
         List<Location> safeLocations = new ArrayList<>();
         for (int i = 0; i < safeZones; i++) {
             Driver randomDriver = activeDrivers.get(random.nextInt(activeDrivers.size()));
@@ -139,7 +139,7 @@ public class MusicalChairSession implements SessionLogic {
             }
         }
 
-        // Marca jogadores que estão perto de uma safe zone (raio de 10 blocos)
+        // Mark players near a safe zone (10 block radius)
         for (Driver driver : activeDrivers) {
             Player player = Bukkit.getPlayer(driver.getUuid());
             if (player == null || !player.isOnline()) continue;
@@ -147,7 +147,7 @@ public class MusicalChairSession implements SessionLogic {
             for (Location safeLoc : safeLocations) {
                 if (player.getLocation().distanceSquared(safeLoc) < 100.0) { // 10 blocos
                     safePlayers.add(driver.getUuid());
-                    player.sendMessage(ChatColor.GREEN + "✓ Você está em uma ZONA SEGURA!");
+                    player.sendMessage(ChatColor.GREEN + "✓ You are in a SAFE ZONE!");
                     player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 1.0f, 2.0f);
                     break;
                 }
@@ -165,16 +165,16 @@ public class MusicalChairSession implements SessionLogic {
                 Player player = Bukkit.getPlayer(driver.getUuid());
                 if (player != null && player.isOnline()) {
                     player.playSound(player.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1.0f, 0.5f);
-                    player.sendMessage(ChatColor.RED + "✗ Você NÃO estava em uma zona segura!");
+                    player.sendMessage(ChatColor.RED + "✗ You were NOT in a safe zone!");
                 }
 
-                heat.handleDriverDNF(driver, "Eliminado nas Cadeiras Musicais");
+                heat.handleDriverDNF(driver, "Eliminated in Musical Chairs");
                 eliminated++;
             }
         }
 
         if (eliminated > 0) {
-            broadcast(heat, ChatColor.RED + "⚠ " + eliminated + " piloto(s) eliminado(s)!");
+            broadcast(heat, ChatColor.RED + "⚠ " + eliminated + " driver(s) eliminated!");
         }
 
         safePlayers.clear();
@@ -185,7 +185,7 @@ public class MusicalChairSession implements SessionLogic {
                 .count();
 
         if (remaining <= 1) {
-            broadcast(heat, ChatColor.GOLD + "🏆 Fim das Cadeiras Musicais!");
+            broadcast(heat, ChatColor.GOLD + "🏆 Musical Chairs Over!");
         }
     }
 

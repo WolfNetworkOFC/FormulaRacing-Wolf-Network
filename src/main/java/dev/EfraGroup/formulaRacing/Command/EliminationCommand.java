@@ -27,7 +27,7 @@ public class EliminationCommand extends BaseCommand {
     }
 
     @Subcommand("create")
-    @Description("Cria um novo round de eliminação")
+    @Description("Creates a new elimination round")
     public void onCreate(CommandSender sender,
                          @Name("eventId") int eventId,
                          @Name("roundNumber") int roundNumber,
@@ -35,7 +35,7 @@ public class EliminationCommand extends BaseCommand {
                          @Name("minDrivers") @Default("2") int minDrivers) {
 
         if (plugin.getRaceEventManager() == null) {
-            sender.sendMessage(ChatColor.RED + "Sistema de eventos não disponível!");
+            sender.sendMessage(ChatColor.RED + "Event system not available!");
             return;
         }
 
@@ -43,13 +43,13 @@ public class EliminationCommand extends BaseCommand {
             plugin.getRaceEventManager().getEventById(eventId);
 
         if (eventOpt.isEmpty()) {
-            sender.sendMessage(ChatColor.RED + "Evento #" + eventId + " não encontrado!");
+            sender.sendMessage(ChatColor.RED + "Event #" + eventId + " not found!");
             return;
         }
 
         dev.EfraGroup.formulaRacing.Event.Events event = eventOpt.get();
 
-        // Criar round de eliminação
+        // Create elimination round
         EliminationRound eliminationRound = new EliminationRound(
             plugin,
             0,
@@ -61,57 +61,57 @@ public class EliminationCommand extends BaseCommand {
         eliminationRound.setEliminationIntervalSeconds(intervalSeconds);
         eliminationRound.setMinimumDrivers(minDrivers);
 
-        // Adicionar ao evento através do EventSchedule
+        // Add to event through EventSchedule
         event.getEventSchedule().getRounds().put(roundNumber, eliminationRound);
 
-        // Salvar no banco de dados de forma assíncrona
+        // Save to database asynchronously
         plugin.getRaceEventManager().getDatabaseManager().createRound(
             event.getId(),
             roundNumber,
             RoundType.ELIMINATION
         ).thenAccept(roundId -> {
             eliminationRound.setId(roundId);
-            sender.sendMessage(ChatColor.GREEN + "✓ Round de eliminação criado e salvo no banco de dados!");
+            sender.sendMessage(ChatColor.GREEN + "✓ Elimination round created and saved to the database!");
         }).exceptionally(ex -> {
-            sender.sendMessage(ChatColor.RED + "✗ Erro ao salvar round no banco de dados!");
+            sender.sendMessage(ChatColor.RED + "✗ Error saving round to database!");
             return null;
         });
 
-        sender.sendMessage(ChatColor.GREEN + "✓ Round de eliminação criado!");
-        sender.sendMessage(ChatColor.GRAY + "Evento: " + event.getDisplayName());
+        sender.sendMessage(ChatColor.GREEN + "✓ Elimination round created!");
+        sender.sendMessage(ChatColor.GRAY + "Event: " + event.getDisplayName());
         sender.sendMessage(ChatColor.GRAY + "Round: R" + roundNumber + "E");
-        sender.sendMessage(ChatColor.GRAY + "Intervalo: " + intervalSeconds + "s");
-        sender.sendMessage(ChatColor.GRAY + "Mínimo de pilotos: " + minDrivers);
+        sender.sendMessage(ChatColor.GRAY + "Interval: " + intervalSeconds + "s");
+        sender.sendMessage(ChatColor.GRAY + "Minimum drivers: " + minDrivers);
     }
 
     @Subcommand("start")
-    @Description("Inicia um round de eliminação")
+    @Description("Starts an elimination round")
     public void onStart(CommandSender sender,
                         @Name("roundId") int roundId) {
 
         Optional<Rounds> roundOpt = findRoundById(roundId);
 
         if (roundOpt.isEmpty()) {
-            sender.sendMessage(ChatColor.RED + "Round #" + roundId + " não encontrado!");
+            sender.sendMessage(ChatColor.RED + "Round #" + roundId + " not found!");
             return;
         }
 
         Rounds round = roundOpt.get();
 
         if (round.getRoundType() != RoundType.ELIMINATION) {
-            sender.sendMessage(ChatColor.RED + "Este round não é de eliminação!");
+            sender.sendMessage(ChatColor.RED + "This round is not an elimination!");
             return;
         }
 
         if (round.getHeats().isEmpty()) {
-            sender.sendMessage(ChatColor.RED + "Este round não possui heats!");
+            sender.sendMessage(ChatColor.RED + "This round has no heats!");
             return;
         }
 
         if (round.start()) {
-            sender.sendMessage(ChatColor.GREEN + "✓ Round de eliminação iniciado!");
+            sender.sendMessage(ChatColor.GREEN + "✓ Elimination round started!");
         } else {
-            sender.sendMessage(ChatColor.RED + "✗ Falha ao iniciar round de eliminação!");
+            sender.sendMessage(ChatColor.RED + "✗ Failed to start elimination round!");
         }
     }
 
@@ -143,7 +143,7 @@ public class EliminationCommand extends BaseCommand {
         Rounds round = roundOpt.get();
 
         if (round.getRoundType() != RoundType.ELIMINATION) {
-            sender.sendMessage(ChatColor.RED + "Este round não é de eliminação!");
+            sender.sendMessage(ChatColor.RED + "This round is not an elimination!");
             return;
         }
 
@@ -180,7 +180,7 @@ public class EliminationCommand extends BaseCommand {
         Rounds round = roundOpt.get();
 
         if (!(round instanceof EliminationRound)) {
-            sender.sendMessage(ChatColor.RED + "Este round não é de eliminação!");
+            sender.sendMessage(ChatColor.RED + "This round is not an elimination!");
             return;
         }
 
@@ -211,7 +211,7 @@ public class EliminationCommand extends BaseCommand {
         Rounds round = roundOpt.get();
 
         if (!(round instanceof EliminationRound)) {
-            sender.sendMessage(ChatColor.RED + "Este round não é de eliminação!");
+            sender.sendMessage(ChatColor.RED + "This round is not an elimination!");
             return;
         }
 
@@ -237,7 +237,7 @@ public class EliminationCommand extends BaseCommand {
         Rounds round = roundOpt.get();
 
         if (round.getRoundType() != RoundType.ELIMINATION) {
-            sender.sendMessage(ChatColor.RED + "Este round não é de eliminação!");
+            sender.sendMessage(ChatColor.RED + "This round is not an elimination!");
             return;
         }
 
@@ -284,7 +284,7 @@ public class EliminationCommand extends BaseCommand {
         Rounds round = roundOpt.get();
 
         if (!(round instanceof EliminationRound)) {
-            sender.sendMessage(ChatColor.RED + "Este round não é de eliminação!");
+            sender.sendMessage(ChatColor.RED + "This round is not an elimination!");
             return;
         }
 

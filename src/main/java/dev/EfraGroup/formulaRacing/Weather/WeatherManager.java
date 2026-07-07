@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Gerencia o clima durante as corridas
+ * Manages weather during races
  */
 public class WeatherManager {
 
@@ -27,7 +27,7 @@ public class WeatherManager {
     }
 
     /**
-     * Inicia uma sessão de clima para um heat
+     * Starts a weather session for a heat
      */
     public void startWeatherSession(Heats heat) {
         if (!configManager.isEnabled()) {
@@ -40,29 +40,29 @@ public class WeatherManager {
         WeatherSession session = new WeatherSession(heat.getId(), weatherConditions);
         activeSessions.put(heat.getId(), session);
 
-        plugin.getLogger().info("Sessão de clima iniciada para heat " + heat.getId() +
-                " na pista " + trackName + " com " + weatherConditions.size() + " condições");
+        plugin.getLogger().info("Weather session started for heat " + heat.getId() +
+                " on track " + trackName + " with " + weatherConditions.size() + " conditions");
     }
 
     /**
-     * Para uma sessão de clima
+     * Stops a weather session
      */
     public void stopWeatherSession(int heatId) {
         WeatherSession session = activeSessions.remove(heatId);
         if (session != null) {
-            plugin.getLogger().info("Sessão de clima parada para heat " + heatId);
+            plugin.getLogger().info("Weather session stopped for heat " + heatId);
         }
     }
 
     /**
-     * Obtém a sessão de clima de um heat
+     * Gets the weather session for a heat
      */
     public WeatherSession getWeatherSession(int heatId) {
         return activeSessions.get(heatId);
     }
 
     /**
-     * Atualiza o clima de um heat (chamado a cada volta)
+     * Updates weather for a heat (called each lap)
      */
     public void updateWeatherOnLapComplete(int heatId) {
         WeatherSession session = activeSessions.get(heatId);
@@ -72,7 +72,7 @@ public class WeatherManager {
     }
 
     /**
-     * Inicia a tarefa de atualização periódica
+     * Starts the periodic update task
      */
     public void startUpdateTask() {
         if (updateTask != null && !updateTask.isCancelled()) {
@@ -84,11 +84,11 @@ public class WeatherManager {
                 session.updateTrackWetness(configManager.getTrackWettingRate(),
                         configManager.getTrackDryingRate());
             }
-        }, 20L, 20L); // Atualiza a cada segundo
+        }, 20L, 20L); // Updates every second
     }
 
     /**
-     * Para a tarefa de atualização
+     * Stops the update task
      */
     public void stopUpdateTask() {
         if (updateTask != null && !updateTask.isCancelled()) {
@@ -98,21 +98,21 @@ public class WeatherManager {
     }
 
     /**
-     * Limpa todas as sessões
+     * Clears all sessions
      */
     public void clearAllSessions() {
         activeSessions.clear();
     }
 
     /**
-     * Obtém o gerenciador de configuração
+     * Gets the configuration manager
      */
     public WeatherConfigManager getConfigManager() {
         return configManager;
     }
 
     /**
-     * Sessão de clima para um heat específico
+     * Weather session for a specific heat
      */
     public static class WeatherSession {
         private final int heatId;
@@ -130,7 +130,7 @@ public class WeatherManager {
         }
 
         /**
-         * Avança para a nova condição de clima
+         * Advances to the next weather condition
          */
         public void advanceLap() {
             lapsInCurrentCondition++;
@@ -142,13 +142,13 @@ public class WeatherManager {
                 lapsInCurrentCondition = 0;
 
                 if (currentConditionIndex >= weatherConditions.size()) {
-                    currentConditionIndex = weatherConditions.size() - 1; // Fica na última condição
+                    currentConditionIndex = weatherConditions.size() - 1; // Stay on last condition
                 }
             }
         }
 
         /**
-         * Atualiza a umidade da pista
+         * Updates the track wetness
          */
         public void updateTrackWetness(int wettingRate, int dryingRate) {
             WeatherType currentWeather = getCurrentWeatherType();
@@ -157,16 +157,16 @@ public class WeatherManager {
             }
 
             if (currentWeather.isWet()) {
-                // Aumenta a umidade
+                // Increase wetness
                 trackWetness = Math.min(100, trackWetness + wettingRate);
             } else if (currentWeather.isDry()) {
-                // Diminui a umidade
+                // Decrease wetness
                 trackWetness = Math.max(0, trackWetness - dryingRate);
             }
         }
 
         /**
-         * Obtém a condição de clima atual
+         * Gets the current weather condition
          */
         public WeatherCondition getCurrentCondition() {
             if (weatherConditions.isEmpty()) {
@@ -176,7 +176,7 @@ public class WeatherManager {
         }
 
         /**
-         * Obtém o tipo de clima atual
+         * Gets the current weather type
          */
         public WeatherType getCurrentWeatherType() {
             WeatherCondition condition = getCurrentCondition();
@@ -184,21 +184,21 @@ public class WeatherManager {
         }
 
         /**
-         * Obtém a umidade atual da pista (0-100)
+         * Gets the current track wetness (0-100)
          */
         public int getTrackWetness() {
             return trackWetness;
         }
 
         /**
-         * Define a umidade da pista
+         * Sets the track wetness
          */
         public void setTrackWetness(int wetness) {
             this.trackWetness = Math.max(0, Math.min(100, wetness));
         }
 
         /**
-         * Obtém o modificador de grip atual baseado no clima e umidade da pista
+         * Gets the current grip modifier based on weather and track wetness
          */
         public double getCurrentGripModifier() {
             WeatherType weatherType = getCurrentWeatherType();

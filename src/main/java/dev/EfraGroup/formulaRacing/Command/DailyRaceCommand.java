@@ -11,7 +11,7 @@ import org.bukkit.command.CommandSender;
 
 @CommandAlias("daily")
 @CommandPermission("formularacing.admin.daily")
-@Description("Comandos de Daily Race")
+@Description("Daily Race commands")
 public class DailyRaceCommand extends BaseCommand {
 
     private final DailyRaceManager dailyRaceManager;
@@ -27,91 +27,91 @@ public class DailyRaceCommand extends BaseCommand {
     }
 
     @Subcommand("help|ajuda|?")
-    @Description("Mostra a ajuda do comando daily")
+    @Description("Shows daily command help")
     public void onHelp(CommandSender sender) {
         sendHelp(sender);
     }
 
     @Subcommand("force")
-    @Description("Força o início de uma corrida diária")
+    @Description("Forces the start of a daily race")
     public void onForce(CommandSender sender) {
         if (dailyRaceManager.getPhase() != Phase.IDLE) {
-            sender.sendMessage(ChatColor.RED + "Já existe uma Daily Race em andamento!");
+            sender.sendMessage(ChatColor.RED + "A Daily Race is already in progress!");
             return;
         }
-        sender.sendMessage(ChatColor.GREEN + "Forçando o início da Daily Race...");
+        sender.sendMessage(ChatColor.GREEN + "Forcing the start of the Daily Race...");
         dailyRaceManager.forceStart();
     }
 
     @Subcommand("stop|end")
-    @Description("Encerra a corrida diária atual")
+    @Description("Ends the current daily race")
     public void onStop(CommandSender sender) {
         dailyRaceManager.stopDaily();
-        sender.sendMessage(ChatColor.GREEN + "Daily Race encerrada com sucesso!");
+        sender.sendMessage(ChatColor.GREEN + "Daily Race ended successfully!");
     }
 
     @Subcommand("status")
-    @Description("Mostra o status da corrida diária")
+    @Description("Shows daily race status")
     public void onStatus(CommandSender sender) {
         Phase phase = dailyRaceManager.getPhase();
-        sender.sendMessage(ChatColor.GOLD + "=== Status Daily Race ===");
-        sender.sendMessage(ChatColor.GRAY + "Fase atual: " + ChatColor.WHITE + phase.name());
+        sender.sendMessage(ChatColor.GOLD + "=== Daily Race Status ===");
+        sender.sendMessage(ChatColor.GRAY + "Current phase: " + ChatColor.WHITE + phase.name());
 
         dailyRaceManager.getActiveDailyEvent().ifPresentOrElse(event -> {
-            sender.sendMessage(ChatColor.GRAY + "Evento Ativo: " + ChatColor.WHITE + event.getDisplayName());
-            sender.sendMessage(ChatColor.GRAY + "Pista: " + ChatColor.WHITE + event.getTrackNameWS());
-            sender.sendMessage(ChatColor.GRAY + "Inscritos: " + ChatColor.WHITE + event.getSubscriberCount());
-        }, () -> sender.sendMessage(ChatColor.GRAY + "Nenhum evento ativo no momento."));
+            sender.sendMessage(ChatColor.GRAY + "Active Event: " + ChatColor.WHITE + event.getDisplayName());
+            sender.sendMessage(ChatColor.GRAY + "Track: " + ChatColor.WHITE + event.getTrackNameWS());
+            sender.sendMessage(ChatColor.GRAY + "Entrants: " + ChatColor.WHITE + event.getSubscriberCount());
+        }, () -> sender.sendMessage(ChatColor.GRAY + "No active event at the moment."));
     }
 
     @Subcommand("reload")
-    @Description("Recarrega as configurações")
+    @Description("Reloads the configuration")
     public void onReload(CommandSender sender) {
         dailyRaceManager.reload();
-        sender.sendMessage(ChatColor.GREEN + "Configurações da Daily Race recarregadas!");
+        sender.sendMessage(ChatColor.GREEN + "Daily Race configuration reloaded!");
     }
 
     @Subcommand("skip")
-    @Description("Pula a etapa atual da corrida diária")
+    @Description("Skips the current stage of the daily race")
     public void onSkip(CommandSender sender) {
         if (dailyRaceManager.getPhase() == Phase.IDLE) {
-            sender.sendMessage(ChatColor.RED + "Não há uma Daily Race ativa para pular etapas.");
+            sender.sendMessage(ChatColor.RED + "There is no active Daily Race to skip stages.");
             return;
         }
 
         if (dailyRaceManager.skipPhase()) {
-            sender.sendMessage(ChatColor.GREEN + "Etapa pulada com sucesso!");
+            sender.sendMessage(ChatColor.GREEN + "Stage skipped successfully!");
         } else {
-            sender.sendMessage(ChatColor.RED + "Falha ao pular etapa.");
+            sender.sendMessage(ChatColor.RED + "Failed to skip stage.");
         }
     }
 
     @Subcommand("exclude add")
-    @Description("Exclui uma pista da Daily Race")
+    @Description("Excludes a track from the Daily Race")
     @CommandCompletion("@tracks")
     public void onExcludeAdd(CommandSender sender, String trackName) {
         if (dailyRaceManager.addExcludedTrack(trackName)) {
-            sender.sendMessage(ChatColor.GREEN + "Pista " + ChatColor.WHITE + trackName + ChatColor.GREEN + " adicionada à exclusão.");
+            sender.sendMessage(ChatColor.GREEN + "Track " + ChatColor.WHITE + trackName + ChatColor.GREEN + " added to exclusion.");
         } else {
-            sender.sendMessage(ChatColor.RED + "Esta pista já está na lista ou o nome é inválido.");
+            sender.sendMessage(ChatColor.RED + "This track is already in the list or the name is invalid.");
         }
     }
 
     @Subcommand("exclude remove")
-    @Description("Remove uma pista da lista de exclusão")
+    @Description("Removes a track from the exclusion list")
     @CommandCompletion("@tracks")
     public void onExcludeRemove(CommandSender sender, String trackName) {
         if (dailyRaceManager.removeExcludedTrack(trackName)) {
-            sender.sendMessage(ChatColor.GREEN + "Pista " + ChatColor.WHITE + trackName + ChatColor.GREEN + " removida da exclusão.");
+            sender.sendMessage(ChatColor.GREEN + "Track " + ChatColor.WHITE + trackName + ChatColor.GREEN + " removed from exclusion.");
         } else {
-            sender.sendMessage(ChatColor.RED + "Esta pista não está na lista de exclusão.");
+            sender.sendMessage(ChatColor.RED + "This track is not in the exclusion list.");
         }
     }
 
     @Subcommand("exclude list")
-    @Description("Lista pistas excluídas")
+    @Description("Lists excluded tracks")
     public void onExcludeList(CommandSender sender) {
-        sender.sendMessage(ChatColor.GOLD + "=== Pistas Excluídas ===");
+        sender.sendMessage(ChatColor.GOLD + "=== Excluded Tracks ===");
         dailyRaceManager.getExcludedTracks().forEach(t ->
                 sender.sendMessage(ChatColor.GRAY + "- " + ChatColor.WHITE + t));
     }

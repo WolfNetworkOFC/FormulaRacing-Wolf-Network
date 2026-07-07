@@ -17,12 +17,12 @@ import org.bukkit.potion.PotionEffectType;
 import java.util.*;
 
 /**
- * ☣️ INFECÇÃO
- * Um piloto começa infectado (vermelho, mais lento, com partículas).
- * Quando um infectado toca um não infectado, este também é infectado.
- * Infectados ficam cada vez mais lentos ao longo do tempo.
- * O último não infectado vence. Se todos forem infectados, o último a ser
- * infectado vence.
+ * ☣️ INFECTION
+ * One driver starts infected (red, slower, with particles).
+ * When an infected touches a non-infected, they also become infected.
+ * Infected drivers get progressively slower over time.
+ * The last non-infected wins. If everyone is infected, the last to be
+ * infected wins.
  */
 public class InfectionSession implements SessionLogic {
 
@@ -32,7 +32,7 @@ public class InfectionSession implements SessionLogic {
     private static final double INFECTION_RANGE_SQ = INFECTION_RANGE * INFECTION_RANGE;
 
     private final Set<UUID> infected = new HashSet<>();
-    private final Map<UUID, Integer> infectionTime = new HashMap(); // ticks desde infecção
+    private final Map<UUID, Integer> infectionTime = new HashMap(); // ticks since infection
     private UUID patientZero = null;
     private FRTask checkTask;
     private FRTask decayTask;
@@ -43,7 +43,7 @@ public class InfectionSession implements SessionLogic {
         heat.setHeatState(HeatState.RACING);
         heat.startOfflineMonitoring();
 
-        // Sorteia o paciente zero
+        // Draw patient zero
         List<UUID> drivers = new ArrayList<>();
         for (Driver d : heat.getDrivers().values()) {
             drivers.add(d.getUuid());
@@ -59,19 +59,19 @@ public class InfectionSession implements SessionLogic {
         startDecayTask(heat);
 
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
-        broadcast(heat, ChatColor.DARK_GREEN + "  ☣️ MODO INFECÇÃO ☣️");
+        broadcast(heat, ChatColor.DARK_GREEN + "  ☣️ INFECTION MODE ☣️");
         broadcast(heat, "");
-        broadcast(heat, ChatColor.RED + "  Um piloto está INFECTADO!");
-        broadcast(heat, ChatColor.YELLOW + "  Fuja dos infectados ou seja contaminado!");
-        broadcast(heat, ChatColor.GREEN + "  O último sobrevivente vence!");
+        broadcast(heat, ChatColor.RED + "  A driver is INFECTED!");
+        broadcast(heat, ChatColor.YELLOW + "  Flee from infected or get contaminated!");
+        broadcast(heat, ChatColor.GREEN + "  The last survivor wins!");
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
 
-        // Anuncia o paciente zero
+        // Announce patient zero
         if (patientZero != null) {
             Player pz = Bukkit.getPlayer(patientZero);
             if (pz != null) {
-                broadcast(heat, ChatColor.DARK_RED + "☣ " + pz.getName() + " é o PACIENTE ZERO!");
-                pz.sendMessage(ChatColor.DARK_RED + "☣ VOCÊ É O PACIENTE ZERO! Infecte todos!");
+                broadcast(heat, ChatColor.DARK_RED + "☣ " + pz.getName() + " is PATIENT ZERO!");
+                pz.sendMessage(ChatColor.DARK_RED + "☣ YOU ARE PATIENT ZERO! Infect everyone!");
             }
         }
     }
@@ -85,7 +85,7 @@ public class InfectionSession implements SessionLogic {
 
             tickCounter++;
 
-            // Para cada infectado, verifica se está perto de alguém não infectado
+            // For each infected, check if they are near someone non-infected
             for (UUID infectedId : new HashSet<>(infected)) {
                 Player infectedPlayer = Bukkit.getPlayer(infectedId);
                 if (infectedPlayer == null || !infectedPlayer.isOnline()) continue;
@@ -97,7 +97,7 @@ public class InfectionSession implements SessionLogic {
                     Player target = Bukkit.getPlayer(driver.getUuid());
                     if (target == null || !target.isOnline()) continue;
 
-                    // Verifica distância
+                    // Check distance
                     if (infectedPlayer.getWorld().equals(target.getWorld()) &&
                             infectedPlayer.getLocation().distanceSquared(target.getLocation()) < INFECTION_RANGE_SQ) {
                         infectPlayer(heat, driver.getUuid());
@@ -105,7 +105,7 @@ public class InfectionSession implements SessionLogic {
                 }
             }
 
-            // Efeitos visuais para infectados
+            // Visual effects for infected
             if (tickCounter % 20 == 0) {
                 for (UUID infId : infected) {
                     Player p = Bukkit.getPlayer(infId);
@@ -115,13 +115,13 @@ public class InfectionSession implements SessionLogic {
                 }
             }
 
-            // Verifica fim de jogo
+            // Check end of game
             long uninfected = heat.getDrivers().values().stream()
                     .filter(d -> !d.isFinished() && !d.isDnf() && !infected.contains(d.getUuid()))
                     .count();
 
             if (uninfected <= 1 && infected.size() > 1) {
-                broadcast(heat, ChatColor.GREEN + "🏆 Fim da Infecção! Apenas um sobrevivente!");
+                broadcast(heat, ChatColor.GREEN + "🏆 Infection Over! Only one survivor!");
             }
         }, 0L, INFECTION_CHECK_TICKS);
     }
@@ -133,7 +133,7 @@ public class InfectionSession implements SessionLogic {
                 return;
             }
 
-            // Aumenta o tempo de infecção e aplica lentidão progressiva
+            // Increase infection time and apply progressive slowness
             for (UUID infId : infected) {
                 int time = infectionTime.getOrDefault(infId, 0) + 1;
                 infectionTime.put(infId, time);
@@ -141,13 +141,13 @@ public class InfectionSession implements SessionLogic {
                 Player p = Bukkit.getPlayer(infId);
                 if (p == null || !p.isOnline()) continue;
 
-                // Lentidão progressiva baseada no tempo de infecção
+                // Progressive slowness based on infection time
                 int slownessLevel = Math.min(4, time / 5); // A cada 5 ticks, aumenta
                 if (slownessLevel > 0) {
                     p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, slownessLevel - 1, false, false));
                 }
 
-                // Efeitos visuais progressivos
+                // Progressive visual effects
                 if (time % 10 == 0) {
                     p.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 40, 0, false, false));
                 }
@@ -167,17 +167,17 @@ public class InfectionSession implements SessionLogic {
 
         Player player = Bukkit.getPlayer(uuid);
         if (player != null && player.isOnline()) {
-            player.sendMessage(ChatColor.DARK_RED + "☣ VOCÊ FOI INFECTADO!");
+            player.sendMessage(ChatColor.DARK_RED + "☣ YOU HAVE BEEN INFECTED!");
             player.playSound(player.getLocation(), Sound.ENTITY_ZOMBIE_INFECT, 2.0f, 1.0f);
             player.getWorld().spawnParticle(Particle.ITEM_SLIME, player.getLocation().add(0, 1, 0), 30, 0.5, 0.5, 0.5, 0.1);
             player.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, Integer.MAX_VALUE, 0, false, false));
         }
 
         if (player != null) {
-            broadcast(heat, ChatColor.RED + "☣ " + player.getName() + " foi INFECTADO!");
+            broadcast(heat, ChatColor.RED + "☣ " + player.getName() + " was INFECTED!");
         }
 
-        // Atualiza scoreboard
+        // Update scoreboard
         heat.updateLivePositions();
     }
 
@@ -218,3 +218,4 @@ public class InfectionSession implements SessionLogic {
         return patientZero;
     }
 }
+

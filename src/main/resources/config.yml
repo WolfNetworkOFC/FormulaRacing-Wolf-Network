@@ -89,6 +89,18 @@ spectator:
 # =========================================================
 #                     MESSAGE SETTINGS
 # =========================================================
+# =========================================================#
+#                      DISCORD WEBHOOK                      #
+# =========================================================#
+# Set webhook-url to enable Discord integration (track submissions, record alerts).
+# Leave empty or comment out to disable.
+discord:
+  webhook-url: ""
+  role-id: ""
+
+# =========================================================
+#                     MESSAGE SETTINGS
+# =========================================================
 message-settings:
   join:
     enabled: true

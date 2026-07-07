@@ -111,7 +111,7 @@ public abstract class Rounds {
     }
 
     public boolean nextHeat() {
-        Optional<Heats> currentHeat = this.heats.values().stream().filter((h) -> h.getHeatState() == HeatState.RACING || h.getHeatState() == HeatState.FINISHED || h.getHeatState() == HeatState.QUALIFYING || h.getHeatState() == HeatState.PRACTICE).findFirst();
+        Optional<Heats> currentHeat = this.heats.values().stream().filter((h) -> h.getHeatState() == HeatState.RACING || h.getHeatState() == HeatState.FINISHED || h.getHeatState() == HeatState.QUALIFYING || h.getHeatState() == HeatState.PRACTICE).max(Comparator.comparingInt(Heats::getHeatNumber));
         if (currentHeat.isEmpty()) {
             return false;
         } else {

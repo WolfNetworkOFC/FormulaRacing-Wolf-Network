@@ -22,18 +22,18 @@ public class TimeTrialCancelCommand extends BaseCommand {
 
     @Default
     public void onCancel(Player player) {
-        // Para o cronômetro do jogador
+        // Stop the player's timer
         this.timerUtils.stopTimer(player);
 
-        // Finaliza a sessão no controlador (se houver)
+        // End the session in the controller (if any)
         if (this.plugin.getTimeTrialController() != null) {
             this.plugin.getTimeTrialController().endSession(player);
         }
 
-        // Tradução ou mensagem direta
+        // Translation key or direct message
         this.plugin.sendMessage(player, "tt_cancelled");
 
-        // Atualiza visibilidade se o modo Lonely estiver ativo
+        // Update visibility if Lonely mode is active
         if (this.plugin.getLonelyController() != null) {
             this.plugin.getLonelyController().updatePlayersVisibility(player);
         }
