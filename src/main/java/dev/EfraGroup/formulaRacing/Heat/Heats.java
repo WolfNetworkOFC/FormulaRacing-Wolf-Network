@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -84,7 +85,7 @@ public class Heats {
         this.roundId = round != null ? round.getId() : 0;
         this.heatNumber = heatNumber;
         this.heatState = HeatState.SETUP;
-        this.drivers = new HashMap();
+        this.drivers = new ConcurrentHashMap<>();
         this.startPositions = new ArrayList();
         this.livePositions = new ArrayList();
         this.totalLaps = 3;
@@ -114,7 +115,7 @@ public class Heats {
 
     public Heats() {
         this.plugin = null;
-        this.drivers = new HashMap();
+        this.drivers = new ConcurrentHashMap<>();
         this.startPositions = new ArrayList();
         this.livePositions = new ArrayList();
     }

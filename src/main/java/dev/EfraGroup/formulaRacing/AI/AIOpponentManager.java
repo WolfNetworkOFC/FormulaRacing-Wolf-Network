@@ -49,7 +49,6 @@ public class AIOpponentManager {
         MEDIUM(0.95, 0.15, 0.7, 0.9, 0.7),
         HARD(1.15, 0.05, 0.9, 0.95, 0.9);
 
-        private final String name;
         private final double speedMultiplier;
         private final double errorRate;
         private final double lineAccuracy;
@@ -58,7 +57,6 @@ public class AIOpponentManager {
 
         AIDifficulty(double speedMultiplier, double errorRate, double lineAccuracy,
                      double reactionTime, double aggressionLevel) {
-            this.name = name();
             this.speedMultiplier = speedMultiplier;
             this.errorRate = errorRate;
             this.lineAccuracy = lineAccuracy;
@@ -66,7 +64,7 @@ public class AIOpponentManager {
             this.aggressionLevel = aggressionLevel;
         }
 
-        public String getName() { return name; }
+        public String getName() { return name(); }
         public double getSpeedMultiplier() { return speedMultiplier; }
         public double getErrorRate() { return errorRate; }
         public double getLineAccuracy() { return lineAccuracy; }
@@ -255,6 +253,7 @@ public class AIOpponentManager {
         private final String displayName;
         private final FormulaRacing plugin;
         private AIDifficulty difficulty;
+        private static final int LINE_SEARCH_WINDOW = 32;
         private int currentLineIndex;
         private double currentSpeed;
         private int mistakesMade;
@@ -365,8 +364,12 @@ public class AIOpponentManager {
                 checkForMistake();
 
                 Location currentLoc = controlledEntity.getLocation();
-                calculateSpeed(heat, line, currentLoc);
-                moveBoat(heat, line, controlledEntity, currentLoc);
+                int resolvedIndex = currentLineIndex >= 0 ? currentLineIndex : 0;
+                if (line != null && line.isUsable() && currentLoc != null) {
+                    resolvedIndex = resolveLineIndex(line, currentLoc);
+                }
+                calculateSpeed(heat, line, currentLoc, resolvedIndex);
+                moveBoat(heat, line, controlledEntity, currentLoc, resolvedIndex);
 
                 Location newLoc = controlledEntity.getLocation();
                 processTrackProgress(heat, currentLoc, newLoc);
@@ -449,11 +452,11 @@ public class AIOpponentManager {
             }
         }
 
-        private void calculateSpeed(Heats heat, AIRacingLine line, Location currentLoc) {
+        private void calculateSpeed(Heats heat, AIRacingLine line, Location currentLoc, int resolvedIndex) {
             double desiredSpeed = DEFAULT_THROTTLE * learnedSpeedMultiplier;
 
             if (line != null && line.isUsable() && currentLoc != null) {
-                int closestIndex = resolveLineIndex(line, currentLoc);
+                int closestIndex = resolvedIndex;
                 desiredSpeed = line.getIdealSpeedAtIndex(closestIndex) * learnedSpeedMultiplier;
 
                 if (line.isNearBrakingPoint(currentLoc, 4.0)) {
@@ -497,11 +500,11 @@ public class AIOpponentManager {
             return factor;
         }
 
-        private void moveBoat(Heats heat, AIRacingLine line, Entity controlledEntity, Location currentLoc) {
+        private void moveBoat(Heats heat, AIRacingLine line, Entity controlledEntity, Location currentLoc, int resolvedIndex) {
             Vector movement;
 
             if (line != null && line.isUsable()) {
-                int index = resolveLineIndex(line, currentLoc);
+                int index = resolvedIndex;
                 int lookAhead = Math.max(1, (int) Math.round(2 + (difficulty.getReactionTime() * 4)));
                 Location target = line.getPointAtWrapped(index + lookAhead);
                 if (target == null || target.getWorld() == null || !target.getWorld().equals(currentLoc.getWorld())) {
@@ -658,7 +661,7 @@ public class AIOpponentManager {
         }
 
         private int resolveLineIndex(AIRacingLine line, Location currentLoc) {
-            int closestIndex = line.getClosestIdealLineIndex(currentLoc);
+            int closestIndex = line.getClosestIdealLineIndex(currentLoc, currentLineIndex, LINE_SEARCH_WINDOW);
             if (closestIndex < 0) {
                 return currentLineIndex >= 0 ? currentLineIndex : 0;
             }

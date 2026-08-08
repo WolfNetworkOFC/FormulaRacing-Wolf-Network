@@ -163,6 +163,7 @@ public class AIRacingLineRecorder {
     public class RecordingSession {
         private final Player player;
         private final String trackName;
+        private final Object recordingLock = new Object();
         private final List<Location> recordedPoints;
         private final List<Location> brakingPoints;
         private final List<Location> accelerationPoints;
@@ -230,35 +231,39 @@ public class AIRacingLineRecorder {
         }
 
         private boolean shouldAddPoint(Location newLoc) {
-            if (newLoc == null || newLoc.getWorld() == null) {
-                return false;
-            }
+            synchronized (recordingLock) {
+                if (newLoc == null || newLoc.getWorld() == null) {
+                    return false;
+                }
 
-            if (recordedPoints.isEmpty()) {
-                return true;
-            }
+                if (recordedPoints.isEmpty()) {
+                    return true;
+                }
 
-            Location lastPoint = recordedPoints.get(recordedPoints.size() - 1);
-            if (!lastPoint.getWorld().equals(newLoc.getWorld())) {
-                return true;
-            }
+                Location lastPoint = recordedPoints.get(recordedPoints.size() - 1);
+                if (!lastPoint.getWorld().equals(newLoc.getWorld())) {
+                    return true;
+                }
 
-            return lastPoint.distanceSquared(newLoc) >= 4.0;
+                return lastPoint.distanceSquared(newLoc) >= 4.0;
+            }
         }
 
         private void addPoint(Location loc, Player currentPlayer) {
-            recordedPoints.add(loc.clone());
+            synchronized (recordingLock) {
+                recordedPoints.add(loc.clone());
 
-            double speed = currentPlayer.getVelocity().length();
-            if (speed < 0.3 && recordedPoints.size() > 10) {
-                if (brakingPoints.isEmpty() || brakingPoints.get(brakingPoints.size() - 1).distanceSquared(loc) > 25.0) {
-                    brakingPoints.add(loc.clone());
+                double speed = currentPlayer.getVelocity().length();
+                if (speed < 0.3 && recordedPoints.size() > 10) {
+                    if (brakingPoints.isEmpty() || brakingPoints.get(brakingPoints.size() - 1).distanceSquared(loc) > 25.0) {
+                        brakingPoints.add(loc.clone());
+                    }
                 }
-            }
 
-            if (speed > 0.6 && recordedPoints.size() > 10) {
-                if (accelerationPoints.isEmpty() || accelerationPoints.get(accelerationPoints.size() - 1).distanceSquared(loc) > 25.0) {
-                    accelerationPoints.add(loc.clone());
+                if (speed > 0.6 && recordedPoints.size() > 10) {
+                    if (accelerationPoints.isEmpty() || accelerationPoints.get(accelerationPoints.size() - 1).distanceSquared(loc) > 25.0) {
+                        accelerationPoints.add(loc.clone());
+                    }
                 }
             }
         }
@@ -277,28 +282,37 @@ public class AIRacingLineRecorder {
 
             Player p = getPlayer();
 
-            if (recordedPoints.size() < 5) {
+            List<Location> snapshotRecorded;
+            List<Location> snapshotBraking;
+            List<Location> snapshotAcceleration;
+            synchronized (recordingLock) {
+                snapshotRecorded = new ArrayList<>(recordedPoints);
+                snapshotBraking = new ArrayList<>(brakingPoints);
+                snapshotAcceleration = new ArrayList<>(accelerationPoints);
+            }
+
+            if (snapshotRecorded.size() < 5) {
                 activeSessions.remove(player.getUniqueId());
                 if (p != null && p.isOnline()) {
                     p.sendMessage("§cRecording discarded — too few points recorded.");
                 }
-                plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Recording discarded for " + player.getName() + " — too few points (" + recordedPoints.size() + ")");
+                plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Recording discarded for " + player.getName() + " — too few points (" + snapshotRecorded.size() + ")");
                 return;
             }
 
             AIRacingLine line = racingLineManager.getRacingLine(trackName);
             line.clear();
 
-            int totalPoints = recordedPoints.size();
+            int totalPoints = snapshotRecorded.size();
             for (int i = 0; i < totalPoints; i++) {
-                Location loc = recordedPoints.get(i);
+                Location loc = snapshotRecorded.get(i);
                 line.addIdealLinePoint(loc, calculateSpeedForPoint(i, totalPoints));
             }
 
-            for (Location brakePoint : brakingPoints) {
+            for (Location brakePoint : snapshotBraking) {
                 line.addBrakingPoint(brakePoint);
             }
-            for (Location accelPoint : accelerationPoints) {
+            for (Location accelPoint : snapshotAcceleration) {
                 line.addAccelerationPoint(accelPoint);
             }
 
@@ -317,14 +331,14 @@ public class AIRacingLineRecorder {
                 p.sendMessage("§e  ■ Recording Finished!");
                 p.sendMessage("");
                 p.sendMessage("§f  Track: §b" + trackName);
-                p.sendMessage("§f  Recorded points: §a" + recordedPoints.size());
-                p.sendMessage("§f  Braking points: §c" + brakingPoints.size());
-                p.sendMessage("§f  Acceleration points: §e" + accelerationPoints.size());
+                p.sendMessage("§f  Recorded points: §a" + snapshotRecorded.size());
+                p.sendMessage("§f  Braking points: §c" + snapshotBraking.size());
+                p.sendMessage("§f  Acceleration points: §e" + snapshotAcceleration.size());
                 p.sendMessage("§f  Line saved as §b" + trackName);
                 p.sendMessage("§a═══════════════════════════════");
             }
 
-            plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Line saved for " + trackName + " with " + recordedPoints.size() + " points");
+            plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Line saved for " + trackName + " with " + snapshotRecorded.size() + " points");
         }
 
         private double calculateSpeedForPoint(int index, int totalPoints) {
@@ -373,7 +387,9 @@ public class AIRacingLineRecorder {
         }
 
         public List<Location> getRecordedPoints() {
-            return new ArrayList<>(recordedPoints);
+            synchronized (recordingLock) {
+                return new ArrayList<>(recordedPoints);
+            }
         }
     }
 }

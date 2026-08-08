@@ -161,6 +161,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private MegavexAdapter sharedScoreboardAdapter;
     private TrackVisualizer trackVisualizer;
     private dev.EfraGroup.formulaRacing.Visuals.AILineVisualizer aiLineVisualizer;
+    private AIRacingLineRecorderListener recorderListener;
     private EventAnnouncements eventAnnouncements;
     private TimeTrialController timeTrialController;
     private PlaceholderRegister placeholderRegister;
@@ -581,6 +582,14 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.aiRacingLineManager.getRecorder().cleanup();
         }
 
+        if (this.aiLineVisualizer != null) {
+            this.aiLineVisualizer.shutdown();
+        }
+
+        if (this.recorderListener != null) {
+            this.recorderListener.cleanup();
+        }
+
         if (this.aiOpponentManager != null) {
             this.aiOpponentManager.clearAll();
         }
@@ -686,8 +695,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             ),
             this
         );
+        this.recorderListener = new AIRacingLineRecorderListener(this);
         Bukkit.getPluginManager().registerEvents(
-            new AIRacingLineRecorderListener(this),
+            this.recorderListener,
             this
         );
         this.lightningRodListener = new LightningRodListener(this);

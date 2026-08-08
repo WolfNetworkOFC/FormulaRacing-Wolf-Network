@@ -162,7 +162,7 @@ public class AIRacingLineManager {
             line.writeTo(out);
             return true;
         } catch (IOException e) {
-            plugin.getLogger().warning("[AI] Error saving racing line for " + normalizedTrackName + ": " + e.getMessage());
+            plugin.getDebugManager().logRaceSystem("[AI] Error saving racing line for " + normalizedTrackName + ": " + e.getMessage());
             return false;
         }
     }
@@ -210,7 +210,7 @@ public class AIRacingLineManager {
                     loadedCount++;
                 }
             } catch (IOException e) {
-                plugin.getLogger().warning("[AI] Error loading racing line from " + file.getName() + ": " + e.getMessage());
+                plugin.getDebugManager().logRaceSystem("[AI] Error loading racing line from " + file.getName() + ": " + e.getMessage());
             }
         }
 

@@ -9,6 +9,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Manages the ideal racing line for a track.
@@ -23,10 +24,10 @@ public class AIRacingLine {
 
     public AIRacingLine(String trackName) {
         this.trackName = trackName;
-        this.idealLine = new ArrayList<>();
-        this.idealSpeeds = new ArrayList<>();
-        this.brakingPoints = new ArrayList<>();
-        this.accelerationPoints = new ArrayList<>();
+        this.idealLine = new CopyOnWriteArrayList<>();
+        this.idealSpeeds = new CopyOnWriteArrayList<>();
+        this.brakingPoints = new CopyOnWriteArrayList<>();
+        this.accelerationPoints = new CopyOnWriteArrayList<>();
     }
 
     public void addIdealLinePoint(Location location, double idealSpeed) {
@@ -76,6 +77,41 @@ public class AIRacingLine {
         }
 
         return closestIndex;
+    }
+
+    public int getClosestIdealLineIndex(Location location, int hintIndex, int window) {
+        if (location == null || location.getWorld() == null || idealLine.isEmpty()) {
+            return -1;
+        }
+
+        int pointCount = idealLine.size();
+        if (hintIndex < 0) {
+            return getClosestIdealLineIndex(location);
+        }
+
+        int half = Math.max(1, Math.min(window, pointCount));
+        int bestIndex = -1;
+        double bestDistanceSquared = Double.MAX_VALUE;
+
+        for (int delta = -half; delta <= half; delta++) {
+            int index = Math.floorMod(hintIndex + delta, pointCount);
+            Location point = idealLine.get(index);
+            if (point.getWorld() == null || !point.getWorld().equals(location.getWorld())) {
+                continue;
+            }
+
+            double distanceSquared = point.distanceSquared(location);
+            if (distanceSquared < bestDistanceSquared) {
+                bestDistanceSquared = distanceSquared;
+                bestIndex = index;
+            }
+        }
+
+        if (bestIndex < 0) {
+            return getClosestIdealLineIndex(location);
+        }
+
+        return bestIndex;
     }
 
     public double getIdealSpeedAt(Location location) {

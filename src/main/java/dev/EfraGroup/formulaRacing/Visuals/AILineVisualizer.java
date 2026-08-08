@@ -8,12 +8,14 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Participant.Spectator;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +33,7 @@ public class AILineVisualizer {
 
     private final FormulaRacing plugin;
     private final Map<Integer, AILineCache> activeHeats = new ConcurrentHashMap<>();
+    private FRTask renderTask;
     private static final double RENDER_DISTANCE_SQ = 4096.0; // 64 blocks
     private static final Color IDEAL_COLOR = Color.AQUA;
     private static final Color BRAKE_COLOR = Color.RED;
@@ -116,18 +119,21 @@ public class AILineVisualizer {
     }
 
     private void startTask() {
-        SchedulerHelper.runTaskTimer(plugin, (scheduledTask) -> {
+        renderTask = SchedulerHelper.runTaskTimer(plugin, (scheduledTask) -> {
             if (activeHeats.isEmpty()) {
                 return;
             }
 
             for (AILineCache cache : activeHeats.values()) {
                 Set<UUID> rendered = new HashSet<>();
-                // Players in the heat
-                for (Driver driver : cache.heat.getDrivers().values()) {
+                // Snapshot the driver map so iteration is safe from concurrent mutation.
+                List<Driver> drivers = new ArrayList<>(cache.heat.getDrivers().values());
+                for (Driver driver : drivers) {
                     Player p = plugin.getServer().getPlayer(driver.getUuid());
-                    if (p != null && p.isOnline()) {
-                        renderForPlayer(p, cache);
+                    if (p != null && p.isOnline() && !rendered.contains(p.getUniqueId())) {
+                        // Player entity access (getLocation/getWorld/spawnParticle) must run
+                        // on the player's region thread under Folia.
+                        SchedulerHelper.runTaskFor(plugin, p, () -> renderForPlayer(p, cache));
                         rendered.add(p.getUniqueId());
                     }
                 }
@@ -135,7 +141,8 @@ public class AILineVisualizer {
                 if (plugin.getSpectatorManager() != null && cache.heat.getRound() != null) {
                     Events event = cache.heat.getRound().getEvent();
                     if (event != null) {
-                        for (Spectator spec : plugin.getSpectatorManager().getEventSpectators(event)) {
+                        List<Spectator> spectators = new ArrayList<>(plugin.getSpectatorManager().getEventSpectators(event));
+                        for (Spectator spec : spectators) {
                             if (rendered.contains(spec.getUuid())) {
                                 continue;
                             }
@@ -147,13 +154,20 @@ public class AILineVisualizer {
                             }
                             Player p = plugin.getServer().getPlayer(spec.getUuid());
                             if (p != null && p.isOnline()) {
-                                renderForPlayer(p, cache);
+                                SchedulerHelper.runTaskFor(plugin, p, () -> renderForPlayer(p, cache));
                             }
                         }
                     }
                 }
             }
         }, 0L, 10L);
+    }
+
+    public void shutdown() {
+        if (renderTask != null && !renderTask.isCancelled()) {
+            renderTask.cancel();
+        }
+        activeHeats.clear();
     }
 
     private void renderForPlayer(Player player, AILineCache cache) {
