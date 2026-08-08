@@ -368,55 +368,5 @@ public class PacketSender {
         sendBoatSetting(player, (short) 0);
     }
 
-    private final java.util.Set<UUID> lonelyPlayers = new java.util.HashSet<>();
-    public void applyLonelyToPlayer(Player player, boolean lonelyActive) {
-        UUID uuid = player.getUniqueId();
-        boolean hasMod = FormulaRacing.hasOpenBoatUtilsMod(player);
 
-        if (lonelyActive) {
-            lonelyPlayers.add(uuid);
-
-            if (hasMod) {
-                sendBoatSetting(player, (short) 27, (short) 4);
-            } else {
-                SchedulerHelper.runTaskFor(FormulaRacing.getInstance(), player, () -> {
-                    org.bukkit.entity.Entity boat = player.getVehicle();
-
-                    for (Player other : Bukkit.getOnlinePlayers()) {
-                        if (other.equals(player)) continue;
-
-                        SchedulerHelper.runTaskFor(FormulaRacing.getInstance(), other, () -> {
-                            other.hidePlayer(FormulaRacing.getInstance(), player);
-                            if (boat != null) {
-                                other.hideEntity(FormulaRacing.getInstance(), boat);
-                            }
-                        });
-                    }
-                    Bukkit.getLogger().info("[FormulaRacing] Lonely ON (Invisibilidade total) para: " + player.getName());
-                });
-            }
-        } else {
-            lonelyPlayers.remove(uuid);
-
-            if (hasMod) {
-                sendBoatSetting(player, (short) 27, (short) 0);
-            } else {
-                SchedulerHelper.runTaskFor(FormulaRacing.getInstance(), player, () -> {
-                    org.bukkit.entity.Entity boat = player.getVehicle();
-
-                    for (Player other : Bukkit.getOnlinePlayers()) {
-                        if (other.equals(player)) continue;
-
-                        SchedulerHelper.runTaskFor(FormulaRacing.getInstance(), other, () -> {
-                            other.showPlayer(FormulaRacing.getInstance(), player);
-                            if (boat != null) {
-                                other.showEntity(FormulaRacing.getInstance(), boat);
-                            }
-                        });
-                    }
-                    Bukkit.getLogger().info("[FormulaRacing] Lonely OFF (Visibilidade total) para: " + player.getName());
-                });
-            }
-        }
-    }
 }

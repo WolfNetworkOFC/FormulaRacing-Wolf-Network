@@ -40,7 +40,7 @@ public class RaceMovementListener implements Listener {
                         Heats activeHeat = this.findActiveHeat(round);
                         if (activeHeat != null && activeHeat.getHeatState() == HeatState.RACING) {
                             Driver driver = activeHeat.getDriver(player.getUniqueId());
-                            if (driver != null) {
+                            if (driver != null && !driver.isFinished()) {
                                 this.handlePitStops(player, driver, activeHeat);
                             }
                         }

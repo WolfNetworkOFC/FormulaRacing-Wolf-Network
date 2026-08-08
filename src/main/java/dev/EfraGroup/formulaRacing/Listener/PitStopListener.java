@@ -23,6 +23,7 @@ import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.Bukkit;
@@ -220,6 +221,19 @@ public class PitStopListener implements Listener {
                     : (long) (rawElapsed * 1000.0);
             double preciseElapsedSeconds = (double) totalTimeMillis / 1000.0;
             String langCode = db.getPlayerLanguage(uuid);
+
+            // --- Ghost System: stop recording and capture frames (PIT finish) ---
+            final List<dev.EfraGroup.formulaRacing.Ghost.GhostFrame> ghostFrames =
+                    this.plugin.getGhostManager() != null
+                            ? this.plugin.getGhostManager().stopRecording(player)
+                            : null;
+
+            // --- Medal record: capture lap for /te medals record ---
+            if (this.plugin.getMedalManager() != null) {
+                this.plugin.getMedalManager().handleLapFinish(player, trackNameWS, preciseElapsedSeconds, ghostFrames);
+                // Announce when the lap achieves a diamond/netherite/saphira medal
+                this.plugin.getMedalManager().checkMedalAchievement(player, trackNameWS, preciseElapsedSeconds);
+            }
 
             SchedulerHelper.runAsync(this.plugin, () -> {
                 Object[] pb = db.getPlayerBestTime(player.getName(), trackNameWS);

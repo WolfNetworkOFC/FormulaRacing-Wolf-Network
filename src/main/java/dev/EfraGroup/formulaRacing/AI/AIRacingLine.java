@@ -1,7 +1,12 @@
 package dev.EfraGroup.formulaRacing.AI;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -179,5 +184,78 @@ public class AIRacingLine {
 
     private double clampSpeed(double speed) {
         return Math.max(0.1, Math.min(1.0, speed));
+    }
+
+    // ---- Binary serialization ----
+
+    private static final int FORMAT_VERSION = 1;
+
+    private static void writeLocation(DataOutputStream out, Location loc) throws IOException {
+        out.writeDouble(loc.getX());
+        out.writeDouble(loc.getY());
+        out.writeDouble(loc.getZ());
+        out.writeUTF(loc.getWorld() != null ? loc.getWorld().getName() : "");
+    }
+
+    private static Location readLocation(DataInputStream in) throws IOException {
+        double x = in.readDouble();
+        double y = in.readDouble();
+        double z = in.readDouble();
+        String worldName = in.readUTF();
+        World world = Bukkit.getWorld(worldName);
+        return world == null ? null : new Location(world, x, y, z);
+    }
+
+    public void writeTo(DataOutputStream out) throws IOException {
+        out.writeInt(FORMAT_VERSION);
+
+        out.writeInt(idealLine.size());
+        for (int i = 0; i < idealLine.size(); i++) {
+            writeLocation(out, idealLine.get(i));
+            out.writeDouble(idealSpeeds.get(i));
+        }
+
+        out.writeInt(brakingPoints.size());
+        for (Location loc : brakingPoints) {
+            writeLocation(out, loc);
+        }
+
+        out.writeInt(accelerationPoints.size());
+        for (Location loc : accelerationPoints) {
+            writeLocation(out, loc);
+        }
+    }
+
+    public static AIRacingLine readFrom(DataInputStream in, String trackName) throws IOException {
+        in.readInt(); // version
+
+        AIRacingLine line = new AIRacingLine(trackName);
+
+        int idealCount = in.readInt();
+        for (int i = 0; i < idealCount; i++) {
+            Location loc = readLocation(in);
+            double speed = in.readDouble();
+            if (loc != null && loc.getWorld() != null) {
+                line.addIdealLinePoint(loc, speed);
+            }
+        }
+
+        int brakingCount = in.readInt();
+        for (int i = 0; i < brakingCount; i++) {
+            Location loc = readLocation(in);
+            if (loc != null) {
+                line.addBrakingPoint(loc);
+            }
+        }
+
+        int accelCount = in.readInt();
+        for (int i = 0; i < accelCount; i++) {
+            Location loc = readLocation(in);
+            if (loc != null) {
+                line.addAccelerationPoint(loc);
+            }
+        }
+
+        return line;
     }
 }

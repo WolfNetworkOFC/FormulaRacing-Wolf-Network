@@ -82,7 +82,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                     if (!this.mysql.isTrackOpen(trackName)) continue;
 
                     DatabaseManager.TrackData data = entry.getValue();
-                    String icon = mysql.getIcon(trackName);
+                    String icon = data.getIconName();
                     Double wr = mysql.getBestTime(trackName);
 
                     // Fetch the player's Personal Best (PB)
@@ -126,6 +126,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         if (session == null) {
             return;
         }
+        session.refreshing = true;
         String langCode = this.mysql.getPlayerLanguage(player.getUniqueId());
         int itemsPerPage = 45;
         int totalItems = session.currentView.size();
@@ -206,6 +207,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             );
         }
         player.openInventory(inv);
+        session.refreshing = false;
     }
 
     private void applySortAndFilter(PlayerMenuSession session) {
@@ -260,8 +262,12 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     private ItemStack createTrackItem(TrackMenuInfo info, String langCode) {
         Material mat;
         try {
-            // Removed the unnecessary (String) cast
-            mat = Material.valueOf(info.iconName.toUpperCase());
+            String icon = info.iconName;
+            if (icon == null || icon.isBlank() || "N/A".equalsIgnoreCase(icon)) {
+                mat = Material.PAPER;
+            } else {
+                mat = Material.valueOf(icon.toUpperCase());
+            }
         } catch (Exception e) {
             mat = Material.PAPER;
         }
@@ -275,7 +281,8 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             // FIX: Using List<String> instead of ArrayList<Object>
             List<String> lore = new ArrayList<>();
 
-            lore.add("§7Owner: §e" + info.trackData.getOwnerName());
+            String owner = info.trackData.getOwnerName();
+            lore.add("§7Owner: §e" + (owner != null ? owner : "Unknown"));
             lore.add("");
 
             String pb = (info.playerBestTime == null)
@@ -321,7 +328,13 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     @EventHandler
     public void onClose(InventoryCloseEvent e) {
         if (e.getInventory().getHolder() instanceof TimeTrialMenuHolder) {
-            this.sessions.remove(e.getPlayer().getUniqueId());
+            HumanEntity who = e.getPlayer();
+            PlayerMenuSession session = this.sessions.get(who.getUniqueId());
+            // Ignore the close event fired when we reopen to change pages/sort/filter.
+            if (session != null && session.refreshing) {
+                return;
+            }
+            this.sessions.remove(who.getUniqueId());
         }
     }
 
@@ -340,6 +353,10 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         Player player = (Player) humanEntity;
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || clicked.getType() == Material.AIR) {
+            return;
+        }
+        ItemMeta clickedMeta = clicked.getItemMeta();
+        if (clickedMeta == null) {
             return;
         }
         UUID uuid = player.getUniqueId();
@@ -392,7 +409,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         }
         this.lastClickTime.put(uuid, now);
         String trackName = ChatColor.stripColor(
-            (String) clicked.getItemMeta().getDisplayName()
+            (String) clickedMeta.getDisplayName()
         );
         player.closeInventory();
         this.startTrackFromMenu(player, trackName);
@@ -505,6 +522,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         SchedulerHelper.teleportAsync(player, loc).thenAccept(success -> {
             if (Boolean.TRUE.equals(success)) {
                 this.api.spawnBoatAt(player, loc, false, false, false);
+                this.plugin.getHotbarController().giveTimeTrialHotbar(player);
             }
         });
     }
@@ -522,6 +540,9 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         FilterType filter = FilterType.ALL;
         List<TrackMenuInfo> allTracksRaw = new ArrayList<TrackMenuInfo>();
         List<TrackMenuInfo> currentView = new ArrayList<TrackMenuInfo>();
+        // Set while we reopen the inventory to switch pages/sort/filter, so the
+        // close event from the old inventory doesn't wipe the session.
+        volatile boolean refreshing = false;
 
         private PlayerMenuSession() {}
     }

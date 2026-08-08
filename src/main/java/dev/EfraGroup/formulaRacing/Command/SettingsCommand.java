@@ -4,6 +4,7 @@ import dev.EfraGroup.formulaRacing.Command.Help.CommandHelpService;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Gui.BoatSelectGui;
+import dev.EfraGroup.formulaRacing.Gui.SettingsMenu;
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.CatchUnknown;
 import co.aikar.commands.annotation.CommandAlias;

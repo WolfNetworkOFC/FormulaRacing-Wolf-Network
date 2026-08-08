@@ -9,6 +9,7 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Gui.MainMenu;
 import dev.EfraGroup.formulaRacing.Gui.SettingsMenu;
+import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import java.util.HashMap;
 import java.util.List;
@@ -36,13 +37,59 @@ public class HotbarController {
 
     public void giveHotbarItems(Player player) {
         player.getInventory().clear();
-        player.getInventory().setItem(0, this.createItem(Material.NETHER_STAR, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_menu_name", new String[0]), "menu", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_menu_lore", new String[0])));
-        player.getInventory().setItem(1, this.createItem(Material.FILLED_MAP, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_tracks_name", new String[0]), "time_trial", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_tracks_lore", new String[0])));
-        player.getInventory().setItem(2, this.createItem(Material.FIREWORK_ROCKET, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_random_name", new String[0]), "random_track", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_random_lore", new String[0])));
+        player.getInventory().setItem(0, this.createItem(Material.COMPARATOR, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_settings_name", new String[0]), "settings", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_settings_lore", new String[0])));
+        player.getInventory().setItem(1, this.createItem(Material.BOOK, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_tracks_name", new String[0]), "time_trial", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_tracks_lore", new String[0])));
+        player.getInventory().setItem(2, this.createItem(Material.CHEST, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_cosmetics_name", new String[0]), "cosmetics", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_cosmetics_lore", new String[0])));
         this.updateLonelyItem(player);
+        player.getInventory().setItem(5, this.createItem(Material.NETHER_STAR, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_random_name", new String[0]), "random_track", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_random_lore", new String[0])));
+        player.getInventory().setItem(6, this.createItem(Material.OAK_BOAT, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_boat_name", new String[0]), "boat", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_boat_lore", new String[0])));
+        player.getInventory().setItem(8, this.createItem(Material.BARRIER, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_spawn_name", new String[0]), "spawn", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_spawn_lore", new String[0])));
+
+        try {
+            player.getInventory().setBoots(new ItemStack(Material.LEATHER_BOOTS));
+        } catch (Exception var3) {
+        }
+
+    }
+
+    public void giveTimeTrialHotbar(Player player) {
+        player.getInventory().clear();
         player.getInventory().setItem(0, this.createItem(Material.DRAGON_BREATH, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_reset_name", new String[0]), "reset", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_reset_lore", new String[0])));
-        player.getInventory().setItem(7, this.createItem(Material.RED_BED, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_spawn_name", new String[0]), "spawn", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_spawn_lore", new String[0])));
-        player.getInventory().setItem(8, this.createItem(Material.COMPARATOR, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_settings_name", new String[0]), "settings", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_settings_lore", new String[0])));
+        player.getInventory().setItem(1, this.createItem(Material.BOOK, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_tracks_name", new String[0]), "time_trial", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_tracks_lore", new String[0])));
+        player.getInventory().setItem(2, this.createItem(Material.NETHER_STAR, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_random_name", new String[0]), "random_track", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_random_lore", new String[0])));
+        this.updateLonelyItem(player);
+        player.getInventory().setItem(7, this.createItem(Material.COMPARATOR, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_settings_name", new String[0]), "settings", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_settings_lore", new String[0])));
+        player.getInventory().setItem(8, this.createItem(Material.BARRIER, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_spawn_name", new String[0]), "spawn", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_spawn_lore", new String[0])));
+
+        try {
+            player.getInventory().setBoots(new ItemStack(Material.LEATHER_BOOTS));
+        } catch (Exception var3) {
+        }
+
+    }
+
+    public void giveHeatHotbar(Player player, Heats heat) {
+        player.getInventory().clear();
+        boolean canReset = heat != null && heat.isCanReset();
+        if (canReset) {
+            player.getInventory().setItem(1, this.createItem(Material.DRAGON_BREATH, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_reset_name", new String[0]), "reset", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_reset_lore", new String[0])));
+        } else {
+            player.getInventory().setItem(1, this.createItem(Material.COMPASS, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_resetcp_name", new String[0]), "resetcp", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_resetcp_lore", new String[0])));
+        }
+
+        this.updateLonelyItem(player);
+        player.getInventory().setItem(8, this.createItem(Material.IRON_DOOR, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_leave_event_name", new String[0]), "leave_event", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_leave_event_lore", new String[0])));
+
+        try {
+            player.getInventory().setBoots(new ItemStack(Material.LEATHER_BOOTS));
+        } catch (Exception var4) {
+        }
+
+    }
+
+    public void giveSpectatorHotbar(Player player) {
+        player.getInventory().clear();
+        player.getInventory().setItem(8, this.createItem(Material.BARRIER, this.plugin.getTranslationUtil().getTranslated(player, "hotbar_spawn_name", new String[0]), "spawn", this.plugin.getTranslationUtil().getTranslationList(player, "hotbar_spawn_lore", new String[0])));
 
         try {
             player.getInventory().setBoots(new ItemStack(Material.LEATHER_BOOTS));
@@ -95,6 +142,11 @@ public class HotbarController {
                         case "random_track":
                             player.performCommand("ttr");
                             break;
+                        case "cosmetics":
+                            break;
+                        case "boat":
+                            player.performCommand("boat");
+                            break;
                         case "lonely_toggle":
                             boolean current = this.dm.getLonelyModePlayer(player.getUniqueId());
                             player.performCommand("lonely " + !current);
@@ -103,7 +155,17 @@ public class HotbarController {
                         case "reset":
                             player.performCommand("reset");
                             break;
+                        case "resetcp":
+                            player.performCommand("resetcp");
+                            break;
+                        case "leave_event":
+                            player.performCommand("event leave");
+                            break;
                         case "spawn":
+                            // Delete the player's boat BEFORE teleporting so it doesn't get
+                            // orphaned at the track when the external /spawn moves them.
+                            // The SpawnBoatCleanupListener handles hotbar restore + state cleanup.
+                            this.plugin.getAPI().removePlayerBoat(player.getUniqueId());
                             player.performCommand("spawn");
                             break;
                         case "settings":

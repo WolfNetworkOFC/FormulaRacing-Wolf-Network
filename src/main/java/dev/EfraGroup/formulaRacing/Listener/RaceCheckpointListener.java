@@ -426,9 +426,15 @@ public class RaceCheckpointListener implements Listener {
         SchedulerHelper.runTaskFor(plugin, player, () -> {
             if (finalPlayer.isOnline()) {
                 this.plugin.getAPI().recoverPlayerBoatState(finalPlayer);
-                SchedulerHelper.teleport(finalPlayer, finalTargetLoc);
-                finalPlayer.playSound(finalTargetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
-                this.plugin.getAPI().spawnBoat(finalPlayer, false, false, false);
+                // Folia: teleportAsync é assíncrono — spawnar o barco na posição atual
+                // antes do teleport concluir faria o jogador montar de novo e o teleport
+                // falhar (player dentro de veículo). Spawnamos só após concluir, no destino.
+                SchedulerHelper.teleportAsync(finalPlayer, finalTargetLoc).thenAccept(success -> {
+                    if (Boolean.TRUE.equals(success) && finalPlayer.isOnline()) {
+                        finalPlayer.playSound(finalTargetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
+                        this.plugin.getAPI().spawnBoatAt(finalPlayer, finalTargetLoc, false, false, false);
+                    }
+                });
             }
         }, 1L);
         this.plugin.sendMessage(
@@ -491,17 +497,18 @@ public class RaceCheckpointListener implements Listener {
     }
 
     public void handleLapCompleted(Driver driver, Heats heat, Player player) {
+        String driverName = player != null ? player.getName() : "AI:" + driver.getCustomName();
         Lap currentLap = driver.getCurrentLap();
         if (currentLap == null) {
             this.plugin.getDebugManager().logRaceSystem(
                     "§c[LAP ERROR] " +
-                        player.getName() +
+                        driverName +
                         " completed lap but currentLap is null!"
             );
         } else if (driver.getLaps().isEmpty()) {
             this.plugin.getDebugManager().logRaceSystem(
                     "§c[LAP ERROR] " +
-                        player.getName() +
+                        driverName +
                         " completed lap but laps list is empty!"
             );
         } else {
@@ -519,6 +526,12 @@ public class RaceCheckpointListener implements Listener {
                         completedLap.getLapEnd(),
                         completedLap.isPitted()
                     );
+            }
+
+            // AI drivers have no Player to message/announce to; the lap is already
+            // persisted above, so skip the player-facing updates.
+            if (player == null) {
+                return;
             }
 
             this.checkFastestLap(driver, completedLap, heat, player);
@@ -873,13 +886,20 @@ public class RaceCheckpointListener implements Listener {
             }
 
             if (sessionState == HeatState.RACING) {
-                this.teleportToSpectatorArea(player, heat);
-                this.plugin.getAPI().recoverPlayerBoatState(player);
+                boolean teleported = this.teleportToSpectatorArea(player, heat);
+                // Only delete the boat when the player was actually teleported to a
+                // podium/finish location. If no podium is configured, the player
+                // stays on the boat and can exit voluntarily when ready.
+                if (teleported) {
+                    this.plugin.getAPI().recoverPlayerBoatState(player);
+                }
                 if (this.plugin.getPacketSender() != null) {
                     this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
                     boolean dbLonely = this.plugin.getDatabaseManager().getLonelyModePlayer(player.getUniqueId());
                     this.plugin.getLonelyController().setLonelyMode(player, dbLonely);
                 }
+                // Hide the finished player from active racers in the same heat
+                this.plugin.getLonelyController().onDriverFinished(heat, player);
             }
 
             this.checkAllFinished(heat);
@@ -951,7 +971,7 @@ public class RaceCheckpointListener implements Listener {
             : this.plugin.getServer().getOfflinePlayer(uuid).getName();
     }
 
-    private void teleportToSpectatorArea(Player player, Heats heat) {
+    private boolean teleportToSpectatorArea(Player player, Heats heat) {
         String trackNameWS = heat.getTrackNameWS();
         if (trackNameWS != null) {
             DatabaseManager db = this.plugin.getDatabaseManager();
@@ -973,7 +993,7 @@ public class RaceCheckpointListener implements Listener {
                         80,
                         20
                     );
-                    return;
+                    return true;
                 }
             }
 
@@ -997,8 +1017,10 @@ public class RaceCheckpointListener implements Listener {
                     "race_teleport_stand",
                     new String[0]
                 );
+                return true;
             }
         }
+        return false;
     }
 
     private String formatTime(long timeMs) {

@@ -2,6 +2,7 @@ package dev.EfraGroup.formulaRacing.Controllers;
 
 import dev.EfraGroup.formulaRacing.BoatUtils.NocolManager;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Utils.PlatformUtils;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
@@ -179,6 +180,26 @@ public class LonelyController implements Listener {
         this.updatePlayerVisibility(player);
     }
 
+    /**
+     * Called when a driver finishes a heat race. Refreshes visibility so that
+     * active racers can no longer see the finished driver, while spectators and
+     * out-of-race players still can.
+     */
+    public void onDriverFinished(Heats heat, Player finishedPlayer) {
+        // Recalculate how every viewer perceives the finished player
+        this.updatePlayerVisibility(finishedPlayer);
+        // Recalculate what the finished player now sees (they've left the active-racer scope)
+        this.updatePlayersVisibility(finishedPlayer);
+
+        // Also nudge all other drivers in the heat so their own visibility recalculates
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            if (viewer.equals(finishedPlayer)) continue;
+            if (heat.getDriver(viewer.getUniqueId()) != null) {
+                this.updatePlayersVisibility(viewer);
+            }
+        }
+    }
+
     public boolean hasSeenObuInfo(UUID uuid) {
         return this.obuInfoShown.contains(uuid);
     }
@@ -193,20 +214,27 @@ public class LonelyController implements Listener {
 
     /**
      * Applies the full visibility + collision policy for {@code viewer} against all other
-     * online players.  Mirrors TS {@code updatePlayersVisibility} lambda.
+     * online players.
+     *
+     * <p>Regras de visibilidade:
+     * <ul>
+     *   <li>Pessoas só são ocultadas se o viewer tiver lonely ativado</li>
+     *   <li>Heat lonely DESLIGADO: mostra só participantes do heat (independente do personalLonely)</li>
+     *   <li>Heat lonely LIGADO + personalLonely DESLIGADO + tem mod: mostra participantes + só remove colisão</li>
+     *   <li>Heat lonely LIGADO + personalLonely DESLIGADO + sem mod: oculta todos (fallback)</li>
+     *   <li>Heat lonely LIGADO + personalLonely LIGADO: oculta TODOS (inclusive participantes)</li>
+     *   <li>Permite mudar lonely no meio do heat</li>
+     * </ul>
      */
     private void processViewerVisibility(Player viewer) {
         if (!viewer.isOnline()) return;
 
-        // --- Collision for the viewer themselves ---
+        // Collision for the viewer
         if (isPlayerInBoat(viewer)) {
             applyCollisionForViewer(viewer);
-        } else {
-            // Not in a boat: remove from nocol scoreboard team, no OBU packet needed
-            setVanillaCollision(viewer, false);
         }
 
-        // --- Visibility of every other player ---
+        // Emergency mode: show all
         if (emergencyMode) {
             for (Player other : Bukkit.getOnlinePlayers()) {
                 if (!other.equals(viewer)) showPlayer(viewer, other);
@@ -214,50 +242,84 @@ public class LonelyController implements Listener {
             return;
         }
 
+        // Walking player: show all
         if (!isPlayerInBoat(viewer)) {
-            // Walking player: show everyone regardless of their session
             for (Player other : Bukkit.getOnlinePlayers()) {
                 if (!other.equals(viewer)) showPlayer(viewer, other);
             }
             return;
         }
 
-        boolean canNocol = NocolManager.playerHasMod(viewer);
+        // --- In a boat ---
         boolean personalLonely = isLonely(viewer.getUniqueId());
         Optional<VisibilityScope> scopeOpt = scopeResolver.resolve(viewer);
 
         if (scopeOpt.isEmpty()) {
-            // Open-world boat rider
-            if (canNocol && !personalLonely) {
+            // Open world: hide only if personalLonely
+            if (personalLonely) {
                 for (Player other : Bukkit.getOnlinePlayers()) {
-                    if (!other.equals(viewer)) showPlayer(viewer, other);
+                    if (!other.equals(viewer)) hidePlayer(viewer, other);
                 }
             } else {
                 for (Player other : Bukkit.getOnlinePlayers()) {
-                    if (!other.equals(viewer)) hidePlayer(viewer, other);
+                    if (!other.equals(viewer)) showPlayer(viewer, other);
                 }
             }
             return;
         }
 
+        // --- Inside a scope (heat/duel/timetrial) ---
         VisibilityScope scope = scopeOpt.get();
         Set<UUID> participants = scope.getParticipants();
+        boolean heatLonely = scope.isIsolated();
+        boolean canNocol = NocolManager.playerHasMod(viewer);
+
+        Set<UUID> finishedParticipants = scope.getFinishedParticipants();
+        boolean viewerIsActiveRacer = scope.isActiveRacer(viewer.getUniqueId());
 
         for (Player other : Bukkit.getOnlinePlayers()) {
             if (other.equals(viewer)) continue;
+
+            // Ghosted players are always hidden
             if (ghostedPlayers.contains(other.getUniqueId())) {
                 hidePlayer(viewer, other);
                 continue;
             }
-            boolean inScope = participants.contains(other.getUniqueId());
-            if (!inScope) {
+
+            // Active racers should not see finished drivers in the same heat
+            if (viewerIsActiveRacer && finishedParticipants.contains(other.getUniqueId())) {
                 hidePlayer(viewer, other);
                 continue;
             }
-            if (scope.isIsolated()) {
-                hidePlayer(viewer, other);
+
+            boolean inScope = participants.contains(other.getUniqueId());
+
+            if (!heatLonely) {
+                // Heat NOT lonely: show ONLY participants (regardless of personalLonely)
+                if (inScope) {
+                    showPlayer(viewer, other);
+                } else {
+                    hidePlayer(viewer, other);
+                }
             } else {
-                showPlayer(viewer, other);
+                // Heat IS lonely
+                if (personalLonely) {
+                    // Personal lonely + heat lonely = hide EVERYONE
+                    hidePlayer(viewer, other);
+                } else {
+                    // Personal NOT lonely, heat IS lonely
+                    if (canNocol) {
+                        // Has mod: show participants (collision will be removed via packet)
+                        if (inScope) {
+                            showPlayer(viewer, other);
+                        } else {
+                            hidePlayer(viewer, other);
+                        }
+                    } else {
+                        // No mod: hide all (can't use nocol for collision removal)
+                        hidePlayer(viewer, other);
+                    }
+                }
             }
         }
     }
@@ -289,29 +351,55 @@ public class LonelyController implements Listener {
             return;
         }
 
-        boolean canNocol = NocolManager.playerHasMod(viewer);
         boolean personalLonely = isLonely(viewer.getUniqueId());
         Optional<VisibilityScope> scopeOpt = scopeResolver.resolve(viewer);
 
         if (scopeOpt.isEmpty()) {
-            if (canNocol && !personalLonely) {
-                showPlayer(viewer, target);
-            } else {
+            // Open world
+            if (personalLonely) {
                 hidePlayer(viewer, target);
+            } else {
+                showPlayer(viewer, target);
             }
             return;
         }
 
+        // --- Inside a scope ---
         VisibilityScope scope = scopeOpt.get();
-        boolean inScope = scope.getParticipants().contains(target.getUniqueId());
-        if (!inScope) {
+        Set<UUID> participants = scope.getParticipants();
+        boolean heatLonely = scope.isIsolated();
+        boolean canNocol = NocolManager.playerHasMod(viewer);
+        boolean inScope = participants.contains(target.getUniqueId());
+
+        // Active racers should not see finished drivers in the same heat
+        Set<UUID> finishedParticipants = scope.getFinishedParticipants();
+        if (scope.isActiveRacer(viewer.getUniqueId()) && finishedParticipants.contains(target.getUniqueId())) {
             hidePlayer(viewer, target);
             return;
         }
-        if (scope.isIsolated()) {
-            hidePlayer(viewer, target);
+
+        if (!heatLonely) {
+            // Heat NOT lonely: show only participants
+            if (inScope) {
+                showPlayer(viewer, target);
+            } else {
+                hidePlayer(viewer, target);
+            }
         } else {
-            showPlayer(viewer, target);
+            // Heat IS lonely
+            if (personalLonely) {
+                hidePlayer(viewer, target);
+            } else {
+                if (canNocol) {
+                    if (inScope) {
+                        showPlayer(viewer, target);
+                    } else {
+                        hidePlayer(viewer, target);
+                    }
+                } else {
+                    hidePlayer(viewer, target);
+                }
+            }
         }
     }
 
@@ -321,18 +409,17 @@ public class LonelyController implements Listener {
 
     private void applyCollisionForViewer(Player player) {
         if (emergencyMode) {
-            // Emergency: use vanilla nocol scoreboard team approach, disable OBU nocol
             setVanillaCollision(player, false);
             NocolManager.setCollisionMode(player, true);
             return;
         }
 
+        boolean personalLonely = isLonely(player.getUniqueId());
         Optional<VisibilityScope> scopeOpt = scopeResolver.resolve(player);
         boolean canNocol = NocolManager.playerHasMod(player);
 
         if (scopeOpt.isEmpty()) {
-            // Open-world
-            boolean personalLonely = isLonely(player.getUniqueId());
+            // Open-world: nocol if has mod and not lonely
             if (canNocol && !personalLonely) {
                 setVanillaCollision(player, false);
                 NocolManager.setCollisionMode(player, false);
@@ -344,28 +431,28 @@ public class LonelyController implements Listener {
         }
 
         VisibilityScope scope = scopeOpt.get();
-        CollisionMode mode = scope.getCollisionMode();
+        boolean heatLonely = scope.isIsolated();
 
-        switch (mode) {
-            case HIGH -> {
-                // Full vanilla collision
-                setVanillaCollision(player, false);
-                NocolManager.setCollisionMode(player, true);
-            }
-            case LOW -> {
-                // Filtered: use OBU nocol if available, else vanilla
-                if (canNocol) {
-                    setVanillaCollision(player, false);
-                    NocolManager.setCollisionMode(player, false);
-                } else {
+        if (heatLonely) {
+            // Heat is lonely: no collision (nocol), regardless of personalLonely
+            setVanillaCollision(player, true);
+            NocolManager.setCollisionMode(player, false);
+        } else {
+            // Heat NOT lonely: use the heat's collision mode
+            CollisionMode mode = scope.getCollisionMode();
+            switch (mode) {
+                case HIGH -> {
                     setVanillaCollision(player, false);
                     NocolManager.setCollisionMode(player, true);
                 }
-            }
-            case DISABLED -> {
-                // No collision — also covers heat-lonely, duel, timetrial
-                setVanillaCollision(player, true);
-                NocolManager.setCollisionMode(player, false);
+                case LOW -> {
+                    setVanillaCollision(player, false);
+                    NocolManager.setLowCollisionMode(player);
+                }
+                case DISABLED -> {
+                    setVanillaCollision(player, true);
+                    NocolManager.setCollisionMode(player, false);
+                }
             }
         }
     }

@@ -4,6 +4,8 @@ import dev.EfraGroup.formulaRacing.Database.LeagueDatabaseManager;
 import dev.EfraGroup.formulaRacing.Event.Events;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.League.League;
+import dev.EfraGroup.formulaRacing.League.LeagueCalendarEntry;
+import dev.EfraGroup.formulaRacing.League.LeagueCategory;
 import dev.EfraGroup.formulaRacing.League.LeagueDriver;
 import dev.EfraGroup.formulaRacing.League.LeagueStanding;
 import dev.EfraGroup.formulaRacing.League.LeagueTeam;
@@ -60,6 +62,10 @@ public class LeagueManager {
 
     public void selectLeague(UUID playerUUID, League league) {
         selectedLeagueByPlayer.put(playerUUID, league.getId());
+    }
+
+    public void deselectPlayer(UUID playerUUID) {
+        selectedLeagueByPlayer.remove(playerUUID);
     }
 
     public League createLeague(UUID creatorUUID, String name) throws SQLException {
@@ -135,12 +141,34 @@ public class LeagueManager {
             return;
         }
 
-        boolean applied = databaseManager.applyEventResults(league, event.getId(), results);
+        String categoryName = resolveEventCategory(league, event.getId());
+        Integer pinnedHeatId = resolvePinnedHeat(league, event.getId());
+
+        boolean applied = databaseManager.storeEventResults(
+            league, event.getId(), results, categoryName, pinnedHeatId);
         if (applied) {
             plugin.getDebugManager().logRaceSystem(
                 "[League] Standings atualizadas para a liga " + league.getName()
             );
         }
+    }
+
+    private String resolveEventCategory(League league, int eventId) {
+        for (LeagueCalendarEntry entry : league.getCalendar().values()) {
+            if (entry.getEventId() == eventId && entry.hasCategory()) {
+                return entry.getCategoryName();
+            }
+        }
+        return null;
+    }
+
+    private Integer resolvePinnedHeat(League league, int eventId) {
+        for (LeagueCalendarEntry entry : league.getCalendar().values()) {
+            if (entry.getEventId() == eventId && entry.hasPinnedHeat()) {
+                return entry.getPinnedHeatId();
+            }
+        }
+        return null;
     }
 
     public List<LeagueStanding> getDriverStandings(League league) {
@@ -149,5 +177,60 @@ public class LeagueManager {
 
     public List<LeagueTeamStanding> getTeamStandings(League league) {
         return databaseManager.loadTeamStandings(league.getId());
+    }
+
+    public void adjustPoints(League league, UUID playerUUID, int delta) {
+        try {
+            databaseManager.adjustDriverPoints(league.getId(), playerUUID, delta, "ADMIN");
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation(
+                "[League] Erro ao ajustar pontos: " + e.getMessage()
+            );
+        }
+    }
+
+    public void transferPoints(League league, UUID fromUUID, UUID toUUID, int amount) {
+        try {
+            databaseManager.transferDriverPoints(league.getId(), fromUUID, toUUID, amount);
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation(
+                "[League] Erro ao transferir pontos: " + e.getMessage()
+            );
+        }
+    }
+
+    public void saveLeagueConfig(League league) throws SQLException {
+        databaseManager.saveLeagueConfig(league);
+    }
+
+    public LeagueCategory addCategory(League league, String name) throws SQLException {
+        LeagueCategory cat = new LeagueCategory(name);
+        databaseManager.saveCategory(league, cat);
+        league.getCategories().put(cat.getName().toLowerCase(), cat);
+        return cat;
+    }
+
+    public void removeCategory(League league, String name) throws SQLException {
+        databaseManager.removeCategory(league, name);
+        league.getCategories().remove(name.toLowerCase());
+    }
+
+    public void setEventMeta(League league, int eventId, String categoryName, Integer pinnedHeatId)
+        throws SQLException {
+        databaseManager.setEventMeta(league.getId(), eventId, categoryName, pinnedHeatId);
+        LeagueCalendarEntry entry = league.getCalendar()
+            .computeIfAbsent(eventId, LeagueCalendarEntry::new);
+        if (categoryName != null) entry.setCategoryName(categoryName);
+        if (pinnedHeatId != null) entry.setPinnedHeatId(pinnedHeatId);
+    }
+
+    public void recalculate(League league) {
+        try {
+            databaseManager.recalculateStandings(league);
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation(
+                "[League] Erro ao recalcular standings: " + e.getMessage()
+            );
+        }
     }
 }

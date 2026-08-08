@@ -1,6 +1,7 @@
 package dev.EfraGroup.formulaRacing.Hologram;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.PlatformUtils;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import me.clip.placeholderapi.PlaceholderAPI;
 import java.util.ArrayList;
@@ -22,6 +23,8 @@ public class HologramManager {
     private final JavaPlugin plugin;
     private final Map<String, List<Entity>> holograms = new ConcurrentHashMap<>();
     private final Map<String, Location> hologramLocations = new ConcurrentHashMap<>();
+    private final Map<String, HologramBackend> hdHolograms = new ConcurrentHashMap<>();
+    private final boolean useHolographicDisplays;
 
     private static final double LINE_SPACING = 0.25;
     private static final NamespacedKey HOLO_TAG = new NamespacedKey("formularacing", "hologram");
@@ -32,6 +35,27 @@ public class HologramManager {
 
     public HologramManager(JavaPlugin plugin) {
         this.plugin = plugin;
+        boolean selected = false;
+        if (plugin instanceof FormulaRacing) {
+            var config = ((FormulaRacing) plugin).getConfig();
+            if (config != null && config.isSet("holograms.backend")) {
+                String backendType = config.getString("holograms.backend", "armorstand").toLowerCase();
+                // HolographicDisplays is NOT Folia-compatible, so never enable it on Folia.
+                boolean folia = isFolia();
+                selected = "holographicdisplays".equals(backendType)
+                    && !folia
+                    && plugin.getServer().getPluginManager().getPlugin("HolographicDisplays") != null;
+            }
+        }
+        this.useHolographicDisplays = selected;
+    }
+
+    private static boolean isFolia() {
+        try {
+            return PlatformUtils.isFoliaRuntime();
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     public void createHologram(String name, Location loc, List<String> lines) {
@@ -115,7 +139,27 @@ public class HologramManager {
         hologramLocations.put(name, baseLoc.clone());
     }
 
+    /**
+     * Creates a hologram using the configured backend. When HolographicDisplays is
+     * selected and available, it is used; otherwise the built-in ArmorStand path
+     * is used (default behaviour).
+     */
+    public void createHologramSelectable(String name, Location loc, List<String> lines) {
+        if (useHolographicDisplays) {
+            HolographicDisplaysBackend backend = new HolographicDisplaysBackend(name, loc);
+            backend.create(name, loc, lines);
+            hdHolograms.put(name, backend);
+        } else {
+            createHologram(name, loc, lines);
+        }
+    }
+
     public void updateHologram(String name, List<String> lines) {
+        HologramBackend hd = hdHolograms.get(name);
+        if (hd != null) {
+            hd.updateLines(lines);
+            return;
+        }
         Location baseLoc = hologramLocations.get(name);
         if (baseLoc == null || baseLoc.getWorld() == null) return;
 
@@ -159,6 +203,12 @@ public class HologramManager {
     }
 
     public void deleteHologram(String name) {
+        HologramBackend hd = hdHolograms.remove(name);
+        if (hd != null) {
+            hd.remove();
+            hologramLocations.remove(name);
+            return;
+        }
         List<Entity> stands = holograms.remove(name);
         hologramLocations.remove(name);
         if (stands != null) {
@@ -207,6 +257,10 @@ public class HologramManager {
     }
 
     public void deleteAll() {
+        for (HologramBackend hd : hdHolograms.values()) {
+            hd.remove();
+        }
+        hdHolograms.clear();
         // Snapshot the lists to avoid concurrent modification
         List<Entity> allStands = new ArrayList<>();
         for (List<Entity> stands : holograms.values()) {

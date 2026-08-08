@@ -62,7 +62,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 
              if (!this.mysql.isTrackOpen(trackName)) continue;
 
-             String iconName = this.mysql.getIcon(trackName);
              Double worldRecordTime = this.mysql.getBestTime(trackName);
              Object[] playerBestData = this.mysql.getPlayerBestTime(player.getName(), trackName);
 
@@ -78,14 +77,7 @@ import org.bukkit.inventory.meta.ItemMeta;
                  }
              }
 
-             Material iconMat;
-             try {
-                 iconMat = Material.valueOf(iconName.toUpperCase());
-             } catch (Exception e) {
-                 iconMat = Material.PAPER;
-             }
-
-             ItemStack item = new ItemStack(iconMat);
+             ItemStack item = this.mysql.getTrackIconData(trackName).toItemStack();
              ItemMeta meta = item.getItemMeta();
              if (meta != null) {
                  meta.setDisplayName(ChatColor.WHITE + "" + ChatColor.ITALIC + trackName);
@@ -196,8 +188,13 @@ import org.bukkit.inventory.meta.ItemMeta;
              this.api.recoverPlayerBoatState(player);
              this.ps.sendBoatSetting(player, 0, new Object[0]);
              this.ps.applyBoatUtilsToPlayer(player, trackName);
-             SchedulerHelper.teleport(player, loc);
-             this.api.spawnBoat(player, true, false, false);
+             // Folia: teleportAsync é assíncrono — spawnar o barco na posição atual
+             // antes do teleport concluir quebraria o teleport. Só spawnamos no destino.
+             SchedulerHelper.teleportAsync(player, loc).thenAccept(success -> {
+                 if (Boolean.TRUE.equals(success) && player.isOnline()) {
+                     this.api.spawnBoatAt(player, loc, true, false, false);
+                 }
+             });
              this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);
              DatabaseManager.TrackData trackData = this.mysql.getTrackData(trackName);
              String owner = trackData != null ? trackData.getOwnerName() : null;

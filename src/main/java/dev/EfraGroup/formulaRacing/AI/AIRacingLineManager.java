@@ -8,8 +8,11 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
-
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -23,15 +26,20 @@ import java.util.Optional;
  */
 public class AIRacingLineManager {
 
-    private static final String LINES_FILE = "ai_racing_lines.yml";
+    private static final String LINES_FOLDER = "ailines";
 
     private final FormulaRacing plugin;
     private final Map<String, AIRacingLine> racingLines;
+    private File linesDir;
     private AIRacingLineRecorder recorder;
 
     public AIRacingLineManager(FormulaRacing plugin) {
         this.plugin = plugin;
         this.racingLines = new HashMap<>();
+        this.linesDir = new File(plugin.getDataFolder(), LINES_FOLDER);
+        if (!this.linesDir.exists()) {
+            this.linesDir.mkdirs();
+        }
     }
 
     /**
@@ -129,167 +137,161 @@ public class AIRacingLineManager {
     }
 
     /**
-     * Saves all racing lines to a YAML file in the plugin folder.
+     * Saves all racing lines to individual binary files in the ailines/ folder.
      */
     public void saveAllRacingLines() {
-        File file = new File(plugin.getDataFolder(), LINES_FILE);
-        YamlConfiguration yaml = new YamlConfiguration();
-
+        int savedCount = 0;
         for (Map.Entry<String, AIRacingLine> entry : racingLines.entrySet()) {
-            String trackKey = entry.getKey();
-            AIRacingLine line = entry.getValue();
-
-            if (!line.isUsable()) {
-                continue;
-            }
-
-            String basePath = "lines." + trackKey;
-
-            // Save ideal points
-            List<Location> idealLine = line.getIdealLine();
-            for (int i = 0; i < idealLine.size(); i++) {
-                Location loc = idealLine.get(i);
-                String pointPath = basePath + ".ideal." + i;
-                yaml.set(pointPath + ".world", loc.getWorld() != null ? loc.getWorld().getName() : "");
-                yaml.set(pointPath + ".x", loc.getX());
-                yaml.set(pointPath + ".y", loc.getY());
-                yaml.set(pointPath + ".z", loc.getZ());
-                yaml.set(pointPath + ".speed", line.getIdealSpeedAtIndex(i));
-            }
-
-            // Save braking points
-            List<Location> brakingPoints = line.getBrakingPoints();
-            for (int i = 0; i < brakingPoints.size(); i++) {
-                Location loc = brakingPoints.get(i);
-                String pointPath = basePath + ".braking." + i;
-                yaml.set(pointPath + ".world", loc.getWorld() != null ? loc.getWorld().getName() : "");
-                yaml.set(pointPath + ".x", loc.getX());
-                yaml.set(pointPath + ".y", loc.getY());
-                yaml.set(pointPath + ".z", loc.getZ());
-            }
-
-            // Save acceleration points
-            List<Location> accelPoints = line.getAccelerationPoints();
-            for (int i = 0; i < accelPoints.size(); i++) {
-                Location loc = accelPoints.get(i);
-                String pointPath = basePath + ".acceleration." + i;
-                yaml.set(pointPath + ".world", loc.getWorld() != null ? loc.getWorld().getName() : "");
-                yaml.set(pointPath + ".x", loc.getX());
-                yaml.set(pointPath + ".y", loc.getY());
-                yaml.set(pointPath + ".z", loc.getZ());
+            if (entry.getValue().isUsable() && saveRacingLine(entry.getKey(), entry.getValue())) {
+                savedCount++;
             }
         }
-
-        try {
-            yaml.save(file);
-            plugin.getDebugManager().logRaceSystem("[AI] Racing lines saved to " + LINES_FILE + " (" + racingLines.size() + " tracks).");
-        } catch (IOException e) {
-            plugin.getLogger().warning("[AI] Error saving racing lines: " + e.getMessage());
-        }
+        plugin.getDebugManager().logRaceSystem("[AI] Racing lines saved (" + savedCount + " tracks) to " + LINES_FOLDER + "/");
     }
 
     /**
-     * Loads all racing lines from the YAML file.
+     * Saves a single racing line to its binary file (incremental).
+     */
+    public boolean saveRacingLine(String normalizedTrackName, AIRacingLine line) {
+        if (line == null || !line.isUsable()) {
+            return false;
+        }
+
+        File file = new File(linesDir, sanitizeFileName(normalizedTrackName) + ".bin");
+        try (DataOutputStream out = new DataOutputStream(new FileOutputStream(file))) {
+            line.writeTo(out);
+            return true;
+        } catch (IOException e) {
+            plugin.getLogger().warning("[AI] Error saving racing line for " + normalizedTrackName + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    public void deleteRacingLine(String normalizedTrackName) {
+        File file = new File(linesDir, sanitizeFileName(normalizedTrackName) + ".bin");
+        file.delete();
+        racingLines.remove(normalizedTrackName);
+    }
+
+    private static String sanitizeFileName(String name) {
+        if (name == null || name.isEmpty()) {
+            return "unknown";
+        }
+        return name.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
+    /**
+     * Loads all racing lines from individual binary files in the ailines/ folder.
      */
     public void loadAllRacingLines() {
-        File file = new File(plugin.getDataFolder(), LINES_FILE);
-        if (!file.exists()) {
-            plugin.getDebugManager().logRaceSystem("[AI] File " + LINES_FILE + " not found. No lines loaded.");
+        File[] files = linesDir.listFiles((dir, name) -> name.endsWith(".bin"));
+        if (files == null) {
+            plugin.getDebugManager().logRaceSystem("[AI] Folder " + LINES_FOLDER + "/ not found. No lines loaded.");
             return;
         }
 
-        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-        ConfigurationSection linesSection = yaml.getConfigurationSection("lines");
-        if (linesSection == null) {
-            return;
+        // One-time migration from legacy YAML format if present
+        if (files.length == 0) {
+            migrateFromYaml();
+            files = linesDir.listFiles((dir, name) -> name.endsWith(".bin"));
+            if (files == null || files.length == 0) {
+                plugin.getDebugManager().logRaceSystem("[AI] No racing lines found in " + LINES_FOLDER + "/");
+                return;
+            }
         }
 
         int loadedCount = 0;
-        for (String trackKey : linesSection.getKeys(false)) {
-            String basePath = "lines." + trackKey;
-            AIRacingLine line = getRacingLine(trackKey);
-            line.clear();
-
-            // Load ideal points
-            ConfigurationSection idealSection = yaml.getConfigurationSection(basePath + ".ideal");
-            if (idealSection != null) {
-                // Sort by numerical index
-                List<Integer> indices = new ArrayList<>();
-                for (String key : idealSection.getKeys(false)) {
-                    try {
-                        indices.add(Integer.parseInt(key));
-                    } catch (NumberFormatException ignored) {}
+        for (File file : files) {
+            String trackKey = file.getName().replace(".bin", "");
+            try (DataInputStream in = new DataInputStream(new FileInputStream(file))) {
+                AIRacingLine line = AIRacingLine.readFrom(in, trackKey);
+                if (line.isUsable()) {
+                    racingLines.put(trackKey, line);
+                    loadedCount++;
                 }
-                indices.sort(Integer::compareTo);
-
-                for (int i : indices) {
-                    String pointPath = basePath + ".ideal." + i;
-                    String worldName = yaml.getString(pointPath + ".world", "");
-                    double x = yaml.getDouble(pointPath + ".x");
-                    double y = yaml.getDouble(pointPath + ".y");
-                    double z = yaml.getDouble(pointPath + ".z");
-                    double speed = yaml.getDouble(pointPath + ".speed", 0.5);
-
-                    World world = Bukkit.getWorld(worldName);
-                    Location loc = new Location(world, x, y, z);
-                    line.addIdealLinePoint(loc, speed);
-                }
-            }
-
-            // Load braking points
-            ConfigurationSection brakingSection = yaml.getConfigurationSection(basePath + ".braking");
-            if (brakingSection != null) {
-                List<Integer> indices = new ArrayList<>();
-                for (String key : brakingSection.getKeys(false)) {
-                    try {
-                        indices.add(Integer.parseInt(key));
-                    } catch (NumberFormatException ignored) {}
-                }
-                indices.sort(Integer::compareTo);
-
-                for (int i : indices) {
-                    String pointPath = basePath + ".braking." + i;
-                    String worldName = yaml.getString(pointPath + ".world", "");
-                    double x = yaml.getDouble(pointPath + ".x");
-                    double y = yaml.getDouble(pointPath + ".y");
-                    double z = yaml.getDouble(pointPath + ".z");
-
-                    World world = Bukkit.getWorld(worldName);
-                    Location loc = new Location(world, x, y, z);
-                    line.addBrakingPoint(loc);
-                }
-            }
-
-            // Load acceleration points
-            ConfigurationSection accelSection = yaml.getConfigurationSection(basePath + ".acceleration");
-            if (accelSection != null) {
-                List<Integer> indices = new ArrayList<>();
-                for (String key : accelSection.getKeys(false)) {
-                    try {
-                        indices.add(Integer.parseInt(key));
-                    } catch (NumberFormatException ignored) {}
-                }
-                indices.sort(Integer::compareTo);
-
-                for (int i : indices) {
-                    String pointPath = basePath + ".acceleration." + i;
-                    String worldName = yaml.getString(pointPath + ".world", "");
-                    double x = yaml.getDouble(pointPath + ".x");
-                    double y = yaml.getDouble(pointPath + ".y");
-                    double z = yaml.getDouble(pointPath + ".z");
-
-                    World world = Bukkit.getWorld(worldName);
-                    Location loc = new Location(world, x, y, z);
-                    line.addAccelerationPoint(loc);
-                }
-            }
-
-            if (line.isUsable()) {
-                loadedCount++;
+            } catch (IOException e) {
+                plugin.getLogger().warning("[AI] Error loading racing line from " + file.getName() + ": " + e.getMessage());
             }
         }
 
-        plugin.getDebugManager().logRaceSystem("[AI] " + loadedCount + " racing line(s) loaded from " + LINES_FILE);
+        plugin.getDebugManager().logRaceSystem("[AI] " + loadedCount + " racing line(s) loaded from " + LINES_FOLDER + "/");
+    }
+
+    /**
+     * Migrates racing lines from the legacy YAML file (ai_racing_lines.yml) into
+     * individual binary files. Runs once; the legacy file is renamed afterwards.
+     */
+    private void migrateFromYaml() {
+        File legacyFile = new File(plugin.getDataFolder(), "ai_racing_lines.yml");
+        if (!legacyFile.exists()) {
+            return;
+        }
+
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(legacyFile);
+        ConfigurationSection linesSection = yaml.getConfigurationSection("lines");
+        if (linesSection == null) {
+            legacyFile.renameTo(new File(plugin.getDataFolder(), "ai_racing_lines.yml.migrated"));
+            return;
+        }
+
+        int migrated = 0;
+        for (String trackKey : linesSection.getKeys(false)) {
+            String basePath = "lines." + trackKey;
+            AIRacingLine line = new AIRacingLine(trackKey);
+
+            loadYamlPoints(yaml, basePath + ".ideal", line, PointType.IDEAL);
+            loadYamlPoints(yaml, basePath + ".braking", line, PointType.BRAKING);
+            loadYamlPoints(yaml, basePath + ".acceleration", line, PointType.ACCELERATION);
+
+            if (line.isUsable()) {
+                saveRacingLine(trackKey, line);
+                racingLines.put(trackKey, line);
+                migrated++;
+            }
+        }
+
+        legacyFile.renameTo(new File(plugin.getDataFolder(), "ai_racing_lines.yml.migrated"));
+        plugin.getDebugManager().logRaceSystem("[AI] Migrated " + migrated + " racing line(s) from legacy YAML to binary format.");
+    }
+
+    private enum PointType { IDEAL, BRAKING, ACCELERATION }
+
+    private void loadYamlPoints(YamlConfiguration yaml, String sectionPath, AIRacingLine line, PointType type) {
+        ConfigurationSection section = yaml.getConfigurationSection(sectionPath);
+        if (section == null) {
+            return;
+        }
+
+        List<Integer> indices = new ArrayList<>();
+        for (String key : section.getKeys(false)) {
+            try {
+                indices.add(Integer.parseInt(key));
+            } catch (NumberFormatException ignored) {}
+        }
+        indices.sort(Integer::compareTo);
+
+        for (int i : indices) {
+            String pointPath = sectionPath + "." + i;
+            String worldName = yaml.getString(pointPath + ".world", "");
+            World world = Bukkit.getWorld(worldName);
+            if (world == null) {
+                continue;
+            }
+            Location loc = new Location(
+                    world,
+                    yaml.getDouble(pointPath + ".x"),
+                    yaml.getDouble(pointPath + ".y"),
+                    yaml.getDouble(pointPath + ".z")
+            );
+            if (type == PointType.IDEAL) {
+                double speed = yaml.getDouble(pointPath + ".speed", 0.5);
+                line.addIdealLinePoint(loc, speed);
+            } else if (type == PointType.BRAKING) {
+                line.addBrakingPoint(loc);
+            } else {
+                line.addAccelerationPoint(loc);
+            }
+        }
     }
 
     private String normalizeTrackName(String trackName) {

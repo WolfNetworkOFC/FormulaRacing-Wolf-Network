@@ -1,5 +1,6 @@
 package dev.EfraGroup.formulaRacing.League;
 
+import dev.EfraGroup.formulaRacing.Pontuation.PointsConfig;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -13,6 +14,14 @@ public class League {
     private LeagueStatus status;
     private final Map<Integer, LeagueTeam> teams;
     private final Map<UUID, LeagueDriver> drivers;
+
+    private String scoringSystem = "BASIC";
+    private PointsConfig customScale;
+    private TeamMode teamMode = TeamMode.MAIN_RESERVE;
+    private TeamConfig teamConfig = new TeamConfig();
+    private int mulliganCount = 0;
+    private final Map<String, LeagueCategory> categories = new LinkedHashMap<>();
+    private final Map<Integer, LeagueCalendarEntry> calendar = new LinkedHashMap<>();
 
     public League(int id, UUID creatorUUID, String name, LeagueStatus status) {
         this.id = id;
@@ -57,5 +66,57 @@ public class League {
 
     public Collection<LeagueDriver> getDriversView() {
         return drivers.values();
+    }
+
+    public String getScoringSystem() {
+        return scoringSystem;
+    }
+
+    public void setScoringSystem(String scoringSystem) {
+        this.scoringSystem = scoringSystem;
+    }
+
+    public PointsConfig getCustomScale() {
+        return customScale;
+    }
+
+    public void setCustomScale(PointsConfig customScale) {
+        this.customScale = customScale;
+    }
+
+    public TeamMode getTeamMode() {
+        return teamMode;
+    }
+
+    public void setTeamMode(TeamMode teamMode) {
+        this.teamMode = teamMode;
+    }
+
+    public TeamConfig getTeamConfig() {
+        return teamConfig;
+    }
+
+    public void setTeamConfig(TeamConfig teamConfig) {
+        this.teamConfig = teamConfig;
+    }
+
+    public int getMulliganCount() {
+        return mulliganCount;
+    }
+
+    public void setMulliganCount(int mulliganCount) {
+        this.mulliganCount = mulliganCount;
+    }
+
+    public Map<String, LeagueCategory> getCategories() {
+        return categories;
+    }
+
+    public LeagueCategory getCategory(String name) {
+        return categories.get(name.toLowerCase());
+    }
+
+    public Map<Integer, LeagueCalendarEntry> getCalendar() {
+        return calendar;
     }
 }

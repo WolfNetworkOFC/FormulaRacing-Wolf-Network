@@ -15,8 +15,12 @@ import java.util.logging.Level;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.BlockStateMeta;
+import org.bukkit.inventory.meta.ItemMeta;
 
 public class DatabaseManager {
 
@@ -311,6 +315,31 @@ public class DatabaseManager {
 
             stmt.executeUpdate(
                 """
+                CREATE TABLE IF NOT EXISTS fr_track_medals (
+                    trackNameWS TEXT NOT NULL,
+                    medal TEXT NOT NULL,
+                    time_seconds REAL NOT NULL,
+                    PRIMARY KEY (trackNameWS, medal)
+                )"""
+            );
+
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS fr_player_medals (
+                    player_uuid TEXT NOT NULL,
+                    trackNameWS TEXT NOT NULL,
+                    medal TEXT NOT NULL,
+                    time_seconds REAL NOT NULL,
+                    achieved_at INTEGER DEFAULT NULL,
+                    PRIMARY KEY (player_uuid, trackNameWS, medal)
+                )"""
+            );
+            try {
+                stmt.executeUpdate("ALTER TABLE fr_player_medals ADD COLUMN achieved_at INTEGER DEFAULT NULL");
+            } catch (SQLException ignored) {}
+
+            stmt.executeUpdate(
+                """
                 CREATE TABLE IF NOT EXISTS fr_regions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     trackNameWS TEXT DEFAULT NULL,
@@ -379,6 +408,153 @@ public class DatabaseManager {
                 );
             } catch (SQLException ignored) {}
 
+            // League tables (TimingLeague port)
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS fr_leagues (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    creatorUUID TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'SETUP',
+                    createdAt INTEGER DEFAULT NULL,
+                    scoringSystem TEXT DEFAULT 'BASIC',
+                    customScaleJson TEXT DEFAULT NULL,
+                    teamMode TEXT DEFAULT 'MAIN_RESERVE',
+                    teamConfigJson TEXT DEFAULT NULL,
+                    mulliganCount INTEGER DEFAULT 0,
+                    calendarJson TEXT DEFAULT NULL
+                )"""
+            );
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS fr_league_teams (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    leagueId INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    colorHex TEXT DEFAULT NULL
+                )"""
+            );
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS fr_league_drivers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    leagueId INTEGER NOT NULL,
+                    playerUUID TEXT NOT NULL,
+                    teamId INTEGER DEFAULT NULL,
+                    joinedAt INTEGER DEFAULT NULL
+                )"""
+            );
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS fr_league_events (
+                    leagueId INTEGER NOT NULL,
+                    eventId INTEGER NOT NULL,
+                    roundNumber INTEGER DEFAULT NULL,
+                    pointsApplied INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (leagueId, eventId)
+                )"""
+            );
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS fr_league_driver_standings (
+                    leagueId INTEGER NOT NULL,
+                    playerUUID TEXT NOT NULL,
+                    points INTEGER NOT NULL DEFAULT 0,
+                    wins INTEGER NOT NULL DEFAULT 0,
+                    podiums INTEGER NOT NULL DEFAULT 0,
+                    eventsCount INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (leagueId, playerUUID)
+                )"""
+            );
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS fr_league_team_standings (
+                    leagueId INTEGER NOT NULL,
+                    teamId INTEGER NOT NULL,
+                    points INTEGER NOT NULL DEFAULT 0,
+                    wins INTEGER NOT NULL DEFAULT 0,
+                    podiums INTEGER NOT NULL DEFAULT 0,
+                    eventsCount INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (leagueId, teamId)
+                )"""
+            );
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS fr_league_categories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    leagueId INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    displayName TEXT DEFAULT NULL,
+                    scoringSystem TEXT DEFAULT 'BASIC',
+                    mulliganCount INTEGER DEFAULT 0,
+                    customScaleJson TEXT DEFAULT NULL
+                )"""
+            );
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS fr_league_event_meta (
+                    leagueId INTEGER NOT NULL,
+                    eventId INTEGER NOT NULL,
+                    categoryName TEXT DEFAULT NULL,
+                    pinnedHeatId INTEGER DEFAULT NULL,
+                    roundNumber INTEGER DEFAULT NULL
+                )"""
+            );
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS fr_league_event_results (
+                    leagueId INTEGER NOT NULL,
+                    eventId INTEGER NOT NULL,
+                    position INTEGER NOT NULL,
+                    playerUUID TEXT NOT NULL,
+                    teamId INTEGER DEFAULT NULL,
+                    heatId INTEGER DEFAULT NULL,
+                    points INTEGER NOT NULL DEFAULT 0,
+                    fastestLap BOOLEAN NOT NULL DEFAULT FALSE,
+                    isDNF BOOLEAN NOT NULL DEFAULT FALSE,
+                    isDSQ BOOLEAN NOT NULL DEFAULT FALSE,
+                    PRIMARY KEY (leagueId, eventId, playerUUID)
+                )"""
+            );
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS fr_league_point_history (
+                    leagueId INTEGER NOT NULL,
+                    eventId INTEGER NOT NULL,
+                    playerUUID TEXT NOT NULL,
+                    points INTEGER NOT NULL DEFAULT 0,
+                    position INTEGER NOT NULL DEFAULT 0,
+                    categoryName TEXT DEFAULT NULL,
+                    heatId INTEGER DEFAULT NULL
+                )"""
+            );
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS fr_league_breakdown (
+                    leagueId INTEGER NOT NULL,
+                    playerUUID TEXT NOT NULL,
+                    eventId INTEGER NOT NULL,
+                    categoryName TEXT DEFAULT NULL,
+                    basePoints INTEGER NOT NULL DEFAULT 0,
+                    mulliganDropped INTEGER NOT NULL DEFAULT 0,
+                    finalPoints INTEGER NOT NULL DEFAULT 0
+                )"""
+            );
+            String[] leagueAlterColumns = {
+                "ALTER TABLE fr_leagues ADD COLUMN scoringSystem TEXT DEFAULT 'BASIC'",
+                "ALTER TABLE fr_leagues ADD COLUMN customScaleJson TEXT DEFAULT NULL",
+                "ALTER TABLE fr_leagues ADD COLUMN teamMode TEXT DEFAULT 'MAIN_RESERVE'",
+                "ALTER TABLE fr_leagues ADD COLUMN teamConfigJson TEXT DEFAULT NULL",
+                "ALTER TABLE fr_leagues ADD COLUMN mulliganCount INTEGER DEFAULT 0",
+                "ALTER TABLE fr_leagues ADD COLUMN calendarJson TEXT DEFAULT NULL",
+                "ALTER TABLE fr_league_teams ADD COLUMN colorHex TEXT DEFAULT NULL"
+            };
+            for (String alterSql : leagueAlterColumns) {
+                try {
+                    stmt.executeUpdate(alterSql);
+                } catch (SQLException ignored) {}
+            }
+
             // Soft-delete columns
             try {
                 stmt.executeUpdate(
@@ -427,7 +603,6 @@ public class DatabaseManager {
                     airStepping BOOLEAN DEFAULT FALSE,
                     tenStepInterpolation BOOLEAN DEFAULT FALSE,
                     collisionResolution TINYINT DEFAULT 5,
-                    exclusiveMode BOOLEAN DEFAULT FALSE,
                     customSlipperiness TEXT DEFAULT NULL,
                     perBlockSetting TEXT DEFAULT NULL,
                     walltapMultiplier REAL DEFAULT 0.0,
@@ -445,11 +620,6 @@ public class DatabaseManager {
                     minObuVersion INT DEFAULT 1
                 )"""
             );
-            try {
-                stmt.execute(
-                    "ALTER TABLE fr_boatutils ADD COLUMN exclusiveMode BOOLEAN DEFAULT FALSE;"
-                );
-            } catch (SQLException ignored) {}
             try {
                 stmt.execute("ALTER TABLE fr_boatutils ADD COLUMN walltapMultiplier REAL DEFAULT 0.0;");
             } catch (SQLException ignored) {}
@@ -659,6 +829,10 @@ public class DatabaseManager {
             stmt.executeUpdate(
                 "CREATE TABLE IF NOT EXISTS fr_holograms (trackNameWS TEXT PRIMARY KEY, world TEXT, x REAL, y REAL, z REAL, java_enabled INTEGER DEFAULT 1, bedrock_enabled INTEGER DEFAULT 1)"
             );
+            stmt.executeUpdate(
+                "CREATE TABLE IF NOT EXISTS fr_duel_elo (" +
+                "uuid TEXT PRIMARY KEY, elo INTEGER DEFAULT 1200, wins INTEGER DEFAULT 0, losses INTEGER DEFAULT 0)"
+            );
             // Migration for existing databases that lack toggle columns
             try {
                 stmt.executeUpdate("ALTER TABLE fr_holograms ADD COLUMN java_enabled INTEGER DEFAULT 1");
@@ -763,6 +937,14 @@ public class DatabaseManager {
             // Adds game_time column to the fr_tracks table
             try {
                 stmt.executeUpdate("ALTER TABLE fr_tracks ADD COLUMN game_time INTEGER DEFAULT NULL");
+            } catch (SQLException ignored) {}
+
+            // Adds icon_amount and icon_meta columns to fr_tracks
+            try {
+                stmt.executeUpdate("ALTER TABLE fr_tracks ADD COLUMN icon_amount INTEGER DEFAULT 1");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.executeUpdate("ALTER TABLE fr_tracks ADD COLUMN icon_meta TEXT DEFAULT NULL");
             } catch (SQLException ignored) {}
 
             // [NEW] Adds columns for "Start Region" to the fr_pit_stops table
@@ -1395,6 +1577,255 @@ public class DatabaseManager {
                 );
         }
         return null;
+    }
+
+    /**
+     * Renomeia uma pista em TODAS as tabelas do banco de dados.
+     * Atualiza trackNameWS em fr_tracks, fr_player_times, fr_checkpoint,
+     * fr_checkpoint_times, fr_boatutils, fr_grid_positions, fr_cameras,
+     * fr_track_finish_positions, fr_timetrial_duels, fr_events, fr_regions,
+     * fr_drs, fr_pit_stops, fr_holograms, fr_laps e renomeia o ficheiro ghost.
+     *
+     * @param oldName Nome antigo da pista (trackName original com espaços)
+     * @param newName Novo nome da pista (trackName original com espaços)
+     * @return true se a renomeação foi bem-sucedida
+     */
+    public synchronized boolean renameTrack(String oldName, String newName) {
+        if (oldName == null || newName == null || oldName.equals(newName)) return false;
+
+        String oldNameWS = oldName.replaceAll("\\s+", "");
+        String newNameWS = newName.replaceAll("\\s+", "");
+
+        plugin.getDebugManager().logDatabaseOperation(
+                "[RENAME] Renomeando pista '" + oldName + "' -> '" + newName + "'");
+
+        Connection conn = null;
+        try {
+            conn = getOrConnect();
+            conn.setAutoCommit(false);
+
+            int totalUpdated = 0;
+
+            // 1. fr_tracks
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_tracks SET trackName = ?, trackNameWS = ? WHERE trackNameWS = ?")) {
+                ps.setString(1, newName);
+                ps.setString(2, newNameWS);
+                ps.setString(3, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) {
+                    plugin.getDebugManager().logDatabaseOperation("  ✅ fr_tracks: " + r + " registo(s)");
+                    totalUpdated += r;
+                }
+            }
+
+            // 2. fr_player_times
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_player_times SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_player_times: " + r + " registo(s)");
+                totalUpdated += r;
+            }
+
+            // 3. fr_checkpoint
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_checkpoint SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_checkpoint: " + r + " registo(s)");
+                totalUpdated += r;
+            }
+
+            // 4. fr_checkpoint_times
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_checkpoint_times SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_checkpoint_times: " + r + " registo(s)");
+                totalUpdated += r;
+            }
+
+            // 5. fr_boatutils
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_boatutils SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_boatutils: " + r + " registo(s)");
+                totalUpdated += r;
+            }
+
+            // 6. fr_grid_positions
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_grid_positions SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_grid_positions: " + r + " registo(s)");
+                totalUpdated += r;
+            }
+
+            // 7. fr_cameras
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_cameras SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_cameras: " + r + " registo(s)");
+                totalUpdated += r;
+            }
+
+            // 8. fr_track_finish_positions
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_track_finish_positions SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_track_finish_positions: " + r + " registo(s)");
+                totalUpdated += r;
+            }
+
+            // 9. fr_timetrial_duels
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_timetrial_duels SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_timetrial_duels: " + r + " registo(s)");
+                totalUpdated += r;
+            }
+
+            // 10. fr_events
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_events SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_events: " + r + " registo(s)");
+                totalUpdated += r;
+            } catch (SQLException e) {
+                // fr_events may not have trackNameWS column in older schemas
+                plugin.getDebugManager().logDatabaseOperation("  ⚠️ fr_events: coluna trackNameWS não encontrada");
+            }
+
+            // 11. fr_regions
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_regions SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_regions: " + r + " registo(s)");
+                totalUpdated += r;
+            }
+
+            // 12. fr_drs
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_drs SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_drs: " + r + " registo(s)");
+                totalUpdated += r;
+            }
+
+            // 13. fr_pit_stops
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_pit_stops SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_pit_stops: " + r + " registo(s)");
+                totalUpdated += r;
+            }
+
+            // 14. fr_holograms
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_holograms SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_holograms: " + r + " registo(s)");
+                totalUpdated += r;
+            } catch (SQLException e) {
+                // fr_holograms may not exist
+                plugin.getDebugManager().logDatabaseOperation("  ⚠️ fr_holograms: tabela não encontrada");
+            }
+
+            // 15. fr_laps
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_laps SET tracknameWS = ? WHERE tracknameWS = ?")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_laps: " + r + " registo(s)");
+                totalUpdated += r;
+            }
+
+            conn.commit();
+
+            plugin.getDebugManager().logDatabaseOperation(
+                    "[RENAME] ✅ Renomeação concluída! Total de registos atualizados: " + totalUpdated);
+
+            // Renomear ficheiro ghost no disco (se existir)
+            try {
+                renameGhostFile(oldNameWS, newNameWS);
+            } catch (Exception ghostEx) {
+                plugin.getDebugManager().logDatabaseOperation(
+                        "[RENAME] ⚠️ Ghost rename failed (non-critical): " + ghostEx.getMessage());
+            }
+
+            return true;
+
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation(
+                    "[RENAME] ❌ Erro: " + e.getMessage());
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                    plugin.getDebugManager().logDatabaseOperation("[RENAME] ↻ Transaction rolled back.");
+                } catch (SQLException rollbackEx) {
+                    plugin.getDebugManager().logDatabaseOperation(
+                            "[RENAME] ❌ Rollback failed: " + rollbackEx.getMessage());
+                }
+            }
+            handleSqlError(e);
+            return false;
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                } catch (SQLException ignored) {}
+            }
+        }
+    }
+
+    /**
+     * Renomeia ficheiro ghost no disco.
+     */
+    private void renameGhostFile(String oldNameWS, String newNameWS) {
+        java.io.File ghostsRoot = new java.io.File(plugin.getDataFolder(), "ghosts");
+        if (!ghostsRoot.exists()) return;
+
+        java.io.File[] playerFolders = ghostsRoot.listFiles(java.io.File::isDirectory);
+        if (playerFolders == null) return;
+
+        String oldFile = oldNameWS.toLowerCase() + ".json";
+        String newFile = newNameWS.toLowerCase() + ".json";
+
+        for (java.io.File playerFolder : playerFolders) {
+            java.io.File oldGhost = new java.io.File(playerFolder, oldFile);
+            if (oldGhost.exists()) {
+                java.io.File newGhost = new java.io.File(playerFolder, newFile);
+                if (oldGhost.renameTo(newGhost)) {
+                    plugin.getDebugManager().logDatabaseOperation(
+                            "  ✅ Ghost renomeado: " + playerFolder.getName());
+                }
+            }
+        }
     }
 
     /**
@@ -2952,8 +3383,149 @@ public class DatabaseManager {
     }
 
     /* =======================================================
-          LEADERBOARD, GRIDS, CÃMERAS E CONFIGS
+          TRACK MEDALS (fr_track_medals)
 ====================================================== */
+
+    /**
+     * Define o tempo de uma medalha de uma pista (upsert).
+     *
+     * @param trackNameWS nome da pista normalizado (sem espaços, lowercase recomendado)
+     * @param medalType   tipo da medalha (saphira/netherite/diamond/gold/silver/bronze)
+     * @param timeSeconds tempo em segundos
+     * @return true se salvou com sucesso
+     */
+    public synchronized boolean setTrackMedalTime(String trackNameWS, String medalType, double timeSeconds) {
+        String sql = "INSERT INTO fr_track_medals (trackNameWS, medal, time_seconds) VALUES (?, ?, ?) " +
+                "ON CONFLICT(trackNameWS, medal) DO UPDATE SET time_seconds = excluded.time_seconds";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackNameWS.toLowerCase());
+                ps.setString(2, medalType.toLowerCase());
+                ps.setDouble(3, timeSeconds);
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
+    }
+
+    /**
+     * Busca todos os tempos de medalha de uma pista.
+     *
+     * @return mapa medalha -> tempo em segundos (vazio se não houver)
+     */
+    public synchronized Map<String, Double> getAllTrackMedalTimes(String trackNameWS) {
+        Map<String, Double> times = new LinkedHashMap<>();
+        String sql = "SELECT medal, time_seconds FROM fr_track_medals WHERE LOWER(trackNameWS) = LOWER(?)";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackNameWS);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        times.put(rs.getString("medal"), rs.getDouble("time_seconds"));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return times;
+    }
+
+    /* =======================================================
+       PLAYER MEDALS (fr_player_medals)
+    ====================================================== */
+
+    /**
+     * Verifica se um jogador já possui uma medalha específica em uma pista.
+     *
+     * @param uuid      UUID do jogador
+     * @param trackNameWS pista normalizada
+     * @param medalType tipo da medalha (saphira/netherite/diamond/gold/silver/bronze)
+     * @return true se o jogador já tem a medalha
+     */
+    public synchronized boolean playerHasMedal(UUID uuid, String trackNameWS, String medalType) {
+        String sql = "SELECT 1 FROM fr_player_medals WHERE player_uuid = ? AND LOWER(trackNameWS) = LOWER(?) AND LOWER(medal) = LOWER(?) LIMIT 1";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, trackNameWS);
+                ps.setString(3, medalType);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next();
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
+    }
+
+    /**
+     * Concede uma medalha a um jogador (upsert).
+     *
+     * @param uuid      UUID do jogador
+     * @param trackNameWS pista normalizada
+     * @param medalType tipo da medalha
+     * @param timeSeconds tempo que conquistou a medalha
+     * @return true se salvou com sucesso
+     */
+    public synchronized boolean grantMedal(UUID uuid, String trackNameWS, String medalType, double timeSeconds) {
+        String sql = "INSERT INTO fr_player_medals (player_uuid, trackNameWS, medal, time_seconds, achieved_at) " +
+                "VALUES (?, ?, ?, ?, ?) " +
+                "ON CONFLICT(player_uuid, trackNameWS, medal) DO UPDATE SET " +
+                "time_seconds = excluded.time_seconds, " +
+                "achieved_at = excluded.achieved_at";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, trackNameWS.toLowerCase());
+                ps.setString(3, medalType.toLowerCase());
+                ps.setDouble(4, timeSeconds);
+                ps.setLong(5, System.currentTimeMillis());
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
+    }
+
+    /**
+     * Busca todas as medalhas de um jogador em uma pista.
+     *
+     * @param uuid      UUID do jogador
+     * @param trackNameWS pista normalizada
+     * @return mapa medalha -> tempo em segundos
+     */
+    public synchronized Map<String, Double> getPlayerMedals(UUID uuid, String trackNameWS) {
+        Map<String, Double> medals = new LinkedHashMap<>();
+        String sql = "SELECT medal, time_seconds FROM fr_player_medals WHERE player_uuid = ? AND LOWER(trackNameWS) = LOWER(?)";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, trackNameWS);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        medals.put(rs.getString("medal"), rs.getDouble("time_seconds"));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return medals;
+    }
+
+    /* =======================================================
+       LEADERBOARD, GRIDS, CÃMERAS E CONFIGS
+    ====================================================== */
     public synchronized List<PlayerTime> getLeaderboard(String trackName) {
         List<PlayerTime> leaderboard = new ArrayList<>();
         String trackWS = trackName.replaceAll("\\s+", "");
@@ -3054,13 +3626,28 @@ public class DatabaseManager {
         String trackName,
         String iconName
     ) {
+        return setTrackIcon(trackName, iconName, 1, null);
+    }
+
+    public synchronized boolean setTrackIcon(
+        String trackName,
+        String iconName,
+        int amount,
+        String iconMeta
+    ) {
         String sql =
-            "UPDATE fr_tracks SET icon_name = ? WHERE LOWER(trackNameWS) = LOWER(?)";
+            "UPDATE fr_tracks SET icon_name = ?, icon_amount = ?, icon_meta = ? WHERE LOWER(trackNameWS) = LOWER(?)";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, iconName);
-                ps.setString(2, trackName.replaceAll("\\s+", ""));
+                ps.setInt(2, Math.max(1, amount));
+                if (iconMeta != null && !iconMeta.isEmpty()) {
+                    ps.setString(3, iconMeta);
+                } else {
+                    ps.setNull(3, java.sql.Types.VARCHAR);
+                }
+                ps.setString(4, trackName.replaceAll("\\s+", ""));
                 return ps.executeUpdate() > 0;
             }
         } catch (SQLException e) {
@@ -3551,6 +4138,23 @@ public class DatabaseManager {
             handleSqlError(e);
         }
         return openTracks;
+    }
+
+    public synchronized List<String> getAllTrackNames() {
+        List<String> tracks = new ArrayList<>();
+        String sql = "SELECT trackNameWS FROM fr_tracks";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql);
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    tracks.add(rs.getString("trackNameWS"));
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return tracks;
     }
 
     /**
@@ -4833,6 +5437,49 @@ public class DatabaseManager {
     }
 
     /* =======================================================
+          MÉTODOS DE GAME TIME (dia/noite)
+======================================================= */
+
+    public synchronized long getTrackGameTime(String trackName) {
+        if (trackName == null || trackName.isEmpty()) return -1;
+        String trackNameWS = trackName.replaceAll("\\s+", "");
+        String sql = "SELECT game_time FROM fr_tracks WHERE LOWER(trackNameWS) = LOWER(?)";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackNameWS);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        long gameTime = rs.getLong("game_time");
+                        if (rs.wasNull()) return -1;
+                        return gameTime;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return -1;
+    }
+
+    public synchronized boolean setTrackGameTime(String trackName, long gameTime) {
+        if (trackName == null) return false;
+        String trackNameWS = trackName.replaceAll("\\s+", "").toLowerCase();
+        String sql = "UPDATE fr_tracks SET game_time = ? WHERE LOWER(trackNameWS) = LOWER(?)";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setLong(1, gameTime);
+                ps.setString(2, trackNameWS);
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
+    }
+
+    /* =======================================================
           MÉTODOS DE RESET E EXCLUSÃO DE TEMPOS
 ======================================================= */
 
@@ -4880,6 +5527,36 @@ public class DatabaseManager {
                 .getDebugManager()
                 .logDatabaseOperation(
                     "[FormulaRacing] Erro ao resetar tempos: " + e.getMessage()
+                );
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized void clearCheckpointTimesForTrack(String trackName) {
+        String trackWS = trackName.replaceAll("\\s+", "");
+        String sql =
+            "DELETE FROM fr_checkpoint_times WHERE LOWER(trackNameWS) = LOWER(?)";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackWS);
+                int removed = ps.executeUpdate();
+                plugin
+                    .getDebugManager()
+                    .logDatabaseOperation(
+                        "[FormulaRacing] Tempos-de-checkpoint (delta) da pista '" +
+                            trackWS +
+                            "' limpos (" +
+                            removed +
+                            " registros)."
+                    );
+            }
+        } catch (SQLException e) {
+            plugin
+                .getDebugManager()
+                .logDatabaseOperation(
+                    "[FormulaRacing] Erro ao limpar checkpoint_times: " +
+                        e.getMessage()
                 );
             handleSqlError(e);
         }
@@ -4999,6 +5676,14 @@ public class DatabaseManager {
         String trackName,
         Location location
     ) {
+        return saveHologramLocation(trackName, "java", location);
+    }
+
+    public synchronized boolean saveHologramLocation(
+        String trackName,
+        String type,
+        Location location
+    ) {
         if (trackName == null || location == null) return false;
 
         String trackNameWS = trackName.replaceAll("\\s+", "");
@@ -5073,46 +5758,107 @@ public class DatabaseManager {
         return false;
     }
 
-    public synchronized String getIcon(String trackName) {
+    public synchronized TrackIconData getTrackIconData(String trackName) {
         String trackNameNoSpaces = trackName.replaceAll("\\s+", "");
         String sql =
-            "SELECT icon_name FROM fr_tracks WHERE LOWER(trackNameWS) = LOWER(?)";
+            "SELECT icon_name, icon_amount, icon_meta FROM fr_tracks WHERE LOWER(trackNameWS) = LOWER(?)";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, trackNameNoSpaces);
                 try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) return rs.getString("icon_name");
+                    if (rs.next()) {
+                        String iconName = rs.getString("icon_name");
+                        int amount = rs.getInt("icon_amount");
+                        if (amount < 1) amount = 1;
+                        String meta = rs.getString("icon_meta");
+                        return new TrackIconData(iconName != null ? iconName : "PAPER", amount, meta);
+                    }
                 }
             }
         } catch (SQLException e) {
-            plugin
-                .getDebugManager()
-                .logDatabaseOperation(
-                    "Erro ao buscar ícone: " + e.getMessage()
-                );
             handleSqlError(e);
         }
-        return null;
+        return new TrackIconData("PAPER", 1, null);
     }
 
-    public synchronized String getTrackIconByTrackNameWS(String trackNameWS) {
-        String sql = "SELECT icon_name FROM fr_tracks WHERE trackNameWS = ?";
-        try {
-            Connection conn = getOrConnect();
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setString(1, trackNameWS);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) return rs.getString("icon_name");
-                }
-            }
-        } catch (SQLException e) {
-            handleSqlError(e);
+    public static class TrackIconData {
+        private final String materialName;
+        private final int amount;
+        private final String meta;
+
+        public TrackIconData(String materialName, int amount, String meta) {
+            this.materialName = materialName;
+            this.amount = amount;
+            this.meta = meta;
         }
-        return "PAPER";
+
+        public String getMaterialName() { return materialName; }
+        public int getAmount() { return amount; }
+        public String getMeta() { return meta; }
+
+        /**
+         * Builds the ItemStack for this track icon, applying material, amount
+         * and the parsed meta (e.g. level=2, custom_model_data=42).
+         */
+        public ItemStack toItemStack() {
+            Material mat;
+            try {
+                mat = Material.valueOf(materialName.toUpperCase());
+            } catch (Exception e) {
+                mat = Material.PAPER;
+            }
+            ItemStack item = new ItemStack(mat, Math.max(1, amount));
+            if (meta != null && !meta.isEmpty()) {
+                applyMeta(item, meta);
+            }
+            return item;
+        }
+
+        /**
+         * Applies comma-separated key=value meta props to the item.
+         * Supported: level=N (LIGHT), custom_model_data=N / cmd=N.
+         */
+        private static void applyMeta(ItemStack item, String meta) {
+            ItemMeta itemMeta = item.getItemMeta();
+            if (itemMeta == null) return;
+            for (String prop : meta.split(",")) {
+                prop = prop.trim();
+                int eq = prop.indexOf('=');
+                if (eq <= 0) continue;
+                String key = prop.substring(0, eq).trim().toLowerCase();
+                String value = prop.substring(eq + 1).trim();
+                try {
+                    switch (key) {
+                        case "level" -> {
+                            if (item.getType() == Material.LIGHT && itemMeta instanceof BlockStateMeta blockMeta) {
+                                org.bukkit.block.BlockState blockState = blockMeta.getBlockState();
+                                org.bukkit.block.data.BlockData blockData = blockState.getBlockData();
+                                if (blockData instanceof org.bukkit.block.data.type.Light light) {
+                                    light.setLevel(Math.max(0, Math.min(15, Integer.parseInt(value))));
+                                    blockState.setBlockData(blockData);
+                                    blockMeta.setBlockState(blockState);
+                                }
+                            }
+                        }
+                        case "custom_model_data", "cmd" -> itemMeta.setCustomModelData(Integer.parseInt(value));
+                        default -> { /* ignore unknown props */ }
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
+            item.setItemMeta(itemMeta);
+        }
+    }
+
+    public DatabaseType getDatabaseType() {
+        return this.databaseType;
     }
 
     public synchronized Location getHologramLocation(String trackName) {
+        return getHologramLocation(trackName, "java");
+    }
+
+    public synchronized Location getHologramLocation(String trackName, String type) {
         if (trackName == null) return null;
         String trackNameWS = trackName.replaceAll("\\s+", "");
         String sql =
@@ -5124,7 +5870,9 @@ public class DatabaseManager {
                 ps.setString(1, trackNameWS);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
-                        World world = Bukkit.getWorld(rs.getString("world"));
+                        String worldName = rs.getString("world");
+                        if (worldName == null) return null;
+                        World world = Bukkit.getWorld(worldName);
                         if (world == null) return null;
                         return new Location(
                             world,
@@ -5178,6 +5926,74 @@ public class DatabaseManager {
         } catch (SQLException e) {
             handleSqlError(e);
         }
+    }
+
+    // ── ELO (ranked duels) ────────────────────────────────────────────────────
+
+    public synchronized int getElo(UUID uuid) {
+        if (uuid == null) return 1200;
+        String sql = "SELECT elo FROM fr_duel_elo WHERE uuid = ?";
+        try (
+            Connection conn = getOrConnect();
+            PreparedStatement ps = conn.prepareStatement(sql)
+        ) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("elo");
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return 1200;
+    }
+
+    public synchronized void setElo(UUID uuid, int elo, boolean won) {
+        if (uuid == null) return;
+        String sql =
+            "INSERT INTO fr_duel_elo (uuid, elo, wins, losses) VALUES (?, ?, ?, ?) " +
+            "ON CONFLICT(uuid) DO UPDATE SET " +
+            "elo = excluded.elo, " +
+            "wins = wins + excluded.wins, " +
+            "losses = losses + excluded.losses";
+        try (
+            Connection conn = getOrConnect();
+            PreparedStatement ps = conn.prepareStatement(sql)
+        ) {
+            ps.setString(1, uuid.toString());
+            ps.setInt(2, elo);
+            ps.setInt(3, won ? 1 : 0);
+            ps.setInt(4, won ? 0 : 1);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized List<Map<String, Object>> getEloLeaderboard(int limit) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        String sql =
+            "SELECT uuid, elo, wins, losses FROM fr_duel_elo ORDER BY elo DESC LIMIT ?";
+        try (
+            Connection conn = getOrConnect();
+            PreparedStatement ps = conn.prepareStatement(sql)
+        ) {
+            ps.setInt(1, Math.max(1, limit));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("uuid", rs.getString("uuid"));
+                    row.put("elo", rs.getInt("elo"));
+                    row.put("wins", rs.getInt("wins"));
+                    row.put("losses", rs.getInt("losses"));
+                    result.add(row);
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return result;
     }
 
     public synchronized void setStepHigh(
@@ -6540,7 +7356,7 @@ public class DatabaseManager {
     public synchronized boolean isBoatUtilsExclusive(String trackNameWS) {
         String trackNameNormalized = trackNameWS.replaceAll("\\s+", "");
         final String sql =
-            "SELECT exclusiveMode FROM fr_boatutils WHERE LOWER(trackNameWS) = LOWER(?)";
+            "SELECT 1 FROM fr_boatutils WHERE LOWER(trackNameWS) = LOWER(?)";
 
         try {
             Connection conn = getOrConnect();
@@ -6548,7 +7364,7 @@ public class DatabaseManager {
                 ps.setString(1, trackNameNormalized);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
-                        return rs.getBoolean("exclusiveMode");
+                        return true;
                     }
                 }
             }
@@ -6624,7 +7440,6 @@ public class DatabaseManager {
                         "collisionResolution",
                         rs.getInt("collisionResolution")
                     );
-                    map.put("exclusiveMode", rs.getBoolean("exclusiveMode"));
                     map.put(
                         "customSlipperiness",
                         rs.getString("customSlipperiness")

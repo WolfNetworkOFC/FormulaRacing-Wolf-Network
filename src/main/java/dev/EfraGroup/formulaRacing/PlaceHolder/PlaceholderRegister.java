@@ -81,6 +81,21 @@ public class PlaceholderRegister extends PlaceholderExpansion {
             return Integer.toString(this.cachedOpenTracksCount);
         }
 
+        if (player != null) {
+            if ("player_hex_color1".equalsIgnoreCase(params)) {
+                return toHexCode(this.plugin.getDatabaseManager().getPlayerColor1(player.getUniqueId()));
+            }
+            if ("player_hex_color2".equalsIgnoreCase(params)) {
+                return toHexCode(this.plugin.getDatabaseManager().getPlayerColor2(player.getUniqueId()));
+            }
+        }
+
         return null;
+    }
+
+    private static String toHexCode(String hex) {
+        if (hex == null) return "";
+        String clean = hex.startsWith("#") ? hex.substring(1) : hex;
+        return "&" + "#" + clean.toUpperCase();
     }
 }

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormulaRacing - Live Map</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/live-map.css">
+</head>
+<body>
+    <div class="map-container">
+        <!-- Canvas Area -->
+        <div class="map-canvas-wrapper">
+            <canvas id="map-canvas"></canvas>
+            <div class="map-info" id="map-info">
+                <span id="map-track-name"><strong>No heat selected</strong></span>
+                <span style="margin-left: 12px;" id="map-driver-count"></span>
+                <span style="margin-left: 12px;">🔄 <span id="map-refresh-rate">0</span>ms</span>
+            </div>
+        </div>
+
+        <!-- Side Panel -->
+        <div class="map-sidebar">
+            <div class="map-sidebar-header">
+                <div class="logo">FR</div>
+                <h2>Live Map</h2>
+                <div class="live-badge">
+                    <span class="live-dot"></span>
+                    <span id="live-status-text">Live</span>
+                </div>
+            </div>
+
+            <div class="heat-selector">
+                <label>Active Heat</label>
+                <select id="heat-select">
+                    <option value="">— Select a heat —</option>
+                </select>
+            </div>
+
+            <div class="driver-list" id="driver-list">
+                <div class="driver-list-title">Drivers</div>
+                <div id="driver-items" style="color: var(--text-muted); font-size: 13px; padding: 8px 4px;">
+                    Select a heat to view drivers
+                </div>
+            </div>
+
+            <div class="map-controls">
+                <button id="btn-follow" class="active" title="Auto-follow the selected heat">Follow</button>
+                <button id="btn-names" class="active" title="Show driver names">Names</button>
+                <button id="btn-trails" title="Show movement trails">Trails</button>
+                <button id="btn-bg" class="active" title="Show track background">Background</button>
+                <button id="btn-reset-view" title="Reset camera view">Reset View</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/live-map.js"></script>
+</body>
+</html>

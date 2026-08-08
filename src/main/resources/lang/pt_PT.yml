@@ -805,43 +805,33 @@ scoreboard_duel_track: '&fPista: '
 hotbar_menu_name: '&a&oMenu Principal'
 hotbar_menu_lore:
   - '&7Clica para abrir o menu.'
-  - ''
-  - '&eClica com o botão direito.'
 hotbar_tracks_name: '&e&oPistas / Time Trial'
 hotbar_tracks_lore:
   - '&7Clica para selecionar uma pista.'
-  - ''
-  - '&eClica com o botão direito.'
 hotbar_random_name: '&d&oPista Aleatória'
 hotbar_random_lore:
   - '&7Ir para uma pista aleatória.'
-  - ''
-  - '&eClica com o botão direito.'
 hotbar_visibility_on_name: '&b&oJogadores: &a&oVisíveis'
 hotbar_visibility_on_lore:
   - '&7Clica para &cOCULTAR &7jogadores.'
-  - ''
-  - '&eClica com o botão direito.'
 hotbar_visibility_off_name: '&b&oJogadores: &c&oOcultos'
 hotbar_visibility_off_lore:
   - '&7Clica para &aMOSTRAR &7jogadores.'
-  - ''
-  - '&eClica com o botão direito.'
 hotbar_reset_name: '&c&oReset'
 hotbar_reset_lore:
   - '&7Reiniciar corrida atual.'
-  - ''
-  - '&eClica com o botão direito.'
 hotbar_spawn_name: '&c&oVoltar ao Spawn'
 hotbar_spawn_lore:
   - '&7Voltar ao lobby.'
-  - ''
-  - '&eClica com o botão direito.'
 hotbar_settings_name: '&7&oDefinições'
 hotbar_settings_lore:
   - '&7Abrir definições.'
-  - ''
-  - '&eClica com o botão direito.'
+hotbar_cosmetics_name: '&6&oCosméticos'
+hotbar_cosmetics_lore:
+  - '&7Abrir os teus cosméticos.'
+hotbar_boat_name: '&a&oBarco'
+hotbar_boat_lore:
+  - '&7Escolher o teu barco.'
 
 lonely_cannot_change_racing: '§c❌ Não podes alterar o Lonely Mode durante uma corrida ou duelo!'
 lonely_invalid_usage: '§cSubcomando inválido. Usa: /lonely <true|false>'
@@ -853,6 +843,15 @@ lonely_obu_tip_line2: '§7deves §cDESATIVAR §7o Lonely Mode durante'
 lonely_obu_tip_line3: '§7treinos ou qualificatórias.'
 lonely_no_obu_info: '§7ℹ Instala o §bOpenBoatUtils §7para teres acesso ao Ghost Mode!'
 
+hotbar_resetcp_name: '&a&oReset do Checkpoint'
+hotbar_resetcp_lore:
+  - '&7Volta para o último checkpoint.'
+hotbar_leave_event_name: '&c&oSair do Evento'
+hotbar_leave_event_lore:
+  - '&7Sai do evento e assiste como espectador.'
+resetcp_not_in_heat: '&cNão estás numa corrida ativa.'
+resetcp_no_spawn: '&cNão foi possível encontrar o spawn da pista.'
+resetcp_teleported: '&aVoltaste para o último checkpoint.'
 cam_usage: '§eUsa: /cam <follow|stop|edit|set|view|list|menu>'
 cam_require_spectator: '§cPrecisas de estar no modo §lEspectador §cpara usares câmaras.'
 cam_player_not_found: '§cJogador não encontrado.'
@@ -974,9 +973,9 @@ scoreboard_v2_position: "&pPosição: &x{position}"
 scoreboard_v2_time: "&pTempo: &x{time}"
 
 # Color Settings
-gui_settings_color_name: "&pCor"
+gui_settings_color_name: "&eCor"
 gui_settings_color_lore: "&xClica para escolher a cor do teu tema"
-gui_color_title: "&pDefinições de Cor"
+gui_color_title: "&eDefinições de Cor"
 gui_color_lore: "&aClica para selecionar"
 gui_color_current: "&aCor atual! &7({color})"
 gui_color_back_name: "&7← Voltar"

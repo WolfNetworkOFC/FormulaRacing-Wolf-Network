@@ -6,7 +6,6 @@ import dev.EfraGroup.formulaRacing.Gui.Framework.BaseGui;
 import dev.EfraGroup.formulaRacing.Gui.Framework.GuiButton;
 import java.util.Map;
 import java.util.function.Consumer;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -30,16 +29,9 @@ public class TrackSelectorGui extends BaseGui {
 
             String trackName = (String)entry.getKey();
             if (db.isTrackOpen(trackName)) {
-                String iconName = db.getIcon(trackName);
+                DatabaseManager.TrackIconData iconData = db.getTrackIconData(trackName);
+                ItemStack item = iconData.toItemStack();
 
-                Material iconMat;
-                try {
-                    iconMat = Material.valueOf(iconName.toUpperCase());
-                } catch (Exception var15) {
-                    iconMat = Material.PAPER;
-                }
-
-                ItemStack item = new ItemStack(iconMat);
                 ItemMeta meta = item.getItemMeta();
                 if (meta != null) {
                     meta.setDisplayName("§e" + trackName);

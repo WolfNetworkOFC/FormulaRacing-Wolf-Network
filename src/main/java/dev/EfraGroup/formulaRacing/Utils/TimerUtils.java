@@ -83,6 +83,20 @@ public class TimerUtils {
                 return;
             }
             SchedulerHelper.runAsync(TimerUtils.this.plugin, () -> {
+                // Clean up entries for players who went offline without stopping their timer
+                TimerUtils.this.activeTimers.keySet().removeIf(uuid -> {
+                    Player player = Bukkit.getPlayer(uuid);
+                    if (player != null && player.isOnline()) {
+                        return false;
+                    }
+                    // Also clean up auxiliary maps for this UUID
+                    TimerUtils.this.tempCheckpoints.remove(uuid);
+                    TimerUtils.this.warnedPlayersNoCheckpoints.remove(uuid);
+                    String uuidStr = uuid.toString();
+                    TimerUtils.this.lastWarningTime.entrySet().removeIf(entry -> entry.getKey().startsWith(uuidStr + ":"));
+                    TimerUtils.this.lastDebugLogTime.entrySet().removeIf(entry -> entry.getKey().startsWith(uuidStr + ":"));
+                    return true;
+                });
                 for (Map.Entry<UUID, Map<String, PlayerTimerData>> playerEntry : TimerUtils.this.activeTimers.entrySet()) {
                     UUID uuid = playerEntry.getKey();
                     Player player = Bukkit.getPlayer(uuid);
@@ -150,25 +164,29 @@ public class TimerUtils {
         }, 0L, 1L);
     }
 
-    public void stopTimer(Player player) {
-        UUID uuid = player.getUniqueId();
-        Map<String, PlayerTimerData> map = this.activeTimers.get(uuid);
-        this.plugin.getDebugManager().logTimeTrialSystem("[TimerUtils] stopTimer(Player) chamado para " + player.getName() + ", timers ativos: " + String.valueOf(map != null ? map.keySet() : "nenhum"));
+    /**
+     * Clean up all timer data for a player by UUID (safe for offline players).
+     * Called from onPlayerQuit to prevent memory leaks.
+     */
+    public void cleanupPlayer(UUID uuid) {
+        Map<String, PlayerTimerData> map = this.activeTimers.remove(uuid);
         if (map != null) {
-            for (String track : new HashSet<String>(map.keySet())) {
-                this.stopTimer(player, track);
-            }
+            this.plugin.getDebugManager().logTimeTrialSystem("[TimerUtils] cleanupPlayer(UUID) removido para " + uuid + ", timers: " + map.keySet());
         }
-        this.activeTimers.remove(uuid);
         this.tempCheckpoints.remove(uuid);
         this.warnedPlayersNoCheckpoints.remove(uuid);
-        this.lastWarningTime.entrySet().removeIf(entry -> ((String)entry.getKey()).startsWith(uuid.toString() + ":"));
-        this.lastDebugLogTime.entrySet().removeIf(entry -> ((String)entry.getKey()).startsWith(uuid.toString() + ":"));
+        String uuidStr = uuid.toString();
+        this.lastWarningTime.entrySet().removeIf(entry -> entry.getKey().startsWith(uuidStr + ":"));
+        this.lastDebugLogTime.entrySet().removeIf(entry -> entry.getKey().startsWith(uuidStr + ":"));
+    }
+
+    public void stopTimer(Player player) {
+        if (player == null) return;
+        UUID uuid = player.getUniqueId();
+        this.cleanupPlayer(uuid);
         try {
             player.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(""));
-            this.plugin.getDebugManager().logTimeTrialSystem("[TimerUtils] Action bar limpa para " + player.getName());
         } catch (Exception ignored) {
-            this.plugin.getDebugManager().logTimeTrialSystem("[TimerUtils] Erro ao limpar action bar para " + player.getName());
         }
     }
 

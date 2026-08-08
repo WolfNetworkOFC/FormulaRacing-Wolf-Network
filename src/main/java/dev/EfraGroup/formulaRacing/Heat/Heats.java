@@ -292,9 +292,20 @@ public class Heats {
 
     public void applyCollisionModeToPlayer(Player player) {
         if (this.plugin.getPacketSender() != null) {
-            short modeValue = 0;
-            if (this.collisionMode == CollisionMode.DISABLED) {
-                modeValue = 4;
+            short modeValue;
+            switch (this.collisionMode) {
+                case HIGH:
+                    modeValue = 0; // Vanilla — full collision (same as Frosthex)
+                    break;
+                case LOW:
+                    modeValue = 0; // Vanilla — same as HIGH (no filtered system yet)
+                    break;
+                case DISABLED:
+                    modeValue = 2; // No collision with anything (same as Frosthex)
+                    break;
+                default:
+                    modeValue = 0; // Vanilla (fallback)
+                    break;
             }
 
             this.plugin.getPacketSender().sendBoatSetting(
@@ -541,6 +552,7 @@ public class Heats {
                         player,
                         this
                     );
+                    this.plugin.getHotbarController().giveHeatHotbar(player, this);
                 }
             }
 
@@ -552,6 +564,12 @@ public class Heats {
             }
 
             this.setHeatState(HeatState.LOADED);
+
+            // Spawn AI opponents as soon as the heat is loaded so they appear on the grid.
+            if (this.plugin != null && this.plugin.getAIOpponentManager() != null) {
+                this.plugin.getAIOpponentManager().startAIForHeat(this);
+            }
+
             this.saveConfigIfDirty();
             var10000 = this.plugin.getDebugManager();
             var10001 = this.id;
@@ -765,6 +783,10 @@ public class Heats {
             }
 
             this.gridManager.clear();
+            // Despawn any AI-controlled boats so they don't leak after the heat ends.
+            if (this.plugin.getAIOpponentManager() != null) {
+                this.plugin.getAIOpponentManager().stopAIForHeat(this.id);
+            }
             if (this.plugin.getPacketSender() != null) {
                 long now = System.currentTimeMillis();
                 for (Driver driver : this.drivers.values()) {
@@ -1277,6 +1299,8 @@ public class Heats {
                     this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, this.trackNameWS);
                     this.applyCollisionModeToPlayer(player);
                 }
+                // Apply track game time (day/night cycle)
+                this.plugin.applyTrackGameTime(player, this.trackNameWS);
                 boolean collidable = this.collisionMode != CollisionMode.DISABLED;
                 this.plugin.getAPI().spawnBoatAt(player, gridLoc, false, true, false, collidable);
             }
@@ -1365,6 +1389,7 @@ public class Heats {
             }
 
             this.stopTimeTrialTimer(player);
+            this.plugin.getHotbarController().giveHeatHotbar(player, this);
             if (this.plugin.getPacketSender() != null) {
                 this.plugin.getPacketSender().applyBoatUtilsToPlayer(
                     player,
@@ -1402,6 +1427,8 @@ public class Heats {
                             }
 
                             this.gridManager.teleportDriver(driver);
+                            // Apply track game time (day/night cycle) for grid teleport
+                            this.plugin.applyTrackGameTime(player, this.trackNameWS);
                             var10000 = this.plugin.getDebugManager();
                             var10001 = player.getName();
                             var10000.logRaceSystem(
@@ -1419,6 +1446,8 @@ public class Heats {
                             );
                         if (spawnLoc != null) {
                             SchedulerHelper.teleportAsync(this.plugin, player, spawnLoc);
+                            // Apply track game time (day/night cycle)
+                            this.plugin.applyTrackGameTime(player, this.trackNameWS);
                             boolean collidable = this.collisionMode != CollisionMode.DISABLED;
                             this.plugin.getAPI().spawnBoat(
                                 player,
@@ -1462,6 +1491,7 @@ public class Heats {
             this.plugin.getLonelyController().clearGhost(player.getUniqueId());
             this.plugin.getRaceScoreboardManager().removePlayer(player);
             this.plugin.getRaceActionBarManager().removePlayer(player);
+            this.plugin.resetTrackGameTime(player);
             this.plugin.getAPI().recoverPlayerBoatState(player);
             if (this.plugin.getPacketSender() != null) {
                 boolean dbLonely =
@@ -1719,6 +1749,7 @@ public class Heats {
 
     public void setHeatState(HeatState heatState) {
         HeatStateMachine.validateTransition(this.heatState, heatState);
+        HeatState previous = this.heatState;
         this.previousState = this.heatState;
         this.heatState = heatState;
         if (
@@ -1729,6 +1760,15 @@ public class Heats {
             this.plugin.getRaceEventManager()
                 .getDatabaseManager()
                 .updateHeatState(this.id, heatState);
+        }
+
+        // Render the AI racing line when a heat with AI drivers goes live.
+        if (this.plugin != null && this.plugin.getAILineVisualizer() != null) {
+            if (heatState == HeatState.RACING && previous != HeatState.RACING) {
+                this.plugin.getAILineVisualizer().registerHeat(this);
+            } else if (heatState == HeatState.FINISHED) {
+                this.plugin.getAILineVisualizer().unregisterHeat(this.id);
+            }
         }
     }
 
@@ -2081,15 +2121,6 @@ public class Heats {
             for (Driver driver : this.drivers.values()) {
                 if (!driver.hasCompletedMandatoryPits(this.totalPits)) {
                     int missingPits = this.totalPits - driver.getPitstops();
-                    Player player = this.plugin.getServer().getPlayer(
-                        driver.getUuid()
-                    );
-                    if (player != null) {
-                        player.getName();
-                    } else {
-                        String var10000 = "Piloto";
-                    }
-
                     EventAnnouncements announcements =
                         this.round != null && this.round.getEvent() != null
                             ? this.round.getEvent().getAnnouncements()

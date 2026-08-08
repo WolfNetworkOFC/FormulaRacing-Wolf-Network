@@ -14,15 +14,16 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Boat;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import org.bukkit.util.Vector;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -30,8 +31,8 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class AIOpponentManager {
 
-    private static final double DEFAULT_THROTTLE = 0.45;
-    private static final double MAX_BOAT_SPEED = 0.95;
+    private static final double DEFAULT_THROTTLE = 0.85;
+    private static final double MAX_BOAT_SPEED = 1.6;
 
     private final FormulaRacing plugin;
     private final Map<UUID, AIOpponent> aiOpponents;
@@ -40,13 +41,13 @@ public class AIOpponentManager {
 
     public AIOpponentManager(FormulaRacing plugin) {
         this.plugin = plugin;
-        this.aiOpponents = new HashMap<>();
+        this.aiOpponents = new ConcurrentHashMap<>();
     }
 
     public enum AIDifficulty {
-        EASY(0.7, 0.3, 0.5, 0.8, 0.4),
-        MEDIUM(0.85, 0.15, 0.7, 0.9, 0.7),
-        HARD(0.95, 0.05, 0.9, 0.95, 0.9);
+        EASY(0.8, 0.3, 0.5, 0.8, 0.4),
+        MEDIUM(0.95, 0.15, 0.7, 0.9, 0.7),
+        HARD(1.15, 0.05, 0.9, 0.95, 0.9);
 
         private final String name;
         private final double speedMultiplier;
@@ -187,9 +188,11 @@ public class AIOpponentManager {
                     continue;
                 }
 
-                Location loc1 = entity1.getLocation();
-                Location loc2 = entity2.getLocation();
+                // getLocation(Location) is thread-safe on Folia (copies into the arg).
+                Location loc1 = entity1.getLocation(new Location(null, 0, 0, 0));
+                Location loc2 = entity2.getLocation(new Location(null, 0, 0, 0));
                 if (loc1.distanceSquared(loc2) < collisionDistanceSquared) {
+                    // Resolve the push on each entity's own region thread.
                     applyCollision(entity1, entity2, loc1, loc2, bumpForce);
                 }
             }
@@ -209,8 +212,17 @@ public class AIOpponentManager {
         }
 
         Vector push = direction.normalize().multiply(force);
-        entity1.setVelocity(entity1.getVelocity().subtract(push));
-        entity2.setVelocity(entity2.getVelocity().add(push));
+        // Each setVelocity runs on its own entity's region thread (Folia).
+        SchedulerHelper.runTaskFor(plugin, entity1, () -> {
+            if (entity1.isValid()) {
+                entity1.setVelocity(entity1.getVelocity().subtract(push));
+            }
+        });
+        SchedulerHelper.runTaskFor(plugin, entity2, () -> {
+            if (entity2.isValid()) {
+                entity2.setVelocity(entity2.getVelocity().add(push));
+            }
+        });
     }
 
     public void clearAll() {
@@ -297,26 +309,28 @@ public class AIOpponentManager {
                 return;
             }
 
-            plugin.getDebugManager().logRaceSystem("[AI] Spawning " + displayName + " at " + spawn.getWorld().getName() + " (" + String.format("%.1f", spawn.getX()) + ", " + String.format("%.1f", spawn.getY()) + ", " + String.format("%.1f", spawn.getZ()) + ")");
-
-            Boat boat = spawn.getWorld().spawn(spawn, Boat.class, spawnedBoat -> {
-                spawnedBoat.setCustomName(displayName);
-                spawnedBoat.setCustomNameVisible(true);
-                spawnedBoat.setInvulnerable(true);
-                spawnedBoat.setGravity(true);
-                spawnedBoat.setPersistent(false);
-                spawnedBoat.setSilent(true);
-                spawnedBoat.setRotation(spawn.getYaw(), spawn.getPitch());
+            // Entity creation must run on the world's region thread (Folia).
+            // Boat is an interface, so we spawn the concrete OAK_BOAT entity type.
+            final Location finalSpawn = spawn.clone();
+            SchedulerHelper.runTaskAtLocation(plugin, finalSpawn, () -> {
+                Boat boat = (Boat) finalSpawn.getWorld().spawnEntity(finalSpawn, EntityType.OAK_BOAT);
+                boat.setCustomName(displayName);
+                boat.setCustomNameVisible(true);
+                boat.setInvulnerable(true);
+                boat.setGravity(true);
+                boat.setPersistent(false);
+                boat.setSilent(true);
+                boat.setRotation(finalSpawn.getYaw(), finalSpawn.getPitch());
+                boatUuid = boat.getUniqueId();
+                lastKnownLocation = boat.getLocation().clone();
             });
-
-            boatUuid = boat.getUniqueId();
-            lastKnownLocation = boat.getLocation().clone();
         }
 
         public void despawnEntity() {
             Entity entity = getControlledEntity();
             if (entity != null) {
-                entity.remove();
+                // Entity.remove() must run on the owning region thread (Folia).
+                SchedulerHelper.runTaskFor(plugin, entity, entity::remove);
             }
             boatUuid = null;
             lastKnownLocation = null;
@@ -337,21 +351,27 @@ public class AIOpponentManager {
         }
 
         public void update(Heats heat, AIRacingLine line) {
+            // All entity access (getLocation/setVelocity/setRotation) must run on the
+            // boat's region thread on Folia, so dispatch the whole tick there.
             Entity controlledEntity = getControlledEntity();
             if (controlledEntity == null || !controlledEntity.isValid()) {
                 return;
             }
+            SchedulerHelper.runTaskFor(plugin, controlledEntity, () -> {
+                if (!controlledEntity.isValid()) {
+                    return;
+                }
+                updateLapTime();
+                checkForMistake();
 
-            updateLapTime();
-            checkForMistake();
+                Location currentLoc = controlledEntity.getLocation();
+                calculateSpeed(heat, line, currentLoc);
+                moveBoat(heat, line, controlledEntity, currentLoc);
 
-            Location currentLoc = controlledEntity.getLocation();
-            calculateSpeed(heat, line, currentLoc);
-            moveBoat(heat, line, controlledEntity, currentLoc);
-
-            Location newLoc = controlledEntity.getLocation();
-            processTrackProgress(heat, currentLoc, newLoc);
-            lastKnownLocation = newLoc.clone();
+                Location newLoc = controlledEntity.getLocation();
+                processTrackProgress(heat, currentLoc, newLoc);
+                lastKnownLocation = newLoc.clone();
+            });
         }
 
         private void updateLapTime() {

@@ -189,7 +189,8 @@ public class GridManager {
     private void spawnBoatWithTrackConfig(final Player player, Location location, Driver driver) {
         final String trackNameWS = this.heat.getTrackNameWS();
         final Location gridLoc = location.clone();
-        SchedulerHelper.runTaskLater(this.plugin, () -> {
+        // Player-entity work must run on the player's region thread (Folia).
+        SchedulerHelper.runTaskFor(this.plugin, player, () -> {
             if (player.isOnline()) {
                 SchedulerHelper.teleport(player, gridLoc);
                 GridManager.this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackNameWS);

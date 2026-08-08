@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -82,9 +83,9 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
         );
         this.defaultBuilder = new DefaultStateViewModelBuilder();
 
-        this.playerHeats = new HashMap<>();
-        this.spectatorHeats = new HashMap<>();
-        this.lastHeatUpdate = new HashMap<>();
+        this.playerHeats = new ConcurrentHashMap<>();
+        this.spectatorHeats = new ConcurrentHashMap<>();
+        this.lastHeatUpdate = new ConcurrentHashMap<>();
 
         this.startAutoUpdate();
     }
@@ -119,11 +120,12 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
 
         this.lastHeatUpdate.remove(heat);
 
-        this.playerHeats.entrySet().removeIf(entry -> {
-            if (!entry.getValue().equals(heat)) {
+        this.playerHeats.keySet().removeIf(uuid -> {
+            Heats h = this.playerHeats.get(uuid);
+            if (h == null || !h.equals(heat)) {
                 return false;
             }
-            Player player = Bukkit.getPlayer(entry.getKey());
+            Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
                 this.primaryAdapter.delete(player);
                 this.ownershipCoordinator.release(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.RACE);
@@ -131,11 +133,12 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
             return true;
         });
 
-        this.spectatorHeats.entrySet().removeIf(entry -> {
-            if (!entry.getValue().equals(heat)) {
+        this.spectatorHeats.keySet().removeIf(uuid -> {
+            Heats h = this.spectatorHeats.get(uuid);
+            if (h == null || !h.equals(heat)) {
                 return false;
             }
-            Player player = Bukkit.getPlayer(entry.getKey());
+            Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
                 this.primaryAdapter.delete(player);
                 this.ownershipCoordinator.release(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.RACE);
@@ -212,7 +215,7 @@ public class RaceScoreboardV2Manager implements RaceScoreboardService {
             Set<Heats> heatsToRender = new HashSet<>();
             heatsToRender.addAll(playersByHeat.keySet());
             heatsToRender.addAll(spectatorsByHeat.keySet());
-            RaceScoreboardV2Manager.this.lastHeatUpdate.entrySet().removeIf(entry -> !heatsToRender.contains(entry.getKey()));
+            RaceScoreboardV2Manager.this.lastHeatUpdate.keySet().removeIf(heatKey -> !heatsToRender.contains(heatKey));
 
             for (Heats heat : heatsToRender) {
                 if (!RaceScoreboardV2Manager.this.shouldUpdateHeat(heat, now)) {

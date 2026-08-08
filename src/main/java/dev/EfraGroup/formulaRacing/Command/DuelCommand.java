@@ -44,6 +44,7 @@ public class DuelCommand extends BaseCommand implements Listener {
     private final NamespacedKey KEY_LAPS = new NamespacedKey("formula", "laps");
     private final NamespacedKey KEY_MODE = new NamespacedKey("formula", "mode");
     private final NamespacedKey KEY_LONELY = new NamespacedKey("formula", "lonely");
+    private final NamespacedKey KEY_RANKED = new NamespacedKey("formula", "ranked");
     private static final Map<UUID, UUID> pendingInvites = new HashMap<>();
 
     // Constructor
@@ -79,6 +80,20 @@ public class DuelCommand extends BaseCommand implements Listener {
         }
 
         openSetupGUI(player, target);
+    }
+
+    // 1b. Subcommand: /duel ranked — toggles ELO-ranked duels
+    @Subcommand("ranked")
+    public void onToggleRanked(Player player) {
+        int current = player.getPersistentDataContainer().getOrDefault(KEY_RANKED, PersistentDataType.INTEGER, 0);
+        int next = current == 1 ? 0 : 1;
+        player.getPersistentDataContainer().set(KEY_RANKED, PersistentDataType.INTEGER, next);
+        if (next == 1) {
+            player.sendMessage("§aDuelos rankeados (ELO) ativados. Seu ranking mudará ao vencer/perder.");
+        } else {
+            player.sendMessage("§7Duelos rankeados (ELO) desativados.");
+        }
+        playSound(player, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f);
     }
 
     // 2. Subcommand: /duel accept [player]
@@ -159,14 +174,14 @@ public class DuelCommand extends BaseCommand implements Listener {
 
         for (String trackName : tracks) {
             if (slot >= 45) break;
-            String iconName = databaseManager.getIcon(trackName);
-            Material material;
-            try {
-                material = (iconName != null) ? Material.valueOf(iconName.toUpperCase()) : Material.PAPER;
-            } catch (IllegalArgumentException e) {
-                material = Material.PAPER;
+            ItemStack iconStack = databaseManager.getTrackIconData(trackName).toItemStack();
+            ItemMeta iconMeta = iconStack.getItemMeta();
+            if (iconMeta != null) {
+                iconMeta.setDisplayName("§b" + trackName);
+                iconMeta.setLore(Collections.singletonList("§7Click to select this track"));
+                iconStack.setItemMeta(iconMeta);
             }
-            inv.setItem(slot++, createItem(material, "§b" + trackName, "§7Click to select this track"));
+            inv.setItem(slot++, iconStack);
         }
 
         inv.setItem(49, createItem(Material.NAME_TAG, "§e§lSearch by Name", "§7Click to type the name in chat"));
@@ -431,6 +446,9 @@ public class DuelCommand extends BaseCommand implements Listener {
         String mode = challenger.getPersistentDataContainer().getOrDefault(KEY_MODE, PersistentDataType.STRING, "CORRIDA");
         boolean isTimeTrialMode = mode.equalsIgnoreCase("TIME TRIAL") || mode.equalsIgnoreCase("TIME_TRIAL") || mode.toUpperCase().contains("TIME");
 
+        int rankedInt = challenger.getPersistentDataContainer().getOrDefault(KEY_RANKED, PersistentDataType.INTEGER, 0);
+        boolean isRanked = (rankedInt == 1);
+
         if (track.equals("None")) {
             responder.sendMessage("§c§lERROR §8» §7The challenger did not select a valid track.");
             return;
@@ -440,7 +458,7 @@ public class DuelCommand extends BaseCommand implements Listener {
             playSound(responder, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f);
             playSound(challenger, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f);
             if (isTimeTrialMode) {
-                timeTrialDuels.startDuelPreparation(challenger, responder, track, laps, timeLimitSeconds, isLonely, isTimeTrialMode);
+                timeTrialDuels.startDuelPreparation(challenger, responder, track, laps, timeLimitSeconds, isLonely, isTimeTrialMode, isRanked);
             } else {
                 // For race mode, use QuickRaceManager
                 QuickRaceManager qrm = plugin.getQuickRaceManager();

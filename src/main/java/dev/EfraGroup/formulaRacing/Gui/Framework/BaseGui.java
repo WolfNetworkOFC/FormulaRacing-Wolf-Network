@@ -1,8 +1,8 @@
 package dev.EfraGroup.formulaRacing.Gui.Framework;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -13,7 +13,7 @@ import org.bukkit.inventory.ItemStack;
 public class BaseGui implements InventoryHolder {
     protected final Inventory inventory;
     protected final String title;
-    protected final List<GuiButton> buttons = new ArrayList();
+    protected final Map<Integer, GuiButton> buttons = new HashMap();
     protected final FormulaRacing plugin;
 
     public BaseGui(String title, int rows) {
@@ -23,36 +23,33 @@ public class BaseGui implements InventoryHolder {
     }
 
     public void setItem(GuiButton button, int slot) {
-        this.buttons.add(button);
+        this.buttons.put(slot, button);
         this.inventory.setItem(slot, button.getStack());
     }
 
     public void addItem(GuiButton button) {
-        this.buttons.add(button);
-        this.inventory.addItem(new ItemStack[]{button.getStack()});
+        int slot = this.inventory.firstEmpty();
+        if (slot >= 0) {
+            this.buttons.put(slot, button);
+            this.inventory.setItem(slot, button.getStack());
+        }
     }
 
     public void removeItem(int slot) {
         ItemStack item = this.inventory.getItem(slot);
         if (item != null) {
-            this.buttons.removeIf((b) -> b.getStack().isSimilar(item));
+            this.buttons.remove(slot);
             this.inventory.setItem(slot, (ItemStack)null);
         }
     }
 
     public boolean handleButton(InventoryClickEvent event) {
-        ItemStack currentItem = event.getCurrentItem();
-        if (currentItem == null) {
+        GuiButton button = this.buttons.get(event.getSlot());
+        if (button == null) {
             return false;
         } else {
-            for(GuiButton button : this.buttons) {
-                if (button.getStack().isSimilar(currentItem)) {
-                    button.run(event);
-                    return true;
-                }
-            }
-
-            return false;
+            button.run(event);
+            return true;
         }
     }
 

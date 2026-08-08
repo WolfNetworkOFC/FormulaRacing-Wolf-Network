@@ -14,6 +14,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
 public class ScoreboardTimeTrialUtils {
@@ -322,7 +323,6 @@ public class ScoreboardTimeTrialUtils {
             .getConfig()
             .getString("scoreboard.style.accent-marker", "┃");
         String accent = TimingScoreboardStyle.normalizeAccentMarker(configured);
-        String marker = color + "§l" + accent + accent + "§r";
         String nameBase = isMe
             ? ChatColor.stripColor(
                   FormulaRacing.getInstance()
@@ -334,7 +334,52 @@ public class ScoreboardTimeTrialUtils {
         String nameDisplay =
             nameColor + TimingScoreboardStyle.padRight(nameBase, 14) + "§r";
         String rank = color + pos + ". ";
+
+        // Separator bars (||): first bar uses the player's chosen primary colour
+        // (color1), second bar uses their accent colour (color2), both bold+italic.
+        UUID recordUuid = this.resolvePlayerUuid(tr.getPlayerName());
+        String bar1Color = recordUuid != null
+            ? hexToMinecraft(this.mysql.getPlayerColor1(recordUuid))
+            : color;
+        String bar2Color = recordUuid != null
+            ? hexToMinecraft(this.mysql.getPlayerColor2(recordUuid))
+            : color;
+        String marker = bar1Color + "§o§l" + accent + "§r" + bar2Color + "§o§l" + accent + "§r";
+
         return rank + "§7| " + timeDisplay + " " + marker + " " + nameDisplay;
+    }
+
+    private UUID resolvePlayerUuid(String playerName) {
+        if (playerName == null || playerName.isBlank()) {
+            return null;
+        }
+        // Prefer the database lookup so stored records (whose colour is persisted by
+        // uuid) resolve reliably — not just players the server already knows about.
+        UUID fromDb = this.mysql.getPlayerUUIDByName(playerName);
+        if (fromDb != null) {
+            return fromDb;
+        }
+        Player online = Bukkit.getPlayerExact(playerName);
+        if (online != null) {
+            return online.getUniqueId();
+        }
+        OfflinePlayer offline = Bukkit.getOfflinePlayer(playerName);
+        return (offline != null && offline.hasPlayedBefore()) ? offline.getUniqueId() : null;
+    }
+
+    private static String hexToMinecraft(String hex) {
+        if (hex == null || hex.isBlank()) {
+            return "§f";
+        }
+        String clean = hex.startsWith("#") ? hex.substring(1) : hex;
+        if (clean.length() != 6) {
+            return "§f";
+        }
+        StringBuilder sb = new StringBuilder("§");
+        for (char c : clean.toCharArray()) {
+            sb.append('§').append(Character.toLowerCase(c));
+        }
+        return sb.toString();
     }
 
     public String formatTime(double timeInSeconds) {

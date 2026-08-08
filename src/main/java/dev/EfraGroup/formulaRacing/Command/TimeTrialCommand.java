@@ -11,6 +11,7 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.PacketSender;
     import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+    import dev.EfraGroup.formulaRacing.AI.AIRacingLineManager;
     import dev.EfraGroup.formulaRacing.Heat.HeatState;
     import dev.EfraGroup.formulaRacing.Heat.Heats;
     import dev.EfraGroup.formulaRacing.Heat.Lap;
@@ -155,9 +156,44 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                     }
 
                     this.api.recoverPlayerBoatState(player);
+                    final String trackNameWS = trackName.replaceAll("\\s+", "");
                     SchedulerHelper.teleportAsync(player, loc).thenAccept(success -> {
                         if (Boolean.TRUE.equals(success)) {
                             this.api.spawnBoatAt(player, loc, false, false, false);
+                            // Apply track game time (day/night cycle)
+                            this.plugin.applyTrackGameTime(player, trackName);
+                            // Ensure giveTimeTrialHotbar runs on the correct thread
+                            SchedulerHelper.runTaskFor(this.plugin, player, () ->
+                                this.plugin.getHotbarController().giveTimeTrialHotbar(player)
+                            );
+                            // --- Ghost System: start recording ---
+                            if (this.plugin.getGhostManager() != null) {
+                                this.plugin.getGhostManager().startRecording(player);
+                            }
+                            // --- Ghost System: load and start replay if ghost exists ---
+                             if (this.plugin.getGhostManager() != null) {
+                                 this.plugin.getGhostManager().loadGhostAsync(
+                                         player.getUniqueId(), trackNameWS, frames -> {
+                                     if (frames != null && !frames.isEmpty() && player.isOnline()) {
+                                         this.plugin.getGhostManager().startReplay(player, frames);
+                                     }
+                                 });
+                             }
+                             // --- WolfMOD: Send track racing line to client ---
+                             var wolfMod = this.plugin.getWolfMod();
+                             if (wolfMod != null) {
+                                 SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                                     wolfMod.sendGhostClear(player);
+                                     AIRacingLineManager aiManager = this.plugin.getAIRacingLineManager();
+                                     if (aiManager != null && aiManager.hasRacingLine(trackNameWS)) {
+                                         var line = aiManager.getRacingLine(trackNameWS);
+                                         if (line != null && line.isUsable()) {
+                                             wolfMod.sendTrackLine(player, trackNameWS, line);
+                                             wolfMod.sendGhostStart(player);
+                                         }
+                                     }
+                                 });
+                             }
                         }
                     });
                 }
@@ -169,6 +205,18 @@ import dev.EfraGroup.formulaRacing.PacketSender;
         public void onCancel(Player player) {
             this.timerUtils.stopTimer(player);
             this.timeTrialController.endSession(player);
+            // NOTE: o /ttc NÃO faz resetTrackGameTime — o tempo do jogador
+            // permanece como está (aplica-se apenas ao sair para spawn/mudar de modo).
+            // Clean up ghost recording and replay
+            if (this.plugin.getGhostManager() != null) {
+                this.plugin.getGhostManager().cleanupPlayer(player);
+            }
+            // Clean up WolfMOD ghost rendering
+            var wolfMod = this.plugin.getWolfMod();
+            if (wolfMod != null) {
+                wolfMod.sendGhostStop(player);
+                wolfMod.sendGhostClear(player);
+            }
             this.plugin.sendMessage(player, "tt_cancelled", new String[0]);
             if (this.plugin.getLonelyController() != null) {
                 this.plugin.getLonelyController().updatePlayersVisibility(player);
@@ -328,12 +376,37 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                             }
 
                             this.api.recoverPlayerBoatState(player);
+                            final String finalTrackName = trackName;
+                            final String finalTrackNameWS = trackName != null ? trackName.replaceAll("\\s+", "") : null;
                             SchedulerHelper.teleportAsync(player, spawn).thenAccept(success -> {
                                 if (Boolean.TRUE.equals(success)) {
                                     this.api.spawnBoatAt(player, spawn, false, false, false);
+                                    // Apply track game time (day/night cycle)
+                                    this.plugin.applyTrackGameTime(player, finalTrackName);
+                                    // Set time trial hotbar after teleport + boat spawn
+                                    SchedulerHelper.runTaskFor(this.plugin, player, () ->
+                                        this.plugin.getHotbarController().giveTimeTrialHotbar(player)
+                                    );
+                                    // --- Ghost System: start recording ---
+                                    if (this.plugin.getGhostManager() != null
+                                            && finalTrackNameWS != null) {
+                                        this.plugin.getGhostManager().startRecording(player);
+                                    }
+                                    // --- Ghost System: load and start replay if ghost exists ---
+                                    if (this.plugin.getGhostManager() != null
+                                            && finalTrackNameWS != null) {
+                                        this.plugin.getGhostManager().loadGhostAsync(
+                                                player.getUniqueId(), finalTrackNameWS, frames -> {
+                                            if (frames != null && !frames.isEmpty()
+                                                    && player.isOnline()) {
+                                                this.plugin.getGhostManager().startReplay(
+                                                        player, frames);
+                                            }
+                                        });
+                                    }
                                 }
                             });
-                            if (activeHeat == null) {
+                                    if (activeHeat == null) {
                                 String owner = null;
                                 if (trackName != null) {
                                     DatabaseManager.TrackData td = this.mysql.getTrackData(trackName);
@@ -343,6 +416,12 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                                 }
 
                                 this.stt.setPlayerTrack(player, trackName, owner);
+                            }
+                            // Clear WolfMOD ghost when resetting
+                            var wolfMod = this.plugin.getWolfMod();
+                            if (wolfMod != null) {
+                                wolfMod.sendGhostStop(player);
+                                wolfMod.sendGhostClear(player);
                             }
 
                         }

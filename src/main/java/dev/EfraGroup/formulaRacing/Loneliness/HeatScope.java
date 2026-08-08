@@ -2,9 +2,11 @@ package dev.EfraGroup.formulaRacing.Loneliness;
 
 import dev.EfraGroup.formulaRacing.Heat.CollisionMode;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
+import dev.EfraGroup.formulaRacing.Participant.Driver;
 
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -49,5 +51,23 @@ public final class HeatScope implements VisibilityScope {
     @Override
     public boolean isIsolated() {
         return heat.isLonely();
+    }
+
+    @Override
+    public Set<UUID> getFinishedParticipants() {
+        Set<UUID> finished = new HashSet<>();
+        for (Map.Entry<UUID, Driver> entry : heat.getDrivers().entrySet()) {
+            Driver driver = entry.getValue();
+            if (driver != null && driver.isFinished() && !driver.isDnf()) {
+                finished.add(entry.getKey());
+            }
+        }
+        return finished;
+    }
+
+    @Override
+    public boolean isActiveRacer(UUID uuid) {
+        Driver driver = heat.getDriver(uuid);
+        return driver != null && !driver.isFinished() && !driver.isDnf();
     }
 }

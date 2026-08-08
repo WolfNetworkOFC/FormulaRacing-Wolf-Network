@@ -899,6 +899,9 @@ public class RaceEventManager {
                 if (this.plugin.getTimerUtils() != null) {
                     this.plugin.getTimerUtils().stopTimer(player);
                 }
+                
+                // Reset player time back to world time
+                this.plugin.resetTrackGameTime(player);
 
                 if (this.plugin.getPacketSender() != null) {
                     this.plugin.getPacketSender().resetBoatUtilsToVanilla(
@@ -915,13 +918,19 @@ public class RaceEventManager {
                 }
 
                 this.plugin.getAPI().recoverPlayerBoatState(player);
-                if (player.getVehicle() != null) {
-                    player.getVehicle().remove();
-                }
-
-                Location respawn = player.getWorld().getSpawnLocation();
-
-                SchedulerHelper.teleport(player, respawn);
+                // Entity work must run on the player's region thread (Folia).
+                final Player leavePlayer = player;
+                SchedulerHelper.runTaskFor(this.plugin, leavePlayer, () -> {
+                    if (leavePlayer.getVehicle() != null) {
+                        leavePlayer.getVehicle().remove();
+                    }
+                    Location respawn = leavePlayer.getWorld().getSpawnLocation();
+                    SchedulerHelper.teleport(leavePlayer, respawn);
+                    // Restore default hotbar after leaving event
+                    if (this.plugin.getHotbarController() != null) {
+                        this.plugin.getHotbarController().giveHotbarItems(leavePlayer);
+                    }
+                });
                 event.removeSubscriber(uuid);
                 this.playerActiveEvent.remove(uuid);
                 player.sendMessage(

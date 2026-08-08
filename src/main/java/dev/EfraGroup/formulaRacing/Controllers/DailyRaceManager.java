@@ -206,10 +206,16 @@ public class DailyRaceManager {
 
                 this.plugin.getAPI().recoverPlayerBoatState(player);
 
-                SchedulerHelper.teleport(player, loc);
-                this.plugin.sendMessage(player, "daily_teleport_practice", new String[0]);
-                this.plugin.getAPI().spawnBoat(player, false, false, false);
-                this.notifyPlayerJoinPractice(player);
+                // Folia: teleportAsync é assíncrono — spawnar o barco na posição atual
+                // antes do teleport concluir quebraria o teleport (player dentro de
+                // veículo). Spawnamos apenas depois, no destino.
+                SchedulerHelper.teleportAsync(player, loc).thenAccept(success -> {
+                    if (Boolean.TRUE.equals(success) && player.isOnline()) {
+                        this.plugin.sendMessage(player, "daily_teleport_practice", new String[0]);
+                        this.plugin.getAPI().spawnBoatAt(player, loc, false, false, false);
+                        this.notifyPlayerJoinPractice(player);
+                    }
+                });
             }
         } else {
             player.sendMessage(String.valueOf(ChatColor.RED) + "Track not configured for this event.");

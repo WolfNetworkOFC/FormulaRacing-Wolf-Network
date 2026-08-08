@@ -37,6 +37,7 @@ public class TimeTrialDuels implements Listener {
     private final PacketSender packet;
     private final TimeTrialDuelsAction ttda;
     private final ScoreboardDuelsTimeUtils scoreboardDuelsUtils;
+    private final EloManager eloManager;
     private final Map<Integer, DuelState> activeDuels = new ConcurrentHashMap();
     private final Map<UUID, PlayerDuelState> playerStates = new ConcurrentHashMap();
     private static final Set<UUID> playersBeingLapReset = ConcurrentHashMap.newKeySet();
@@ -47,6 +48,7 @@ public class TimeTrialDuels implements Listener {
         this.packet = packet;
         this.ttda = ttda;
         this.scoreboardDuelsUtils = scoreboardDuelsUtils;
+        this.eloManager = new EloManager(plugin, dm);
     }
 
     public boolean isPlayerInActiveDuelCached(UUID playerUUID) {
@@ -83,7 +85,7 @@ public class TimeTrialDuels implements Listener {
         return (DuelState)this.activeDuels.get(duelId);
     }
 
-    public void startDuelPreparation(Player p1, Player p2, String trackName, int laps, int timeLimit, boolean lonely, boolean isTimeTrialMode) {
+    public void startDuelPreparation(Player p1, Player p2, String trackName, int laps, int timeLimit, boolean lonely, boolean isTimeTrialMode, boolean isRanked) {
         Location spawnLoc = this.dm.getTrackSpawn(trackName);
         if (spawnLoc == null) {
             String lang1 = this.dm.getPlayerLanguage(p1.getUniqueId());
@@ -120,7 +122,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                     p1.sendMessage(this.plugin.getDirectTranslation("duel_error_create", lang1));
                     p2.sendMessage(this.plugin.getDirectTranslation("duel_error_create", lang2));
                 } else {
-                    DuelState duelState = new DuelState(duelId, trackNameWS, laps, timeLimit, lonely, isTimeTrialMode);
+                    DuelState duelState = new DuelState(duelId, trackNameWS, laps, timeLimit, lonely, isTimeTrialMode, isRanked);
                     duelState.addPlayer(p1.getUniqueId());
                     duelState.addPlayer(p2.getUniqueId());
                     this.activeDuels.put(duelId, duelState);
@@ -425,6 +427,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
 
             if (winnerUUID != null) {
                 this.dm.setDuelStateWithWinner(duelId, "FINISHED", winnerUUID);
+                this.updateRankedElo(duelState, winnerUUID);
             } else {
                 this.dm.setDuelState(duelId, "FINISHED");
             }
@@ -442,6 +445,21 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
         } else {
             UUID winnerByFinish = duelState.getWinner();
             return winnerByFinish != null ? winnerByFinish : this.determineWinnerByProgress(duelState);
+        }
+    }
+
+    /**
+     * Applies ELO changes for a ranked duel. No-op if the duel is not ranked.
+     */
+    private void updateRankedElo(DuelState duelState, UUID winnerUUID) {
+        if (duelState == null || !duelState.isRanked() || winnerUUID == null) {
+            return;
+        }
+        for (UUID loser : duelState.getPlayers()) {
+            if (!loser.equals(winnerUUID)) {
+                eloManager.applyDuelResultAsync(winnerUUID, loser);
+                break;
+            }
         }
     }
 
@@ -888,6 +906,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
 
             if (winnerUUID != null) {
                 this.dm.setDuelStateWithWinner(duelId, "FINISHED", winnerUUID);
+                this.updateRankedElo(duelState, winnerUUID);
                 if (duelState.isTimeTrialMode()) {
                     for(UUID uuid : duelState.getPlayers()) {
                         Player p = Bukkit.getPlayer(uuid);
@@ -1019,6 +1038,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
             if (duelState.getPlayerCount() == 1) {
                 UUID winnerUUID = (UUID)duelState.getPlayers().iterator().next();
                 this.dm.setDuelStateWithWinner(duelId, "FINISHED", winnerUUID);
+                this.updateRankedElo(duelState, winnerUUID);
                 Player winner = Bukkit.getPlayer(winnerUUID);
                 if (winner != null && winner.isOnline()) {
                     String langCode = this.dm.getPlayerLanguage(winnerUUID);
@@ -1268,6 +1288,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
         private final int timeLimit;
         private final boolean lonely;
         private final boolean timeTrialMode;
+        private final boolean ranked;
         private final Set<UUID> players;
         private final List<UUID> finishOrder;
         private boolean raceStarted;
@@ -1275,13 +1296,14 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
         private boolean timeLimitReached;
         private final Map<UUID, Double> bestLapTimes;
 
-        public DuelState(int duelId, String trackName, int totalLaps, int timeLimit, boolean lonely, boolean timeTrialMode) {
+        public DuelState(int duelId, String trackName, int totalLaps, int timeLimit, boolean lonely, boolean timeTrialMode, boolean ranked) {
             this.duelId = duelId;
             this.trackName = trackName;
             this.totalLaps = totalLaps;
             this.timeLimit = timeLimit;
             this.lonely = lonely;
             this.timeTrialMode = timeTrialMode;
+            this.ranked = ranked;
             this.players = new HashSet();
             this.finishOrder = new ArrayList();
             this.raceStarted = false;
@@ -1328,6 +1350,10 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
 
         public boolean isTimeTrialMode() {
             return this.timeTrialMode;
+        }
+
+        public boolean isRanked() {
+            return this.ranked;
         }
 
         public boolean isRaceMode() {

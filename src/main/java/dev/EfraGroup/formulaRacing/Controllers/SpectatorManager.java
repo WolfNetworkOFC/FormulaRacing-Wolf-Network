@@ -40,7 +40,6 @@ public class SpectatorManager {
     private static final int FOLLOW_UPDATE_INTERVAL_TICKS = 5;
     private static final int BINDING_UPDATE_INTERVAL_TICKS = 10;
     private final boolean proximityActionBarEnabled;
-    private final double proximityRadiusSquared;
     private final int proximityIntervalTicks;
 
     public Set<UUID> getSpectatorsInEvent(int eventId) {
@@ -56,8 +55,6 @@ public class SpectatorManager {
         this.spectatorBoundHeat = new ConcurrentHashMap();
         this.previousGameModes = new ConcurrentHashMap();
         this.proximityActionBarEnabled = plugin.getConfig().getBoolean("spectator.actionbar-proximity.enabled", true);
-        double radius = Math.max(1.0, plugin.getConfig().getDouble("spectator.actionbar-proximity.radius", 18.0));
-        this.proximityRadiusSquared = radius * radius;
         this.proximityIntervalTicks = Math.max(1, plugin.getConfig().getInt("spectator.actionbar-proximity.interval-ticks", 5));
         this.startFollowTask();
         this.startBindingTask();
@@ -124,8 +121,14 @@ public class SpectatorManager {
             if (this.plugin.getLonelyController() != null) {
                 this.plugin.getLonelyController().reconcilePlayer(player);
             }
+            // Reset player time back to world time
+            this.plugin.resetTrackGameTime(player);
             long watchTime = spectator.getWatchTime() / 1000L;
             this.plugin.sendMessage(player, "spectator_time_watched", new String[]{"{time}", this.formatTime(watchTime)});
+            // Restore default hotbar after leaving spectator mode
+            if (this.plugin.getHotbarController() != null) {
+                this.plugin.getHotbarController().giveHotbarItems(player);
+            }
             this.debug.logSpectatorSystem(String.format("%s saiu do modo espectador", player.getName()));
             return true;
         }
@@ -159,6 +162,9 @@ public class SpectatorManager {
         player.setGameMode(previousMode);
         player.setFlying(false);
         player.setAllowFlight(previousMode == GameMode.CREATIVE || previousMode == GameMode.SPECTATOR);
+        if (this.plugin.getHotbarController() != null) {
+            this.plugin.getHotbarController().giveHotbarItems(player);
+        }
     }
 
     private Location getSpectatorLocation(Events event) {
@@ -406,7 +412,7 @@ public class SpectatorManager {
                 continue;
             }
             double distanceSquared = spectatorPlayer.getLocation().distanceSquared(driverPlayer.getLocation());
-            if (distanceSquared > this.proximityRadiusSquared || distanceSquared >= bestDistance) {
+            if (distanceSquared >= bestDistance) {
                 continue;
             }
             bestDistance = distanceSquared;

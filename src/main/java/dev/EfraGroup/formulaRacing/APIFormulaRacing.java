@@ -2,6 +2,9 @@ package dev.EfraGroup.formulaRacing;
 
 import dev.EfraGroup.formulaRacing.Cosmetics.BoatTrailManager;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -129,9 +132,7 @@ public class APIFormulaRacing {
         ArmorStand lockedAnchor = (ArmorStand)lockedBoats.get(uuid);
         if (lockedAnchor != null) {
             recovered = true;
-        }
-
-        this.releaseBoat(player);
+        }            this.releaseBoat(player);
         Entity vehicle = player.getVehicle();
         if (vehicle != null) {
             boolean temporaryMetadata = !player.hasMetadata("fr_resetting");
@@ -139,24 +140,30 @@ public class APIFormulaRacing {
                 player.setMetadata("fr_resetting", new FixedMetadataValue(this.plugin, true));
             }
 
+            // leaveVehicle() dispara o VehicleExitEvent de forma SÍNCRONA — o
+            // listener já viu o flag fr_resetting durante a chamada. Podemos removê-lo
+            // logo em seguida: se ficar preso (ex.: task do barco descartada em chunk
+            // descarregado no Folia), o próximo shift-exit durante um TT cairia no
+            // branch fr_resetting do listener e o timer nunca pararia.
             player.leaveVehicle();
+            if (temporaryMetadata) {
+                player.removeMetadata("fr_resetting", this.plugin);
+            }
 
             if (vehicle instanceof Boat boat) {
-                boolean tempMeta = temporaryMetadata;
                 Player finalPlayer = player;
-                SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
+                Location boatLoc = boat.getLocation();
+                SchedulerHelper.runTaskAt(this.plugin, boatLoc, () -> {
                     if (boat.getPassengers().contains(finalPlayer)) {
                         boat.removePassenger(finalPlayer);
                     }
                     deleteBoat(boat);
-                    if (tempMeta) {
-                        SchedulerHelper.runTaskFor(this.plugin, finalPlayer, () -> {
-                            finalPlayer.removeMetadata("fr_resetting", this.plugin);
-                        });
+                    // Rede de segurança: limpa o flag aqui também, caso algum caminho
+                    // o tenha deixado preso.
+                    if (finalPlayer.hasMetadata("fr_resetting")) {
+                        finalPlayer.removeMetadata("fr_resetting", this.plugin);
                     }
                 });
-            } else if (temporaryMetadata) {
-                player.removeMetadata("fr_resetting", this.plugin);
             }
 
             recovered = true;
@@ -172,30 +179,39 @@ public class APIFormulaRacing {
         ArmorStand ar = (ArmorStand)lockedBoats.get(player.getUniqueId());
         if (ar != null) {
             lockedBoats.remove(player.getUniqueId());
-            SchedulerHelper.runTaskFor(this.plugin, ar, () -> ar.remove());
+            // Use location-based scheduler to survive chunk unloads (Folia fix)
+            Location arLoc = ar.getLocation();
+            SchedulerHelper.runTaskAt(this.plugin, arLoc, () -> {
+                if (ar.isValid()) ar.remove();
+            });
         }
 
     }
 
     public void deleteBoat(Entity boat) {
         if (!(boat instanceof Boat)) return;
-        playerBoats.values().remove(boat);
+        // Use location-based scheduler so the task runs even if the boat's
+        // region gets unloaded (Folia: EntityScheduler silently drops tasks
+        // for entities in unloaded regions).
+        Location boatLoc = boat.getLocation();
+        SchedulerHelper.runTaskAt(this.plugin, boatLoc, () -> {
+            playerBoats.values().remove(boat);
 
-        if (!boat.getPassengers().isEmpty()) {
-            Entity passenger = boat.getPassengers().getFirst();
-            if (passenger instanceof Player p) {
-                FormulaRacing fr = (FormulaRacing) this.plugin;
-                if (fr.getLightningRodListener() != null) {
-                    fr.getLightningRodListener().removeRodForPlayer(p.getUniqueId());
+            if (!boat.getPassengers().isEmpty()) {
+                Entity passenger = boat.getPassengers().getFirst();
+                if (passenger instanceof Player p) {
+                    FormulaRacing fr = (FormulaRacing) this.plugin;
+                    if (fr.getLightningRodListener() != null) {
+                        fr.getLightningRodListener().removeRodForPlayer(p.getUniqueId());
+                    }
                 }
             }
-        }
 
-        SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
             Entity vehicle = boat.getVehicle();
             if (vehicle instanceof ArmorStand as) {
                 lockedBoats.values().remove(as);
-                SchedulerHelper.runTaskFor(this.plugin, as, () -> {
+                Location asLoc = as.getLocation();
+                SchedulerHelper.runTaskAt(this.plugin, asLoc, () -> {
                     if (as.isValid()) as.remove();
                 });
             }
@@ -205,25 +221,37 @@ public class APIFormulaRacing {
         });
     }
 
-    public void queueDeleteBoat(Entity boat) {
-        if (!(boat instanceof Boat)) return;
-        playerBoats.values().remove(boat);
-
-        if (!boat.getPassengers().isEmpty()) {
-            Entity passenger = boat.getPassengers().getFirst();
-            if (passenger instanceof Player p) {
-                FormulaRacing fr = (FormulaRacing) this.plugin;
-                if (fr.getLightningRodListener() != null) {
-                    fr.getLightningRodListener().removeRodForPlayer(p.getUniqueId());
-                }
+    public Collection<Boat> getTrackedBoats() {
+        List<Boat> boats = new ArrayList<>();
+        for (Entity e : playerBoats.values()) {
+            if (e instanceof Boat boat && boat.isValid()) {
+                boats.add(boat);
             }
         }
+        return boats;
+    }
 
-        SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
+    public void queueDeleteBoat(Entity boat) {
+        if (!(boat instanceof Boat)) return;
+        Location boatLoc = boat.getLocation();
+        SchedulerHelper.runTaskAt(this.plugin, boatLoc, () -> {
+            playerBoats.values().remove(boat);
+
+            if (!boat.getPassengers().isEmpty()) {
+                Entity passenger = boat.getPassengers().getFirst();
+                if (passenger instanceof Player p) {
+                    FormulaRacing fr = (FormulaRacing) this.plugin;
+                    if (fr.getLightningRodListener() != null) {
+                        fr.getLightningRodListener().removeRodForPlayer(p.getUniqueId());
+                    }
+                }
+            }
+
             Entity vehicle = boat.getVehicle();
             if (vehicle instanceof ArmorStand as) {
                 lockedBoats.values().remove(as);
-                SchedulerHelper.runTaskFor(this.plugin, as, () -> {
+                Location asLoc = as.getLocation();
+                SchedulerHelper.runTaskAt(this.plugin, asLoc, () -> {
                     if (as.isValid()) as.remove();
                 });
             }
@@ -241,13 +269,16 @@ public class APIFormulaRacing {
 
         ArmorStand anchor = lockedBoats.remove(uuid);
         if (anchor != null) {
-            SchedulerHelper.runTaskFor(this.plugin, anchor, () -> {
+            // Use location-based scheduler to survive chunk unloads
+            Location anchorLoc = anchor.getLocation();
+            SchedulerHelper.runTaskAt(this.plugin, anchorLoc, () -> {
                 if (anchor.isValid()) anchor.remove();
             });
         }
         Entity vehicle = playerBoats.remove(uuid);
         if (vehicle instanceof Boat boat) {
-            SchedulerHelper.runTaskFor(this.plugin, boat, () -> {
+            Location boatLoc = boat.getLocation();
+            SchedulerHelper.runTaskAt(this.plugin, boatLoc, () -> {
                 if (boat.isValid()) boat.remove();
             });
         }

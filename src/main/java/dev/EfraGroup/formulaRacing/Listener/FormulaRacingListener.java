@@ -11,7 +11,6 @@ import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
-import dev.EfraGroup.formulaRacing.Utils.PlatformUtils;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import java.util.Map;
@@ -50,17 +49,14 @@ public class FormulaRacingListener implements Listener {
     }
 
     private void startBoatCleaner() {
-        if (PlatformUtils.isFoliaRuntime()) return;
         SchedulerHelper.runTaskTimer(this.plugin, () -> {
-            for(World world : Bukkit.getWorlds()) {
-                for(Boat boat : world.getEntitiesByClass(Boat.class)) {
-                    final Boat captured = boat;
-                    SchedulerHelper.runTaskFor(this.plugin, captured, () -> {
-                        if (captured.isValid() && captured.getPassengers().isEmpty()) {
-                            this.api.queueDeleteBoat(captured);
-                        }
-                    });
-                }
+            for (Boat boat : this.api.getTrackedBoats()) {
+                final Boat captured = boat;
+                SchedulerHelper.runTaskFor(this.plugin, captured, () -> {
+                    if (captured.isValid() && captured.getPassengers().isEmpty()) {
+                        this.api.queueDeleteBoat(captured);
+                    }
+                });
             }
         }, 1200L, 6000L);
     }
@@ -98,6 +94,17 @@ public class FormulaRacingListener implements Listener {
         }
     }
 
+    /**
+     * Checks if the given player is the driver (first passenger) of the boat.
+     * If the player is NOT the driver (e.g., a passenger in a multiplayer boat),
+     * we should NOT delete the boat or run cleanup — just let them exit.
+     */
+    private boolean isBoatDriver(Player player, Boat boat) {
+        if (boat == null || boat.isEmpty()) return true; // no other passengers, player IS the driver
+        return boat.getPassengers().get(0) instanceof Player first
+            && first.getUniqueId().equals(player.getUniqueId());
+    }
+
     @EventHandler(
             priority = EventPriority.HIGHEST
     )
@@ -107,6 +114,22 @@ public class FormulaRacingListener implements Listener {
             LivingEntity var4 = event.getExited();
             if (var4 instanceof Player player) {
                 if (player.hasMetadata("fr_resetting")) {
+                    // fr_resetting significa que recoverPlayerBoatState já tratou do cleanup,
+                    // mas o barco pode não ter sido removido se a task agendada falhou.
+                    // Garantimos a remoção aqui também para evitar barcos fantasmas.
+                    this.api.deleteBoat(boat);
+                    // Auto-cura: limpa o flag após o uso. Se ele ficar preso (ex.: task
+                    // do barco descartada em chunk descarregado no Folia), o próximo
+                    // shift-exit durante um TT cairia aqui e o timer nunca pararia.
+                    player.removeMetadata("fr_resetting", this.plugin);
+                    return;
+                }
+
+                // If this player is NOT the boat driver, just let them exit without cleanup
+                if (!isBoatDriver(player, boat)) {
+                    this.plugin.getDebugManager().logTimeTrialSystem(
+                        "[LISTENER] " + player.getName() + " saiu como pendura - barco preservado"
+                    );
                     return;
                 }
 
@@ -195,9 +218,9 @@ public class FormulaRacingListener implements Listener {
                         this.plugin.getTimeTrialController().endSession(player);
                     }
 
-                    if (this.plugin.getScoreboardTimeTrialUtils() != null) {
-                        this.plugin.getScoreboardTimeTrialUtils().clearPlayerTrack(player);
-                    }
+                    // O scoreboard de Time Trial NÃO é limpo ao sair do barco: ele
+                    // persiste até o jogador usar /spawn, sair do jogo, voltar ao
+                    // spawn ou entrar numa corrida.
 
                     if (this.plugin.getTimeTrialDuelsAction() != null) {
                         this.plugin.getTimeTrialDuelsAction().stopAll(player);

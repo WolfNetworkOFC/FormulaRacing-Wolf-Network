@@ -19,6 +19,9 @@ public class BoatCommand extends BaseCommand {
 
     @Default // Comando executado ao digitar apenas /boat
     public void onSpawnBoat(Player player) {
+        if (player.isInsideVehicle()) {
+            return;
+        }
         api.respawnBoat(player, true, false, true);
     }
 }

@@ -259,8 +259,23 @@ podium:
       pitch: 0.0
 
 # =========================================================#
-#                         THEME                            #
+#                         ELO                             #
 # =========================================================#
+# ELO rating system for ranked duels (/duel ranked).
+elo:
+  default: 1200     # starting rating for new players
+  kfactor: 32       # ELO calculation multiplier
+  minchange: 1      # minimum ELO change per duel
+  maxchange: 50     # maximum ELO change per duel
+
+# =========================================================#
+#                       HOLOGRAMS                         #
+# =========================================================#
+# Backend used for leaderboards/holograms:
+#   armorstand         -> built-in (default, no extra plugin)
+#   holographicdisplays-> requires the HolographicDisplays plugin installed
+holograms:
+  backend: armorstand
 # Default server-wide accent colours (used for players who have not set a
 # personal colour, and for console/non-player senders).
 # Only 'primary' and 'accent' are applied — all body text / success / warning /

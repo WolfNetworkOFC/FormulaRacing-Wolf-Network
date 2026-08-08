@@ -42,6 +42,7 @@ import dev.EfraGroup.formulaRacing.Listener.PitStopListener;
 import dev.EfraGroup.formulaRacing.Listener.RaceCheckpointListener;
 import dev.EfraGroup.formulaRacing.Listener.RaceMovementListener;
 import dev.EfraGroup.formulaRacing.Listener.RegionListener;
+import dev.EfraGroup.formulaRacing.Listener.SpawnBoatCleanupListener;
 import dev.EfraGroup.formulaRacing.PlaceHolder.PlaceholderRegister;
 import dev.EfraGroup.formulaRacing.Participant.DriverLookup;
 import dev.EfraGroup.formulaRacing.Round.RoundType;
@@ -51,9 +52,13 @@ import dev.EfraGroup.formulaRacing.TVCamera.TVCameraController;
 import dev.EfraGroup.formulaRacing.TVCamera.TVCameraListener;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import org.bstats.bukkit.Metrics;
+import org.bstats.charts.SimplePie;
+import org.bstats.charts.SingleLineChart;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
 import dev.EfraGroup.formulaRacing.Utils.RaceActionBarManager;
 import dev.EfraGroup.formulaRacing.Utils.LightningRodListener;
+import dev.EfraGroup.formulaRacing.Utils.MojangApiClient;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardService;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardDuelsTimeUtils;
@@ -77,6 +82,9 @@ import dev.EfraGroup.formulaRacing.Hologram.HologramManager;
 import dev.EfraGroup.formulaRacing.Visuals.TrackVisualizer;
 import dev.EfraGroup.formulaRacing.Weather.WeatherManager;
 import dev.EfraGroup.formulaRacing.BoatUtils.OpenBoatUtilsVersion;
+import dev.EfraGroup.formulaRacing.Ghost.GhostManager;
+import dev.EfraGroup.formulaRacing.WolfMod.WolfMOD;
+import dev.EfraGroup.formulaRacing.Medals.MedalManager;
 import me.clip.placeholderapi.PlaceholderAPI;
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -120,6 +128,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     public DatabaseManager dm;
     private WorldEditSelect worldEditSelect;
     private TrackExchangeManager trackExchangeManager;
+    private MojangApiClient mojangApiClient;
     private TimerUtils timerUtils;
     private RegionListener rcl;
     private TimeUtils tu;
@@ -131,6 +140,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private TimeTrialDuelsAction ttda;
     private TimeTrialDuels ttd;
     private DebugManager debugManager;
+    private Metrics metrics;
     private HotbarController hotbarController;
     private RaceEventManager raceEventManager;
     private TrackIntegrationManager trackIntegrationManager;
@@ -150,6 +160,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private ScoreboardOwnershipCoordinator scoreboardOwnershipCoordinator;
     private MegavexAdapter sharedScoreboardAdapter;
     private TrackVisualizer trackVisualizer;
+    private dev.EfraGroup.formulaRacing.Visuals.AILineVisualizer aiLineVisualizer;
     private EventAnnouncements eventAnnouncements;
     private TimeTrialController timeTrialController;
     private PlaceholderRegister placeholderRegister;
@@ -165,9 +176,13 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private ApiManager apiManager;
     private GimmickManager gimmickManager;
     private LeagueManager leagueManager;
+    private dev.EfraGroup.formulaRacing.League.Hologram.LeagueHologramService leagueHologramService;
     private WeatherManager weatherManager;
     private LightningRodListener lightningRodListener;
     private HologramManager hologramManager;
+    private GhostManager ghostManager;
+    private WolfMOD wolfMod;
+    private MedalManager medalManager;
 
     public static FormulaRacing getInstance() {
         return instance;
@@ -205,6 +220,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     public TrackVisualizer getTrackVisualizer() {
         return this.trackVisualizer;
+    }
+
+    public dev.EfraGroup.formulaRacing.Visuals.AILineVisualizer getAILineVisualizer() {
+        return this.aiLineVisualizer;
     }
 
     public EventAnnouncements getEventAnnouncements() {
@@ -256,6 +275,13 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return this.leagueManager;
     }
 
+    public dev.EfraGroup.formulaRacing.League.Hologram.LeagueHologramService getLeagueHologramService() {
+        if (this.leagueHologramService == null) {
+            this.leagueHologramService = new dev.EfraGroup.formulaRacing.League.Hologram.LeagueHologramService(this);
+        }
+        return this.leagueHologramService;
+    }
+
     public WeatherManager getWeatherManager() {
         if (this.weatherManager == null) {
             this.weatherManager = new WeatherManager(this);
@@ -265,6 +291,21 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     public HologramManager getHologramManager() {
         return hologramManager;
+    }
+
+    public GhostManager getGhostManager() {
+        return ghostManager;
+    }
+
+    public WolfMOD getWolfMod() {
+        return wolfMod;
+    }
+
+    public MedalManager getMedalManager() {
+        if (this.medalManager == null) {
+            this.medalManager = new MedalManager(this);
+        }
+        return this.medalManager;
     }
 
     public Map<String, TrackLeaderboard> getTrackLeaderboards() {
@@ -287,6 +328,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.tu = new TimeUtils();
             this.worldEditSelect = new WorldEditSelect();
             this.trackExchangeManager = new TrackExchangeManager(this, this.dm);
+            this.mojangApiClient = new MojangApiClient();
             this.dcu = new DiscordUtils();
             DiscordUtils.init(
                 this.getConfig().getString("discord.webhook-url", ""),
@@ -335,6 +377,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 "[FormulaRacing] Unified scoreboard enabled (Megavex)."
             );
             this.trackVisualizer = new TrackVisualizer(this);
+            this.aiLineVisualizer = new dev.EfraGroup.formulaRacing.Visuals.AILineVisualizer(this);
             this.eventAnnouncements = new EventAnnouncements(this);
             this.quickRaceManager = new QuickRaceManager(
                 this,
@@ -363,9 +406,12 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.aiRacingLineManager = new AIRacingLineManager(this);
             this.aiRacingLineManager.initialize();
             this.apiManager = new ApiManager(this);
+            this.apiManager.init();
             this.gimmickManager = new GimmickManager(this);
             this.leagueManager = new LeagueManager(this);
             this.weatherManager = new WeatherManager(this);
+            this.ghostManager = new GhostManager(this);
+            this.wolfMod = new WolfMOD(this);
             this.raceEventManager.loadActiveEventsFromDatabase();
             SchedulerHelper.runTask(this, () -> {
                 List<Integer> staleEventIds = new java.util.ArrayList<>();
@@ -435,6 +481,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.guiManager = new GuiManager();
             this.registerListeners();
             this.registerCommands();
+            this.getCommand("resetcp").setExecutor(new ResetCheckpointCommand(this, this.dm));
             this.registerPlaceholders();
             this.loadLeaderboards();
             this.startLeaderboardUpdater();
@@ -445,6 +492,20 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             SchedulerHelper.runDelayedTask(this, () ->
                 HologramManager.removeOrphanStands(), 100L
             );
+            // bStats telemetry (replace 00000 with your bStats plugin ID)
+            try {
+                this.metrics = new Metrics(this, 00000);
+                this.metrics.addCustomChart(new SimplePie("database_type",
+                    () -> this.dm.getDatabaseType().name().toLowerCase()));
+                this.metrics.addCustomChart(new SingleLineChart("tracks",
+                    () -> this.dm.getAllTracks().size()));
+                this.metrics.addCustomChart(new SingleLineChart("online_players",
+                    () -> Bukkit.getOnlinePlayers().size()));
+                this.metrics.addCustomChart(new SingleLineChart("league_count",
+                    () -> this.getLeagueManager().getAllLeagues().size()));
+            } catch (Exception e) {
+                this.getLogger().warning("[FormulaRacing] Falha ao iniciar bStats: " + e.getMessage());
+            }
             if (this.debugManager != null) {
                 this.getLogger().info(
                     "[FormulaRacing] Plugin enabled successfully!"
@@ -474,6 +535,14 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     public void onDisable() {
         if (this.debugManager != null) {
             this.getLogger().info("[FormulaRacing] Disabling plugin...");
+        }
+
+        if (this.dm != null) {
+            this.dm.closePool();
+        }
+
+        if (this.apiManager != null) {
+            this.apiManager.shutdown();
         }
 
         if (this.placeholderRegister != null) {
@@ -540,6 +609,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.lightningRodListener.shutdown();
         }
 
+        if (this.ghostManager != null) {
+            this.ghostManager.shutdown();
+        }
+
         try {
             if (this.dm != null) {
                 this.dm.deleteAllParties();
@@ -591,6 +664,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         );
         Bukkit.getPluginManager().registerEvents(
             new DuelProtectionListener(this, this.dm),
+            this
+        );
+        Bukkit.getPluginManager().registerEvents(
+            new SpawnBoatCleanupListener(this),
             this
         );
         Bukkit.getPluginManager().registerEvents(
@@ -656,12 +733,6 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.commandManager.registerCommand(new SettingsCommand(this));
             this.commandManager.registerCommand(new LanguageCommand(this));
             this.commandManager.registerCommand(
-                new TimeTrialCancelCommand(this)
-            );
-            this.commandManager.registerCommand(
-                new TimeTrialRandomCommand(this)
-            );
-            this.commandManager.registerCommand(
                     new AnnounceCommand()
             );
             this.commandManager.registerCommand(new TimeTrialCommand(this));
@@ -688,6 +759,15 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.commandManager.registerCommand(new UnghostCommand(this));
             this.commandManager.registerCommand(new AICommand(this));
             this.commandManager.registerCommand(new ToggleRodsCommand(this));
+            this.commandManager.registerCommand(new LeagueCommand(this));
+            this.commandManager.registerCommand(new ApiCommand());
+            this.commandManager.registerCommand(new DebugCommand(this));
+            this.commandManager.registerCommand(new EliminationCommand(this));
+            this.commandManager.registerCommand(new GimmickCommand(this));
+            this.commandManager.registerCommand(new OpenBoatUtilsCommand(this));
+            this.commandManager.registerCommand(new RaceConfigCommand(this));
+            this.commandManager.registerCommand(new ReverseGridCommand(this));
+            this.commandManager.registerCommand(new WeatherCommand(this));
         } catch (Exception e) {
             if (this.debugManager != null) {
                 this.debugManager.logRaceSystem(
@@ -803,7 +883,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 String placeholder = placeholders[i];
                 String value = placeholders[i + 1];
                 if (message.contains(placeholder)) {
-                    message = message.replace(placeholder, value);
+                    message = message.replace(placeholder, value != null ? value : "");
                 }
             }
 
@@ -828,9 +908,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         }
 
         for (int i = 0; i < values.size(); ++i) {
+            CharSequence value = values.get(i);
             message = message.replace(
                 "%" + (i + 1) + "$s",
-                (CharSequence) values.get(i)
+                value != null ? value : ""
             );
         }
 
@@ -841,7 +922,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             }
 
             message =
-                message.substring(0, idx) + value + message.substring(idx + 2);
+                message.substring(0, idx) + (value != null ? value : "") + message.substring(idx + 2);
         }
 
         return message;
@@ -942,15 +1023,27 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             List<String> tracks = this.dm.getAllTracks();
 
             for (String trackName : tracks) {
-                Location savedLoc = this.dm.getHologramLocation(trackName);
+                // Load each board's own location (fallback to the legacy shared
+                // column when the per-type column is empty).
+                Location savedJava = this.dm.getHologramLocation(trackName, "java");
+                Location savedBedrock = this.dm.getHologramLocation(trackName, "bedrock");
+                Location fallback = savedJava != null ? savedJava
+                        : this.dm.getHologramLocation(trackName);
+                Location baseLoc = savedJava != null ? savedJava
+                        : (savedBedrock != null ? savedBedrock : fallback);
 
-                if (savedLoc != null) {
+                if (baseLoc != null) {
                     // Use only ONE instance:
                     // The getOrCreateLeaderboard method returns the single instance
-                    TrackLeaderboard leaderboard = this.getOrCreateLeaderboard(trackName, savedLoc);
+                    TrackLeaderboard leaderboard = this.getOrCreateLeaderboard(trackName, baseLoc);
 
-                    // Set location once for the track
-                    leaderboard.setLocation(savedLoc);
+                    // Apply each board's own location independently.
+                    if (savedJava != null) {
+                        leaderboard.setLocation(savedJava, "java");
+                    }
+                    if (savedBedrock != null) {
+                        leaderboard.setLocation(savedBedrock, "bedrock");
+                    }
 
                     // Call specific updates within the same instance
                     leaderboard.updateJavaLeaderboard();
@@ -1061,6 +1154,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return this.dm;
     }
 
+    public MojangApiClient getMojangApiClient() {
+        return this.mojangApiClient;
+    }
+
     public TrackIntegrationManager getTrackIntegrationManager() {
         return this.trackIntegrationManager;
     }
@@ -1157,6 +1254,38 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         this.lastDuelTrack.remove(playerId);
     }
 
+    /**
+     * Applies the track's configured game time (day/night cycle) to a player.
+     * Uses player.setPlayerTime so each player sees their own time (client-side only).
+     * If the track has no game_time configured, resets to the world's normal time.
+     */
+    public void applyTrackGameTime(Player player, String trackName) {
+        if (player == null || trackName == null) return;
+        long gameTime = this.dm.getTrackGameTime(trackName);
+        if (gameTime >= 0) {
+            player.setPlayerTime(gameTime, false);
+        } else {
+            player.resetPlayerTime();
+        }
+    }
+
+    /**
+     * Resets the player's time back to the world's normal time.
+     * Should be called when a player leaves a time trial or heat.
+     */
+    public void resetTrackGameTime(Player player) {
+        if (player == null) return;
+        player.resetPlayerTime();
+    }
+
+    public void clearLastTimeTrialTrack(UUID playerId) {
+        this.lastTimeTrialTrack.remove(playerId);
+    }
+
+    public void clearLastDuelLonelyStatus(UUID playerId) {
+        this.lastDuelLonelyStatus.remove(playerId);
+    }
+
     public TimeTrialDuels getTimeTrialDuels() {
         return this.ttd;
     }
@@ -1175,14 +1304,45 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
-        UUID uuid = event.getPlayer().getUniqueId();
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
         setPlayerHasMod(uuid, false);
+
+        // Clean up per-player caches to prevent memory leaks
+        this.clearLastTimeTrialTrack(uuid);
+        this.clearLastDuelTrack(uuid);
+        this.clearLastDuelLonelyStatus(uuid);
+
         if (this.trackVisualizer != null) {
-            this.trackVisualizer.stopView(event.getPlayer());
+            this.trackVisualizer.stopView(player);
         }
 
         if (this.spectatorManager != null) {
-            this.spectatorManager.removeSpectator(event.getPlayer());
+            this.spectatorManager.removeSpectator(player);
+        }
+
+        if (this.raceEventManager != null) {
+            this.raceEventManager.removePlayerFromEvent(uuid);
+        }
+
+        if (this.timeTrialController != null) {
+            this.timeTrialController.endSession(uuid);
+        }
+
+        if (this.timerUtils != null) {
+            this.timerUtils.stopTimer(player);
+        }
+
+        if (this.raceActionBarManager != null) {
+            this.raceActionBarManager.removePlayer(player);
+        }
+
+        if (this.scoreboardOwnershipCoordinator != null) {
+            this.scoreboardOwnershipCoordinator.clear(uuid);
+        }
+
+        if (this.leagueManager != null) {
+            this.leagueManager.deselectPlayer(uuid);
         }
 
         this.rcl.cleanupPlayer(uuid);
@@ -1192,6 +1352,17 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         if (this.driverLookup != null) {
             this.driverLookup.unregister(uuid);
         }
+        // Reset player time back to world time
+        this.resetTrackGameTime(player);
+
+        if (this.ghostManager != null) {
+            this.ghostManager.cleanupPlayer(uuid);
+        }
+
+        if (this.medalManager != null) {
+            this.medalManager.clearPending(uuid);
+        }
+
         this.api.removePlayerBoat(uuid);
     }
 

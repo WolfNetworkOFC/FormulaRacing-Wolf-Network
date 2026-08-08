@@ -176,6 +176,67 @@
             <artifactId>spark-core</artifactId>
             <version>2.9.4</version>
         </dependency>
+
+        <!-- Connection pooling (HikariCP) -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>5.1.0</version>
+        </dependency>
+
+        <!-- bStats telemetry -->
+        <dependency>
+            <groupId>org.bstats</groupId>
+            <artifactId>bstats-bukkit</artifactId>
+            <version>3.0.2</version>
+        </dependency>
+
+        <!-- Lombok (reduces boilerplate) -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.34</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- HolographicDisplays API (2nd hologram backend) -->
+        <dependency>
+            <groupId>me.filoghost.holographicdisplays</groupId>
+            <artifactId>holographicdisplays-api</artifactId>
+            <version>3.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Mojang profile/skin API -->
+        <dependency>
+            <groupId>com.github.SparklingComet</groupId>
+            <artifactId>java-mojang-api</artifactId>
+            <version>592fabf3e2</version>
+        </dependency>
+        <!-- java-mojang-api transitives (shaded) -->
+        <dependency>
+            <groupId>com.googlecode.json-simple</groupId>
+            <artifactId>json-simple</artifactId>
+            <version>1.1.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.14</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.17.1</version>
+        </dependency>
+
+        <!-- Tests -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.11.0</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -189,7 +250,21 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.34</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+
+            <!-- Test runner -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.1</version>
             </plugin>
 
             <!-- Shade Plugin para empacotar libs internas -->
@@ -218,6 +293,38 @@
                                 <relocation>
                                     <pattern>co.aikar.taskchain</pattern>
                                     <shadedPattern>dev.efragroup.libs.taskchain</shadedPattern>
+                                </relocation>
+                                <!-- HikariCP -->
+                                <relocation>
+                                    <pattern>com.zaxxer.hikari</pattern>
+                                    <shadedPattern>dev.efragroup.libs.hikari</shadedPattern>
+                                </relocation>
+                                <!-- bStats -->
+                                <relocation>
+                                    <pattern>org.bstats</pattern>
+                                    <shadedPattern>dev.efragroup.libs.bstats</shadedPattern>
+                                </relocation>
+                                <!-- java-mojang-api -->
+                                <relocation>
+                                    <pattern>org.shanerx.mojang</pattern>
+                                    <shadedPattern>dev.efragroup.libs.mojangapi</shadedPattern>
+                                </relocation>
+                                <!-- java-mojang-api transitives -->
+                                <relocation>
+                                    <pattern>org.json.simple</pattern>
+                                    <shadedPattern>dev.efragroup.libs.jsonsimple</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.http</pattern>
+                                    <shadedPattern>dev.efragroup.libs.apachehttp</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.commons.codec</pattern>
+                                    <shadedPattern>dev.efragroup.libs.commonscodec</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.mashape.unirest</pattern>
+                                    <shadedPattern>dev.efragroup.libs.unirest</shadedPattern>
                                 </relocation>
                             </relocations>
                             <filters>

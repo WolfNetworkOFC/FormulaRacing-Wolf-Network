@@ -15,6 +15,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 
 public class DiscordUtils {
     private static String webhook = "";
@@ -25,11 +26,11 @@ public class DiscordUtils {
         roleMention = roleId != null && !roleId.isEmpty() ? "<@&" + roleId + ">" : "";
     }
 
-    private static boolean isEnabled() {
+    public static boolean isEnabled() {
         return webhook != null && !webhook.isEmpty();
     }
 
-    public static void sendNewTrackEmbed(JavaPlugin plugin, String trackName, String creator, String description, String imageUrl) {
+    public static void sendNewTrackEmbed(JavaPlugin plugin, String trackName, String creator, String collaborators, String boatMode, List<String> tags, List<String> images) {
         if (!isEnabled()) return;
         SchedulerHelper.runAsync(plugin, () -> {
             try {
@@ -39,34 +40,79 @@ public class DiscordUtils {
                 connection.setDoOutput(true);
                 connection.setRequestProperty("Content-Type", "application/json");
 
+                JsonArray embedsArray = new JsonArray();
+
                 JsonObject embed = new JsonObject();
-                embed.addProperty("title", "🏁 New track added!");
-                embed.addProperty("color", 65280); // Green
+                embed.addProperty("title", "📢 New track added!");
+                embed.addProperty("color", 8100096); // FormulaRacing primary (#7bf200)
 
                 JsonArray fields = new JsonArray();
-                fields.add(createField("Track", trackName, false));
-                fields.add(createField("Criador", creator, false));
+                fields.add(createField("🏁 Track", trackName, true));
+                fields.add(createField("👑 Creator", creator, true));
 
-                if (description != null && !description.isEmpty()) {
-                    fields.add(createField("Grids", description, false));
+                // Quebra de linha alinhada SEM gap: ambas as linhas viram grade de 3 colunas,
+                // sendo a 3a coluna um spacer inline invisivel. Assim Collaborators alinha
+                // embaixo de Creator e nao fica linha vazia entre elas.
+                if ((tags != null && !tags.isEmpty()) || (collaborators != null && !collaborators.isEmpty())) {
+                    JsonObject spacer = new JsonObject();
+                    spacer.addProperty("name", "​");
+                    spacer.addProperty("value", "​");
+                    spacer.addProperty("inline", true);
+                    fields.add(spacer);
+                }
+
+                if (tags != null && !tags.isEmpty()) {
+                    fields.add(createField("🏷️ Tags", String.join("\n", tags), true));
+                }
+
+                if (collaborators != null && !collaborators.isEmpty()) {
+                    fields.add(createField("🤝 Collaborators", collaborators.replace(",", "\n"), true));
+                    JsonObject spacer2 = new JsonObject();
+                    spacer2.addProperty("name", "​");
+                    spacer2.addProperty("value", "​");
+                    spacer2.addProperty("inline", true);
+                    fields.add(spacer2);
+                }
+
+                if (boatMode != null && !boatMode.isEmpty()) {
+                    fields.add(createField("🚤 Boat Mode", boatMode, false));
                 }
                 embed.add("fields", fields);
 
+                embed.addProperty("timestamp", java.time.Instant.now().toString());
+
                 JsonObject footer = new JsonObject();
-                footer.addProperty("text", "FormulaRacing Discord");
+                footer.addProperty("text", "WolfNetwork");
                 embed.add("footer", footer);
 
-                if (imageUrl != null && !imageUrl.isEmpty()) {
-                    JsonObject image = new JsonObject();
-                    image.addProperty("url", imageUrl);
-                    embed.add("image", image);
-                    // Opcional: Baixar a imagem localmente
-                    downloadImage(plugin, trackName, imageUrl);
+                // Primeira imagem no embed principal
+                if (images != null && !images.isEmpty()) {
+                    String first = images.get(0);
+                    if (first != null && !first.isEmpty()) {
+                        JsonObject image = new JsonObject();
+                        image.addProperty("url", first);
+                        embed.add("image", image);
+                        // Opcional: Baixar a imagem localmente
+                        downloadImage(plugin, trackName, first);
+                    }
+                }
+                embedsArray.add(embed);
+
+                // Imagens extras em embeds separados (sem titulo, so a imagem)
+                if (images != null) {
+                    for (int i = 1; i < images.size(); i++) {
+                        String extra = images.get(i);
+                        if (extra == null || extra.isEmpty()) continue;
+                        JsonObject extraEmbed = new JsonObject();
+                        extraEmbed.addProperty("color", 8100096);
+                        JsonObject image = new JsonObject();
+                        image.addProperty("url", extra);
+                        extraEmbed.add("image", image);
+                        embedsArray.add(extraEmbed);
+                    }
                 }
 
                 JsonObject payload = new JsonObject();
-                JsonArray embedsArray = new JsonArray();
-                embedsArray.add(embed);
                 payload.add("embeds", embedsArray);
                 payload.addProperty("content", roleMention);
 
@@ -128,7 +174,60 @@ public class DiscordUtils {
         });
     }
 
+    public static void sendTestEmbed(JavaPlugin plugin) {
+        if (!isEnabled()) return;
+        SchedulerHelper.runAsync(plugin, () -> {
+            try {
+                URL url = URI.create(webhook).toURL();
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("POST");
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type", "application/json");
+
+                JsonObject embed = new JsonObject();
+                embed.addProperty("title", "📢 New track added! [TEST]");
+                embed.addProperty("color", 16776960); // Yellow, to flag it's a test
+
+                JsonArray fields = new JsonArray();
+                fields.add(createField("🏁 Track", "Example_Track_Name", true));
+                fields.add(createField("👑 Creator", "TestUser", true));
+                fields.add(createField("🤝 Collaborators", "gytixss, sharfyy, amethyst002", false));
+                fields.add(createField("🏎️ Grids", "12", true));
+                embed.add("fields", fields);
+
+                JsonObject footer = new JsonObject();
+                footer.addProperty("text", "FormulaRacing");
+                embed.add("footer", footer);
+
+                embed.addProperty("timestamp", java.time.Instant.now().toString());
+
+                JsonObject payload = new JsonObject();
+                JsonArray embedsArray = new JsonArray();
+                embedsArray.add(embed);
+                payload.add("embeds", embedsArray);
+                payload.addProperty("content", roleMention);
+
+                JsonObject allowedMentions = new JsonObject();
+                JsonArray parse = new JsonArray();
+                parse.add("roles");
+                allowedMentions.add("parse", parse);
+                payload.add("allowed_mentions", allowedMentions);
+
+                sendPayload(connection, payload);
+
+                int responseCode = connection.getResponseCode();
+                if (responseCode >= 300) {
+                    logError(plugin, "Failed to send test embed. Code: " + responseCode);
+                }
+            } catch (Exception e) {
+                logError(plugin, "Error sending test embed: " + e.getMessage());
+            }
+        });
+    }
+
     // --- HELPER METHODS ---
+
+
 
     private static JsonObject createField(String name, String value, boolean inline) {
         JsonObject field = new JsonObject();

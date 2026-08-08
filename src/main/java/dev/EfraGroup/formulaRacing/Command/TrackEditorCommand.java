@@ -9,6 +9,7 @@ import dev.EfraGroup.formulaRacing.Database.GridPosition;
 import dev.EfraGroup.formulaRacing.Gui.PitStopEditorGui;
 import dev.EfraGroup.formulaRacing.Heat.PitStopManager;
 import dev.EfraGroup.formulaRacing.Heat.PitStopRegion;
+import dev.EfraGroup.formulaRacing.Medals.MedalManager;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
@@ -215,14 +216,67 @@ public class TrackEditorCommand extends BaseCommand {
         }
     }
 
+    @Subcommand("rename fullname")
+    @Description("Renames a track (uses display name with spaces) and updates all DB references")
+    @CommandCompletion("@tracks @nothing")
+    public void onRenameFullname(Player player, String trackName, String newName) {
+        executeRename(player, trackName, newName,
+                trackName.replaceAll("\\s+", ""), newName.replaceAll("\\s+", ""));
+    }
+
+    @Subcommand("rename trackname")
+    @Description("Renames a track (uses internal WS name without spaces) and updates all DB references")
+    @CommandCompletion("@tracks @nothing")
+    public void onRenameTrackname(Player player, String trackNameWS, String newNameWS) {
+        executeRename(player, trackNameWS, newNameWS, trackNameWS, newNameWS);
+    }
+
+    private void executeRename(Player player, String trackName, String newName, String trackNameWS, String newNameWS) {
+        if (!this.mysql.isTrackExists(trackNameWS)) {
+            player.sendMessage("§cTrack '" + trackName + "' not found.");
+            return;
+        }
+        if (trackNameWS.equalsIgnoreCase(newNameWS)) {
+            player.sendMessage("§cThe new name is the same as the current name.");
+            return;
+        }
+        if (this.mysql.isTrackExists(newNameWS)) {
+            player.sendMessage("§cA track with the name '" + newName + "' already exists.");
+            return;
+        }
+
+        boolean success = this.mysql.renameTrack(trackName, newName);
+        if (success) {
+            player.sendMessage("§a✅ Track renamed to '" + newName + "'!");
+            player.sendMessage("§7All database references, regions, checkpoints, "
+                    + "boatutils settings, ghost files, and leaderboards have been updated.");
+            this.plugin.getTrackLeaderboards().remove(trackNameWS);
+            org.bukkit.Location holoLoc = this.mysql.getHologramLocation(newNameWS);
+            if (holoLoc != null) {
+                this.plugin.getOrCreateLeaderboard(newNameWS, holoLoc);
+            }
+        } else {
+            player.sendMessage("§c❌ Error renaming track. Check console for details.");
+        }
+    }
+
     @Subcommand("broadcast newtrack")
     @Description("Sends new track message to Discord")
     @CommandCompletion("@nothing @tracks")
-    public void onBroadcastNewTrack(Player player, @Optional String imageUrl, @Optional String trackNameArg) {
+    public void onBroadcastNewTrack(Player player, @Optional String imageUrl, @Optional String tags, @Optional String collaborators, @Optional String boatMode, @Optional String trackNameArg) {
+        if (!DiscordUtils.isEnabled()) {
+            player.sendMessage("§c❌ Discord webhook not configured! Set it up in the config.yml first.");
+            return;
+        }
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
-            DiscordUtils.sendNewTrackEmbed(this.plugin, trackName, this.mysql.getTrackOwner(trackName), (String)null, imageUrl);
-            player.sendMessage("§a✅ Test message sent to Discord!");
+            List<String> tagsList = java.util.List.of();
+            if (tags != null && !tags.isEmpty()) {
+                tagsList = java.util.Arrays.asList(tags.split(","));
+            }
+            DiscordUtils.sendNewTrackEmbed(this.plugin, trackName, this.mysql.getTrackOwner(trackName), collaborators, boatMode != null ? boatMode : "", tagsList,
+                imageUrl != null && !imageUrl.isEmpty() ? java.util.List.of(imageUrl) : java.util.List.of());
+            player.sendMessage("§a✅ Broadcast sent to Discord!");
         }
     }
 
@@ -669,6 +723,7 @@ public class TrackEditorCommand extends BaseCommand {
                 String worldName = player.getWorld().getName();
                 boolean success = this.mysql.addCheckpoint(id, trackNameWS, player);
                 if (success) {
+                    this.mysql.clearCheckpointTimesForTrack(trackNameWS);
                     this.plugin.sendMessage(player, "te_checkpoint_added", new String[]{"{id}", String.valueOf(id), "{track}", trackName});
                     this.plugin.getDebugManager().logDatabaseOperations("[FormulaRacing] === Saving Checkpoint ===");
                     this.plugin.getDebugManager().logDatabaseOperations("[FormulaRacing] Track: " + trackName);
@@ -698,6 +753,7 @@ public class TrackEditorCommand extends BaseCommand {
             String trackNameWS = this.normalizeTrackName(trackName);
             boolean success = this.mysql.removeCheckpoint(trackNameWS, id);
             if (success) {
+                this.mysql.clearCheckpointTimesForTrack(trackNameWS);
                 this.plugin.sendMessage(player, "te_checkpoint_removed", new String[]{"{id}", String.valueOf(id), "{track}", trackName});
             } else {
                 this.plugin.sendMessage(player, "te_checkpoint_error", new String[]{"{id}", String.valueOf(id)});
@@ -725,30 +781,134 @@ public class TrackEditorCommand extends BaseCommand {
     public void onTime(Player player, long ticks, @Optional String trackNameArg) {
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
-            this.plugin.sendMessage(player, "te_time_ticks", new String[]{"{track}", trackName, "{ticks}", String.valueOf(ticks)});
+            boolean saved = this.mysql.setTrackGameTime(trackName, ticks);
+            if (saved) {
+                // Preview the time change for the admin
+                player.setPlayerTime(ticks, false);
+                this.plugin.sendMessage(player, "te_time_ticks", new String[]{"{track}", trackName, "{ticks}", String.valueOf(ticks)});
+            } else {
+                player.sendMessage("§c❌ Error saving game time for track §e" + trackName);
+            }
         }
     }
 
+    @Subcommand("time reset")
+    @Description("Resets the track time to normal (world time)")
+    @CommandCompletion("@tracks")
+    public void onTimeReset(Player player, @Optional String trackNameArg) {
+        String trackName = this.getTargetTrack(player, trackNameArg);
+        if (trackName != null) {
+            boolean saved = this.mysql.setTrackGameTime(trackName, -1L);
+            if (saved) {
+                // Reset the admin's time preview back to world time
+                player.resetPlayerTime();
+                player.sendMessage("§a✅ Track time reset to normal for §e" + trackName);
+            } else {
+                player.sendMessage("§c❌ Error resetting game time for track §e" + trackName);
+            }
+        }
+    }
+
+    @Subcommand("medals")
+    @Description("Sets a track medal time. Syntax: /te medals <saphira|netherite|diamond|gold|silver|bronze> <tempo> [pista]")
+    @CommandCompletion("saphira netherite diamond gold silver bronze @nothing @tracks")
+    public void onMedals(Player player, String medalType, String timeArg, @Optional String trackNameArg) {
+        String medal = MedalManager.normalizeMedal(medalType);
+        if (!MedalManager.MEDAL_TYPES.contains(medal)) {
+            player.sendMessage("§cMedalha inválida. Use: saphira, netherite, diamond, gold, silver ou bronze.");
+            return;
+        }
+        double timeSeconds;
+        try {
+            timeSeconds = MedalManager.parseTimeToSeconds(timeArg);
+        } catch (NumberFormatException e) {
+            player.sendMessage("§cTempo inválido: " + timeArg + " (use formato 1:32.434 ou 92.434)");
+            return;
+        }
+        String trackName = this.getTargetTrack(player, trackNameArg);
+        if (trackName == null) return;
+        boolean saved = this.plugin.getMedalManager().setMedalTime(trackName, medal, timeSeconds);
+        if (saved) {
+            player.sendMessage("§a✅ Medalha §e" + medal.toUpperCase() + "§a definida em §e" + trackName
+                    + "§a — §e" + MedalManager.formatTime(timeSeconds));
+        } else {
+            player.sendMessage("§c❌ Erro ao salvar a medalha na database.");
+        }
+    }
+
+    @Subcommand("medals record")
+    @Description("Records the next lap as a medal (time + line). Syntax: /te medals record <medal> [pista]")
+    @CommandCompletion("saphira netherite diamond gold silver bronze @tracks")
+    public void onMedalsRecord(Player player, String medalType, @Optional String trackNameArg) {
+        String medal = MedalManager.normalizeMedal(medalType);
+        if (!MedalManager.MEDAL_TYPES.contains(medal)) {
+            player.sendMessage("§cMedalha inválida. Use: saphira, netherite, diamond, gold, silver ou bronze.");
+            return;
+        }
+        String trackName = this.getTargetTrack(player, trackNameArg);
+        if (trackName == null) return;
+        this.plugin.getMedalManager().armRecord(player, medal, trackName);
+        player.sendMessage("§a🎯 Gravação armada: a próxima volta em §e" + trackName
+                + "§a será salva como medalha §e" + medal.toUpperCase() + "§a (tempo + linha).");
+    }
+
     @Subcommand("icon")
-    @Description("Sets the track icon")
-    @CommandCompletion("@nothing @tracks")
-    public void onIcon(Player player, String materialName, @Optional String trackNameArg) {
+    @Description("Sets the track icon. Syntax: /te icon material[props] [amount] [track]")
+    @CommandCompletion("@nothing @nothing @tracks")
+    public void onIcon(Player player, String iconArg, @Optional String amountArg, @Optional String trackNameArg) {
+        String materialName;
+        String iconMeta = null;
+        int amount = 1;
+
+        // Parse bracket syntax: light[level=2]
+        int bracketStart = iconArg.indexOf('[');
+        if (bracketStart > 0 && iconArg.endsWith("]")) {
+            materialName = iconArg.substring(0, bracketStart);
+            iconMeta = iconArg.substring(bracketStart + 1, iconArg.length() - 1);
+        } else {
+            materialName = iconArg;
+        }
+
+        // Parse optional amount from second argument
+        if (amountArg != null && !amountArg.isEmpty()) {
+            try {
+                // amountArg might be a track name if user didn't specify amount — detect by checking if it's a number
+                if (amountArg.matches("\\d+")) {
+                    amount = Integer.parseInt(amountArg);
+                    if (amount < 1 || amount > 99) {
+                        player.sendMessage("§cAmount must be between 1 and 99.");
+                        return;
+                    }
+                    // Second arg was consumed as amount, third arg is trackName
+                } else {
+                    // Second arg was a track name, use default amount
+                    trackNameArg = amountArg;
+                    amountArg = null;
+                }
+            } catch (NumberFormatException e) {
+                // Not a number, treat as track name
+                trackNameArg = amountArg;
+            }
+        }
+
         Material iconMat;
         try {
             iconMat = Material.valueOf(materialName.toUpperCase());
-        } catch (IllegalArgumentException var6) {
+        } catch (IllegalArgumentException e) {
             player.sendMessage("§cInvalid material: " + materialName);
             return;
         }
 
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
-            if (this.mysql.setTrackIcon(trackName, iconMat.name())) {
-                this.plugin.sendMessage(player, "te_icon_updated", new String[]{"{track}", trackName, "{icon}", iconMat.name()});
+            if (this.mysql.setTrackIcon(trackName, iconMat.name(), amount, iconMeta)) {
+                String msg = "§a✅ Track icon updated to §e" + iconMat.name();
+                if (iconMeta != null) msg += "[" + iconMeta + "]";
+                if (amount > 1) msg += " §7x" + amount;
+                player.sendMessage(msg);
             } else {
                 player.sendMessage("§cError updating track icon.");
             }
-
         }
     }
 
@@ -1059,7 +1219,7 @@ public class TrackEditorCommand extends BaseCommand {
         }
     }
 
-    @Subcommand("boatutils set customslipperiness add")
+    @Subcommand("boatutils config customslipperiness add")
     @Description("Sets custom slipperiness for a block type")
     @CommandCompletion("@materials @nothing @tracks")
     public void onBoatUtilsAddSlipperiness(Player player, String materialName, float value, @Optional String trackArg) {
@@ -1077,7 +1237,7 @@ public class TrackEditorCommand extends BaseCommand {
         }
     }
 
-    @Subcommand("boatutils set customslipperiness reset")
+    @Subcommand("boatutils config customslipperiness reset")
     @Description("Removes all block slipperiness customizations")
     @CommandCompletion("@tracks")
     public void onBoatUtilsResetSlipperiness(Player player, @Optional String trackArg) {
@@ -1611,7 +1771,7 @@ public class TrackEditorCommand extends BaseCommand {
         // Uses the unified method that returns the track's unique instance
         TrackLeaderboard leaderboard = this.plugin.getOrCreateLeaderboard(trackName, targetLocation);
 
-        leaderboard.setLocation(targetLocation);
+        leaderboard.setLocation(targetLocation, "java");
         leaderboard.updateJavaLeaderboard(); // Updates specifically the Java side
 
         player.sendMessage("§aJAVA hologram for track §e" + trackName + " §ateleported!");
@@ -1628,7 +1788,7 @@ public class TrackEditorCommand extends BaseCommand {
         // Uses the SAME instance that Java would use
         TrackLeaderboard leaderboard = this.plugin.getOrCreateLeaderboard(trackName, targetLocation);
 
-        leaderboard.setLocation(targetLocation);
+        leaderboard.setLocation(targetLocation, "bedrock");
         leaderboard.updateBedrockLeaderboard(); // Updates specifically the Bedrock side
 
         player.sendMessage("§aBEDROCK hologram for track §e" + trackName + " §ateleported!");
@@ -1636,28 +1796,26 @@ public class TrackEditorCommand extends BaseCommand {
 
     @Subcommand("togglehologram java")
     @Description("Toggles the Java leaderboard hologram on/off for a track")
-    @CommandCompletion("@tracks")
-    public void onToggleHologramJava(Player player, String trackName) {
-        String targetTrack = getTargetTrack(player, trackName);
+    @CommandCompletion("@nothing @tracks")
+    public void onToggleHologramJava(Player player, boolean enabled, @Optional String trackNameArg) {
+        String targetTrack = getTargetTrack(player, trackNameArg);
         if (targetTrack == null) return;
 
         TrackLeaderboard leaderboard = this.plugin.getOrCreateLeaderboard(targetTrack, player.getLocation());
-        boolean newState = !leaderboard.isJavaEnabled();
-        leaderboard.setJavaEnabled(newState);
-        player.sendMessage("§aJava hologram for track §e" + targetTrack + " §a" + (newState ? "enabled" : "disabled") + "!");
+        leaderboard.setJavaEnabled(enabled);
+        player.sendMessage("§aJava hologram for track §e" + targetTrack + " §a" + (enabled ? "enabled" : "disabled") + "!");
     }
 
     @Subcommand("togglehologram bedrock")
     @Description("Toggles the Bedrock leaderboard hologram on/off for a track")
-    @CommandCompletion("@tracks")
-    public void onToggleHologramBedrock(Player player, String trackName) {
-        String targetTrack = getTargetTrack(player, trackName);
+    @CommandCompletion("@nothing @tracks")
+    public void onToggleHologramBedrock(Player player, boolean enabled, @Optional String trackNameArg) {
+        String targetTrack = getTargetTrack(player, trackNameArg);
         if (targetTrack == null) return;
 
         TrackLeaderboard leaderboard = this.plugin.getOrCreateLeaderboard(targetTrack, player.getLocation());
-        boolean newState = !leaderboard.isBedrockEnabled();
-        leaderboard.setBedrockEnabled(newState);
-        player.sendMessage("§aBedrock hologram for track §e" + targetTrack + " §a" + (newState ? "enabled" : "disabled") + "!");
+        leaderboard.setBedrockEnabled(enabled);
+        player.sendMessage("§aBedrock hologram for track §e" + targetTrack + " §a" + (enabled ? "enabled" : "disabled") + "!");
     }
 
     @Subcommand("location startline")

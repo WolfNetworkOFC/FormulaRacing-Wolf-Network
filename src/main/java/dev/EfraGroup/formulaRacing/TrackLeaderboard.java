@@ -18,7 +18,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class TrackLeaderboard {
     private final String trackName;
-    private Location location;
     private final DatabaseManager mySQLManager;
     private final JavaPlugin plugin;
     private FRTask task;
@@ -28,12 +27,22 @@ public class TrackLeaderboard {
     private boolean javaEnabled = true;
     private boolean bedrockEnabled = true;
 
+    // Per-type base locations so moving/setting one board never moves the other.
+    private Location javaLocation;
+    private Location bedrockLocation;
+
+    private Location locationForType(String type) {
+        return "bedrock".equals(type) ? this.bedrockLocation : this.javaLocation;
+    }
+
     public TrackLeaderboard(JavaPlugin plugin, String trackName, Location defaultLocation, DatabaseManager mySQLManager) {
         this.plugin = plugin;
         this.trackName = trackName;
         this.mySQLManager = mySQLManager;
-        Location savedLoc = mySQLManager.getHologramLocation(trackName);
-        this.location = savedLoc != null ? savedLoc : defaultLocation;
+        Location savedJava = mySQLManager.getHologramLocation(trackName, "java");
+        Location savedBedrock = mySQLManager.getHologramLocation(trackName, "bedrock");
+        this.javaLocation = savedJava != null ? savedJava : defaultLocation.clone();
+        this.bedrockLocation = savedBedrock != null ? savedBedrock : defaultLocation.clone();
         this.javaEnabled = mySQLManager.isHologramEnabled(trackName, "java");
         this.bedrockEnabled = mySQLManager.isHologramEnabled(trackName, "bedrock");
     }
@@ -51,7 +60,7 @@ public class TrackLeaderboard {
         this.mySQLManager.setHologramEnabled(this.trackName, "java", enabled);
         if (!enabled) {
             removeHologramByType("java");
-        } else if (this.location != null) {
+        } else if (this.javaLocation != null) {
             updateJavaLeaderboard();
         }
     }
@@ -61,7 +70,7 @@ public class TrackLeaderboard {
         this.mySQLManager.setHologramEnabled(this.trackName, "bedrock", enabled);
         if (!enabled) {
             removeHologramByType("bedrock");
-        } else if (this.location != null) {
+        } else if (this.bedrockLocation != null) {
             updateBedrockLeaderboard();
         }
     }
@@ -71,7 +80,10 @@ public class TrackLeaderboard {
             String safeName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
             String holoName = "lb_" + type + "_" + safeName;
             try {
-                Hologram holo = DHAPI.getHologram(holoName);
+                Hologram holo = this.holograms.get(type);
+                if (holo == null) {
+                    holo = DHAPI.getHologram(holoName);
+                }
                 if (holo != null) holo.delete();
             } catch (Exception ignored) {}
             holograms.remove(type);
@@ -81,6 +93,7 @@ public class TrackLeaderboard {
                 String safeName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
                 hm.deleteHologram(safeName + "_" + type);
             }
+            holograms.remove(type);
         }
     }
 
@@ -113,19 +126,54 @@ public class TrackLeaderboard {
         });
     }
 
+    public void setLocation(Location newLocation, String type) {
+        if (this.removed) return;
+        if ("bedrock".equals(type)) {
+            this.bedrockLocation = newLocation.clone();
+            this.mySQLManager.saveHologramLocation(this.trackName, "bedrock", newLocation);
+        } else {
+            this.javaLocation = newLocation.clone();
+            this.mySQLManager.saveHologramLocation(this.trackName, "java", newLocation);
+        }
+
+        boolean bedrock = "bedrock".equals(type);
+        Location loc = bedrock ? this.bedrockLocation : this.javaLocation;
+        Runnable moveHologram = () -> {
+            if (this.removed) return;
+            if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
+                try {
+                    Hologram holo = this.holograms.get(type);
+                    if (holo == null) {
+                        holo = DHAPI.getHologram("lb_" + type + "_" + this.trackName.toLowerCase().replaceAll("[^a-z0-9]", ""));
+                    }
+                    if (holo != null) {
+                        holo.setLocation(loc);
+                    }
+                } catch (Exception ignored) {}
+            }
+        };
+        if (this.plugin.isEnabled()) {
+            SchedulerHelper.runTask(this.plugin, moveHologram);
+        } else {
+            moveHologram.run();
+        }
+    }
+
     public void setLocation(Location newLocation) {
         if (this.removed) return;
-        this.location = newLocation;
-        this.mySQLManager.saveHologramLocation(this.trackName, newLocation);
+        // Persist the new base per-type so each board keeps its own location.
+        this.javaLocation = newLocation.clone();
+        this.bedrockLocation = newLocation.clone();
+        this.mySQLManager.saveHologramLocation(this.trackName, "java", newLocation);
+        this.mySQLManager.saveHologramLocation(this.trackName, "bedrock", newLocation);
 
         Runnable moveHolograms = () -> {
             if (this.removed) return;
             if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
                 try {
-                    holograms.forEach((type, holo) -> {
+                    holograms.forEach((t, holo) -> {
                         if (holo != null) {
-                            Location holoLoc = newLocation.clone();
-                            holo.setLocation(holoLoc);
+                            holo.setLocation(this.locationForType(t));
                         }
                     });
                 } catch (Exception ignored) {}
@@ -146,9 +194,19 @@ public class TrackLeaderboard {
         int totalCheckpoints = this.mySQLManager.getCheckpointCount(this.trackName);
 
         List<DatabaseManager.PlayerTime> top10 = leaderboard.stream()
-                .sorted((p1, p2) -> p1.getCheckpointsReached() != p2.getCheckpointsReached()
-                        ? Integer.compare(p2.getCheckpointsReached(), p1.getCheckpointsReached())
-                        : Double.compare(p1.getTime(), p2.getTime()))
+                .sorted((p1, p2) -> {
+                    // Finished laps rank above partial checkpoint runs.
+                    if (p1.isFinished() != p2.isFinished()) {
+                        return p2.isFinished() ? 1 : -1;
+                    }
+                    // More checkpoints reached rank higher.
+                    int byCheckpoints = Integer.compare(p2.getCheckpointsReached(), p1.getCheckpointsReached());
+                    if (byCheckpoints != 0) {
+                        return byCheckpoints;
+                    }
+                    // Faster time ranks higher.
+                    return Double.compare(p1.getTime(), p2.getTime());
+                })
                 .limit(10)
                 .toList();
 
@@ -191,7 +249,7 @@ public class TrackLeaderboard {
         }
 
         String safeTrackName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
-        Location holoLoc = this.location.clone();
+        Location holoLoc = this.locationForType(type);
 
         if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
             Runnable updateDecentHologram = () -> {

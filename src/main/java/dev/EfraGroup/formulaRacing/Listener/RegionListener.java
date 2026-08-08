@@ -382,18 +382,13 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                                 regionTrackWS = heat.getTrackNameWS();
                                 int checkpointsReached = driver.getCheckpointsReached();
                                 List<DatabaseManager.RegionData> checkpointByIdList = this.plugin.getTrackIntegrationManager().getCheckpointById(regionTrackWS, checkpointsReached - 1);
-                                if (driver.getResetCount() == 0 && checkpointsReached > 0 && checkpointByIdList != null && !checkpointByIdList.isEmpty()) {
+                                if (checkpointsReached > 0 && checkpointByIdList != null && !checkpointByIdList.isEmpty()) {
                                     DatabaseManager.RegionData cp = checkpointByIdList.get(0);
                                     targetLoc = new Location(Bukkit.getWorld(cp.getWorld()), (cp.getMinX() + cp.getMaxX()) / (double)2.0F, cp.getMaxY() - (double)0.5F, (cp.getMinZ() + cp.getMaxZ()) / (double)2.0F, player.getLocation().getYaw(), player.getLocation().getPitch());
                                     driver.incrementResetCount();
                                     DebugManager var10000 = this.plugin.getDebugManager();
                                     String var10001 = player.getName();
                                     var10000.logRaceSystem("[RESET-HEAT] " + var10001 + " -> CP " + checkpointsReached + " (resetCount=" + driver.getResetCount() + ")");
-                                } else if (driver.getResetCount() >= 1) {
-                                    targetLoc = this.plugin.getTrackIntegrationManager().getTrackSpawn(regionTrackWS);
-                                    DebugManager var10000 = this.plugin.getDebugManager();
-                                    String var10001 = player.getName();
-                                    var10000.logRaceSystem("[RESET-HEAT] " + var10001 + " -> Track Spawn (resetCount=" + driver.getResetCount() + ")");
                                 }
                             }
                         }
@@ -401,18 +396,20 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                         if (targetLoc == null) {
                             String activeTrackKey = this.timerUtils.getActiveTrack(player);
                             if (activeTrackKey != null) {
-                                TimerUtils.PlayerTimerData data = this.timerUtils.getTimerData(player, activeTrackKey);
-                                if (data != null) {
-                                    regionTrackWS = activeTrackKey;
-                                    int checkpointsReached = data.getCheckpointsReached();
-                                    List<DatabaseManager.RegionData> checkpointByIdList = this.plugin.getTrackIntegrationManager().getCheckpointById(activeTrackKey, checkpointsReached - 1);
-                                    if (checkpointsReached > 0 && checkpointByIdList != null && !checkpointByIdList.isEmpty()) {
-                                        DatabaseManager.RegionData cp = checkpointByIdList.get(0);
-                                        targetLoc = new Location(Bukkit.getWorld(cp.getWorld()), (cp.getMinX() + cp.getMaxX()) / (double)2.0F, cp.getMaxY() - (double)0.5F, (cp.getMinZ() + cp.getMaxZ()) / (double)2.0F, player.getLocation().getYaw(), player.getLocation().getPitch());
-                                        DebugManager var64 = this.plugin.getDebugManager();
-                                        String var67 = player.getName();
-                                        var64.logTimeTrialSystem("[RESET-SOLO] " + var67 + " -> CP " + checkpointsReached);
+                                regionTrackWS = activeTrackKey;
+                                targetLoc = this.plugin.getTrackIntegrationManager().getTrackSpawn(regionTrackWS);
+                                if (targetLoc != null) {
+                                    // Parar o timer IMEDIATAMENTE no momento do reset (mesmo
+                                    // comportamento do /reset), em vez de só quando cruzar a
+                                    // linha START/END novamente.
+                                    this.timerUtils.stopTimer(player);
+                                    this.timeTrialController.endSession(player);
+                                    // Cancelar a gravação de ghost para não acumular frames
+                                    // da volta abortada (memory leak no buffer de gravação).
+                                    if (this.plugin.getGhostManager() != null) {
+                                        this.plugin.getGhostManager().cancelRecording(player);
                                     }
+                                    this.plugin.getDebugManager().logTimeTrialSystem("[RESET-SOLO] " + player.getName() + " -> Track Spawn (full reset)");
                                 }
                             }
                         }
@@ -475,14 +472,19 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                         SchedulerHelper.runTaskLater(this.plugin, () -> {
                             // Verificamos se o jogador ainda está online após o delay de 1 tick
                             if (finalPlayer.isOnline()) {
-                                // Teleport and sound effect usando as referências finais
-                                SchedulerHelper.teleport(finalPlayer, finalTargetLoc);
-                                finalPlayer.playSound(finalTargetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
-
-                                // Gera o barco através da API
-                                this.plugin.getAPI().spawnBoat(finalPlayer, false, false, false);
-
-                                finalDebug.logTimeTrialSystem("[RESET] " + finalPlayer.getName() + " -> API Spawn Boat executed (Delayed).");
+                                // Folia: teleportAsync é ASSÍNCRONO. Se spawnarmos o barco na
+                                // posição atual antes do teleport concluir, o jogador monta no
+                                // barco novo dentro da região de reset, o teleport falha (player
+                                // dentro de veículo) e o processo se repete em loop até sair da
+                                // região. Por isso spawnamos o barco SOMENTE depois do teleport,
+                                // e no local de DESTINO.
+                                SchedulerHelper.teleportAsync(finalPlayer, finalTargetLoc).thenAccept(success -> {
+                                    if (Boolean.TRUE.equals(success) && finalPlayer.isOnline()) {
+                                        finalPlayer.playSound(finalTargetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
+                                        this.plugin.getAPI().spawnBoatAt(finalPlayer, finalTargetLoc, false, false, false);
+                                        finalDebug.logTimeTrialSystem("[RESET] " + finalPlayer.getName() + " -> API Spawn Boat executed (Delayed).");
+                                    }
+                                });
                             }
                         }, 1L);
                     }
@@ -661,10 +663,34 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                         TimeTrialSession session = this.timeTrialController.getSession(player);
                         long totalTimeMillis = session != null ? preciseFinishTime - session.getStartTime().toEpochMilli() : (long)(rawElapsed * (double)1000.0F);
                         double preciseElapsedSeconds = (double)totalTimeMillis / (double)1000.0F;
+
+                        // --- Ghost System: stop recording and capture frames ---
+                        final List<dev.EfraGroup.formulaRacing.Ghost.GhostFrame> ghostFrames =
+                                this.plugin.getGhostManager() != null
+                                        ? this.plugin.getGhostManager().stopRecording(player)
+                                        : null;
+
+                        // --- Medal record: capture lap for /te medals record ---
+                        if (this.plugin.getMedalManager() != null) {
+                            this.plugin.getMedalManager().handleLapFinish(
+                                    player, regionTrackWS, preciseElapsedSeconds, ghostFrames);
+                            // Announce when the lap achieves a diamond/netherite/saphira medal
+                            this.plugin.getMedalManager().checkMedalAchievement(
+                                    player, regionTrackWS, preciseElapsedSeconds);
+                        }
+
                         SchedulerHelper.runAsync(this.plugin, () -> {
                             Object[] pb = this.database.getPlayerBestTime(player.getName(), regionTrackWS);
                             double bestTime = pb != null && pb[0] != null ? (Double)pb[0] : Double.MAX_VALUE;
                             boolean isPB = preciseElapsedSeconds < bestTime;
+
+                            // If new PB, save ghost frames
+                            if (isPB && ghostFrames != null && !ghostFrames.isEmpty()
+                                    && this.plugin.getGhostManager() != null) {
+                                this.plugin.getGhostManager().saveGhostAsync(
+                                        uuid, regionTrackWS, ghostFrames);
+                            }
+
                             SchedulerHelper.runTask(this.plugin, () -> {
                                 TimeTrialFinishEvent event = new TimeTrialFinishEvent(player, session, totalTimeMillis, isPB);
                                 Bukkit.getPluginManager().callEvent(event);
@@ -789,10 +815,38 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
         if (!event.isCancelled()) {
             this.timerUtils.startTimer(player, regionTrackWS, startTime);
             this.timeTrialController.startSession(player, regionTrackWS, session.getStartTime());
+            // Apply track game time (day/night cycle)
+            this.plugin.applyTrackGameTime(player, regionTrackDisplayName);
+            // Update hotbar to time trial mode when time trial starts
+            if (this.plugin.getHotbarController() != null) {
+                this.plugin.getHotbarController().giveTimeTrialHotbar(player);
+            }
             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0F, 1.2F);
             if (this.plugin.getLonelyController() != null) {
                 this.plugin.getLonelyController().updatePlayersVisibility(player);
                 this.plugin.getLonelyController().updatePlayerVisibility(player);
+            }
+
+            // --- Ghost System: start recording ---
+            if (this.plugin.getGhostManager() != null) {
+                this.plugin.getGhostManager().startRecording(player);
+            }
+
+            // --- Ghost System: load and start replay if ghost exists ---
+            if (this.plugin.getGhostManager() != null) {
+                this.plugin.getGhostManager().loadGhostAsync(uuid, regionTrackWS, frames -> {
+                    if (frames != null && !frames.isEmpty() && player.isOnline()) {
+                        this.plugin.getGhostManager().startReplay(player, frames);
+                        this.plugin.getDebugManager().logTimeTrialSystem(
+                                "[GHOST] Replay started for " + player.getName()
+                                        + " — " + frames.size() + " frames");
+                    }
+                });
+            }
+
+            // --- Medal System: start colored medal line replay if faster than PB ---
+            if (this.plugin.getMedalManager() != null) {
+                this.plugin.getMedalManager().startMedalReplayIfBetter(player, regionTrackWS);
             }
 
             int totalCheckpoints = this.database.getCheckpointCount(regionTrackWS);

@@ -129,8 +129,8 @@ public class EventAnnouncements {
     }
 
     public void broadcastDNF(Heats heat, Driver driver, String reason) {
-        String name = Bukkit.getOfflinePlayer(driver.getUuid()).getName();
-        this.broadcastToHeat(heat, "event_broadcast_dnf", "{player}", name, "{reason}", reason != null ? reason : "");
+        String name = driver.getName() != null ? driver.getName() : Bukkit.getOfflinePlayer(driver.getUuid()).getName();
+        this.broadcastToHeat(heat, "event_broadcast_dnf", "{player}", name != null ? name : "Piloto", "{reason}", reason != null ? reason : "");
         Player p = Bukkit.getPlayer(driver.getUuid());
         if (p != null) {
             String title = this.t.getTranslated(p, "event_dnf_title", new String[0]);

@@ -10,6 +10,7 @@ depend:
 softdepend:
   - TAB
   - DecentHolograms
+  - HolographicDisplays
   - PlayerPoints
   - HeadDatabase
   - LuckPerms
@@ -57,6 +58,9 @@ commands:
   reset:
     description: Reseta sua timetrial.
     usage: /reset
+  resetcp:
+    description: Volta para o último checkpoint da corrida.
+    usage: /resetcp
   timetrialrandom:
     description: Entra em uma timetrial aleatória.
     usage: /timetrialrandom

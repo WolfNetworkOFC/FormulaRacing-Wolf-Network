@@ -2,6 +2,7 @@ package dev.EfraGroup.formulaRacing.Loneliness;
 
 import dev.EfraGroup.formulaRacing.Heat.CollisionMode;
 
+import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 
@@ -36,4 +37,22 @@ public interface VisibilityScope {
      * hidden from every other participant regardless of CollisionMode).
      */
     boolean isIsolated();
+
+    /**
+     * Returns participant UUIDs who have finished their session and should be
+     * hidden from active (non-finished) racers in the same scope.
+     * <p>
+     * Only applies to heat/race scopes. Defaults to empty for duel/timetrial/open-world.
+     */
+    default Set<UUID> getFinishedParticipants() {
+        return Collections.emptySet();
+    }
+
+    /**
+     * Returns true if the given UUID belongs to an active (non-finished) driver
+     * in this scope (not a spectator, not a finished driver).
+     */
+    default boolean isActiveRacer(UUID uuid) {
+        return false;
+    }
 }

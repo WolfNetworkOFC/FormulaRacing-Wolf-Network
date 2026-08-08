@@ -72,8 +72,21 @@ public class ResetCommand implements CommandExecutor {
         // =========================
         // Teleport and create boat
         // =========================
-        SchedulerHelper.teleport(player, spawn);
-        api.spawnBoat(player, false, false, false);
+        api.recoverPlayerBoatState(player);
+        // Folia: teleportAsync é assíncrono — só spawnar o barco DEPOIS do teleport
+        // concluir, no destino (senão o barco nasce na posição antiga e o teleport
+        // falha com o player dentro de veículo).
+        SchedulerHelper.teleportAsync(player, spawn).thenAccept(success -> {
+            if (Boolean.TRUE.equals(success) && player.isOnline()) {
+                api.spawnBoatAt(player, spawn, false, false, false);
+
+                // Reapply boatutils settings (same as /tt)
+                if (this.plugin.getPacketSender() != null) {
+                    this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
+                    this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, lastTrack);
+                }
+            }
+        });
 
         return true;
     }

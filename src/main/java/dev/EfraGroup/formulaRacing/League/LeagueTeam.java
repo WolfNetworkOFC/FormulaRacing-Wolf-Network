@@ -5,6 +5,7 @@ public class LeagueTeam {
     private final int id;
     private final int leagueId;
     private final String name;
+    private String colorHex;
 
     public LeagueTeam(int id, int leagueId, String name) {
         this.id = id;
@@ -22,5 +23,13 @@ public class LeagueTeam {
 
     public String getName() {
         return name;
+    }
+
+    public String getColorHex() {
+        return colorHex;
+    }
+
+    public void setColorHex(String colorHex) {
+        this.colorHex = colorHex;
     }
 }

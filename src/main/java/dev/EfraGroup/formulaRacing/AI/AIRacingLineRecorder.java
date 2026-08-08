@@ -208,7 +208,7 @@ public class AIRacingLineRecorder {
                 p.sendMessage("§a═══════════════════════════════");
             }
 
-            recordingTask = SchedulerHelper.runTaskTimer(plugin, () -> {
+            recordingTask = SchedulerHelper.runTaskTimerAtEntity(plugin, player, () -> {
                 if (cancelled || completed || !recording) {
                     return;
                 }
@@ -302,8 +302,11 @@ public class AIRacingLineRecorder {
                 line.addAccelerationPoint(accelPoint);
             }
 
-            // Save to file
-            racingLineManager.saveAllRacingLines();
+            // Save to file (incremental — only this track, async to avoid blocking the tick)
+            String finalTrackName = trackName;
+            SchedulerHelper.runAsync(plugin, () ->
+                racingLineManager.saveRacingLine(finalTrackName, line)
+            );
 
             activeSessions.remove(player.getUniqueId());
 

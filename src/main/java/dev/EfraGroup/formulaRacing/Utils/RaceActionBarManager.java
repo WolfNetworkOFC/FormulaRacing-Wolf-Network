@@ -9,7 +9,6 @@ import dev.EfraGroup.formulaRacing.Utils.Theme.FRTheme;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeResolver;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -40,10 +39,10 @@ public class RaceActionBarManager {
 
     public RaceActionBarManager(FormulaRacing plugin) {
         this.plugin = plugin;
-        this.playerHeats = new HashMap<>();
-        this.spectatorTargets = new HashMap<>();
-        this.lastActionBarMessage = new HashMap<>();
-        this.lastStaticUpdateAt = new HashMap<>();
+        this.playerHeats = new ConcurrentHashMap<>();
+        this.spectatorTargets = new ConcurrentHashMap<>();
+        this.lastActionBarMessage = new ConcurrentHashMap<>();
+        this.lastStaticUpdateAt = new ConcurrentHashMap<>();
         this.trackCheckpointCountCache = new ConcurrentHashMap<>();
         this.dynamicUpdateIntervalTicks = Math.max(1, plugin.getConfig().getInt("race-actionbar.dynamic-update-interval-ticks", 2));
         this.staticUpdateIntervalMs = Math.max(50L, plugin.getConfig().getLong("race-actionbar.static-update-interval-ms", 250L));
@@ -73,6 +72,11 @@ public class RaceActionBarManager {
     private void startAutoUpdate() {
         this.updateTask = SchedulerHelper.runTaskTimer(this.plugin, () -> {
             long now = System.currentTimeMillis();
+            // Remove stale entries for players who disconnected without proper cleanup
+            RaceActionBarManager.this.playerHeats.keySet().removeIf(playerId -> {
+                Player player = Bukkit.getPlayer(playerId);
+                return player == null || !player.isOnline();
+            });
             for (Map.Entry<UUID, Heats> entry : RaceActionBarManager.this.playerHeats.entrySet()) {
                 UUID playerId = entry.getKey();
                 Player player = Bukkit.getPlayer(playerId);
@@ -156,7 +160,9 @@ public class RaceActionBarManager {
         if (heat != null) {
             this.plugin.getDebugManager().logRaceSystem("[ActionBar] Removendo jogador " + player.getName() + " do heat " + heat.getId());
         }
-        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(""));
+        if (player.isOnline()) {
+            player.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(""));
+        }
     }
 
     public void setSpectatorTarget(Player spectator, Heats heat, UUID driverId) {
@@ -201,12 +207,11 @@ public class RaceActionBarManager {
                 this.removePlayer(player);
             }
         }
-        this.spectatorTargets.entrySet().removeIf(entry -> {
-            SpectatorTarget target = entry.getValue();
+        this.spectatorTargets.keySet().removeIf(spectatorId -> {
+            SpectatorTarget target = this.spectatorTargets.get(spectatorId);
             if (target == null || target.heat == null || !target.heat.equals(heat)) {
                 return false;
             }
-            UUID spectatorId = entry.getKey();
             Player spectator = Bukkit.getPlayer(spectatorId);
             if (spectator != null && spectator.isOnline()) {
                 spectator.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(""));
@@ -250,6 +255,11 @@ public class RaceActionBarManager {
 
     private void updateActionBarForDriver(Player viewer, Heats heat, Driver driver) {
         String message = this.buildActionBarMessage(heat, driver, viewer);
+        // If viewer is not the driver, they're spectating — prepend driver name in bold
+        if (!viewer.getUniqueId().equals(driver.getUuid())) {
+            String driverName = driver.getName();
+            message = "§l> " + driverName + " §r| " + message;
+        }
         this.sendActionBarIfChanged(viewer, message);
     }
 

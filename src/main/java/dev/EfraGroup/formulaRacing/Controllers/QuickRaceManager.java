@@ -395,6 +395,9 @@ public class QuickRaceManager {
                 this.plugin.getAPI().recoverPlayerBoatState(player);
                 this.currentHeat.removeDriver(player.getUniqueId());
 
+                // Reset player time back to world time
+                this.plugin.resetTrackGameTime(player);
+
                 Location respawn;
                 try {
                     respawn = player.getRespawnLocation();
@@ -406,6 +409,12 @@ public class QuickRaceManager {
                 }
 
                 SchedulerHelper.teleport(player, respawn);
+                // Restore default hotbar after leaving race
+                SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                    if (this.plugin.getHotbarController() != null) {
+                        this.plugin.getHotbarController().giveHotbarItems(player);
+                    }
+                }, 1L);
                 this.plugin.sendMessage(player, "quickrace_left_dnf", new String[0]);
                 return true;
             } else {
@@ -423,6 +432,14 @@ public class QuickRaceManager {
                     }
 
                     this.plugin.getAPI().recoverPlayerBoatState(player);
+                    // Reset player time back to world time
+                    this.plugin.resetTrackGameTime(player);
+                    // Restore default hotbar after leaving race lobby
+                    SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                        if (this.plugin.getHotbarController() != null) {
+                            this.plugin.getHotbarController().giveHotbarItems(player);
+                        }
+                    }, 1L);
 
                     this.plugin.sendMessage(player, "quickrace_left", new String[0]);
                     EventAnnouncements announcements = this.currentQuickRace != null ? this.currentQuickRace.getAnnouncements() : this.plugin.getEventAnnouncements();

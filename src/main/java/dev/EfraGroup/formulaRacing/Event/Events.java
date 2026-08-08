@@ -130,6 +130,12 @@ public class Events {
                     if (this.plugin.getPodiumManager() != null) {
                         this.plugin.getPodiumManager().startCeremony(this, results);
                     }
+
+                    if (this.getLeague() != null && !this.getLeague().isBlank()) {
+                        this.plugin.getLeagueManager()
+                            .getLeagueByName(this.getLeague())
+                            .ifPresent(lg -> this.plugin.getLeagueManager().onEventFinished(this, results));
+                    }
                 }
             }
 

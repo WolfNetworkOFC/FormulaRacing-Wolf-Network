@@ -807,43 +807,33 @@ scoreboard_duel_track: ' &fTrack: '
 hotbar_menu_name: '&a&oMain Menu'
 hotbar_menu_lore:
   - '&7Click to open the menu.'
-  - ''
-  - '&eRight-click.'
 hotbar_tracks_name: '&e&oTracks / Time Trial'
 hotbar_tracks_lore:
   - '&7Click to select a track.'
-  - ''
-  - '&eRight-click.'
 hotbar_random_name: '&d&oRandom Track'
 hotbar_random_lore:
   - '&7Go to a random track.'
-  - ''
-  - '&eRight-click.'
 hotbar_visibility_on_name: '&b&oPlayers: &a&oVisible'
 hotbar_visibility_on_lore:
   - '&7Click to &cHIDE &7players.'
-  - ''
-  - '&eRight-click.'
 hotbar_visibility_off_name: '&b&oPlayers: &c&oHidden'
 hotbar_visibility_off_lore:
   - '&7Click to &aSHOW &7players.'
-  - ''
-  - '&eRight-click.'
 hotbar_reset_name: '&c&oReset'
 hotbar_reset_lore:
   - '&7Reset current race.'
-  - ''
-  - '&eRight-click.'
 hotbar_spawn_name: '&c&oBack to Spawn'
 hotbar_spawn_lore:
   - '&7Return to lobby.'
-  - ''
-  - '&eRight-click.'
 hotbar_settings_name: '&7&oSettings'
 hotbar_settings_lore:
   - '&7Open settings.'
-  - ''
-  - '&eRight-click.'
+hotbar_cosmetics_name: '&6&oCosmetics'
+hotbar_cosmetics_lore:
+  - '&7Open your cosmetics.'
+hotbar_boat_name: '&a&oBoat'
+hotbar_boat_lore:
+  - '&7Choose your boat.'
 
 lonely_cannot_change_racing: '§c❌ You cannot change Lonely Mode during a race or duel!'
 lonely_invalid_usage: '§cInvalid subcommand. Use: /lonely <true|false>'
@@ -855,6 +845,15 @@ lonely_obu_tip_line2: '§7you must §cDISABLE §7Lonely Mode during'
 lonely_obu_tip_line3: '§7practice or qualifying.'
 lonely_no_obu_info: '§7ℹ Install §bOpenBoatUtils §7to access Ghost Mode!'
 
+hotbar_resetcp_name: '&a&oReset Checkpoint'
+hotbar_resetcp_lore:
+  - '&7Teleport to your last checkpoint.'
+hotbar_leave_event_name: '&c&oLeave Event'
+hotbar_leave_event_lore:
+  - '&7Leave the event and watch as spectator.'
+resetcp_not_in_heat: '&cYou are not in an active race.'
+resetcp_no_spawn: '&cCould not find the track spawn point.'
+resetcp_teleported: '&aTeleported to your last checkpoint.'
 cam_usage: '§eUse: /cam <follow|stop|edit|set|view|list|menu>'
 cam_require_spectator: '§cYou need to be in §lSpectator §cmode to use cameras.'
 cam_player_not_found: '§cPlayer not found.'
@@ -976,9 +975,9 @@ scoreboard_v2_position: "&pPosition: &x{position}"
 scoreboard_v2_time: "&pTime: &x{time}"
 
 # Color Settings
-gui_settings_color_name: "&pColor"
+gui_settings_color_name: "&eColor"
 gui_settings_color_lore: "&xClick to choose your theme color"
-gui_color_title: "&pColor Settings"
+gui_color_title: "&eColor Settings"
 gui_color_lore: "&aClick to select"
 gui_color_current: "&aCurrent color! &7({color})"
 gui_color_back_name: "&7← Back"
@@ -1011,3 +1010,54 @@ scoreboard_state_loaded: "Grid ready"
 scoreboard_state_starting: "Starting"
 scoreboard_state_racing: "Racing"
 scoreboard_state_finished: "Finished"
+
+# ==========================================
+# League (TimingLeague port) Messages
+# ==========================================
+league_none_selected: "&cNo league selected. Use /league select <name>"
+league_not_found: "&cLeague not found: &e{league}"
+league_create_error: "&cError creating league."
+league_created: "&aLeague created: &e{league}"
+league_selected: "&aSelected league: &e{league}"
+league_deleted: "&aLeague deleted: &e{league}"
+league_list_header: "&6&lLeagues:"
+league_list_row: "&e- &f{league} &7(&bdrivers: {drivers}&7)"
+league_team_add_error: "&cError adding team &e{team}"
+league_team_added: "&aTeam &e{team} &aadded to league &e{league}"
+league_driver_add_error: "&cError adding driver &e{player}"
+league_driver_added: "&aDriver &e{player} &aadded to league &e{league}"
+league_link_error: "&cError linking event to league."
+league_event_linked: "&aEvent &e{event} &alinked to league &e{league}"
+league_event_unlinked: "&aEvent &e{event} &aunlinked from league &e{league}"
+league_standings_drivers_header: "&6&l{league} - Driver Standings"
+league_standings_driver_row: "&e#{position} &f{player} &7- &b{points} pts"
+league_standings_teams_header: "&6&l{league} - Team Standings"
+league_standings_team_row: "&e#{position} &f{team} &7- &b{points} pts"
+league_info_header: "&6&lLeague: &e{league}"
+league_info_status: "&7Status: &f{status}"
+league_info_teams: "&7Teams: &f{teams}"
+league_info_drivers: "&7Drivers: &f{drivers}"
+league_scoring_invalid: "&cInvalid scoring system: &e{system}"
+league_scoring_set: "&aScoring system set to &e{system}"
+league_teammode_invalid: "&cInvalid team mode: &e{mode}"
+league_teammode_set: "&aTeam mode set to &e{mode}"
+league_teamconfig_set: "&aTeam config updated."
+league_customscale_set: "&aCustom scale set: position &e{position} &a= &e{points} pts"
+league_mulligans_set: "&aMulligans set to &e{count}"
+league_category_not_found: "&cCategory not found: &e{category}"
+league_category_added: "&aCategory &e{category} &aadded."
+league_category_removed: "&aCategory &e{category} &aremoved."
+league_category_usage: "&cUse: /league <name> category <add|remove> <categoryName>"
+league_calendar_header: "&6&l{league} - Calendar"
+league_calendar_row: "&e- &f{event} &7(cat: {category}, heat: {heat})"
+league_recalculated: "&aStandings recalculated for &e{league}"
+league_holo_created: "&aHologram (&e{scope}&a) created for &e{league}"
+league_holo_removed: "&aHolograms removed for &e{league}"
+league_holo_updated: "&aHolograms updated for &e{league}"
+league_breakdown_header: "&6&l{league} - Points Breakdown"
+league_breakdown_row: "&e- &f{player} &7- &b{points} pts"
+league_event_category_set: "&aEvent &e{event} &acategory set to &e{category}"
+league_event_heat_set: "&aEvent &e{event} &apinned heat set to &e{heat}"
+league_points_given: "&a&e{amount} &apoints given to &e{player} &ain league &e{league}"
+league_points_taken: "&a&e{amount} &apoints taken from &e{player} &ain league &e{league}"
+league_points_transferred: "&a&e{amount} &apoints transferred from &e{from} &ato &e{to} &ain league &e{league}"

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormulaRacing Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-icon">FR</div>
+                <div>
+                    <h1>FormulaRacing</h1>
+                    <span class="version">v2.0</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">General</div>
+                    <a href="index.html" class="nav-item active" data-page="overview">
+                        <span class="icon">📊</span>
+                        <span>Overview</span>
+                    </a>
+                    <a href="index.html?page=tracks" class="nav-item" data-page="tracks">
+                        <span class="icon">🏁</span>
+                        <span>Tracks</span>
+                    </a>
+                    <a href="index.html?page=players" class="nav-item" data-page="players">
+                        <span class="icon">👥</span>
+                        <span>Players</span>
+                    </a>
+                    <a href="index.html?page=events" class="nav-item" data-page="events">
+                        <span class="icon">🏆</span>
+                        <span>Events</span>
+                        <span class="badge" id="active-events-badge">0</span>
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Live</div>
+                    <a href="live-map.html" class="nav-item">
+                        <span class="icon">🗺️</span>
+                        <span>Live Map</span>
+                        <span class="pulse-dot" id="live-indicator" style="margin-left:auto;"></span>
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">System</div>
+                    <a href="index.html?page=logs" class="nav-item" data-page="logs">
+                        <span class="icon">📋</span>
+                        <span>Logs</span>
+                    </a>
+                    <a href="index.html?page=status" class="nav-item" data-page="status">
+                        <span class="icon">⚡</span>
+                        <span>API Status</span>
+                    </a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content" id="main-content">
+            <div class="page-header">
+                <h2 id="page-title">Dashboard</h2>
+                <p id="page-subtitle">Real-time overview of your FormulaRacing server</p>
+            </div>
+            <div id="page-content"></div>
+        </main>
+    </div>
+
+    <script src="js/dashboard.js"></script>
+</body>
+</html>

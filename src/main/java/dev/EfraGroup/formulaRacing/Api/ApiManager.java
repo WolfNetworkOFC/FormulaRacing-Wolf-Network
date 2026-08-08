@@ -52,6 +52,10 @@ public class ApiManager {
         return instance;
     }
 
+    public void shutdown() {
+        // Nothing to clean up currently
+    }
+
     public void init() {
         instance = this;
 
@@ -192,6 +196,9 @@ public class ApiManager {
     }
 
     private void setupEndpoints() {
+        // ============================================================
+        //  1. TRACKS (v1 + v3)
+        // ============================================================
         // GET /api/v1/readonly/tracks - List all tracks
         get("/api/v1/readonly/tracks", (request, response) -> {
             try {
@@ -266,8 +273,9 @@ public class ApiManager {
                 responseObject.add("medals", medalsObj);
 
                 // Track record
+                // DB stores seconds, convert to ms
                 Double trackRecord = plugin.getDatabaseManager().getTrackRecord(trackName);
-                responseObject.addProperty("record", trackRecord != null ? trackRecord : 0);
+                responseObject.addProperty("record", trackRecord != null ? trackRecord * 1000.0 : 0);
 
                 if (logRequests) {
                     plugin.getLogger().info("API: GET /api/v1/readonly/tracks/" + trackName);
@@ -281,6 +289,9 @@ public class ApiManager {
             }
         });
 
+        // ============================================================
+        //  2. PLAYERS (v1)
+        // ============================================================
         // GET /api/v1/readonly/players - List all online players
         get("/api/v1/readonly/players", (request, response) -> {
             try {
@@ -462,7 +473,8 @@ public class ApiManager {
                 JsonObject responseObject = new JsonObject();
                 responseObject.addProperty("uuid", uuid.toString());
                 responseObject.addProperty("track", trackName);
-                responseObject.addProperty("best_time", bestTime != null ? bestTime : 0);
+                // DB stores seconds, convert to ms
+                responseObject.addProperty("best_time", bestTime != null ? bestTime * 1000.0 : 0);
                 responseObject.addProperty("rank", rank);
 
                 if (logRequests) {
@@ -512,6 +524,9 @@ public class ApiManager {
             }
         });
 
+        // ============================================================
+        //  3. SERVER STATUS (v1)
+        // ============================================================
         // GET /api/v1/readonly/status - API status
         get("/api/v1/readonly/status", (request, response) -> {
             try {
@@ -556,6 +571,9 @@ public class ApiManager {
             }
         });
 
+        // ============================================================
+        //  4. LIVE / REAL-TIME (v1)
+        // ============================================================
         // GET /api/v1/readonly/live/positions - Real-time positions
         get("/api/v1/readonly/live/positions", (request, response) -> {
             try {
@@ -674,9 +692,11 @@ public class ApiManager {
                 JsonArray timesArray = new JsonArray();
                 for (DatabaseManager.TrackRecord record : topTimes) {
                     JsonObject timeObj = new JsonObject();
+                    // DB stores seconds, convert to ms
+                    long timeMs = (long)(record.getTime() * 1000.0);
                     timeObj.addProperty("player_name", record.getPlayerName());
-                    timeObj.addProperty("time", formatTime((long) record.getTime()));
-                    timeObj.addProperty("time_ms", record.getTime());
+                    timeObj.addProperty("time", formatTime(timeMs));
+                    timeObj.addProperty("time_ms", timeMs);
                     timeObj.addProperty("checkpoints", record.getCheckpointsReached());
                     timeObj.addProperty("finished", record.isFinished());
                     timeObj.addProperty("date", record.getTimeCreated());
@@ -696,6 +716,9 @@ public class ApiManager {
             }
         });
 
+        // ============================================================
+        //  5. ACTIVITY (v1)
+        // ============================================================
         // GET /api/v1/readonly/activity/stats - Activity statistics
         get("/api/v1/readonly/activity/stats", (request, response) -> {
             try {
@@ -817,6 +840,9 @@ public class ApiManager {
             }
         });
 
+        // ============================================================
+        //  6. EVENTS (v1)
+        // ============================================================
         // GET /api/v1/readonly/events - All events
         get("/api/v1/readonly/events", (request, response) -> {
             try {
@@ -864,6 +890,9 @@ public class ApiManager {
             }
         });
 
+        // ============================================================
+        //  7. LOGS (v1)
+        // ============================================================
         // GET /api/v1/readonly/logs - System logs
         get("/api/v1/readonly/logs", (request, response) -> {
             try {
