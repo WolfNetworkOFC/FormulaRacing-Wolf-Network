@@ -16,6 +16,7 @@ import dev.EfraGroup.formulaRacing.TimeTrial.Events.TimeTrialStartEvent;
 import dev.EfraGroup.formulaRacing.TimeTrial.TimeTrialController;
 import dev.EfraGroup.formulaRacing.TimeTrial.TimeTrialSession;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.RegionMathUtils;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardTimeTrialUtils;
@@ -908,9 +909,11 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
     }
 
     // --- INITIALIZATION METHODS THAT WERE MISSING ---
+    private FRTask regionLoaderTask;
+    private FRTask regionCheckerTask;
 
     private void startRegionLoader() {
-        SchedulerHelper.runAsyncTimer(this.plugin, () -> {
+        this.regionLoaderTask = SchedulerHelper.runAsyncTimer(this.plugin, () -> {
             List<DatabaseManager.RegionData> allRegions = database.getAllRegions();
             SchedulerHelper.runTask(plugin, () -> {
                 Map<String, List<DatabaseManager.RegionData>> newRegionsMap = new HashMap<>();
@@ -926,7 +929,7 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
 
 
     private void startRegionChecker() {
-        SchedulerHelper.runTaskTimer(this.plugin, scheduledTask -> {
+        this.regionCheckerTask = SchedulerHelper.runTaskTimer(this.plugin, scheduledTask -> {
             if (regions.isEmpty()) return;
 
             for (Player player : Bukkit.getOnlinePlayers()) {
@@ -938,6 +941,17 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                 });
             }
         }, 0L, 2L);
+    }
+
+    public void shutdown() {
+        if (regionLoaderTask != null && !regionLoaderTask.isCancelled()) {
+            regionLoaderTask.cancel();
+            regionLoaderTask = null;
+        }
+        if (regionCheckerTask != null && !regionCheckerTask.isCancelled()) {
+            regionCheckerTask.cancel();
+            regionCheckerTask = null;
+        }
     }
 
 }

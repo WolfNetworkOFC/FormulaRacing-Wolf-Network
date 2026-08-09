@@ -1,6 +1,7 @@
 package dev.EfraGroup.formulaRacing.TVCamera;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -23,11 +24,19 @@ public class TVCameraListener implements Listener {
 
     private final FormulaRacing plugin;
     private final TVCameraController controller;
+    private FRTask updateFollowersTask;
 
     public TVCameraListener(FormulaRacing plugin, TVCameraController controller) {
         this.plugin = plugin;
         this.controller = controller;
-        SchedulerHelper.runTaskTimer(plugin, () -> controller.updateFollowers(), 0L, 5L);
+        this.updateFollowersTask = SchedulerHelper.runTaskTimer(plugin, () -> controller.updateFollowers(), 0L, 5L);
+    }
+
+    public void shutdown() {
+        if (updateFollowersTask != null && !updateFollowersTask.isCancelled()) {
+            updateFollowersTask.cancel();
+            updateFollowersTask = null;
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

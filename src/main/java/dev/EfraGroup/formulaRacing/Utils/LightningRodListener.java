@@ -33,6 +33,7 @@ public class LightningRodListener implements Listener {
     private final Map<UUID, ItemDisplay> playerRods = new ConcurrentHashMap<>();
     private int tickCounter = 0;
     private static final int DEBUG_INTERVAL = 100;
+    private FRTask processRodsTask;
 
     private static final Transformation FLIPPED_ROD = new Transformation(
         new Vector3f(0, 0.625F, 0),
@@ -46,7 +47,10 @@ public class LightningRodListener implements Listener {
     }
 
     public void start() {
-        SchedulerHelper.runTaskTimer(plugin, this::processRods, 1L, 1L);
+        if (processRodsTask != null && !processRodsTask.isCancelled()) {
+            return;
+        }
+        processRodsTask = SchedulerHelper.runTaskTimer(plugin, this::processRods, 1L, 1L);
     }
 
     private void processRods() {
@@ -242,6 +246,10 @@ public class LightningRodListener implements Listener {
 
     public void shutdown() {
         Bukkit.getLogger().info("[RodDebug] Removing all rods on shutdown");
+        if (processRodsTask != null && !processRodsTask.isCancelled()) {
+            processRodsTask.cancel();
+            processRodsTask = null;
+        }
         removeAllRods();
     }
 

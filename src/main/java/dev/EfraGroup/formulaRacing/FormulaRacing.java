@@ -622,6 +622,27 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.ghostManager.shutdown();
         }
 
+        if (this.tvCameraListener != null) {
+            this.tvCameraListener.shutdown();
+        }
+
+        if (this.rcl != null) {
+            this.rcl.shutdown();
+        }
+
+        if (this.weatherManager != null) {
+            this.weatherManager.stopUpdateTask();
+        }
+
+        if (this.raceActionBarManager != null) {
+            this.raceActionBarManager.shutdown();
+        }
+
+        dev.EfraGroup.formulaRacing.Utils.LightningRodManager.clearAllToggles();
+
+        playersWithMod.clear();
+        playersModVersion.clear();
+
         try {
             if (this.dm != null) {
                 this.dm.deleteAllParties();
@@ -1317,6 +1338,8 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
         setPlayerHasMod(uuid, false);
+        playersWithMod.remove(uuid);
+        playersModVersion.remove(uuid);
 
         // Clean up per-player caches to prevent memory leaks
         this.clearLastTimeTrialTrack(uuid);
