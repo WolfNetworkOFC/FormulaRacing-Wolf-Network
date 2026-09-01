@@ -3,6 +3,7 @@ package dev.EfraGroup.formulaRacing.Utils;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -20,9 +21,9 @@ import org.bukkit.entity.Player;
 public class TimerUtils {
     private final FormulaRacing plugin;
     private final DatabaseManager databaseManager;
-    private boolean globalLoopRunning = false;
     private final Map<UUID, List<CheckpointData>> tempCheckpoints = new ConcurrentHashMap<UUID, List<CheckpointData>>();
     private final Map<UUID, Map<String, PlayerTimerData>> activeTimers = new ConcurrentHashMap<UUID, Map<String, PlayerTimerData>>();
+    private final Map<UUID, FRTask> playerTasks = new ConcurrentHashMap<UUID, FRTask>();
     private final Set<UUID> warnedPlayersNoCheckpoints = ConcurrentHashMap.newKeySet();
     private final Map<String, Long> lastWarningTime = new ConcurrentHashMap<String, Long>();
     private final Map<String, Long> lastDebugLogTime = new ConcurrentHashMap<String, Long>();
@@ -49,9 +50,7 @@ public class TimerUtils {
         int initialCPs = this.databaseManager.getCheckpointCount(trackName);
         PlayerTimerData data = new PlayerTimerData(startTime, adjustedNano, initialCPs, attemptId);
         this.activeTimers.computeIfAbsent(uuid, k -> new ConcurrentHashMap()).put(trackName, data);
-        if (!this.globalLoopRunning) {
-            this.startGlobalLoop();
-        }
+        this.startPlayerLoop(player);
         SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 Object[] pb = this.databaseManager.getPlayerBestTime(playerName, trackName);
@@ -72,40 +71,35 @@ public class TimerUtils {
         });
     }
 
-    public void startGlobalLoop() {
-        if (this.globalLoopRunning) {
-            return;
+    private void startPlayerLoop(Player player) {
+        UUID uuid = player.getUniqueId();
+        // Cancel existing task for this player if any
+        FRTask existing = this.playerTasks.remove(uuid);
+        if (existing != null) {
+            existing.cancel();
         }
-        this.globalLoopRunning = true;
-        SchedulerHelper.runTaskTimer(this.plugin, () -> {
-            if (TimerUtils.this.activeTimers.isEmpty()) {
-                TimerUtils.this.globalLoopRunning = false;
-                return;
-            }
-            // Clean up entries for players who went offline without stopping their timer
-            TimerUtils.this.activeTimers.keySet().removeIf(uuid -> {
-                Player player = Bukkit.getPlayer(uuid);
-                if (player != null && player.isOnline()) {
-                    return false;
+        // On Folia, entity scheduler runs on the entity's tick — guaranteed every tick.
+        // On Paper, falls back to global scheduler (still works, just not entity-bound).
+        FRTask task = SchedulerHelper.runTaskTimerAtEntity(
+            this.plugin,
+            player,
+            () -> {
+                // Player went offline — stop
+                if (!player.isOnline()) {
+                    this.stopTimer(player);
+                    return;
                 }
-                // Also clean up auxiliary maps for this UUID
-                TimerUtils.this.tempCheckpoints.remove(uuid);
-                TimerUtils.this.warnedPlayersNoCheckpoints.remove(uuid);
-                String uuidStr = uuid.toString();
-                TimerUtils.this.lastWarningTime.entrySet().removeIf(entry -> entry.getKey().startsWith(uuidStr + ":"));
-                TimerUtils.this.lastDebugLogTime.entrySet().removeIf(entry -> entry.getKey().startsWith(uuidStr + ":"));
-                return true;
-            });
-            for (Map.Entry<UUID, Map<String, PlayerTimerData>> playerEntry : TimerUtils.this.activeTimers.entrySet()) {
-                UUID uuid = playerEntry.getKey();
-                Player player = Bukkit.getPlayer(uuid);
-                if (player == null || !player.isOnline()) continue;
-                for (Map.Entry<String, PlayerTimerData> trackEntry : playerEntry.getValue().entrySet()) {
-                    boolean worstTime;
-                    CheckpointData potentialCp;
+                Map<String, PlayerTimerData> trackMap = this.activeTimers.get(uuid);
+                if (trackMap == null || trackMap.isEmpty()) {
+                    FRTask t = this.playerTasks.remove(uuid);
+                    if (t != null) t.cancel();
+                    return;
+                }
+                for (Map.Entry<String, PlayerTimerData> trackEntry : trackMap.entrySet()) {
                     String trackName = trackEntry.getKey();
                     PlayerTimerData data = trackEntry.getValue();
-                    List<CheckpointData> tempCps = TimerUtils.this.tempCheckpoints.get(uuid);
+                    List<CheckpointData> tempCps = this.tempCheckpoints.get(uuid);
+                    CheckpointData potentialCp;
                     CheckpointData lastCp = null;
                     if (tempCps != null && !tempCps.isEmpty() && (potentialCp = tempCps.get(tempCps.size() - 1)).getTrack().equalsIgnoreCase(trackName)) {
                         lastCp = potentialCp;
@@ -115,7 +109,7 @@ public class TimerUtils {
                     Double pb = cache != null ? cache.getPbTime() : null;
                     Map<Integer, Double> cpTimes = cache != null ? cache.getCpTimes() : null;
                     StringBuilder sb = new StringBuilder(64);
-                    boolean bl = worstTime = pb != null && elapsed > pb;
+                    boolean worstTime = pb != null && elapsed > pb;
                     sb.append(pb == null ? "\u00a7a" : (worstTime ? "\u00a7c" : "\u00a7e"));
                     int minutes = (int)(elapsed / 60.0);
                     double sec = elapsed % 60.0;
@@ -154,12 +148,12 @@ public class TimerUtils {
                         sb.append(m);
                     }
                     String finalHud = sb.toString();
-                    if (player.isOnline()) {
-                        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(finalHud));
-                    }
+                    player.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(finalHud));
                 }
-            }
-        }, 0L, 1L);
+            },
+            0L, 1L
+        );
+        this.playerTasks.put(uuid, task);
     }
 
     /**
@@ -167,6 +161,11 @@ public class TimerUtils {
      * Called from onPlayerQuit to prevent memory leaks.
      */
     public void cleanupPlayer(UUID uuid) {
+        // Cancel the per-player entity task
+        FRTask task = this.playerTasks.remove(uuid);
+        if (task != null) {
+            task.cancel();
+        }
         Map<String, PlayerTimerData> map = this.activeTimers.remove(uuid);
         if (map != null) {
             this.plugin.getDebugManager().logTimeTrialSystem("[TimerUtils] cleanupPlayer(UUID) removido para " + uuid + ", timers: " + map.keySet());

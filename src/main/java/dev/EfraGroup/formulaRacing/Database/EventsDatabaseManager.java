@@ -7,6 +7,7 @@ import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Heat.CollisionMode;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
+import dev.EfraGroup.formulaRacing.Heat.Lap;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Participant.Subscriber;
 import dev.EfraGroup.formulaRacing.Round.EliminationRound;
@@ -994,7 +995,43 @@ public class EventsDatabaseManager {
                         startPosition
                     );
                     driver.setId(driverId);
+                    driver.setPosition(rs.getInt("position"));
+                    driver.setPitstops(rs.getInt("pitstops"));
+                    long startTimestamp = rs.getLong("startTime");
+                    if (startTimestamp > 0L) {
+                        driver.setStartTime(startTimestamp);
+                    }
+                    long endTimestamp = rs.getLong("endTime");
+                    if (endTimestamp > 0L) {
+                        driver.setEndTime(endTimestamp);
+                        driver.setFinished(true);
+                    }
+                    // Load laps from fr_laps so fastestLap etc. survive restarts
+                    this.loadLapsForDriver(driver, heat.getId(), conn);
                     heat.addDriverDirect(driver);
+                }
+            }
+        }
+    }
+
+    private void loadLapsForDriver(Driver driver, int heatId, Connection conn) throws SQLException {
+        String lapSql =
+            "SELECT * FROM fr_laps WHERE uuid = ? AND heatId = ? ORDER BY lapStart";
+        try (PreparedStatement lapStmt = conn.prepareStatement(lapSql)) {
+            lapStmt.setString(1, driver.getUuid().toString());
+            lapStmt.setInt(2, heatId);
+            try (ResultSet lapRs = lapStmt.executeQuery()) {
+                while (lapRs.next()) {
+                    Lap lap = new Lap(
+                        lapRs.getInt("id"),
+                        driver.getUuid(),
+                        heatId,
+                        lapRs.getString("tracknameWS"),
+                        lapRs.getLong("lapStart"),
+                        lapRs.getLong("lapEnd"),
+                        lapRs.getInt("pitted") == 1
+                    );
+                    driver.addLap(lap);
                 }
             }
         }
