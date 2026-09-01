@@ -4590,8 +4590,10 @@ public class DatabaseManager {
         int checkpointsReached
     ) {
         String trackNameWS = trackName.replaceAll("\\s+", "");
-        // Rounding to milliseconds (3 decimal places) to support subtick
-        double roundedTime = Math.round(time * 1000.0) / 1000.0;
+        // Round to nearest tick (50ms) for clean display on Folia
+        long roundedMs = Math.round(time * 1000.0);
+        roundedMs = (roundedMs + 25L) / 50L * 50L;
+        double roundedTime = roundedMs / 1000.0;
 
         try {
             Connection conn = getOrConnect();
@@ -4903,7 +4905,10 @@ public class DatabaseManager {
     ) {
         if (lastCheckpoint <= 0) return;
         String trackNameWS = trackName.replaceAll("\\s+", "");
-        double roundedTime = Math.round(time * 1000.0) / 1000.0;
+        // Round to nearest tick (50ms) for clean display on Folia
+        long roundedMs = Math.round(time * 1000.0);
+        roundedMs = (roundedMs + 25L) / 50L * 50L;
+        double roundedTime = roundedMs / 1000.0;
 
         try {
             Connection conn = getOrConnect();
