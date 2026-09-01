@@ -82,85 +82,83 @@ public class TimerUtils {
                 TimerUtils.this.globalLoopRunning = false;
                 return;
             }
-            SchedulerHelper.runAsync(TimerUtils.this.plugin, () -> {
-                // Clean up entries for players who went offline without stopping their timer
-                TimerUtils.this.activeTimers.keySet().removeIf(uuid -> {
-                    Player player = Bukkit.getPlayer(uuid);
-                    if (player != null && player.isOnline()) {
-                        return false;
+            // Clean up entries for players who went offline without stopping their timer
+            TimerUtils.this.activeTimers.keySet().removeIf(uuid -> {
+                Player player = Bukkit.getPlayer(uuid);
+                if (player != null && player.isOnline()) {
+                    return false;
+                }
+                // Also clean up auxiliary maps for this UUID
+                TimerUtils.this.tempCheckpoints.remove(uuid);
+                TimerUtils.this.warnedPlayersNoCheckpoints.remove(uuid);
+                String uuidStr = uuid.toString();
+                TimerUtils.this.lastWarningTime.entrySet().removeIf(entry -> entry.getKey().startsWith(uuidStr + ":"));
+                TimerUtils.this.lastDebugLogTime.entrySet().removeIf(entry -> entry.getKey().startsWith(uuidStr + ":"));
+                return true;
+            });
+            for (Map.Entry<UUID, Map<String, PlayerTimerData>> playerEntry : TimerUtils.this.activeTimers.entrySet()) {
+                UUID uuid = playerEntry.getKey();
+                Player player = Bukkit.getPlayer(uuid);
+                if (player == null || !player.isOnline()) continue;
+                for (Map.Entry<String, PlayerTimerData> trackEntry : playerEntry.getValue().entrySet()) {
+                    boolean worstTime;
+                    CheckpointData potentialCp;
+                    String trackName = trackEntry.getKey();
+                    PlayerTimerData data = trackEntry.getValue();
+                    List<CheckpointData> tempCps = TimerUtils.this.tempCheckpoints.get(uuid);
+                    CheckpointData lastCp = null;
+                    if (tempCps != null && !tempCps.isEmpty() && (potentialCp = tempCps.get(tempCps.size() - 1)).getTrack().equalsIgnoreCase(trackName)) {
+                        lastCp = potentialCp;
                     }
-                    // Also clean up auxiliary maps for this UUID
-                    TimerUtils.this.tempCheckpoints.remove(uuid);
-                    TimerUtils.this.warnedPlayersNoCheckpoints.remove(uuid);
-                    String uuidStr = uuid.toString();
-                    TimerUtils.this.lastWarningTime.entrySet().removeIf(entry -> entry.getKey().startsWith(uuidStr + ":"));
-                    TimerUtils.this.lastDebugLogTime.entrySet().removeIf(entry -> entry.getKey().startsWith(uuidStr + ":"));
-                    return true;
-                });
-                for (Map.Entry<UUID, Map<String, PlayerTimerData>> playerEntry : TimerUtils.this.activeTimers.entrySet()) {
-                    UUID uuid = playerEntry.getKey();
-                    Player player = Bukkit.getPlayer(uuid);
-                    if (player == null || !player.isOnline()) continue;
-                    for (Map.Entry<String, PlayerTimerData> trackEntry : playerEntry.getValue().entrySet()) {
-                        boolean worstTime;
-                        CheckpointData potentialCp;
-                        String trackName = trackEntry.getKey();
-                        PlayerTimerData data = trackEntry.getValue();
-                        List<CheckpointData> tempCps = TimerUtils.this.tempCheckpoints.get(uuid);
-                        CheckpointData lastCp = null;
-                        if (tempCps != null && !tempCps.isEmpty() && (potentialCp = tempCps.get(tempCps.size() - 1)).getTrack().equalsIgnoreCase(trackName)) {
-                            lastCp = potentialCp;
-                        }
-                        double elapsed = (double)(System.nanoTime() - data.getStartNanoTime()) / 1.0E9;
-                        RaceSessionCache cache = data.getSessionCache();
-                        Double pb = cache != null ? cache.getPbTime() : null;
-                        Map<Integer, Double> cpTimes = cache != null ? cache.getCpTimes() : null;
-                        StringBuilder sb = new StringBuilder(64);
-                        boolean bl = worstTime = pb != null && elapsed > pb;
-                        sb.append(pb == null ? "\u00a7a" : (worstTime ? "\u00a7c" : "\u00a7e"));
-                        int minutes = (int)(elapsed / 60.0);
-                        double sec = elapsed % 60.0;
-                        if (minutes > 0) {
-                            sb.append(minutes).append(":");
-                            if (sec < 10.0) {
-                                sb.append("0");
-                            }
-                        }
-                        long s1000 = (long)(sec * 1000.0);
-                        sb.append(s1000 / 1000L).append(".");
-                        long milli = s1000 % 1000L;
-                        if (milli < 100L) {
+                    double elapsed = (double)(System.nanoTime() - data.getStartNanoTime()) / 1.0E9;
+                    RaceSessionCache cache = data.getSessionCache();
+                    Double pb = cache != null ? cache.getPbTime() : null;
+                    Map<Integer, Double> cpTimes = cache != null ? cache.getCpTimes() : null;
+                    StringBuilder sb = new StringBuilder(64);
+                    boolean bl = worstTime = pb != null && elapsed > pb;
+                    sb.append(pb == null ? "\u00a7a" : (worstTime ? "\u00a7c" : "\u00a7e"));
+                    int minutes = (int)(elapsed / 60.0);
+                    double sec = elapsed % 60.0;
+                    if (minutes > 0) {
+                        sb.append(minutes).append(":");
+                        if (sec < 10.0) {
                             sb.append("0");
                         }
-                        if (milli < 10L) {
+                    } else if (sec < 10.0) {
+                        sb.append("0");
+                    }
+                    long s1000 = (long)(sec * 1000.0);
+                    sb.append(s1000 / 1000L).append(".");
+                    long milli = s1000 % 1000L;
+                    if (milli < 100L) {
+                        sb.append("0");
+                    }
+                    if (milli < 10L) {
+                        sb.append("0");
+                    }
+                    sb.append(milli);
+                    sb.append(" \u00a77(").append(data.getCheckpointsReached()).append("/").append(data.getTotalCheckpoints()).append(")");
+                    if (lastCp != null && cpTimes != null && cpTimes.containsKey(lastCp.getId())) {
+                        double delta = lastCp.getTime() - cpTimes.get(lastCp.getId());
+                        sb.append(delta < 0.0 ? " \u00a7a-" : " \u00a7c+");
+                        double absDelta = Math.abs(delta);
+                        long d1000 = (long)(absDelta * 1000.0);
+                        sb.append(d1000 / 1000L).append(".");
+                        long m = d1000 % 1000L;
+                        if (m < 100L) {
                             sb.append("0");
                         }
-                        sb.append(milli);
-                        sb.append(" \u00a77(").append(data.getCheckpointsReached()).append("/").append(data.getTotalCheckpoints()).append(")");
-                        if (lastCp != null && cpTimes != null && cpTimes.containsKey(lastCp.getId())) {
-                            double delta = lastCp.getTime() - cpTimes.get(lastCp.getId());
-                            sb.append(delta < 0.0 ? " \u00a7a-" : " \u00a7c+");
-                            double absDelta = Math.abs(delta);
-                            long d1000 = (long)(absDelta * 1000.0);
-                            sb.append(d1000 / 1000L).append(".");
-                            long m = d1000 % 1000L;
-                            if (m < 100L) {
-                                sb.append("0");
-                            }
-                            if (m < 10L) {
-                                sb.append("0");
-                            }
-                            sb.append(m);
+                        if (m < 10L) {
+                            sb.append("0");
                         }
-                        String finalHud = sb.toString();
-                        SchedulerHelper.runTask(TimerUtils.this.plugin, () -> {
-                            if (player.isOnline()) {
-                                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(finalHud));
-                            }
-                        });
+                        sb.append(m);
+                    }
+                    String finalHud = sb.toString();
+                    if (player.isOnline()) {
+                        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(finalHud));
                     }
                 }
-            });
+            }
         }, 0L, 1L);
     }
 
