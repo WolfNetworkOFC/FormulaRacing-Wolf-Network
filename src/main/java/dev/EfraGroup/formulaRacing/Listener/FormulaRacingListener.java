@@ -193,7 +193,9 @@ public class FormulaRacingListener implements Listener {
                             if (this.plugin.getTimeTrialController() != null) {
                                 this.plugin.getTimeTrialController().endSession(player);
                             }
-
+                            if (this.plugin.getGhostManager() != null) {
+                                this.plugin.getGhostManager().cleanupPlayer(player);
+                            }
                             if (this.plugin.getTimeTrialDuelsAction() != null) {
                                 this.plugin.getTimeTrialDuelsAction().stopAll(player);
                             }
@@ -216,6 +218,9 @@ public class FormulaRacingListener implements Listener {
                     this.timerUtils.stopTimer(player);
                     if (this.plugin.getTimeTrialController() != null) {
                         this.plugin.getTimeTrialController().endSession(player);
+                    }
+                    if (this.plugin.getGhostManager() != null) {
+                        this.plugin.getGhostManager().cleanupPlayer(player);
                     }
 
                     // O scoreboard de Time Trial NÃO é limpo ao sair do barco: ele
