@@ -156,7 +156,7 @@ public class TimerUtils {
                     player.spigot().sendMessage(ChatMessageType.ACTION_BAR, (BaseComponent)new TextComponent(finalHud));
                 }
             },
-            0L, 1L
+            0L, this.plugin.isBedrockPlayer(player) ? 2L : 1L
         );
         this.playerTasks.put(uuid, task);
     }
