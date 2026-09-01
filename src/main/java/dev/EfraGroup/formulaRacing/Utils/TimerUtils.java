@@ -122,6 +122,11 @@ public class TimerUtils {
                         sb.append("0");
                     }
                     long s1000 = (long)(sec * 1000.0);
+                    // Round to nearest tick (50ms) for clean display on Folia
+                    s1000 = (s1000 + 25L) / 50L * 50L;
+                    if (s1000 >= 1000L) {
+                        s1000 = 0L;
+                    }
                     sb.append(s1000 / 1000L).append(".");
                     long milli = s1000 % 1000L;
                     if (milli < 100L) {
@@ -418,7 +423,10 @@ public class TimerUtils {
     }
 
     public String formatTime(double seconds, boolean hasPB, boolean worstTime) {
-        double rounded = (double)Math.round(seconds * 100.0) / 100.0;
+        // Round to nearest tick (50ms) for clean display on Folia
+        long ms = Math.round(seconds * 1000.0);
+        ms = (ms + 25L) / 50L * 50L;
+        double rounded = ms / 1000.0;
         int minutes = (int)(rounded / 60.0);
         double sec = rounded % 60.0;
         String color = !hasPB ? "\u00a7a" : (worstTime ? "\u00a7c" : "\u00a7e");
