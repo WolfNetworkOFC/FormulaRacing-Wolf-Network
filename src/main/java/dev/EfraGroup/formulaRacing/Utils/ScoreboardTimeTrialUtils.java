@@ -33,6 +33,8 @@ public class ScoreboardTimeTrialUtils {
         new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> enabledCache = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastEnabledCheck = new ConcurrentHashMap<>();
+    private final Map<UUID, Boolean> compactCache = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastCompactCheck = new ConcurrentHashMap<>();
     private static final long SETTINGS_TTL = 5000L;
 
     public ScoreboardTimeTrialUtils(
@@ -150,6 +152,26 @@ public class ScoreboardTimeTrialUtils {
         }
     }
 
+    /**
+     * Whether the viewer has compact mode on (/settings compact), cached with the
+     * same TTL as the enabled check — updateBoard runs every second per player.
+     */
+    private boolean isCompactMode(Player player) {
+        long now = System.currentTimeMillis();
+        Boolean cached = this.compactCache.get(player.getUniqueId());
+        if (
+            cached != null &&
+            now - this.lastCompactCheck.getOrDefault(player.getUniqueId(), 0L) <
+            SETTINGS_TTL
+        ) {
+            return cached;
+        }
+        boolean compact = this.mysql.getPlayerCompactMode(player.getUniqueId());
+        this.compactCache.put(player.getUniqueId(), compact);
+        this.lastCompactCheck.put(player.getUniqueId(), now);
+        return compact;
+    }
+
     private void updateBoard(Player player, String trackName) {
         List<DatabaseManager.TrackRecord> allRecords;
         CachedLeaderboard cached = this.leaderboardCache.get(trackName);
@@ -191,8 +213,10 @@ public class ScoreboardTimeTrialUtils {
             player,
             this.boldTitle(tu.getTranslated(player, "scoreboard_tt_title"))
         );
-        String separator =
-            "§l" + "§7-------------------------" ;
+        // Compact mode (/settings compact) shrinks the board horizontally: shorter
+        // separator lines so they don't keep the board as wide as the normal layout.
+        boolean compact = this.isCompactMode(player);
+        String separator = "§l" + "§7" + (compact ? "------------" : "-------------------------");
         String footer = "§ewolfnetwork.com.br";
 
         List<String> lines = new ArrayList<>();
@@ -275,7 +299,7 @@ public class ScoreboardTimeTrialUtils {
 
         if (firstPlace != null) {
             lines.add(
-                formatRecordLine(firstPlace, 1, player.getName(), player)
+                formatRecordLine(firstPlace, 1, player.getName(), player, compact)
             );
         }
         if (includeSeparator) {
@@ -284,7 +308,7 @@ public class ScoreboardTimeTrialUtils {
         for (DatabaseManager.TrackRecord tr : neighbors) {
             int actualPos = allRecords.indexOf(tr) + 1;
             lines.add(
-                formatRecordLine(tr, actualPos, player.getName(), player)
+                formatRecordLine(tr, actualPos, player.getName(), player, compact)
             );
         }
 
@@ -297,7 +321,8 @@ public class ScoreboardTimeTrialUtils {
         DatabaseManager.TrackRecord tr,
         int pos,
         String observerName,
-        Player viewer
+        Player viewer,
+        boolean compact
     ) {
         boolean isMe = tr.getPlayerName().equals(observerName);
         String color;
@@ -330,9 +355,16 @@ public class ScoreboardTimeTrialUtils {
                       .getTranslated(viewer, "scoreboard_tt_you")
               )
             : tr.getPlayerName();
+        // Compact mode: player names shrink to their first 3 letters (Joka_10 →
+        // Jok) so the board gets narrower. The "you" label is kept as-is.
+        if (compact && !isMe && nameBase != null && nameBase.length() > 3) {
+            nameBase = nameBase.substring(0, 3);
+        }
         String nameColor = isMe ? "§e§l" : "§f§r";
         String nameDisplay =
-            nameColor + TimingScoreboardStyle.padRight(nameBase, 14) + "§r";
+            nameColor +
+                TimingScoreboardStyle.padRight(nameBase, compact ? 3 : 14) +
+                "§r";
         String rank = color + pos + ". ";
 
         // Separator bars (||): first bar uses the player's chosen primary colour

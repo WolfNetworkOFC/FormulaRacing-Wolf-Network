@@ -41,7 +41,6 @@ public class InfectionSession implements SessionLogic {
     @Override
     public void start(Heats heat) {
         heat.setHeatState(HeatState.RACING);
-        heat.startOfflineMonitoring();
 
         // Draw patient zero
         List<UUID> drivers = new ArrayList<>();

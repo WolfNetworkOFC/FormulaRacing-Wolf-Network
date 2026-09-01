@@ -326,9 +326,9 @@ public class TrackExchangeManager {
 
                     BlockVector3 offset = weRegion.getMinimumPoint().subtract(weRegion.getMinimumPoint());
                     JsonObject clipboardOffset = new JsonObject();
-                    clipboardOffset.addProperty("x", offset.getX());
-                    clipboardOffset.addProperty("y", offset.getY());
-                    clipboardOffset.addProperty("z", offset.getZ());
+                    clipboardOffset.addProperty("x", offset.x());
+                    clipboardOffset.addProperty("y", offset.y());
+                    clipboardOffset.addProperty("z", offset.z());
                     clipboardOffset.addProperty("yaw", 0);
                     clipboardOffset.addProperty("pitch", 0);
 

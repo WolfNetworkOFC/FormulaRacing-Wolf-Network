@@ -13,6 +13,7 @@ import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Event.Events;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.CollisionMode;
+import dev.EfraGroup.formulaRacing.Heat.HeatConfig;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
@@ -613,9 +614,58 @@ public class HeatCommand extends BaseCommand {
                     isAdmin
                 )
             );
+            HeatConfig heatCfg = heat.getHeatConfig();
+            TextComponent configRow5 = new TextComponent("  ");
+            var50 = heatCfg.isTimeBased() ? "ON" : "OFF";
+            var10004 = heat.getName();
+            configRow5.addExtra(
+                this.formattedSetting(
+                    "Endurance",
+                    var50,
+                    "/heat set timed " + var10004 + " ",
+                    isAdmin
+                )
+            );
+            var50 = String.valueOf(ChatColor.DARK_GRAY);
+            configRow5.addExtra(new TextComponent(var50 + " | "));
+            var50 = heatCfg.isFuelSystemEnabled() ? "ON" : "OFF";
+            var10004 = heat.getName();
+            configRow5.addExtra(
+                this.formattedSetting(
+                    "Combustível",
+                    var50,
+                    "/heat set fuel " + var10004 + " ",
+                    isAdmin
+                )
+            );
+            var50 = String.valueOf(ChatColor.DARK_GRAY);
+            configRow5.addExtra(new TextComponent(var50 + " | "));
+            var50 = heatCfg.isEnableCheckeredFlagFlow() ? "ON" : "OFF";
+            var10004 = heat.getName();
+            configRow5.addExtra(
+                this.formattedSetting(
+                    "Cheq Flag",
+                    var50,
+                    "/heat set checkeredflag " + var10004 + " ",
+                    isAdmin
+                )
+            );
+            var50 = String.valueOf(ChatColor.DARK_GRAY);
+            configRow5.addExtra(new TextComponent(var50 + " | "));
+            var50 = heatCfg.isF1StartEnabled() ? "ON" : "OFF";
+            var10004 = heat.getName();
+            configRow5.addExtra(
+                this.formattedSetting(
+                    "React Start",
+                    var50,
+                    "/heat set reactstart " + var10004 + " ",
+                    isAdmin
+                )
+            );
             player.spigot().sendMessage(configRow2);
             player.spigot().sendMessage(configRow3);
             player.spigot().sendMessage(configRow4);
+            player.spigot().sendMessage(configRow5);
             if (heat.getRound() != null && heat.getRound().getType() == RoundType.ELIMINATION) {
                 TextComponent elimRow = new TextComponent("  ");
                 String elimIntervalStr = heat.getEliminationIntervalSeconds() + "s";
@@ -1013,6 +1063,134 @@ public class HeatCommand extends BaseCommand {
         );
     }
 
+    @Subcommand("set timed")
+    @CommandCompletion("@heat true|false")
+    @CommandPermission("formularacing.admin")
+    @Description("Configura corrida endurance por tempo (usa o /heat set timelimit; volta final quando o tempo acaba)")
+    public void onSetTimed(Player player, Heats heat, boolean enabled) {
+        heat = this.resolveHeat(player, heat);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+
+        HeatConfig config = heat.getHeatConfig();
+        config.setTimeBased(enabled);
+        if (enabled) {
+            Integer timeLimit = heat.getTimeLimit();
+            if (timeLimit == null || timeLimit <= 0) {
+                player.sendMessage(
+                    "§a[Config] Endurance §fATIVADO §ano heat §f" + heat.getId() +
+                    "§c, mas o heat não tem timelimit!"
+                );
+                player.sendMessage(
+                    ChatColor.GRAY + "Defina com: " + ChatColor.WHITE + "/heat set timelimit " + heat.getId() + " <segundos>"
+                );
+                player.sendMessage(ChatColor.GRAY + "Sem timelimit, a corrida cai no modo normal de voltas.");
+            } else {
+                player.sendMessage(
+                    "§a[Config] Endurance §fATIVADO §ano heat §f" + heat.getId() +
+                    "§a — limite de §f" + timeLimit + "s" +
+                    " §7(o tempo acaba → todos fazem a volta final)"
+                );
+            }
+        } else {
+            player.sendMessage("§a[Config] Endurance §fDESATIVADO §ano heat §f" + heat.getId());
+        }
+    }
+
+    @Subcommand("set fuel")
+    @CommandCompletion("@heat true|false 100 0.45")
+    @CommandPermission("formularacing.admin")
+    @Description("Configura sistema de combustível do heat")
+    public void onSetFuel(Player player, Heats heat, boolean enabled,
+                          @Default("100") Double startingFuel,
+                          @Default("0.45") Double consumption) {
+        heat = this.resolveHeat(player, heat);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+
+        HeatConfig config = heat.getHeatConfig();
+        config.setFuelSystemEnabled(enabled);
+        if (startingFuel != null) config.setStartingFuel(startingFuel);
+        if (consumption != null) config.setFuelConsumptionPerSecond(consumption);
+
+        player.sendMessage("§a[Config] Combustível " + (enabled ? "§fATIVADO" : "§fDESATIVADO") + " §ano heat §f" + heat.getId());
+        if (enabled) {
+            player.sendMessage("§7  Carga inicial: §f" + config.getStartingFuel() + "% §8| §7Consumo/s: §f" + config.getFuelConsumptionPerSecond());
+        }
+    }
+
+    @Subcommand("set checkeredflag")
+    @CommandCompletion("@heat true|false")
+    @CommandPermission("formularacing.admin")
+    @Description("Configura fluxo de bandeira quadriculada")
+    public void onSetCheckeredFlag(Player player, Heats heat, boolean enabled) {
+        heat = this.resolveHeat(player, heat);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+
+        heat.getHeatConfig().setEnableCheckeredFlagFlow(enabled);
+        player.sendMessage("§a[Config] Checkered Flag Flow " + (enabled ? "§fATIVADO" : "§fDESATIVADO") + " §ano heat §f" + heat.getId());
+    }
+
+    @Subcommand("set reactstart")
+    @CommandCompletion("@heat true|false 3")
+    @CommandPermission("formularacing.admin")
+    @Description("Configura largada por reação (hold aleatório + punição de largada antecipada)")
+    public void onSetReactStart(Player player, Heats heat, boolean enabled, @Default("3") Integer penaltySeconds) {
+        heat = this.resolveHeat(player, heat);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+
+        HeatConfig config = heat.getHeatConfig();
+        config.setF1StartEnabled(enabled);
+        if (penaltySeconds != null) {
+            config.setF1StartPenaltySeconds(penaltySeconds);
+        }
+
+        player.sendMessage("§a[Config] React Start " + (enabled ? "§fATIVADA" : "§fDESATIVADA") + " §ano heat §f" + heat.getId());
+        if (enabled) {
+            player.sendMessage("§7  Punição por largada antecipada: §f" + config.getF1StartPenaltySeconds() + "s");
+        }
+    }
+
+    @Subcommand("gui")
+    @CommandCompletion("@heat")
+    @CommandPermission("formularacing.admin")
+    @Description("Abre a GUI de configuração do heat")
+    public void onGui(Player player, @co.aikar.commands.annotation.Optional Heats heat) {
+        heat = this.resolveHeat(player, heat);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+
+        new dev.EfraGroup.formulaRacing.Gui.HeatConfigGui(this.plugin, player, heat).show(player);
+    }
+
+    @Subcommand("set reset")
+    @CommandCompletion("@heat")
+    @CommandPermission("formularacing.admin")
+    @Description("Reseta a configuração avançada do heat (endurance, fuel, checkered flag, largada F1)")
+    public void onSetReset(Player player, Heats heat) {
+        heat = this.resolveHeat(player, heat);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+
+        heat.getHeatConfig().reset();
+        player.sendMessage("§a[Config] Configuração avançada do heat §f" + heat.getId() + " §aresetada!");
+        player.sendMessage(ChatColor.GRAY + "Visualize tudo com: " + ChatColor.WHITE + "/heat info " + heat.getName());
+    }
+
     @Subcommand("load")
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.event.admin")
@@ -1025,12 +1203,18 @@ public class HeatCommand extends BaseCommand {
                     "✗ Nenhum heat selecionado ou ativo!"
             );
         } else {
-            heat.loadHeat();
-            String var10001 = String.valueOf(ChatColor.GREEN);
-            player.sendMessage(
-                var10001 + "✓ Heat " + heat.getName() + " carregado!"
-            );
-            this.displaySortedDrivers(player, heat);
+            if (heat.loadHeat(player)) {
+                String var10001 = String.valueOf(ChatColor.GREEN);
+                player.sendMessage(
+                    var10001 + "✓ Heat " + heat.getName() + " carregado!"
+                );
+                this.displaySortedDrivers(player, heat);
+            } else {
+                player.sendMessage(
+                    String.valueOf(ChatColor.RED) +
+                        "✗ Falha ao carregar o heat (veja o motivo acima)."
+                );
+            }
         }
     }
 
@@ -1149,19 +1333,52 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("start")
-    @CommandCompletion("@heat")
+    @CommandCompletion("@heat 5 lights|normal")
     @CommandPermission("formularacing.event.admin")
-    @Description("Inicia a contagem regressiva do heat")
+    @Description("Inicia a contagem regressiva do heat (lights = largada F1, normal = padrão)")
     public void onStart(
         Player player,
         Heats heat,
-        @Default("5") Integer seconds
+        @Default("5") Integer seconds,
+        @co.aikar.commands.annotation.Optional String mode
     ) {
         heat = this.resolveHeat(player, heat);
         if (heat == null) {
             player.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo!"
+            );
+        } else if (mode != null && mode.equalsIgnoreCase("force")) {
+            // "/heat start <heat> <s> force" cai aqui quando o ACF resolve nesta
+            // sobrecarga — mesmo comportamento do onStartForce.
+            if (heat.startCountdown(seconds)) {
+                this.plugin.getReadyCheckManager().stopReadyCheck(
+                    heat.getId()
+                );
+                player.sendMessage(
+                    String.valueOf(ChatColor.GREEN) +
+                        "✓ Contagem regressiva do heat " +
+                        heat.getName() +
+                        " iniciada (FORÇADO)!"
+                );
+            } else {
+                player.sendMessage(
+                    String.valueOf(ChatColor.RED) +
+                        "✗ Falha ao iniciar contagem do heat."
+                );
+            }
+        } else if (
+            mode != null &&
+            !mode.equalsIgnoreCase("lights") &&
+            !mode.equalsIgnoreCase("normal")
+        ) {
+            player.sendMessage(
+                String.valueOf(ChatColor.RED) +
+                    "✗ Modo de largada inválido: " + mode
+            );
+            player.sendMessage(
+                String.valueOf(ChatColor.GRAY) +
+                    "Uso: /heat start [heat] [segundos] [lights|normal]"
             );
         } else if (
             this.plugin.getReadyCheckManager().isReadyCheckActive(heat.getId())
@@ -1184,6 +1401,9 @@ public class HeatCommand extends BaseCommand {
                 false
             );
         } else {
+            // Sem argumento de modo = normal (padrão).
+            boolean f1Start = mode != null && mode.equalsIgnoreCase("lights");
+            heat.getHeatConfig().setF1StartEnabled(f1Start);
             if (heat.startCountdown(seconds)) {
                 player.sendMessage(
                     String.valueOf(ChatColor.GREEN) +
@@ -1191,7 +1411,10 @@ public class HeatCommand extends BaseCommand {
                         seconds +
                         "s do heat " +
                         heat.getName() +
-                        " iniciada!"
+                        " iniciada!" +
+                        (f1Start
+                            ? " §7(Largada F1: hold aleatório + jump start)"
+                            : "")
                 );
             } else {
                 player.sendMessage(
@@ -1668,7 +1891,7 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("set pushtopass|set p2p")
     @CommandCompletion("@heat true|false")
     @CommandPermission("formularacing.event.admin")
-    public void onSetPushToPass(Player player, Heats heat, Boolean enabled) {
+    public void onSetPushToPass(Player player, Heats heat, @co.aikar.commands.annotation.Optional Boolean enabled) {
         if (heat == null) {
             Events selected = this.database.getPlayerSelectedEvent(
                 player.getUniqueId()
@@ -1680,6 +1903,21 @@ public class HeatCommand extends BaseCommand {
                 return;
             }
 
+            // Sem valor explícito: alterna a partir do estado do primeiro heat do evento.
+            if (enabled == null) {
+                for (Rounds round : selected.getSchedule().getRoundsCollection()) {
+                    for (Heats h : round.getHeats().values()) {
+                        enabled = !h.isPushtopass();
+                        break;
+                    }
+                    if (enabled != null) break;
+                }
+                if (enabled == null) {
+                    enabled = true;
+                }
+            }
+
+            final boolean finalEnabled = enabled;
             selected
                 .getSchedule()
                 .getRoundsCollection()
@@ -1687,9 +1925,9 @@ public class HeatCommand extends BaseCommand {
                     round
                         .getHeats()
                         .values()
-                        .forEach(h -> h.setPushtopass(enabled))
+                        .forEach(h -> h.setPushtopass(finalEnabled))
                 );
-            String status = enabled ? "§2LIGADO" : "§cDESLIGADO";
+            String status = finalEnabled ? "§2LIGADO" : "§cDESLIGADO";
             player.sendMessage(
                 "§a[P2P] Status definido como " +
                     status +
@@ -1697,8 +1935,9 @@ public class HeatCommand extends BaseCommand {
                     selected
             );
         } else {
-            heat.setPushtopass(enabled);
-            String status = enabled ? "§2LIGADO" : "§cDESLIGADO";
+            boolean value = enabled != null ? enabled : !heat.isPushtopass();
+            heat.setPushtopass(value);
+            String status = value ? "§2LIGADO" : "§cDESLIGADO";
             player.sendMessage(
                 "§a[P2P] Status definido como " +
                     status +

@@ -5,7 +5,12 @@ import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 import org.bukkit.Bukkit;
+import org.bukkit.Input;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 
@@ -15,10 +20,23 @@ public class RaceCountdown {
     private final Runnable onComplete;
     private FRTask countdownTask;
     private int lightsOn;
-    private boolean completed;
+    /** Written by the global countdown task, read by region threads (flagJumpStart) — volatile. */
+    private volatile boolean completed;
     private int maxLights;
     private static final int TICKS_PER_LIGHT = 20;
     private static final int LIGHTS_OUT_DELAY = 20;
+    /** F1 start: random hold between 5th light and lights out (ticks). */
+    private static final int F1_HOLD_MIN_TICKS = 20;
+    private static final int F1_HOLD_MAX_TICKS = 40;
+    /**
+     * Drivers already flagged for jumping the start (one penalty per start).
+     * Jump starts are detected from the player's INPUT packets (see
+     * JumpStartListener and pollHeldInputs), never from boat physics — lag
+     * corrections and rubber-banding must not be able to cause a false penalty.
+     * Concurrent: flagged from the input event thread and the countdown thread.
+     */
+    private final Set<UUID> jumpStarters = ConcurrentHashMap.newKeySet();
+    private int lightsOutTick;
 
     public RaceCountdown(FormulaRacing plugin, Heats heat, Runnable onComplete) {
         this(plugin, heat, 5, onComplete);
@@ -34,6 +52,10 @@ public class RaceCountdown {
         this.onComplete = onComplete;
     }
 
+    private boolean isF1Start() {
+        return this.heat.getHeatConfig() != null && this.heat.getHeatConfig().isF1StartEnabled();
+    }
+
     public void start() {
         if (!this.completed) {
             this.lightsOn = 0;
@@ -41,6 +63,13 @@ public class RaceCountdown {
                 this.announceLocalizedToAll("quali_countdown_prepare");
             } else {
                 this.announceLocalizedToAll("race_countdown_prepare");
+            }
+
+            // F1 start: the hold after the last light is random (like real F1), so
+            // drivers cannot time the launch — they must react to lights out.
+            this.lightsOutTick = this.maxLights * 20 + LIGHTS_OUT_DELAY;
+            if (this.isF1Start()) {
+                this.lightsOutTick += ThreadLocalRandom.current().nextInt(F1_HOLD_MIN_TICKS, F1_HOLD_MAX_TICKS + 1);
             }
 
             int[] tick = {0};
@@ -56,7 +85,15 @@ public class RaceCountdown {
                         RaceCountdown.this.onLightOn(RaceCountdown.this.lightsOn);
                     }
 
-                    if (tick[0] >= RaceCountdown.this.maxLights * 20 + 20) {
+                    if (RaceCountdown.this.isF1Start()) {
+                        // While all lights are on (the random hold), keep the display
+                        // refreshed so it does not fade out before lights out.
+                        if (RaceCountdown.this.lightsOn >= RaceCountdown.this.maxLights && tick[0] % 20 == 0 && tick[0] < RaceCountdown.this.lightsOutTick) {
+                            RaceCountdown.this.refreshLightsDisplay();
+                        }
+                    }
+
+                    if (tick[0] >= RaceCountdown.this.lightsOutTick) {
                         RaceCountdown.this.onLightsOut();
                         if (RaceCountdown.this.countdownTask != null) {
                             RaceCountdown.this.countdownTask.cancel();
@@ -67,6 +104,44 @@ public class RaceCountdown {
                     }
                 }
             }, 0L, 1L);
+        }
+    }
+
+    /**
+     * Flags a jump start for a driver whose movement input arrived while the
+     * lights were still on. Called by JumpStartListener from PlayerInputEvent —
+     * input-based, so network lag can only delay a packet, never fabricate one.
+     */
+    public void flagJumpStart(Player player) {
+        if (this.completed || player == null || !player.isOnline()) {
+            return;
+        }
+        if (this.heat.getHeatState() != HeatState.STARTING || !this.isF1Start()) {
+            return;
+        }
+        UUID uuid = player.getUniqueId();
+        Driver driver = this.heat.getDriver(uuid);
+        if (driver == null || driver.isAiControlled() || !this.heat.getGridManager().isFrozen(uuid)) {
+            return;
+        }
+        // Atomic add: guarantees a single penalty even when the flag comes from
+        // both the input listener and a held-input poll.
+        if (!this.jumpStarters.add(uuid)) {
+            return;
+        }
+        int penaltySeconds = Math.max(1, this.heat.getHeatConfig().getF1StartPenaltySeconds());
+        this.heat.getGridManager().penalizeJumpStart(uuid, penaltySeconds * 20L);
+        this.plugin.sendMessage(player, "race_jump_start", new String[]{"{seconds}", String.valueOf(penaltySeconds)});
+        this.plugin.getDebugManager().logRaceSystem(String.format("[Heat %d] JUMP START by %s — %ds penalty", this.heat.getId(), player.getName(), penaltySeconds));
+    }
+
+    private void refreshLightsDisplay() {
+        String lights = this.buildLightsDisplay(this.maxLights);
+        for (Driver driver : this.heat.getDrivers().values()) {
+            Player player = Bukkit.getPlayer(driver.getUuid());
+            if (player != null && player.isOnline()) {
+                TitleHelper.sendThemedTitle(player, lights, "", 0, 30, 0);
+            }
         }
     }
 
@@ -82,7 +157,34 @@ public class RaceCountdown {
             }
         }
 
+        // From light 3 on, also poll currently-held inputs: a driver holding a
+        // movement key since BEFORE the countdown never fires an input CHANGE
+        // event. The two-light grace lets players lift off muscle-memory W from
+        // being teleported onto the grid.
+        if (this.isF1Start() && lightNumber >= 3) {
+            this.pollHeldInputs();
+        }
+
         this.plugin.getDebugManager().logRaceSystem(String.format("[Heat %d] Luz %d acesa", this.heat.getId(), lightNumber));
+    }
+
+    /** Input-based (never physics): flags frozen drivers currently holding throttle keys. */
+    private void pollHeldInputs() {
+        for (Driver driver : this.heat.getDrivers().values()) {
+            if (driver.isAiControlled()) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(driver.getUuid());
+            if (player == null || !player.isOnline()) {
+                continue;
+            }
+            SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                Input input = player.getCurrentInput();
+                if (input != null && (input.isForward() || input.isBackward() || input.isJump() || input.isSprint())) {
+                    this.flagJumpStart(player);
+                }
+            });
+        }
     }
 
     private void onLightsOut() {

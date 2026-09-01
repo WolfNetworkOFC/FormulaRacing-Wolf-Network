@@ -36,7 +36,6 @@ public class HotPotatoSession implements SessionLogic {
     @Override
     public void start(Heats heat) {
         heat.setHeatState(HeatState.RACING);
-        heat.startOfflineMonitoring();
 
         // Initialize heat for all drivers
         for (Driver driver : heat.getDrivers().values()) {

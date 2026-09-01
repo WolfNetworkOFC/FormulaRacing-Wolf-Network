@@ -37,7 +37,6 @@ public class CaptureTheFlagSession implements SessionLogic {
     @Override
     public void start(Heats heat) {
         heat.setHeatState(HeatState.RACING);
-        heat.startOfflineMonitoring();
         matchFinished = false;
         matchTimeSeconds = 0;
 

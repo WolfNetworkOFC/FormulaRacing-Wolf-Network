@@ -255,8 +255,13 @@ public class RegionListener implements Listener {
                                 }
                             }
 
-                            // Check if crossed START/END region
-DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, current, worldRegions);
+                            // Check if crossed START/END region. When the player has an
+                            // intended track (running /tt, or lastTimeTrialTrack set),
+                            // only regions of THAT track are detected — otherwise tracks
+                            // with overlapping/stacked regions all trigger at once and
+                            // the wrong time trial starts (e.g. two tracks sharing the
+                            // same start line).
+                            DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(player, previous, current, worldRegions);
                                 if (startEndRegion != null) {
                                     Location finalFrom = previous.clone();
                                     Location finalTo = current.clone();
@@ -382,7 +387,14 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                             if (driver != null) {
                                 regionTrackWS = heat.getTrackNameWS();
                                 int checkpointsReached = driver.getCheckpointsReached();
-                                List<DatabaseManager.RegionData> checkpointByIdList = this.plugin.getTrackIntegrationManager().getCheckpointById(regionTrackWS, checkpointsReached - 1);
+                                // Last PASSED checkpoint by ordinal → real id
+                                // (ids may have gaps; checkpointsReached-1 as an
+                                // id only works by coincidence on clean tracks).
+                                List<Integer> orderedIds = this.plugin.getTrackIntegrationManager().getOrderedCheckpointIds(regionTrackWS);
+                                Integer lastPassedId = checkpointsReached > 0 && checkpointsReached - 1 < orderedIds.size()
+                                        ? orderedIds.get(checkpointsReached - 1) : null;
+                                List<DatabaseManager.RegionData> checkpointByIdList = lastPassedId != null
+                                        ? this.plugin.getTrackIntegrationManager().getCheckpointById(regionTrackWS, lastPassedId) : null;
                                 if (checkpointsReached > 0 && checkpointByIdList != null && !checkpointByIdList.isEmpty()) {
                                     DatabaseManager.RegionData cp = checkpointByIdList.get(0);
                                     targetLoc = new Location(Bukkit.getWorld(cp.getWorld()), (cp.getMinX() + cp.getMaxX()) / (double)2.0F, cp.getMaxY() - (double)0.5F, (cp.getMinZ() + cp.getMaxZ()) / (double)2.0F, player.getLocation().getYaw(), player.getLocation().getPitch());
@@ -409,6 +421,9 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                                     // da volta abortada (memory leak no buffer de gravação).
                                     if (this.plugin.getGhostManager() != null) {
                                         this.plugin.getGhostManager().cancelRecording(player);
+                                        // Esconder as linhas de PB/medalha — só reaparecem
+                                        // ao cruzar START/END de novo (startSoloTimer).
+                                        this.plugin.getGhostManager().stopReplay(player);
                                     }
                                     this.plugin.getDebugManager().logTimeTrialSystem("[RESET-SOLO] " + player.getName() + " -> Track Spawn (full reset)");
                                 }
@@ -469,6 +484,7 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                         final DebugManager finalDebug = this.plugin.getDebugManager();
                         final Location finalTargetLoc = targetLoc;
                         final Player finalPlayer = player;
+                        final String finalTrackWS = regionTrackWS;
 
                         SchedulerHelper.runTaskLater(this.plugin, () -> {
                             // Verificamos se o jogador ainda está online após o delay de 1 tick
@@ -483,6 +499,14 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
                                     if (Boolean.TRUE.equals(success) && finalPlayer.isOnline()) {
                                         finalPlayer.playSound(finalTargetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
                                         this.plugin.getAPI().spawnBoatAt(finalPlayer, finalTargetLoc, false, false, false);
+                                        // O barco novo nasce com física vanilla: o mod OpenBoatUtils
+                                        // perde a configuração da pista quando a entidade do barco
+                                        // troca. Reenvia a config da pista (mesmo efeito do /tt e
+                                        // do /reset — sem isso o barco ficava vanilla após cair em
+                                        // uma região de reset).
+                                        if (this.plugin.getPacketSender() != null) {
+                                            this.plugin.getPacketSender().applyBoatUtilsToPlayer(finalPlayer, finalTrackWS);
+                                        }
                                         finalDebug.logTimeTrialSystem("[RESET] " + finalPlayer.getName() + " -> API Spawn Boat executed (Delayed).");
                                     }
                                 });
@@ -867,15 +891,63 @@ DatabaseManager.RegionData startEndRegion = this.getRegionAtLine(previous, curre
         return minutes > 0L ? String.format("%02d:%02d.%03d", minutes, seconds, millis) : String.format("%02d.%03d", seconds, millis);
     }
 
-    private DatabaseManager.RegionData getRegionAtLine(Location from, Location to, List<DatabaseManager.RegionData> worldRegions) {
+    private DatabaseManager.RegionData getRegionAtLine(Player player, Location from, Location to, List<DatabaseManager.RegionData> worldRegions) {
+        String intendedTrack = resolveIntendedTrack(player);
+        // Normalize once per check (hot path: runs every 2 ticks per online player).
+        String normalizedTrack = intendedTrack == null ? null
+                : intendedTrack.replaceAll("\\s+", "").toLowerCase();
         for(DatabaseManager.RegionData r : worldRegions) {
             String type = r.getType().toUpperCase();
             if ((type.equals("START") || type.equals("END") || type.equals("RESET")) && RegionMathUtils.intersectsRegion(from, to, r)) {
+                // With an intended track selected, ignore regions from other tracks
+                // (they may share the same position and would hijack the time trial).
+                if (normalizedTrack != null && !matchesNormalizedTrack(r, normalizedTrack)) {
+                    continue;
+                }
                 return r;
             }
         }
 
         return null;
+    }
+
+    /**
+     * The track the player intends to drive on, if any:
+     * 1. The track of a running solo timer (time trial in progress);
+     * 2. The track last selected via /tt (or the TT menu) — survives until the
+     *    player crosses START/END on that track, so overlapping regions on other
+     *    tracks cannot hijack the detection.
+     * Returns null when the player has no time trial intent — free roam, race
+     * heats or duels (whose region handling is track-aware on their own and must
+     * keep unfiltered START/END detection, e.g. a heat running on track B while
+     * lastTimeTrialTrack still points to a stale /tt track).
+     */
+    private String resolveIntendedTrack(Player player) {
+        if (player == null) {
+            return null;
+        }
+        String activeTrack = this.timerUtils.getActiveTrack(player);
+        if (activeTrack != null) {
+            return activeTrack;
+        }
+        // Do not let a stale /tt selection filter regions while the player is in
+        // a heat or duel — those modes resolve their own track.
+        if (this.plugin.getDriverLookup().isRacing(player.getUniqueId())
+                || this.timeTrialDuels.isPlayerInDuel(player.getUniqueId())) {
+            return null;
+        }
+        return this.plugin.getLastTimeTrialTrack(player.getUniqueId());
+    }
+
+    private boolean matchesNormalizedTrack(DatabaseManager.RegionData region, String normalizedTrack) {
+        if (region == null || normalizedTrack == null) {
+            return false;
+        }
+        if (region.getTrackNameWS() != null && region.getTrackNameWS().equalsIgnoreCase(normalizedTrack)) {
+            return true;
+        }
+        return region.getTrackName() != null
+                && region.getTrackName().replaceAll("\\s+", "").equalsIgnoreCase(normalizedTrack);
     }
 
     private void handleRaceLapCrossing(Player player, Driver driver, Heats heat, Location from, Location to, DatabaseManager.RegionData regionData) {

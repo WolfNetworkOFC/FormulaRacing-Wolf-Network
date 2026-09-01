@@ -9,10 +9,10 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages racing line recording based on the heat timer.
@@ -29,7 +29,10 @@ public class AIRacingLineRecorder {
     public AIRacingLineRecorder(FormulaRacing plugin, AIRacingLineManager racingLineManager) {
         this.plugin = plugin;
         this.racingLineManager = racingLineManager;
-        this.activeSessions = new HashMap<>();
+        // Mutated from region threads (heat state changes) and the cleanup task;
+        // a plain HashMap could corrupt or throw CME when complete() removes
+        // entries while onHeatFinished() iterates.
+        this.activeSessions = new ConcurrentHashMap<>();
         startCleanupTask();
     }
 
@@ -40,7 +43,7 @@ public class AIRacingLineRecorder {
     public boolean startRecording(Player player, String trackName) {
         UUID uuid = player.getUniqueId();
         if (activeSessions.containsKey(uuid)) {
-            player.sendMessage("§cYou are already recording a racing line!");
+            player.sendMessage(tr(player, "ai_record_already"));
             return false;
         }
 
@@ -48,15 +51,15 @@ public class AIRacingLineRecorder {
         activeSessions.put(uuid, session);
 
         player.sendMessage("");
-        player.sendMessage("§a═══════════════════════════════");
-        player.sendMessage("§e  Recording Line Registered");
+        player.sendMessage(tr(player, "ai_separator_green"));
+        player.sendMessage(tr(player, "ai_record_registered_title"));
         player.sendMessage("");
-        player.sendMessage("§f  Track: §b" + trackName);
-        player.sendMessage("§f  Recording will start when the race begins");
-        player.sendMessage("§f  and will end automatically upon completion");
+        player.sendMessage(tr(player, "ai_record_registered_track", "{track}", trackName));
+        player.sendMessage(tr(player, "ai_record_registered_hint1"));
+        player.sendMessage(tr(player, "ai_record_registered_hint2"));
         player.sendMessage("");
-        player.sendMessage("§c  Use /ai record stop to cancel");
-        player.sendMessage("§a═══════════════════════════════");
+        player.sendMessage(tr(player, "ai_record_registered_cancel"));
+        player.sendMessage(tr(player, "ai_separator_green"));
 
         plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Recording registration for " + player.getName() + " on track " + trackName);
         return true;
@@ -70,14 +73,18 @@ public class AIRacingLineRecorder {
         RecordingSession session = activeSessions.remove(uuid);
 
         if (session == null) {
-            player.sendMessage("§cYou are not recording any racing line!");
+            player.sendMessage(tr(player, "ai_record_not_recording"));
             return false;
         }
 
         session.cancel();
-        player.sendMessage("§eRecording cancelled!");
+        player.sendMessage(tr(player, "ai_record_cancelled"));
         plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Recording cancelled for " + player.getName());
         return true;
+    }
+
+    private String tr(Player player, String key, String... placeholders) {
+        return plugin.getTranslationUtil().getTranslated(player, key, placeholders);
     }
 
     /**
@@ -161,26 +168,26 @@ public class AIRacingLineRecorder {
     }
 
     public class RecordingSession {
+
         private final Player player;
         private final String trackName;
         private final Object recordingLock = new Object();
         private final List<Location> recordedPoints;
-        private final List<Location> brakingPoints;
-        private final List<Location> accelerationPoints;
+        private final List<Double> recordedSpeeds;
         private final long registerTime;
         private long lastUpdateTime;
         private long recordingStartTime;
         private FRTask recordingTask;
-        private boolean recording;
-        private boolean cancelled;
-        private boolean completed;
+        // Read/written from different region threads and the cleanup task.
+        private volatile boolean recording;
+        private volatile boolean cancelled;
+        private volatile boolean completed;
 
         public RecordingSession(Player player, String trackName) {
             this.player = player;
             this.trackName = trackName == null ? "" : trackName.replace(" ", "").toLowerCase();
             this.recordedPoints = new ArrayList<>();
-            this.brakingPoints = new ArrayList<>();
-            this.accelerationPoints = new ArrayList<>();
+            this.recordedSpeeds = new ArrayList<>();
             this.registerTime = System.currentTimeMillis();
             this.lastUpdateTime = registerTime;
             this.recordingStartTime = 0L;
@@ -201,12 +208,12 @@ public class AIRacingLineRecorder {
             Player p = getPlayer();
             if (p != null && p.isOnline()) {
                 p.sendMessage("");
-                p.sendMessage("§a═══════════════════════════════");
-                p.sendMessage("§e  ▶ Recording Started!");
+                p.sendMessage(tr(p, "ai_separator_green"));
+                p.sendMessage(tr(p, "ai_record_started_title"));
                 p.sendMessage("");
-                p.sendMessage("§f  The race has started — recording racing line");
-                p.sendMessage("§f  The line will be saved at the end of the race");
-                p.sendMessage("§a═══════════════════════════════");
+                p.sendMessage(tr(p, "ai_record_started_hint1"));
+                p.sendMessage(tr(p, "ai_record_started_hint2"));
+                p.sendMessage(tr(p, "ai_separator_green"));
             }
 
             recordingTask = SchedulerHelper.runTaskTimerAtEntity(plugin, player, () -> {
@@ -225,7 +232,7 @@ public class AIRacingLineRecorder {
                 if (shouldAddPoint(currentLoc)) {
                     addPoint(currentLoc, currentPlayer);
                 }
-            }, 1L, 2L);
+            }, 1L, 1L);
 
             plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Recording started for " + player.getName() + " on track " + trackName);
         }
@@ -245,7 +252,10 @@ public class AIRacingLineRecorder {
                     return true;
                 }
 
-                return lastPoint.distanceSquared(newLoc) >= 4.0;
+                // Sample every tick and keep points >= 1 block apart: at vanilla
+                // ice speeds (~3.6 b/t) the old 2-tick / 2-block sampling left
+                // points ~7 blocks apart, too coarse to represent corners.
+                return lastPoint.distanceSquared(newLoc) >= 1.0;
             }
         }
 
@@ -253,18 +263,19 @@ public class AIRacingLineRecorder {
             synchronized (recordingLock) {
                 recordedPoints.add(loc.clone());
 
+                // Measure the BOAT's velocity, not the passenger's: while riding, the
+                // player's own deltaMovement is ~0 (the vehicle moves and repositions the
+                // passenger), so recording player.getVelocity() would produce a line whose
+                // speeds are all clamped to the 0.1 floor and the AI would crawl.
                 double speed = currentPlayer.getVelocity().length();
-                if (speed < 0.3 && recordedPoints.size() > 10) {
-                    if (brakingPoints.isEmpty() || brakingPoints.get(brakingPoints.size() - 1).distanceSquared(loc) > 25.0) {
-                        brakingPoints.add(loc.clone());
-                    }
+                if (currentPlayer.getVehicle() != null && currentPlayer.getVehicle().isValid()) {
+                    speed = currentPlayer.getVehicle().getVelocity().length();
                 }
-
-                if (speed > 0.6 && recordedPoints.size() > 10) {
-                    if (accelerationPoints.isEmpty() || accelerationPoints.get(accelerationPoints.size() - 1).distanceSquared(loc) > 25.0) {
-                        accelerationPoints.add(loc.clone());
-                    }
-                }
+                recordedSpeeds.add(speed);
+                // Braking/acceleration markers are NOT recorded per-tick: raw
+                // single-tick speeds are too noisy. They are derived from the
+                // smoothed, surface-normalized speeds when the recording
+                // completes (AIRacingLineManager.deriveMarkersFor).
             }
         }
 
@@ -283,18 +294,16 @@ public class AIRacingLineRecorder {
             Player p = getPlayer();
 
             List<Location> snapshotRecorded;
-            List<Location> snapshotBraking;
-            List<Location> snapshotAcceleration;
+            List<Double> recordedSpeedsSnapshot;
             synchronized (recordingLock) {
                 snapshotRecorded = new ArrayList<>(recordedPoints);
-                snapshotBraking = new ArrayList<>(brakingPoints);
-                snapshotAcceleration = new ArrayList<>(accelerationPoints);
+                recordedSpeedsSnapshot = new ArrayList<>(recordedSpeeds);
             }
 
             if (snapshotRecorded.size() < 5) {
                 activeSessions.remove(player.getUniqueId());
                 if (p != null && p.isOnline()) {
-                    p.sendMessage("§cRecording discarded — too few points recorded.");
+                    p.sendMessage(tr(p, "ai_record_discarded"));
                 }
                 plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Recording discarded for " + player.getName() + " — too few points (" + snapshotRecorded.size() + ")");
                 return;
@@ -303,18 +312,29 @@ public class AIRacingLineRecorder {
             AIRacingLine line = racingLineManager.getRacingLine(trackName);
             line.clear();
 
+            // Normalize each recorded speed against the surface it was measured
+            // on, so line speeds stay true to the real pace per section: a fast
+            // straight on blue ice and a slow corner on regular ice are scaled
+            // independently, and at runtime (lineSpeed * surfaceMaxSpeed) they
+            // come back to the recorded speeds.
+            List<Double> pointSpeeds = normalizeAndSmoothSpeeds(recordedSpeedsSnapshot, snapshotRecorded);
+
             int totalPoints = snapshotRecorded.size();
             for (int i = 0; i < totalPoints; i++) {
                 Location loc = snapshotRecorded.get(i);
-                line.addIdealLinePoint(loc, calculateSpeedForPoint(i, totalPoints));
+                line.addIdealLinePoint(loc, pointSpeeds.get(i));
             }
 
-            for (Location brakePoint : snapshotBraking) {
-                line.addBrakingPoint(brakePoint);
-            }
-            for (Location accelPoint : snapshotAcceleration) {
-                line.addAccelerationPoint(accelPoint);
-            }
+            // The recording spans the WHOLE heat (grid + several laps + a
+            // mid-track tail where the heat ended). Trim it to exactly one lap
+            // (first → second crossing of the START region) so the line is a
+            // closed loop: otherwise the AI's wrap-around target at the end of
+            // the line jumps back to the grid and it drives backward.
+            racingLineManager.trimLineToSingleLap(line, trackName);
+
+            // Markers must match the (possibly trimmed) line: derive them from
+            // the smoothed speeds instead of trusting noisy per-tick samples.
+            racingLineManager.deriveMarkersFor(line);
 
             // Save to file (incremental — only this track, async to avoid blocking the tick)
             String finalTrackName = trackName;
@@ -327,27 +347,54 @@ public class AIRacingLineRecorder {
             // Chat message for the player
             if (p != null && p.isOnline()) {
                 p.sendMessage("");
-                p.sendMessage("§a═══════════════════════════════");
-                p.sendMessage("§e  ■ Recording Finished!");
+                p.sendMessage(tr(p, "ai_separator_green"));
+                p.sendMessage(tr(p, "ai_record_finished_title"));
                 p.sendMessage("");
-                p.sendMessage("§f  Track: §b" + trackName);
-                p.sendMessage("§f  Recorded points: §a" + snapshotRecorded.size());
-                p.sendMessage("§f  Braking points: §c" + snapshotBraking.size());
-                p.sendMessage("§f  Acceleration points: §e" + snapshotAcceleration.size());
-                p.sendMessage("§f  Line saved as §b" + trackName);
-                p.sendMessage("§a═══════════════════════════════");
+                p.sendMessage(tr(p, "ai_record_finished_track", "{track}", trackName));
+                p.sendMessage(tr(p, "ai_record_finished_points", "{count}", String.valueOf(line.getIdealLineSize())));
+                p.sendMessage(tr(p, "ai_record_finished_braking", "{count}", String.valueOf(line.getBrakingPoints().size())));
+                p.sendMessage(tr(p, "ai_record_finished_accel", "{count}", String.valueOf(line.getAccelerationPoints().size())));
+                p.sendMessage(tr(p, "ai_record_finished_saved", "{track}", trackName));
+                p.sendMessage(tr(p, "ai_separator_green"));
             }
 
             plugin.getDebugManager().logRaceSystem("[AI-RECORDER] Line saved for " + trackName + " with " + snapshotRecorded.size() + " points");
         }
 
-        private double calculateSpeedForPoint(int index, int totalPoints) {
-            if (totalPoints <= 1) {
-                return 0.6;
+        /**
+         * Normalizes the raw recorded velocities (blocks/tick) to the AI speed
+         * scale (0.1..1.0, where 1.0 == the surface max of the point itself) and
+         * applies a 3-point moving average to remove spikes. Each point is
+         * scaled by the surface it was recorded on, so mixed-surface laps keep
+         * their true per-section pace.
+         */
+        private List<Double> normalizeAndSmoothSpeeds(List<Double> rawSpeeds, List<Location> recordedPoints) {
+            List<Double> normalized = new ArrayList<>(rawSpeeds.size());
+            for (int i = 0; i < rawSpeeds.size(); i++) {
+                double surfaceMax = 1.0D;
+                if (i < recordedPoints.size() && recordedPoints.get(i) != null) {
+                    // 0.1 floor matches the lowest runtime surface max (solid ground)
+                    // so recording and playback use the same scale.
+                    surfaceMax = Math.max(0.1D, AIOpponentManager.getSurfaceMaxSpeed(recordedPoints.get(i)));
+                }
+                normalized.add(clampSpeed(rawSpeeds.get(i) / surfaceMax));
             }
 
-            double position = (double) index / (double) (totalPoints - 1);
-            return Math.max(0.35, Math.min(0.95, 0.65 + (0.25 * Math.sin(position * Math.PI * 2))));
+            List<Double> smoothed = new ArrayList<>(normalized.size());
+            for (int i = 0; i < normalized.size(); i++) {
+                int start = Math.max(0, i - 1);
+                int end = Math.min(normalized.size() - 1, i + 1);
+                double sum = 0.0;
+                for (int j = start; j <= end; j++) {
+                    sum += normalized.get(j);
+                }
+                smoothed.add(clampSpeed(sum / (end - start + 1)));
+            }
+            return smoothed;
+        }
+
+        private double clampSpeed(double speed) {
+            return Math.max(0.1, Math.min(1.0, speed));
         }
 
         public void cancel() {

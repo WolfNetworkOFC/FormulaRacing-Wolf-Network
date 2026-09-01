@@ -47,7 +47,7 @@ public class TrackEditorCommand extends BaseCommand {
     private final PacketSender packetSender;
     private final WorldEditSelect worldEditSelect;
     private final TrackExchangeManager trackExchange;
-    private final Map<UUID, String> selectedTracks = new HashMap();
+    private final Map<UUID, String> selectedTracks = new HashMap<>();
 
     public TrackEditorCommand(FormulaRacing plugin, DatabaseManager mysql, PacketSender packetSender, WorldEditSelect worldEditSelect, TrackExchangeManager trackExchange) {
         this.plugin = plugin;
@@ -533,7 +533,7 @@ public class TrackEditorCommand extends BaseCommand {
         }
 
         List<DatabaseManager.RegionData> allRegions = this.mysql.getAllRegions();
-        Map<String, List<DatabaseManager.RegionData>> regionsByTrackAndType = new HashMap();
+        Map<String, List<DatabaseManager.RegionData>> regionsByTrackAndType = new HashMap<>();
         String normalizedSpecificTrack = specificTrack != null ? specificTrack.replace(" ", "").toLowerCase() : null;
 
         for(DatabaseManager.RegionData region : allRegions) {
@@ -541,7 +541,7 @@ public class TrackEditorCommand extends BaseCommand {
             if ((type.equals("START") || type.equals("END")) && (normalizedSpecificTrack == null || region.getTrackName().equalsIgnoreCase(normalizedSpecificTrack))) {
                 String var10000 = region.getTrackName().toLowerCase();
                 String key = var10000 + "_" + type;
-                ((List)regionsByTrackAndType.computeIfAbsent(key, (k) -> new ArrayList())).add(region);
+                regionsByTrackAndType.computeIfAbsent(key, (k) -> new ArrayList<>()).add(region);
             }
         }
 
@@ -549,7 +549,7 @@ public class TrackEditorCommand extends BaseCommand {
         int tracksProcessed = 0;
 
         for(Map.Entry<String, List<DatabaseManager.RegionData>> entry : regionsByTrackAndType.entrySet()) {
-            List<DatabaseManager.RegionData> regions = (List)entry.getValue();
+            List<DatabaseManager.RegionData> regions = entry.getValue();
             if (regions.size() > 1) {
                 regions.sort(Comparator.comparingInt(DatabaseManager.RegionData::getId).reversed());
                 DatabaseManager.RegionData newest = (DatabaseManager.RegionData)regions.get(0);

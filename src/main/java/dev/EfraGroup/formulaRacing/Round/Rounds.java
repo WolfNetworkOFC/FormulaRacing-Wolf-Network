@@ -1,7 +1,6 @@
 package dev.EfraGroup.formulaRacing.Round;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
-import dev.EfraGroup.formulaRacing.Event.EventState;
 import dev.EfraGroup.formulaRacing.Event.Events;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
@@ -110,31 +109,32 @@ public abstract class Rounds {
 
     }
 
-    public boolean nextHeat() {
-        Optional<Heats> currentHeat = this.heats.values().stream().filter((h) -> h.getHeatState() == HeatState.RACING || h.getHeatState() == HeatState.FINISHED || h.getHeatState() == HeatState.QUALIFYING || h.getHeatState() == HeatState.PRACTICE).max(Comparator.comparingInt(Heats::getHeatNumber));
-        if (currentHeat.isEmpty()) {
-            return false;
-        } else {
-            int currentHeatNumber = ((Heats)currentHeat.get()).getHeatNumber();
-            Optional<Heats> nextHeat = this.getHeat(currentHeatNumber + 1);
-            if (nextHeat.isEmpty()) {
-                this.finishRound();
-                return false;
-            } else {
-                this.startHeat((Heats)nextHeat.get());
-                return true;
-            }
-        }
+    /**
+     * Called when one of this round's heats finishes. Never starts anything and
+     * never finishes the round automatically — the round is only finished
+     * manually (/round finish) or explicitly by scripted systems
+     * (DailyRaceManager).
+     */
+    public void onHeatFinished() {
+        long remaining = this.heats.values().stream()
+                .filter(h -> h.getHeatState() != HeatState.FINISHED)
+                .count();
+        this.plugin.getDebugManager().logRaceSystem(
+            "Heat finished on round " + this.id + " — " + remaining +
+            " heat(s) remaining; the round awaits manual finish (/round finish)."
+        );
     }
 
     public void finishRound() {
+        if (this.roundState == RoundState.FINISHED) {
+            return;
+        }
         this.roundState = RoundState.FINISHED;
         this.plugin.getDebugManager().logRaceSystem("Round " + this.id + " finalizado!");
         this.broadcastResults();
-        if (this.event != null && this.event.getState() != EventState.FINISHED && this.event.getEventSchedule() != null) {
-            this.event.getEventSchedule().scheduleNextRound(15);
-        }
-
+        // No automatic scheduling of the next round: progression between heats
+        // and rounds is manual (admins start them), except for scripted
+        // systems (DailyRaceManager) that advance their own phases explicitly.
     }
 
     public int getId() {

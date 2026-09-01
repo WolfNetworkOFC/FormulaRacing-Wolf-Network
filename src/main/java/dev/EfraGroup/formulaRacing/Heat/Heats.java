@@ -31,6 +31,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 
 public class Heats {
 
@@ -58,7 +59,6 @@ public class Heats {
     private String trackNameWS;
     private GridManager gridManager;
     private boolean drsEnabled;
-    private FRTask offlineMonitorTask;
     private List<DrsRegion> drsRegions = new ArrayList<>();
     private boolean pushtopass;
     private int deltaghosting;
@@ -70,6 +70,8 @@ public class Heats {
     private double pushtopasspower;
     private FRTask sessionTask;
     private boolean configDirty = false;
+    /** Countdown currently running for this heat (jump-start listener reaches it). */
+    private volatile RaceCountdown activeCountdown;
     private boolean onlyBedrock = false;
     private boolean ErsEnabled = false;
     private boolean gridReversed = false;
@@ -370,6 +372,19 @@ public class Heats {
     }
 
     public boolean loadHeat() {
+        return this.loadHeat(null);
+    }
+
+    /**
+     * Loads the heat onto the grid. Grids are NEVER auto-generated from the
+     * spawn: a track with no grid positions simply fails to load. When there
+     * are fewer grid slots than drivers, the drivers that fit are loaded and
+     * {@code feedback} (if present) is told how many slots are missing.
+     *
+     * @param feedback who ran the load command (receives the failure reason);
+     *                 null for programmatic (round/session) callers.
+     */
+    public boolean loadHeat(org.bukkit.command.CommandSender feedback) {
         DebugManager var10000 = this.plugin.getDebugManager();
         int var10001 = this.id;
         var10000.logRaceSystem(
@@ -403,6 +418,9 @@ public class Heats {
             this.plugin.getDebugManager().logRaceSystem(
                 "Heat " + this.id + " has no drivers!"
             );
+            if (feedback != null) {
+                feedback.sendMessage("§c✗ Heat " + this.getName() + " não carregou: nenhum piloto inscrito.");
+            }
             return false;
         } else {
             var10000 = this.plugin.getDebugManager();
@@ -420,6 +438,9 @@ public class Heats {
                     this.plugin.getDebugManager().logRaceSystem(
                         "Event does not have a track defined!"
                     );
+                    if (feedback != null) {
+                        feedback.sendMessage("§c✗ Heat " + this.getName() + " não carregou: o evento não tem pista definida.");
+                    }
                     return false;
                 }
 
@@ -437,6 +458,9 @@ public class Heats {
                 this.plugin.getDebugManager().logRaceSystem(
                     "Heat is not associated with a valid event and has no track defined!"
                 );
+                if (feedback != null) {
+                    feedback.sendMessage("§c✗ Heat " + this.getName() + " não carregou: nenhuma pista definida.");
+                }
                 return false;
             }
 
@@ -460,30 +484,22 @@ public class Heats {
                     .getTrackIntegrationManager()
                     .generateQualiGridPositions(this.trackNameWS, this.drivers.size());
                 if (qualiGridPositions.isEmpty()) {
-                    Location spawnLoc =
-                        this.plugin.getTrackIntegrationManager().getTrackSpawn(
-                            this.trackNameWS
-                        );
-                    if (spawnLoc == null) {
-                        this.plugin.getDebugManager().logRaceSystem(
-                            "Failed to get track spawn for Qualifying!"
-                        );
-                        return false;
-                    }
-
-                    for (Driver driver : this.drivers.values()) {
-                        Player player = Bukkit.getPlayer(driver.getUuid());
-                        if (player != null && player.isOnline()) {
-                            SchedulerHelper.runTaskFor(this.plugin, player, () -> {
-                                this.plugin.getAPI().recoverPlayerBoatState(player);
-                            });
-                            this.spawnQualiDriver(player, driver, spawnLoc);
-                        }
-                    }
                     this.plugin.getDebugManager().logRaceSystem(
-                        "Drivers teleported to SPAWN for Qualifying (qualigrid not configured)."
+                        "Quali load failed for Heat " + this.id +
+                        ": track '" + this.trackNameWS + "' has no QUALIGRID positions defined."
                     );
+                    if (feedback != null) {
+                        feedback.sendMessage("§c✗ Heat " + this.getName() + " (Quali) não carregou: a pista §f" +
+                            this.trackNameWS + "§c não tem QUALIGRIDs definidos (defina no /trackedit).");
+                    }
+                    return false;
                 } else {
+                    int missingSlots = this.drivers.size() - qualiGridPositions.size();
+                    if (missingSlots > 0 && feedback != null) {
+                        feedback.sendMessage("§e⚠ Qualigrids insuficientes em §f" + this.trackNameWS + "§e: " +
+                            qualiGridPositions.size() + " posições para " + this.drivers.size() +
+                            " pilotos — §c" + missingSlots + " piloto(s) ficaram FORA do grid§e.");
+                    }
                     for (Driver driver : this.drivers.values()) {
                         Player player = Bukkit.getPlayer(driver.getUuid());
                         if (player != null && player.isOnline()) {
@@ -494,8 +510,8 @@ public class Heats {
                                     this.plugin.getAPI().recoverPlayerBoatState(player);
                                 });
                                 this.spawnQualiDriver(player, driver, qualiLoc);
-                            } else {
-                                player.sendMessage("§cInvalid position on qualigrid.");
+                            } else if (player.isOnline()) {
+                                player.sendMessage("§cSem qualigrid para sua posição (" + driver.getStartPosition() + ").");
                             }
                         }
                     }
@@ -517,12 +533,22 @@ public class Heats {
                     this.plugin.getDebugManager().logRaceSystem(
                         "Failed to generate grid for Heat " + this.id
                     );
+                    if (feedback != null) {
+                        feedback.sendMessage("§c✗ Heat " + this.getName() + " não carregou: a pista §f" +
+                            this.trackNameWS + "§c não tem GRIDs definidos (defina no /trackedit).");
+                    }
                     return false;
                 }
 
                 this.plugin.getDebugManager().logRaceSystem(
                     "[LOAD DEBUG] Grid generated successfully"
                 );
+                int gridSlots = this.gridManager.getGridPositions().size();
+                if (gridSlots < this.drivers.size() && feedback != null) {
+                    feedback.sendMessage("§e⚠ Grids insuficientes em §f" + this.trackNameWS + "§e: " +
+                        gridSlots + " posições para " + this.drivers.size() +
+                        " pilotos — §c" + (this.drivers.size() - gridSlots) + " piloto(s) ficaram FORA do grid§e.");
+                }
                 int teleported = this.gridManager.teleportDriversToGrid();
                 this.plugin.getDebugManager().logRaceSystem(
                     "Heat " +
@@ -537,6 +563,9 @@ public class Heats {
                     this.plugin.getDebugManager().logRaceSystem(
                         "No drivers were teleported!"
                     );
+                    if (feedback != null) {
+                        feedback.sendMessage("§c✗ Heat " + this.getName() + " não carregou: nenhum piloto pôde ser teleportado (todos offline?).");
+                    }
                     return false;
                 }
             }
@@ -674,6 +703,7 @@ public class Heats {
                 seconds,
                 startAction
             );
+            this.activeCountdown = countdown;
             countdown.start();
             return true;
         }
@@ -700,10 +730,19 @@ public class Heats {
         (new RaceSession(this.plugin)).start(this);
     }
 
+    /** The countdown currently running for this heat, if any (used by the jump-start listener). */
+    public RaceCountdown getActiveCountdown() {
+        return this.activeCountdown;
+    }
+
     public boolean passLap(Driver driver) {
-        return this.round != null
+        boolean result = this.round != null
             ? this.round.getSessionLogic().passLap(this, driver)
             : (new RaceSession(this.plugin)).passLap(this, driver);
+        if (result) {
+            this.handleEnduranceFinalLap(driver);
+        }
+        return result;
     }
 
     public boolean passLap(
@@ -712,7 +751,7 @@ public class Heats {
         Location to,
         RegionBox region
     ) {
-        return this.round != null
+        boolean result = this.round != null
             ? this.round.getSessionLogic().passLap(
                   this,
                   driver,
@@ -727,6 +766,55 @@ public class Heats {
                   to,
                   region
               );
+        if (result) {
+            this.handleEnduranceFinalLap(driver);
+        }
+        return result;
+    }
+
+    /**
+     * Endurance (timed) heats: after the time runs out, every driver completes
+     * the lap they are on and then runs ONE more lap — the final lap. The first
+     * line crossing after the flag marks the driver as being on the final lap;
+     * the next crossing finishes them. The heat ends when the last active
+     * driver crosses (or DNFs).
+     */
+    private void handleEnduranceFinalLap(Driver driver) {
+        HeatConfig config = this.getHeatConfig();
+        if (
+            config == null ||
+            !config.isTimeBased() ||
+            !config.isLastLapTriggered() ||
+            driver.isFinished() ||
+            driver.isDnf()
+        ) {
+            return;
+        }
+
+        if (driver.isFinalLapActive()) {
+            // This crossing completed the final lap — the driver is done.
+            driver.setFinalLapActive(false);
+            DriverFinishUtils.finishDriver(driver, this, this.plugin);
+            this.updateLivePositions();
+            if (this.drivers.values().stream().allMatch(d -> d.isFinished() || d.isDnf())) {
+                this.finishHeat();
+            }
+        } else {
+            // First crossing after the flag: the lap starting now is the final lap.
+            driver.setFinalLapActive(true);
+            Player player = Bukkit.getPlayer(driver.getUuid());
+            if (player != null && player.isOnline()) {
+                String langCode = this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
+                TitleHelper.sendThemedTitle(player,
+                    this.plugin.getTranslation("endurance_final_lap_title", langCode, new String[0]),
+                    this.plugin.getTranslation("endurance_final_lap_subtitle", langCode, new String[0]),
+                    5, 40, 10);
+            }
+            this.plugin.getDebugManager().logRaceSystem(
+                "[TIME-BASED] " + (player != null ? player.getName() : "AI:" + driver.getCustomName()) +
+                " is now on the FINAL lap (Heat " + this.id + ")"
+            );
+        }
     }
 
     public void finishHeat() {
@@ -777,7 +865,6 @@ public class Heats {
             this.setHeatState(HeatState.FINISHED);
             this.endTime = Instant.now();
             this.stopSessionTimer();
-            this.stopOfflineMonitoring();
             this.updateLivePositions();
             if (this.plugin.getPitStopManager() != null) {
                 this.plugin.getPitStopManager().clear();
@@ -860,9 +947,9 @@ public class Heats {
 
             if (this.round != null) {
                 this.plugin.getDebugManager().logRaceSystem(
-                    "Heat " + this.id + " finished, advancing round... (roundId=" + this.round.getId() + ")"
+                    "Heat " + this.id + " finished (roundId=" + this.round.getId() + ") — no auto-advance; next heat awaits manual start."
                 );
-                this.round.nextHeat();
+                this.round.onHeatFinished();
             }
             if (teleportToSpawn) {
                 Location targetLoc =
@@ -1031,7 +1118,6 @@ public class Heats {
 
         // Clear timers and managers
         this.stopSessionTimer();
-        this.stopOfflineMonitoring();
         if (this.plugin.getPitStopManager() != null) {
             this.plugin.getPitStopManager().clear();
         }
@@ -1053,6 +1139,7 @@ public class Heats {
             driver.setCheckpointsReached(0);
             driver.setFinished(false);
             driver.setDnf(false);
+            driver.setFinalLapActive(false); // endurance: no stale final-lap state
 
             Player player = Bukkit.getPlayer(driver.getUuid());
             if (player != null && player.isOnline()) {
@@ -1060,6 +1147,14 @@ public class Heats {
                         this.plugin.getDatabaseManager().getLonelyModePlayer(player.getUniqueId());
                 this.plugin.getLonelyController().setLonelyMode(player, dbLonely);
             }
+        }
+
+        // Reset the advanced config too: a heat that ran (or aborted) an
+        // endurance session must not keep lastLapTriggered=true — otherwise
+        // the next start would finish everyone (AI included) after two
+        // line crossings.
+        if (this.getHeatConfig() != null) {
+            this.getHeatConfig().reset();
         }
 
         // Remove rods from players
@@ -1110,83 +1205,6 @@ public class Heats {
     @Deprecated
     public long getPracticeTimeRemaining() {
         return this.getSessionTimeRemaining();
-    }
-
-    public void startOfflineMonitoring() {
-        this.stopOfflineMonitoring();
-        this.offlineMonitorTask = SchedulerHelper.runTaskTimer(
-            this.plugin,
-                () -> {
-                    if (this.heatState != HeatState.RACING) {
-                        this.stopOfflineMonitoring();
-                    } else {
-                        for (Driver driver : this.drivers.values()) {
-                            if (!driver.isFinished() && !driver.isDnf()) {
-                                Player player =
-                                    this.plugin.getServer().getPlayer(
-                                        driver.getUuid()
-                                    );
-                                if (player == null || !player.isOnline()) {
-                                    this.plugin.getDebugManager().logRaceSystem(
-                                        "Driver " +
-                                            String.valueOf(driver.getUuid()) +
-                                            " disconnected during race - marking as DNF"
-                                    );
-                                    driver.setDnf(true);
-                                    driver.setPtpActive(false);
-                                    driver.setPtpEnergy((double) 0.0F);
-                                    EventAnnouncements announcements =
-                                        this.round != null &&
-                                        this.round.getEvent() != null
-                                            ? this.round.getEvent().getAnnouncements()
-                                            : this.plugin.getEventAnnouncements();
-                                    announcements.broadcastDNF(
-                                        this,
-                                        driver,
-                                        "Disconnected"
-                                    );
-                                }
-                            }
-                        }
-
-                        boolean allFinished = this.drivers.values()
-                            .stream()
-                            .allMatch(
-                                driverx ->
-                                    driverx.isFinished() || driverx.isDnf()
-                            );
-                        if (allFinished) {
-                            this.plugin.getDebugManager().logRaceSystem(
-                                "All drivers finished or were marked as DNF - finishing heat"
-                            );
-                            SchedulerHelper.runTask(this.plugin, () -> {
-                                this.finishHeat();
-                                this.plugin.getRaceEventManager().tryDeleteEventForHeat(this);
-                            });
-                        }
-                    }
-                },
-                200L,
-                200L
-            );
-        this.plugin.getDebugManager().logRaceSystem(
-            "Offline player monitoring started for Heat " + this.id
-        );
-    }
-
-    private void stopOfflineMonitoring() {
-        if (
-            this.offlineMonitorTask != null &&
-            !this.offlineMonitorTask.isCancelled()
-        ) {
-            this.offlineMonitorTask.cancel();
-            this.plugin.getDebugManager().logRaceSystem(
-                "Offline player monitoring cancelled for Heat " +
-                    this.id
-            );
-        }
-
-        this.offlineMonitorTask = null;
     }
 
     public void clearTimeTrialActionBar(Player player) {
@@ -1292,20 +1310,33 @@ public class Heats {
 
     private void spawnQualiDriver(Player player, Driver driver, Location gridLoc) {
         this.plugin.getLonelyController().updatePlayersVisibility(player);
-        SchedulerHelper.runTaskLater(this.plugin, () -> {
-            if (player.isOnline()) {
-                SchedulerHelper.teleport(player, gridLoc);
-                if (this.plugin.getPacketSender() != null) {
-                    this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
-                    this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, this.trackNameWS);
-                    this.applyCollisionModeToPlayer(player);
-                }
-                // Apply track game time (day/night cycle)
-                this.plugin.applyTrackGameTime(player, this.trackNameWS);
-                boolean collidable = this.collisionMode != CollisionMode.DISABLED;
-                this.plugin.getAPI().spawnBoatAt(player, gridLoc, false, true, false, collidable);
+        // Folia: teleport first and WAIT for completion, then spawn the boat on the
+        // player's (now grid-region) thread. The old fire-and-forget teleport +
+        // immediate spawn ran on the player's OLD region thread and threw
+        // "Cannot add entity off-main thread" when the quali grid was in another
+        // region than the player.
+        SchedulerHelper.teleportAsync(player, gridLoc).thenAccept(success -> {
+            if (Boolean.TRUE.equals(success) && player.isOnline()) {
+                SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                    if (!player.isOnline()) {
+                        return;
+                    }
+                    if (this.plugin.getPacketSender() != null) {
+                        this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
+                        this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, this.trackNameWS);
+                        this.applyCollisionModeToPlayer(player);
+                    }
+                    // Apply track game time (day/night cycle)
+                    this.plugin.applyTrackGameTime(player, this.trackNameWS);
+                    boolean collidable = this.collisionMode != CollisionMode.DISABLED;
+                    this.plugin.getAPI().spawnBoatAt(player, gridLoc, false, true, false, collidable);
+                });
+            } else {
+                this.plugin.getDebugManager().logRaceSystem(
+                    "[QUALI] Falha ao teleportar " + player.getName() + " para o quali grid — sem barco."
+                );
             }
-        }, 10L);
+        });
     }
 
     public boolean addDriver(UUID uuid, int gridPosition) {
@@ -1446,25 +1477,40 @@ public class Heats {
                                 this.trackNameWS
                             );
                         if (spawnLoc != null) {
-                            SchedulerHelper.teleportAsync(this.plugin, player, spawnLoc);
-                            // Apply track game time (day/night cycle)
-                            this.plugin.applyTrackGameTime(player, this.trackNameWS);
-                            boolean collidable = this.collisionMode != CollisionMode.DISABLED;
-                            this.plugin.getAPI().spawnBoat(
-                                player,
-                                false,
-                                false,
-                                false,
-                                collidable
-                            );
-                            this.plugin.getLonelyController().updatePlayersVisibility(
-                                player
-                            );
-                            this.plugin.getDebugManager().logRaceSystem(
-                                "Player " +
-                                    player.getName() +
-                                    " teleported to Practice/Quali spawn."
-                            );
+                            // Folia: wait for the teleport before spawning, so the boat is
+                            // created on the spawn region's thread and at the right location.
+                            SchedulerHelper.teleportAsync(this.plugin, player, spawnLoc).thenAccept(success -> {
+                                if (Boolean.TRUE.equals(success) && player.isOnline()) {
+                                    SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                                        if (!player.isOnline()) {
+                                            return;
+                                        }
+                                        // Apply track game time (day/night cycle)
+                                        this.plugin.applyTrackGameTime(player, this.trackNameWS);
+                                        boolean collidable = this.collisionMode != CollisionMode.DISABLED;
+                                        this.plugin.getAPI().spawnBoatAt(
+                                            player,
+                                            spawnLoc,
+                                            false,
+                                            false,
+                                            false,
+                                            collidable
+                                        );
+                                        this.plugin.getLonelyController().updatePlayersVisibility(
+                                            player
+                                        );
+                                        this.plugin.getDebugManager().logRaceSystem(
+                                            "Player " +
+                                                player.getName() +
+                                                " teleported to Practice/Quali spawn."
+                                        );
+                                    });
+                                } else {
+                                    this.plugin.getDebugManager().logRaceSystem(
+                                        "[LATEJOIN] Falha ao teleportar " + player.getName() + " para o spawn — sem barco."
+                                    );
+                                }
+                            });
                         }
                     }
                 } else {
@@ -1898,6 +1944,15 @@ public class Heats {
     public void setTotalLaps(Integer totalLaps) {
         this.totalLaps = totalLaps;
         this.updateDatabaseConfig();
+    }
+
+    /**
+     * Sets totalLaps in MEMORY only (no DB write). Used by the endurance
+     * session to disable lap-count finishes — the persisted value must keep
+     * the admin's original setting for normal races.
+     */
+    public void setTotalLapsRuntime(int totalLaps) {
+        this.totalLaps = totalLaps;
     }
 
     public Integer getTotalPits() {

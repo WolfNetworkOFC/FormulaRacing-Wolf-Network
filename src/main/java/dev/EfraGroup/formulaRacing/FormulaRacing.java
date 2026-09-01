@@ -493,19 +493,29 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             SchedulerHelper.runDelayedTask(this, () ->
                 HologramManager.removeOrphanStands(), 100L
             );
-            // bStats telemetry (replace 00000 with your bStats plugin ID)
-            try {
-                this.metrics = new Metrics(this, 00000);
-                this.metrics.addCustomChart(new SimplePie("database_type",
-                    () -> this.dm.getDatabaseType().name().toLowerCase()));
-                this.metrics.addCustomChart(new SingleLineChart("tracks",
-                    () -> this.dm.getAllTracks().size()));
-                this.metrics.addCustomChart(new SingleLineChart("online_players",
-                    () -> Bukkit.getOnlinePlayers().size()));
-                this.metrics.addCustomChart(new SingleLineChart("league_count",
-                    () -> this.getLeagueManager().getAllLeagues().size()));
-            } catch (Exception e) {
-                this.getLogger().warning("[FormulaRacing] Falha ao iniciar bStats: " + e.getMessage());
+            // bStats telemetry — the plugin ID now comes from config.yml (bstats.plugin-id).
+            // Register the plugin at https://bstats.org to get an ID, then set it there.
+            // ID 0 or absent disables telemetry (the old hardcoded 00000 placeholder
+            // silently submitted nothing).
+            int bStatsPluginId = this.getConfig().getInt("bstats.plugin-id", 0);
+            if (bStatsPluginId > 0) {
+                try {
+                    this.metrics = new Metrics(this, bStatsPluginId);
+                    this.metrics.addCustomChart(new SimplePie("database_type",
+                        () -> this.dm.getDatabaseType().name().toLowerCase()));
+                    this.metrics.addCustomChart(new SingleLineChart("tracks",
+                        () -> this.dm.getAllTracks().size()));
+                    this.metrics.addCustomChart(new SingleLineChart("online_players",
+                        () -> Bukkit.getOnlinePlayers().size()));
+                    this.metrics.addCustomChart(new SingleLineChart("league_count",
+                        () -> this.getLeagueManager().getAllLeagues().size()));
+                } catch (Exception e) {
+                    this.getLogger().warning("[FormulaRacing] Falha ao iniciar bStats: " + e.getMessage());
+                }
+            } else {
+                this.getLogger().info(
+                    "[FormulaRacing] bStats desativado. Defina 'bstats.plugin-id' no config.yml para ativar telemetria."
+                );
             }
             if (this.debugManager != null) {
                 this.getLogger().info(
@@ -554,7 +564,13 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         if (this.guiManager != null) {
             this.guiManager.closeAll();
         }
-        this.trackLeaderboards.values().forEach(TrackLeaderboard::removeHologram);
+        try {
+            this.trackLeaderboards.values().forEach(TrackLeaderboard::removeHologram);
+        } catch (Throwable t) {
+            if (this.debugManager != null) {
+                this.debugManager.logRaceSystem("[FormulaRacing] Error removing leaderboard holograms on disable: " + t);
+            }
+        }
         this.trackLeaderboards.clear();
         HologramManager.removeAllHologramStands();
         if (this.dailyRaceManager != null) {
@@ -709,6 +725,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this
         );
         Bukkit.getPluginManager().registerEvents(
+            new dev.EfraGroup.formulaRacing.Listener.JumpStartListener(this),
+            this
+        );
+        Bukkit.getPluginManager().registerEvents(
             new PitStopListener(
                 this,
                 this.raceEventManager,
@@ -719,6 +739,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         this.recorderListener = new AIRacingLineRecorderListener(this);
         Bukkit.getPluginManager().registerEvents(
             this.recorderListener,
+            this
+        );
+        Bukkit.getPluginManager().registerEvents(
+            new dev.EfraGroup.formulaRacing.Listener.AINpcListener(this),
             this
         );
         this.lightningRodListener = new LightningRodListener(this);
@@ -796,7 +820,6 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.commandManager.registerCommand(new EliminationCommand(this));
             this.commandManager.registerCommand(new GimmickCommand(this));
             this.commandManager.registerCommand(new OpenBoatUtilsCommand(this));
-            this.commandManager.registerCommand(new RaceConfigCommand(this));
             this.commandManager.registerCommand(new ReverseGridCommand(this));
             this.commandManager.registerCommand(new WeatherCommand(this));
         } catch (Exception e) {

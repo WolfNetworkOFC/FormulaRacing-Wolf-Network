@@ -77,7 +77,6 @@ public class EliminationSession implements SessionLogic {
             plugin.getRaceEventManager().getDatabaseManager().updateHeatTimes(heat.getId(), heat.getStartTime(), null);
         }
 
-        heat.startOfflineMonitoring();
 
         this.secondsUntilNextElimination = eliminationIntervalSeconds;
         this.heatFinished = false;

@@ -147,7 +147,9 @@ public class HotbarListener implements Listener {
                 event.setCancelled(true);
             }
 
-            if (event.getAction() == InventoryAction.HOTBAR_SWAP || event.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD) {
+            // HOTBAR_MOVE_AND_READD foi removido da verificação: deprecated forRemoval
+            // desde 1.20.6 — clientes atuais só enviam HOTBAR_SWAP.
+            if (event.getAction() == InventoryAction.HOTBAR_SWAP) {
                 int slot = event.getHotbarButton();
                 if (slot != -1 && this.controller.isHotbarItem(player.getInventory().getItem(slot))) {
                     event.setCancelled(true);

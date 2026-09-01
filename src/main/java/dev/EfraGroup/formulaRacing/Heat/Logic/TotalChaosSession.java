@@ -68,7 +68,6 @@ public class TotalChaosSession implements SessionLogic {
     @Override
     public void start(Heats heat) {
         heat.setHeatState(HeatState.RACING);
-        heat.startOfflineMonitoring();
 
         broadcast(heat, ChatColor.GOLD + "═══════════════════════════════");
         broadcast(heat, ChatColor.LIGHT_PURPLE + "  💥 TOTAL CHAOS MODE 💥");

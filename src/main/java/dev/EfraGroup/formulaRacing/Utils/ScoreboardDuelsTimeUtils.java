@@ -24,6 +24,9 @@ public class ScoreboardDuelsTimeUtils {
     private final ScoreboardOwnershipCoordinator ownershipCoordinator;
     private TimeTrialDuels timeTrialDuels;
     private final Map<UUID, DuelContext> duelContexts = new ConcurrentHashMap<>();
+    private final Map<UUID, Boolean> compactCache = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastCompactCheck = new ConcurrentHashMap<>();
+    private static final long SETTINGS_TTL = 5000L;
 
     public ScoreboardDuelsTimeUtils(
             FormulaRacing plugin,
@@ -217,13 +220,34 @@ public class ScoreboardDuelsTimeUtils {
         return "§l" + title;
     }
 
+    /**
+     * Whether the viewer has compact mode on (/settings compact), cached — the
+     * duel board refreshes every 2 ticks per player, so no raw DB reads here.
+     */
+    private boolean isCompactMode(Player player) {
+        long now = System.currentTimeMillis();
+        Boolean cached = this.compactCache.get(player.getUniqueId());
+        if (cached != null && now - this.lastCompactCheck.getOrDefault(player.getUniqueId(), 0L) < SETTINGS_TTL) {
+            return cached;
+        }
+        boolean compact = this.mysql.getPlayerCompactMode(player.getUniqueId());
+        this.compactCache.put(player.getUniqueId(), compact);
+        this.lastCompactCheck.put(player.getUniqueId(), now);
+        return compact;
+    }
+
     private void updateBoardLines(Player player, int timeRemaining, String finalPosDisplay, int lap, int totalLaps, String currentFormattedTime, String finalPB, String finalTimeRemaining, String trackName) {
         if (!this.ownershipCoordinator.isOwner(player.getUniqueId(), ScoreboardOwnershipCoordinator.Mode.DUEL)) {
             return;
         }
 
         List<String> lines = new ArrayList<>();
-        String separator = this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_common_separator");
+        // Compact mode (/settings compact): the duel board shows no player names,
+        // so compacting means shorter separator lines.
+        boolean compact = this.isCompactMode(player);
+        String separator = compact
+                ? "§7------------"
+                : this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_common_separator");
         String footer = this.plugin.getTranslationUtil().getTranslated(player, "scoreboard_common_footer");
         String marker = TimingScoreboardStyle.normalizeAccentMarker(this.plugin.getConfig().getString("scoreboard.style.accent-marker", "┃"));
 

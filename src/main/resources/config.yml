@@ -111,6 +111,15 @@ message-settings:
     message: §8[§c-§8] §c{player} {rank}
 
 # =========================================================#
+#                         BSTATS                           #
+# =========================================================#
+# Telemetria anônima via bstats.org. Para ativar:
+#   1. Registre o plugin em https://bstats.org e copie o ID
+#   2. Defina plugin-id abaixo (0 ou ausente = desativado)
+bstats:
+  plugin-id: 0
+
+# =========================================================#
 #                      DEBUG SYSTEM                       #
 # =========================================================#
 # Enable detailed logging for different systems.

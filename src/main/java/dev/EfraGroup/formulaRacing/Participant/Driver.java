@@ -48,6 +48,8 @@ public class Driver {
     private int tireWear;
     private String customName;
     private boolean aiControlled;
+    /** Endurance (timed) heat: driver is currently on the final lap after the flag. */
+    private volatile boolean finalLapActive;
     private double fuelLevel;
     private double fuelCapacity;
 
@@ -562,6 +564,14 @@ public class Driver {
 
     public void setAiControlled(boolean aiControlled) {
         this.aiControlled = aiControlled;
+    }
+
+    public boolean isFinalLapActive() {
+        return this.finalLapActive;
+    }
+
+    public void setFinalLapActive(boolean finalLapActive) {
+        this.finalLapActive = finalLapActive;
     }
 
     public double getFuelLevel() {

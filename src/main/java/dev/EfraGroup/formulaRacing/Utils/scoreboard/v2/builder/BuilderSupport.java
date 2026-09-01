@@ -27,7 +27,7 @@ final class BuilderSupport {
     private static final int MIDDLE_PIXEL_WIDTH = 66;  // ~11 chars
     private static final int NAME_PIXEL_WIDTH = 78;    // ~13 chars
     private static final int NAME_PIXEL_WIDTH_WITH_PITS = 66;  // ~11 chars
-    private static final int COMPACT_NAME_PIXEL_WIDTH = 24;    // ~4 chars
+    private static final int COMPACT_NAME_PIXEL_WIDTH = 18;    // ~3 chars (first 3 letters of the name)
 
     private BuilderSupport() {
     }
@@ -167,12 +167,29 @@ final class BuilderSupport {
 
     private static String formatLine(ScoreboardContext context, String accentMarker, int pos, Driver current, Driver reference, boolean qualifyingMode) {
         Player p = Bukkit.getPlayer(current.getUuid());
-        String name = p != null ? p.getName() : tr(context, "scoreboard_v2_offline");
+        String name;
+        if (p != null) {
+            name = p.getName();
+        } else if (current.isAiControlled() && current.getCustomName() != null && !current.getCustomName().isEmpty()) {
+            // AI drivers are never real players — use their display name instead
+            // of the offline placeholder (they are racing, not offline).
+            name = current.getCustomName();
+        } else {
+            // Offline real player: show the actual name ("Offline <Name>"),
+            // not a second "Offline" where the name should be.
+            String offlineName = Bukkit.getOfflinePlayer(current.getUuid()).getName();
+            name = offlineName != null ? offlineName : tr(context, "scoreboard_v2_offline");
+        }
         String rank = rankTag(pos, current, context);
         String middle = middleBlock(context, current, reference, p, qualifyingMode);
         String marker = teamMarker(accentMarker, pos);
         boolean showPits = hasRequiredPits(context);
         boolean compact = context.compact();
+        // Compact mode: pilot names shrink to their first 3 letters (Joka_10 → Jok);
+        // the offline placeholder is kept as-is.
+        if (compact && p != null && name != null && name.length() > 3) {
+            name = name.substring(0, 3);
+        }
         int namePixelWidth = compact ? COMPACT_NAME_PIXEL_WIDTH : (showPits ? NAME_PIXEL_WIDTH_WITH_PITS : NAME_PIXEL_WIDTH);
         String pilotName = formatPilotName(name, namePixelWidth);
         String pits = formatPits(context, current);
@@ -438,7 +455,9 @@ final class BuilderSupport {
         if (driver.isDnf()) {
             return middleCell("&m", tr(context, "scoreboard_status_dnf_short"));
         }
-        if (player == null || !player.isOnline()) {
+        // AI drivers are driven by the server, not by an online player — they
+        // must never show the "offline" status while racing.
+        if (!driver.isAiControlled() && (player == null || !player.isOnline())) {
             return middleCell("&m", tr(context, "scoreboard_status_offline"));
         }
         if (context.plugin().getPitStopManager() != null && context.plugin().getPitStopManager().isPlayerInPitRegion(driver.getUuid())) {

@@ -41,24 +41,28 @@ public class AICommand extends BaseCommand {
         this.heatDriverService = new HeatDriverCommandService(plugin);
     }
 
+    private String tr(Player player, String key, String... placeholders) {
+        return plugin.getTranslationUtil().getTranslated(player, key, placeholders);
+    }
+
     @Default
     @Description("Mostra informações do sistema de IA")
     public void onDefault(Player player) {
         player.sendMessage("");
-        player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
-        player.sendMessage(ChatColor.YELLOW + "  Sistema de IA de Oponentes");
+        player.sendMessage(tr(player, "ai_separator_gold"));
+        player.sendMessage(tr(player, "ai_info_title"));
         player.sendMessage("");
-        player.sendMessage(ChatColor.GRAY + "  Pistas com linha: " + ChatColor.WHITE + racingLineManager.getTrackCount());
-        player.sendMessage(ChatColor.GRAY + "  Oponentes ativos: " + ChatColor.WHITE + aiManager.getAIOpponents().size());
+        player.sendMessage(tr(player, "ai_info_tracks", "{count}", String.valueOf(racingLineManager.getTrackCount())));
+        player.sendMessage(tr(player, "ai_info_opponents", "{count}", String.valueOf(aiManager.getAIOpponents().size())));
         player.sendMessage("");
-        player.sendMessage(ChatColor.GRAY + "  Comandos disponíveis:");
-        player.sendMessage(ChatColor.WHITE + "    /ai line <pista> - Gerenciar linha de corrida");
-        player.sendMessage(ChatColor.WHITE + "    /ai record <pista> - Gravar linha por volta");
-        player.sendMessage(ChatColor.WHITE + "    /ai add <heat> <dificuldade> [qtd] - Adicionar IAs");
-        player.sendMessage(ChatColor.WHITE + "    /ai remove <heat> - Remover IAs");
-        player.sendMessage(ChatColor.WHITE + "    /ai difficulty <piloto> <dificuldade> - Definir dificuldade");
-        player.sendMessage(ChatColor.WHITE + "    /ai list - Listar oponentes IA");
-        player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
+        player.sendMessage(tr(player, "ai_info_commands"));
+        player.sendMessage(tr(player, "ai_info_cmd_line"));
+        player.sendMessage(tr(player, "ai_info_cmd_record"));
+        player.sendMessage(tr(player, "ai_info_cmd_add"));
+        player.sendMessage(tr(player, "ai_info_cmd_remove"));
+        player.sendMessage(tr(player, "ai_info_cmd_difficulty"));
+        player.sendMessage(tr(player, "ai_info_cmd_list"));
+        player.sendMessage(tr(player, "ai_separator_gold"));
     }
 
     @Subcommand("record")
@@ -69,13 +73,13 @@ public class AICommand extends BaseCommand {
         AIRacingLineRecorder recorder = racingLineManager.getRecorder();
 
         if (recorder.isRecording(player.getUniqueId())) {
-            player.sendMessage(ChatColor.RED + "✗ Você já está gravando uma linha de corrida!");
-            player.sendMessage(ChatColor.GRAY + "  Use /ai record stop para cancelar");
+            player.sendMessage(tr(player, "ai_record_already"));
+            player.sendMessage(tr(player, "ai_record_stop_hint"));
             return;
         }
 
         if (!recorder.startRecording(player, trackName)) {
-            player.sendMessage(ChatColor.RED + "✗ Não foi possível iniciar a gravação!");
+            player.sendMessage(tr(player, "ai_record_start_failed"));
         }
     }
 
@@ -94,20 +98,20 @@ public class AICommand extends BaseCommand {
         AIRacingLine line = racingLineManager.getRacingLine(trackName);
 
         player.sendMessage("");
-        player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
-        player.sendMessage(ChatColor.YELLOW + "  Linha de Corrida: " + ChatColor.WHITE + trackName);
+        player.sendMessage(tr(player, "ai_separator_gold"));
+        player.sendMessage(tr(player, "ai_line_title", "{track}", trackName));
         player.sendMessage("");
-        player.sendMessage(ChatColor.GRAY + "  Pontos na linha: " + ChatColor.WHITE + line.getIdealLineSize());
-        player.sendMessage(ChatColor.GRAY + "  Pontos de frenagem: " + ChatColor.WHITE + line.getBrakingPoints().size());
-        player.sendMessage(ChatColor.GRAY + "  Pontos de aceleração: " + ChatColor.WHITE + line.getAccelerationPoints().size());
+        player.sendMessage(tr(player, "ai_line_points", "{count}", String.valueOf(line.getIdealLineSize())));
+        player.sendMessage(tr(player, "ai_line_braking", "{count}", String.valueOf(line.getBrakingPoints().size())));
+        player.sendMessage(tr(player, "ai_line_accel", "{count}", String.valueOf(line.getAccelerationPoints().size())));
         player.sendMessage("");
-        player.sendMessage(ChatColor.GRAY + "  Comandos:");
-        player.sendMessage(ChatColor.WHITE + "    /ai line " + trackName + " add - Adicionar ponto atual");
-        player.sendMessage(ChatColor.WHITE + "    /ai line " + trackName + " addbrake - Adicionar ponto de frenagem");
-        player.sendMessage(ChatColor.WHITE + "    /ai line " + trackName + " addaccel - Adicionar ponto de aceleração");
-        player.sendMessage(ChatColor.WHITE + "    /ai line " + trackName + " clear - Limpar linha");
-        player.sendMessage(ChatColor.WHITE + "    /ai line " + trackName + " generate - Gerar linha automática");
-        player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
+        player.sendMessage(tr(player, "ai_line_commands"));
+        player.sendMessage(tr(player, "ai_line_cmd_add", "{track}", trackName));
+        player.sendMessage(tr(player, "ai_line_cmd_addbrake", "{track}", trackName));
+        player.sendMessage(tr(player, "ai_line_cmd_addaccel", "{track}", trackName));
+        player.sendMessage(tr(player, "ai_line_cmd_clear", "{track}", trackName));
+        player.sendMessage(tr(player, "ai_line_cmd_generate", "{track}", trackName));
+        player.sendMessage(tr(player, "ai_separator_gold"));
     }
 
     @Subcommand("line add")
@@ -118,9 +122,9 @@ public class AICommand extends BaseCommand {
         AIRacingLine line = racingLineManager.getRacingLine(trackName);
         line.addIdealLinePoint(player.getLocation(), speed);
 
-        player.sendMessage(ChatColor.GREEN + "✓ Ponto adicionado à linha de " + trackName +
-                " (velocidade: " + String.format("%.2f", speed) + ")");
-        player.sendMessage(ChatColor.GRAY + "  Total de pontos: " + line.getIdealLineSize());
+        player.sendMessage(tr(player, "ai_line_added", "{track}", trackName,
+                "{speed}", String.format("%.2f", speed)));
+        player.sendMessage(tr(player, "ai_line_total", "{count}", String.valueOf(line.getIdealLineSize())));
     }
 
     @Subcommand("line addbrake")
@@ -131,8 +135,8 @@ public class AICommand extends BaseCommand {
         AIRacingLine line = racingLineManager.getRacingLine(trackName);
         line.addBrakingPoint(player.getLocation());
 
-        player.sendMessage(ChatColor.GREEN + "✓ Ponto de frenagem adicionado à linha de " + trackName);
-        player.sendMessage(ChatColor.GRAY + "  Total de pontos de frenagem: " + line.getBrakingPoints().size());
+        player.sendMessage(tr(player, "ai_line_brake_added", "{track}", trackName));
+        player.sendMessage(tr(player, "ai_line_brake_total", "{count}", String.valueOf(line.getBrakingPoints().size())));
     }
 
     @Subcommand("line addaccel")
@@ -143,8 +147,8 @@ public class AICommand extends BaseCommand {
         AIRacingLine line = racingLineManager.getRacingLine(trackName);
         line.addAccelerationPoint(player.getLocation());
 
-        player.sendMessage(ChatColor.GREEN + "✓ Ponto de aceleração adicionado à linha de " + trackName);
-        player.sendMessage(ChatColor.GRAY + "  Total de pontos de aceleração: " + line.getAccelerationPoints().size());
+        player.sendMessage(tr(player, "ai_line_accel_added", "{track}", trackName));
+        player.sendMessage(tr(player, "ai_line_accel_total", "{count}", String.valueOf(line.getAccelerationPoints().size())));
     }
 
     @Subcommand("line clear")
@@ -154,7 +158,7 @@ public class AICommand extends BaseCommand {
     public void onLineClear(Player player, String trackName) {
         AIRacingLine line = racingLineManager.getRacingLine(trackName);
         line.clear();
-        player.sendMessage(ChatColor.YELLOW + "⚠ Linha de corrida de " + trackName + " limpa!");
+        player.sendMessage(tr(player, "ai_line_cleared", "{track}", trackName));
     }
 
     @Subcommand("line generate")
@@ -163,7 +167,28 @@ public class AICommand extends BaseCommand {
     @Description("Gera automaticamente uma linha de corrida básica")
     public void onLineGenerate(Player player, String trackName) {
         racingLineManager.generateBasicRacingLine(trackName);
-        player.sendMessage(ChatColor.GREEN + "✓ Linha de corrida básica gerada para " + trackName);
+        player.sendMessage(tr(player, "ai_line_generated", "{track}", trackName));
+    }
+
+    @Subcommand("line trim")
+    @CommandCompletion("@tracks")
+    @CommandPermission("formularacing.admin")
+    @Description("Ajusta a linha gravada para exatamente uma volta (fecha o loop)")
+    public void onLineTrim(Player player, String trackName) {
+        AIRacingLine line = racingLineManager.getRacingLine(trackName);
+        if (!line.isUsable()) {
+            player.sendMessage(tr(player, "ai_line_trim_no_line", "{track}", trackName));
+            return;
+        }
+
+        boolean trimmed = racingLineManager.trimLineToSingleLap(line, trackName);
+        if (trimmed) {
+            racingLineManager.saveRacingLine(trackName, line);
+            player.sendMessage(tr(player, "ai_line_trim_done",
+                    "{track}", trackName, "{count}", String.valueOf(line.getIdealLineSize())));
+        } else {
+            player.sendMessage(tr(player, "ai_line_trim_failed", "{track}", trackName));
+        }
     }
 
     @Subcommand("difficulty")
@@ -175,27 +200,31 @@ public class AICommand extends BaseCommand {
         try {
             difficulty = AIOpponentManager.AIDifficulty.valueOf(difficultyStr.toUpperCase());
         } catch (IllegalArgumentException e) {
-            player.sendMessage(ChatColor.RED + "✗ Dificuldade inválida! Use: easy, medium, hard");
+            player.sendMessage(tr(player, "ai_difficulty_invalid"));
             return;
         }
 
         List<AIOpponentManager.AIOpponent> matches = new ArrayList<>(aiManager.findByDisplayName(targetName));
         if (matches.isEmpty()) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhuma IA encontrada com o nome " + targetName);
+            player.sendMessage(tr(player, "ai_difficulty_not_found", "{name}", targetName));
             return;
         }
         if (matches.size() > 1) {
-            player.sendMessage(ChatColor.RED + "✗ Há mais de uma IA com esse nome. Use um nome mais específico.");
+            player.sendMessage(tr(player, "ai_difficulty_ambiguous"));
             return;
         }
 
         AIOpponentManager.AIOpponent ai = matches.get(0);
         ai.setDifficulty(difficulty);
 
-        player.sendMessage(ChatColor.GREEN + "✓ Dificuldade definida para " + ai.getDisplayName() + ": " + difficulty.name());
-        player.sendMessage(ChatColor.GRAY + "  Velocidade: " + String.format("%.0f%%", difficulty.getSpeedMultiplier() * 100));
-        player.sendMessage(ChatColor.GRAY + "  Taxa de erro: " + String.format("%.0f%%", difficulty.getErrorRate() * 100));
-        player.sendMessage(ChatColor.GRAY + "  Precisão: " + String.format("%.0f%%", difficulty.getLineAccuracy() * 100));
+        player.sendMessage(tr(player, "ai_difficulty_set",
+                "{name}", ai.getDisplayName(), "{difficulty}", difficulty.name()));
+        player.sendMessage(tr(player, "ai_difficulty_speed",
+                "{value}", String.format("%.0f%%", difficulty.getSpeedMultiplier() * 100)));
+        player.sendMessage(tr(player, "ai_difficulty_error",
+                "{value}", String.format("%.0f%%", difficulty.getErrorRate() * 100)));
+        player.sendMessage(tr(player, "ai_difficulty_accuracy",
+                "{value}", String.format("%.0f%%", difficulty.getLineAccuracy() * 100)));
     }
 
     @Subcommand("list")
@@ -203,12 +232,12 @@ public class AICommand extends BaseCommand {
     @Description("Lista todos os oponentes IA ativos")
     public void onList(Player player) {
         player.sendMessage("");
-        player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
-        player.sendMessage(ChatColor.YELLOW + "  Oponentes IA Ativos");
+        player.sendMessage(tr(player, "ai_separator_gold"));
+        player.sendMessage(tr(player, "ai_list_title"));
         player.sendMessage("");
 
         if (aiManager.getAIOpponents().isEmpty()) {
-            player.sendMessage(ChatColor.GRAY + "  Nenhum oponente IA ativo no momento.");
+            player.sendMessage(tr(player, "ai_list_empty"));
         } else {
             for (AIOpponentManager.AIOpponent ai : aiManager.getAIOpponents().values()) {
                 String difficultyName = ai.getDifficulty().getName();
@@ -221,17 +250,17 @@ public class AICommand extends BaseCommand {
                         : ChatColor.RED.toString();
 
                 player.sendMessage(ChatColor.WHITE + "  " + ai.getDisplayName());
-                player.sendMessage(ChatColor.GRAY + "    Dificuldade: " + ChatColor.AQUA + difficultyName);
-                player.sendMessage(ChatColor.GRAY + "    Aprendizado: " + progressColor + String.format("%.0f%%", learningProgress));
-                player.sendMessage(ChatColor.GRAY + "    Voltas: " + ChatColor.WHITE + lapsCompleted);
+                player.sendMessage(tr(player, "ai_list_difficulty", "{difficulty}", difficultyName));
+                player.sendMessage(tr(player, "ai_list_learning", "{progress}", progressColor + String.format("%.0f%%", learningProgress)));
+                player.sendMessage(tr(player, "ai_list_laps", "{count}", String.valueOf(lapsCompleted)));
                 if (bestLapTime < Double.MAX_VALUE) {
-                    player.sendMessage(ChatColor.GRAY + "    Melhor volta: " + ChatColor.WHITE + String.format("%.2f", bestLapTime) + "s");
+                    player.sendMessage(tr(player, "ai_list_best_lap", "{time}", String.format("%.2f", bestLapTime)));
                 }
                 player.sendMessage("");
             }
         }
 
-        player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
+        player.sendMessage(tr(player, "ai_separator_gold"));
     }
 
     @Subcommand("add")
@@ -243,12 +272,12 @@ public class AICommand extends BaseCommand {
         try {
             difficulty = AIOpponentManager.AIDifficulty.valueOf(difficultyStr.toUpperCase());
         } catch (IllegalArgumentException e) {
-            player.sendMessage(ChatColor.RED + "✗ Dificuldade inválida! Use: easy, medium, hard");
+            player.sendMessage(tr(player, "ai_difficulty_invalid"));
             return;
         }
 
         if (count < 1 || count > 20) {
-            player.sendMessage(ChatColor.RED + "✗ Quantidade inválida! Use entre 1 e 20");
+            player.sendMessage(tr(player, "ai_add_count_invalid"));
             return;
         }
 
@@ -270,11 +299,14 @@ public class AICommand extends BaseCommand {
 
         if (added > 0) {
             aiManager.startAIForHeat(heat);
-            player.sendMessage(ChatColor.GREEN + "✓ Adicionado(s) " + added + " oponente(s) IA (" + difficulty.name() + ") ao heat " + heat.getId());
-            player.sendMessage(ChatColor.GRAY + "  Total de pilotos no heat: " + heat.getDrivers().size());
-            player.sendMessage(ChatColor.GRAY + "  As IAs físicas serão spawnadas no mundo quando o heat iniciar.");
+            player.sendMessage(tr(player, "ai_add_success",
+                    "{count}", String.valueOf(added),
+                    "{difficulty}", difficulty.name(),
+                    "{heat}", String.valueOf(heat.getId())));
+            player.sendMessage(tr(player, "ai_add_total_drivers", "{count}", String.valueOf(heat.getDrivers().size())));
+            player.sendMessage(tr(player, "ai_add_spawn_hint"));
         } else {
-            player.sendMessage(ChatColor.RED + "✗ Não foi possível adicionar oponentes IA ao heat");
+            player.sendMessage(tr(player, "ai_add_failed"));
         }
     }
 
@@ -299,10 +331,12 @@ public class AICommand extends BaseCommand {
         }
 
         if (removed > 0) {
-            player.sendMessage(ChatColor.GREEN + "✓ Removido(s) " + removed + " oponente(s) IA do heat " + heat.getId());
-            player.sendMessage(ChatColor.GRAY + "  Total de pilotos no heat: " + heat.getDrivers().size());
+            player.sendMessage(tr(player, "ai_remove_success",
+                    "{count}", String.valueOf(removed),
+                    "{heat}", String.valueOf(heat.getId())));
+            player.sendMessage(tr(player, "ai_add_total_drivers", "{count}", String.valueOf(heat.getDrivers().size())));
         } else {
-            player.sendMessage(ChatColor.YELLOW + "⚠ Nenhum oponente IA encontrado no heat " + heat.getId());
+            player.sendMessage(tr(player, "ai_remove_none", "{heat}", String.valueOf(heat.getId())));
         }
     }
 
@@ -314,12 +348,12 @@ public class AICommand extends BaseCommand {
         AIRacingLine line = racingLineManager.getRacingLine(trackName);
 
         player.sendMessage("");
-        player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
-        player.sendMessage(ChatColor.YELLOW + "  Informações da Linha: " + ChatColor.WHITE + trackName);
+        player.sendMessage(tr(player, "ai_separator_gold"));
+        player.sendMessage(tr(player, "ai_info_line_title", "{track}", trackName));
         player.sendMessage("");
-        player.sendMessage(ChatColor.GRAY + "  Pontos na linha ideal: " + ChatColor.WHITE + line.getIdealLineSize());
-        player.sendMessage(ChatColor.GRAY + "  Pontos de frenagem: " + ChatColor.WHITE + line.getBrakingPoints().size());
-        player.sendMessage(ChatColor.GRAY + "  Pontos de aceleração: " + ChatColor.WHITE + line.getAccelerationPoints().size());
+        player.sendMessage(tr(player, "ai_line_points", "{count}", String.valueOf(line.getIdealLineSize())));
+        player.sendMessage(tr(player, "ai_line_braking", "{count}", String.valueOf(line.getBrakingPoints().size())));
+        player.sendMessage(tr(player, "ai_line_accel", "{count}", String.valueOf(line.getAccelerationPoints().size())));
 
         if (line.getIdealLineSize() > 0) {
             Location currentLoc = player.getLocation();
@@ -330,13 +364,13 @@ public class AICommand extends BaseCommand {
                 double idealDirection = line.getIdealDirection(currentLoc);
 
                 player.sendMessage("");
-                player.sendMessage(ChatColor.GRAY + "  Status atual:");
-                player.sendMessage(ChatColor.WHITE + "    Distância da linha: " + ChatColor.AQUA + String.format("%.2f", distance) + " blocos");
-                player.sendMessage(ChatColor.WHITE + "    Velocidade ideal: " + ChatColor.AQUA + String.format("%.0f%%", idealSpeed * 100));
-                player.sendMessage(ChatColor.WHITE + "    Direção ideal: " + ChatColor.AQUA + String.format("%.1f°", idealDirection));
+                player.sendMessage(tr(player, "ai_info_status"));
+                player.sendMessage(tr(player, "ai_info_distance", "{distance}", String.format("%.2f", distance)));
+                player.sendMessage(tr(player, "ai_info_ideal_speed", "{value}", String.format("%.0f%%", idealSpeed * 100)));
+                player.sendMessage(tr(player, "ai_info_ideal_direction", "{value}", String.format("%.1f°", idealDirection)));
             }
         }
 
-        player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
+        player.sendMessage(tr(player, "ai_separator_gold"));
     }
 }

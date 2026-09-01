@@ -33,6 +33,14 @@ public class NMSHandlerImpl implements NMSHandler {
         }
     }
 
+    /**
+     * Public helper so other systems (e.g. AI boats) can apply the same
+     * server-side collidable state used for player boats.
+     */
+    public static void setCollidable(Entity entity, boolean collidable) {
+        setCollidableIfPossible(entity, collidable);
+    }
+
     @Override
     public void setBoatType(String boatType) {
         try {

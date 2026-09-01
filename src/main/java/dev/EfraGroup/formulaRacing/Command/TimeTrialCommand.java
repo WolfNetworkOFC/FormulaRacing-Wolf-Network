@@ -169,8 +169,7 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                             // --- Ghost System: start recording ---
                             if (this.plugin.getGhostManager() != null) {
                                 this.plugin.getGhostManager().startRecording(player);
-                            }
-                            // --- Ghost System: load and start replay if ghost exists ---
+                            }                             // --- Ghost System: load and start replay if ghost exists ---
                              if (this.plugin.getGhostManager() != null) {
                                  this.plugin.getGhostManager().loadGhostAsync(
                                          player.getUniqueId(), trackNameWS, frames -> {
@@ -178,6 +177,11 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                                          this.plugin.getGhostManager().startReplay(player, frames);
                                      }
                                  });
+                             }
+                             // --- Medal System: start colored medal line replay only if the
+                             // player's PB is slower than the medal time ---
+                             if (this.plugin.getMedalManager() != null) {
+                                 this.plugin.getMedalManager().startMedalReplayIfBetter(player, trackNameWS);
                              }
                              // --- WolfMOD: Send track racing line to client ---
                              var wolfMod = this.plugin.getWolfMod();
@@ -375,6 +379,12 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                                 }
                             }
 
+                            // --- Ghost System: hide PB and medal lines when resetting ---
+                            // They reappear when the player crosses START/END again (startSoloTimer).
+                            if (this.plugin.getGhostManager() != null) {
+                                this.plugin.getGhostManager().stopReplay(player);
+                            }
+
                             this.api.recoverPlayerBoatState(player);
                             final String finalTrackName = trackName;
                             final String finalTrackNameWS = trackName != null ? trackName.replaceAll("\\s+", "") : null;
@@ -392,18 +402,9 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                                             && finalTrackNameWS != null) {
                                         this.plugin.getGhostManager().startRecording(player);
                                     }
-                                    // --- Ghost System: load and start replay if ghost exists ---
-                                    if (this.plugin.getGhostManager() != null
-                                            && finalTrackNameWS != null) {
-                                        this.plugin.getGhostManager().loadGhostAsync(
-                                                player.getUniqueId(), finalTrackNameWS, frames -> {
-                                            if (frames != null && !frames.isEmpty()
-                                                    && player.isOnline()) {
-                                                this.plugin.getGhostManager().startReplay(
-                                                        player, frames);
-                                            }
-                                        });
-                                    }
+                                    // NOTE: PB/medal line replays are NOT restarted here on purpose —
+                                    // they must stay hidden after a reset and only reappear when the
+                                    // player crosses START/END again (startSoloTimer handles that).
                                 }
                             });
                                     if (activeHeat == null) {

@@ -35,7 +35,6 @@ public class ReversalSession implements SessionLogic {
     @Override
     public void start(Heats heat) {
         heat.setHeatState(HeatState.RACING);
-        heat.startOfflineMonitoring();
         matchFinished = false;
         reversalCount = 0;
 

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import dev.EfraGroup.formulaRacing.Utils.PlatformUtils;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -75,7 +76,30 @@ public class APIFormulaRacing {
 
     public void spawnBoatAt(Player player, Location location, boolean trail, boolean locked, boolean checkground, boolean collidable) {
         Location loc = location.clone();
-        SchedulerHelper.runTaskFor(this.plugin, player, () -> this.spawnBoatNow(player, loc, trail, locked, checkground, collidable));
+        // Folia: world.spawnEntity must run on the REGION thread that owns the chunk
+        // at `loc` — otherwise it throws "Cannot add entity off-main thread". The
+        // player's entity scheduler can belong to a different region (e.g. a grid
+        // position right after a teleport). When that happens, move the player to
+        // `loc` first (teleportAsync is thread-safe), then spawn on the player's
+        // new region thread — the boat and the player must share a region to ride.
+        SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            if (PlatformUtils.isFolia() && !Bukkit.isOwnedByCurrentRegion(loc)) {
+                SchedulerHelper.teleportAsync(player, loc).thenAccept(success -> {
+                    if (Boolean.TRUE.equals(success) && player.isOnline()) {
+                        SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                            if (player.isOnline()) {
+                                this.spawnBoatNow(player, loc, trail, locked, checkground, collidable);
+                            }
+                        });
+                    }
+                });
+            } else {
+                this.spawnBoatNow(player, loc, trail, locked, checkground, collidable);
+            }
+        });
     }
 
     private void spawnBoatNow(Player player, Location loc, boolean trail, boolean locked, boolean checkground, boolean collidable) {

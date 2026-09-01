@@ -22,7 +22,11 @@ public class TrackLeaderboard {
     private final JavaPlugin plugin;
     private FRTask task;
 
-    private final Map<String, Hologram> holograms = new HashMap<>();
+    // Stored as Object so the shutdown lambda never links against the
+    // DecentHolograms classes — during server stop DH may be unloaded before
+    // this plugin, and any hard reference (even inside try/catch) throws
+    // NoClassDefFoundError while the JVM resolves the lambda, aborting onDisable().
+    private final Map<String, Object> holograms = new HashMap<>();
     private volatile boolean removed;
     private boolean javaEnabled = true;
     private boolean bedrockEnabled = true;
@@ -80,12 +84,12 @@ public class TrackLeaderboard {
             String safeName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
             String holoName = "lb_" + type + "_" + safeName;
             try {
-                Hologram holo = this.holograms.get(type);
+                Hologram holo = (Hologram) this.holograms.get(type);
                 if (holo == null) {
                     holo = DHAPI.getHologram(holoName);
                 }
                 if (holo != null) holo.delete();
-            } catch (Exception ignored) {}
+            } catch (Throwable ignored) {}
             holograms.remove(type);
         } else {
             HologramManager hm = FormulaRacing.getInstance().getHologramManager();
@@ -142,14 +146,14 @@ public class TrackLeaderboard {
             if (this.removed) return;
             if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
                 try {
-                    Hologram holo = this.holograms.get(type);
+                    Hologram holo = (Hologram) this.holograms.get(type);
                     if (holo == null) {
                         holo = DHAPI.getHologram("lb_" + type + "_" + this.trackName.toLowerCase().replaceAll("[^a-z0-9]", ""));
                     }
                     if (holo != null) {
                         holo.setLocation(loc);
                     }
-                } catch (Exception ignored) {}
+                } catch (Throwable ignored) {}
             }
         };
         if (this.plugin.isEnabled()) {
@@ -172,11 +176,11 @@ public class TrackLeaderboard {
             if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
                 try {
                     holograms.forEach((t, holo) -> {
-                        if (holo != null) {
-                            holo.setLocation(this.locationForType(t));
+                        if (holo instanceof Hologram h) {
+                            h.setLocation(this.locationForType(t));
                         }
                     });
-                } catch (Exception ignored) {}
+                } catch (Throwable ignored) {}
             }
         };
 
@@ -264,7 +268,7 @@ public class TrackLeaderboard {
                         holo.setLocation(holoLoc);
                     }
                     holograms.put(type, holo);
-                } catch (Exception ignored) {}
+                } catch (Throwable ignored) {}
             };
 
             if (this.plugin.isEnabled()) {
@@ -294,7 +298,11 @@ public class TrackLeaderboard {
         Runnable cleanup = () -> {
             holograms.values().forEach(holo -> {
                 if (holo != null) {
-                    try { holo.delete(); } catch (Throwable ignored) {}
+                    // Reflective delete: this lambda runs unconditionally on shutdown,
+                    // so it must not reference the DecentHolograms classes at all.
+                    try {
+                        holo.getClass().getMethod("delete").invoke(holo);
+                    } catch (Throwable ignored) {}
                 }
             });
             holograms.clear();
@@ -307,7 +315,7 @@ public class TrackLeaderboard {
                         if (orphan != null) {
                             orphan.delete();
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Throwable ignored) {}
                 }
             } else {
                 HologramManager hm = FormulaRacing.getInstance().getHologramManager();

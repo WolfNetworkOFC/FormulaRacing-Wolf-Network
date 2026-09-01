@@ -13,17 +13,12 @@
 *.tar.gz
 *.rar
 
-# Maven
-target/
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
-dependency-reduced-pom.xml
-buildNumber.properties
-.mvn/timing.properties
-.mvn/wrapper/maven-wrapper.jar
+# Gradle
+build/
+.gradle/
+gradle-app.setting
+# Keep the wrapper jar (needed to run gradlew)
+!gradle/wrapper/gradle-wrapper.jar
 
 # IntelliJ IDEA
 .idea/

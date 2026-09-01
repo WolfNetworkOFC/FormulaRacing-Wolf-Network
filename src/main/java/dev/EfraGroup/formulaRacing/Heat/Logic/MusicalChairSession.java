@@ -39,7 +39,6 @@ public class MusicalChairSession implements SessionLogic {
     @Override
     public void start(Heats heat) {
         heat.setHeatState(HeatState.RACING);
-        heat.startOfflineMonitoring();
 
         int totalDrivers = heat.getDrivers().size();
         safeZones = Math.max(1, totalDrivers - 1);

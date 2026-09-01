@@ -22,6 +22,14 @@ public class AIRacingLine {
     private final List<Location> brakingPoints;
     private final List<Location> accelerationPoints;
 
+    /**
+     * Guards mutations that must keep {@link #idealLine} and {@link #idealSpeeds}
+     * in lockstep (same size, index-aligned). Without it, a save triggered from
+     * another thread (e.g. startAIForHeat) could serialize the two lists at
+     * different sizes mid-recording and crash with IndexOutOfBounds.
+     */
+    private final Object mutationLock = new Object();
+
     public AIRacingLine(String trackName) {
         this.trackName = trackName;
         this.idealLine = new CopyOnWriteArrayList<>();
@@ -34,8 +42,10 @@ public class AIRacingLine {
         if (location == null || location.getWorld() == null) {
             return;
         }
-        idealLine.add(location.clone());
-        idealSpeeds.add(clampSpeed(idealSpeed));
+        synchronized (mutationLock) {
+            idealLine.add(location.clone());
+            idealSpeeds.add(clampSpeed(idealSpeed));
+        }
     }
 
     public void addBrakingPoint(Location location) {
@@ -178,6 +188,10 @@ public class AIRacingLine {
         return new ArrayList<>(idealLine);
     }
 
+    public List<Double> getIdealSpeeds() {
+        return new ArrayList<>(idealSpeeds);
+    }
+
     public List<Location> getBrakingPoints() {
         return new ArrayList<>(brakingPoints);
     }
@@ -190,13 +204,43 @@ public class AIRacingLine {
         return idealLine.size();
     }
 
+    /**
+     * Keeps only the points in {@code [startIndex, endIndexExclusive)} and
+     * drops all markers. Used to trim a race-length recording (grid prefix +
+     * several laps + mid-track tail) down to a single closed lap, so the line's
+     * last point meets its first point at the start/finish line.
+     */
+    public void keepRange(int startIndex, int endIndexExclusive) {
+        synchronized (mutationLock) {
+            int size = idealLine.size();
+            if (startIndex < 0 || endIndexExclusive > size || startIndex >= endIndexExclusive) {
+                return;
+            }
+            List<Location> keptPoints = new ArrayList<>(idealLine.subList(startIndex, endIndexExclusive));
+            List<Double> keptSpeeds = new ArrayList<>(idealSpeeds.subList(startIndex, endIndexExclusive));
+            idealLine.clear();
+            idealSpeeds.clear();
+            idealLine.addAll(keptPoints);
+            idealSpeeds.addAll(keptSpeeds);
+        }
+        brakingPoints.clear();
+        accelerationPoints.clear();
+    }
+
     public boolean isUsable() {
         return idealLine.size() >= 2;
     }
 
     public void clear() {
-        idealLine.clear();
-        idealSpeeds.clear();
+        synchronized (mutationLock) {
+            idealLine.clear();
+            idealSpeeds.clear();
+        }
+        brakingPoints.clear();
+        accelerationPoints.clear();
+    }
+
+    public void clearMarkers() {
         brakingPoints.clear();
         accelerationPoints.clear();
     }
@@ -243,27 +287,55 @@ public class AIRacingLine {
     }
 
     public void writeTo(DataOutputStream out) throws IOException {
-        out.writeInt(FORMAT_VERSION);
-
-        out.writeInt(idealLine.size());
-        for (int i = 0; i < idealLine.size(); i++) {
-            writeLocation(out, idealLine.get(i));
-            out.writeDouble(idealSpeeds.get(i));
+        // Snapshot both lists atomically: a recording on another thread may be
+        // appending points while this save runs, and the two lists must stay
+        // index-aligned or the read side gets a corrupted line.
+        List<Location> pointsSnapshot;
+        List<Double> speedsSnapshot;
+        List<Location> brakingSnapshot;
+        List<Location> accelSnapshot;
+        synchronized (mutationLock) {
+            pointsSnapshot = new ArrayList<>(idealLine);
+            speedsSnapshot = new ArrayList<>(idealSpeeds);
+            brakingSnapshot = new ArrayList<>(brakingPoints);
+            accelSnapshot = new ArrayList<>(accelerationPoints);
         }
 
-        out.writeInt(brakingPoints.size());
-        for (Location loc : brakingPoints) {
+        out.writeInt(FORMAT_VERSION);
+
+        out.writeInt(pointsSnapshot.size());
+        for (int i = 0; i < pointsSnapshot.size(); i++) {
+            writeLocation(out, pointsSnapshot.get(i));
+            out.writeDouble(speedsSnapshot.get(i));
+        }
+
+        out.writeInt(brakingSnapshot.size());
+        for (Location loc : brakingSnapshot) {
             writeLocation(out, loc);
         }
 
-        out.writeInt(accelerationPoints.size());
-        for (Location loc : accelerationPoints) {
+        out.writeInt(accelSnapshot.size());
+        for (Location loc : accelSnapshot) {
             writeLocation(out, loc);
         }
     }
 
     public static AIRacingLine readFrom(DataInputStream in, String trackName) throws IOException {
-        in.readInt(); // version
+        return readFrom(in, trackName, null);
+    }
+
+    /**
+     * @param droppedOut optional single-slot array (index 0) that receives how
+     *                   many points were dropped because their world was not
+     *                   loaded, so callers can warn instead of silently losing
+     *                   parts of the line.
+     */
+    public static AIRacingLine readFrom(DataInputStream in, String trackName, int[] droppedOut) throws IOException {
+        int version = in.readInt();
+        if (version != FORMAT_VERSION) {
+            throw new IOException("Unsupported AI racing line format version " + version
+                    + " (expected " + FORMAT_VERSION + ") for track " + trackName);
+        }
 
         AIRacingLine line = new AIRacingLine(trackName);
 
@@ -273,6 +345,8 @@ public class AIRacingLine {
             double speed = in.readDouble();
             if (loc != null && loc.getWorld() != null) {
                 line.addIdealLinePoint(loc, speed);
+            } else if (droppedOut != null) {
+                droppedOut[0]++;
             }
         }
 
@@ -281,6 +355,8 @@ public class AIRacingLine {
             Location loc = readLocation(in);
             if (loc != null) {
                 line.addBrakingPoint(loc);
+            } else if (droppedOut != null) {
+                droppedOut[0]++;
             }
         }
 
@@ -289,6 +365,8 @@ public class AIRacingLine {
             Location loc = readLocation(in);
             if (loc != null) {
                 line.addAccelerationPoint(loc);
+            } else if (droppedOut != null) {
+                droppedOut[0]++;
             }
         }
 

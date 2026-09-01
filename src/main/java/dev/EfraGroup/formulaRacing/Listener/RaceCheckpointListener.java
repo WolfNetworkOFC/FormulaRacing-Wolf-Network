@@ -172,33 +172,34 @@ public class RaceCheckpointListener implements Listener {
                                 }
                                 int checkpointsReached =
                                     driver.getCheckpointsReached();
-                                int nextExpectedZeroBased = checkpointsReached;
-                                int nextExpectedOneBased =
-                                    checkpointsReached + 1;
+                                // Checkpoint ids can have GAPS (deleted/re-created
+                                // checkpoints): map the lap ordinal to the REAL id
+                                // of the next expected checkpoint. Assuming
+                                // id == checkpointsReached (+1) breaks tracks
+                                // whose ids are e.g. 1,3 — the 2nd checkpoint was
+                                // then flagged as "skipped".
+                                List<Integer> orderedCheckpointIds =
+                                    this.trackManager.getOrderedCheckpointIds(
+                                        trackNameWS
+                                    );
+                                Integer expectedCheckpointId =
+                                    checkpointsReached < orderedCheckpointIds.size()
+                                        ? orderedCheckpointIds.get(checkpointsReached)
+                                        : null;
 
                                 List<
                                     DatabaseManager.RegionData
                                 > expectedRegions = new ArrayList<>();
-                                if (nextExpectedZeroBased < totalCheckpoints) {
+                                if (expectedCheckpointId != null) {
                                     List<
                                         DatabaseManager.RegionData
-                                    > zeroBasedRegions = checkpointsById.get(
-                                        nextExpectedZeroBased
+                                    > expectedRegionsForId = checkpointsById.get(
+                                        expectedCheckpointId
                                     );
-                                    if (zeroBasedRegions != null) {
+                                    if (expectedRegionsForId != null) {
                                         expectedRegions.addAll(
-                                            zeroBasedRegions
+                                            expectedRegionsForId
                                         );
-                                    }
-                                }
-                                if (nextExpectedOneBased <= totalCheckpoints) {
-                                    List<
-                                        DatabaseManager.RegionData
-                                    > oneBasedRegions = checkpointsById.get(
-                                        nextExpectedOneBased
-                                    );
-                                    if (oneBasedRegions != null) {
-                                        expectedRegions.addAll(oneBasedRegions);
                                     }
                                 }
 
@@ -232,8 +233,8 @@ public class RaceCheckpointListener implements Listener {
                                 > entry : checkpointsById.entrySet()) {
                                     int checkpointId = entry.getKey();
                                     if (
-                                        checkpointId == nextExpectedZeroBased ||
-                                        checkpointId == nextExpectedOneBased
+                                        expectedCheckpointId != null &&
+                                        checkpointId == expectedCheckpointId
                                     ) {
                                         continue;
                                     }
@@ -271,7 +272,9 @@ public class RaceCheckpointListener implements Listener {
                                                 currentHeat,
                                                 player,
                                                 checkpointId,
-                                                nextExpectedOneBased
+                                                expectedCheckpointId != null
+                                                    ? expectedCheckpointId
+                                                    : checkpointId
                                             );
                                             return;
                                         }
@@ -339,10 +342,12 @@ public class RaceCheckpointListener implements Listener {
     ) {
         this.plugin.getDebugManager().logRaceSystem(
             String.format(
-                "§c[CHECKPOINT SKIP] %s skipped CP%d (expected CP%d) - Resetting",
+                "§c[CHECKPOINT SKIP] %s skipped CP%d (expected CP%d, reached=%d, orderedIds=%s) - Resetting",
                 player.getName(),
                 detectedCheckpointId,
-                expectedCheckpointId
+                expectedCheckpointId,
+                driver.getCheckpointsReached(),
+                this.trackManager.getOrderedCheckpointIds(heat.getTrackNameWS())
             )
         );
         this.lastCheckpointSkip.put(
@@ -367,8 +372,14 @@ public class RaceCheckpointListener implements Listener {
         }
         Map<Integer, List<DatabaseManager.RegionData>> checkpointsById =
             this.trackManager.getCheckpointsById(heat.getTrackNameWS());
+        // Teleport target: the LAST PASSED checkpoint (by ordinal → real id),
+        // or the track spawn when nothing was passed yet this lap. The old
+        // "expectedCheckpointId - 1" math assumed sequential ids and could
+        // teleport to a non-existent checkpoint.
+        List<Integer> orderedIds = this.trackManager.getOrderedCheckpointIds(heat.getTrackNameWS());
+        int passed = driver.getCheckpointsReached();
         Location targetLoc;
-        if (expectedCheckpointId == 0) {
+        if (passed <= 0) {
             targetLoc = this.trackManager.getTrackSpawn(heat.getTrackNameWS());
             if (targetLoc != null) {
                 targetLoc = new Location(
@@ -381,9 +392,9 @@ public class RaceCheckpointListener implements Listener {
                 );
             }
         } else {
-            int targetCheckpoint = expectedCheckpointId - 1;
+            Integer lastPassedId = passed - 1 < orderedIds.size() ? orderedIds.get(passed - 1) : null;
             List<DatabaseManager.RegionData> targetRegions =
-                checkpointsById.get(targetCheckpoint);
+                lastPassedId != null ? checkpointsById.get(lastPassedId) : null;
             if (targetRegions != null && !targetRegions.isEmpty()) {
                 DatabaseManager.RegionData cp = targetRegions.get(0);
                 double tpX = (cp.getMinX() + cp.getMaxX()) / 2.0;

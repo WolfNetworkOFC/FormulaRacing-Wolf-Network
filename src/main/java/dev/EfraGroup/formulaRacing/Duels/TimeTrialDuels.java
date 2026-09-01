@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
@@ -136,12 +137,14 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                         this.plugin.getDebugManager().logDuelSystem("[PREP] Removed old boat of " + p1.getName());
                     }
 
-                    if (p2.getVehicle() != null && p2.getVehicle() instanceof Boat) {
-                        Boat oldBoat = (Boat)p2.getVehicle();
-                        oldBoat.eject();
-                        oldBoat.remove();
-                        this.plugin.getDebugManager().logDuelSystem("[PREP] Removed old boat of " + p2.getName());
-                    }
+                    // p2's boat belongs to p2's region thread on Folia — remove it there.
+                    SchedulerHelper.runTaskFor(this.plugin, p2, () -> {
+                        if (p2.getVehicle() instanceof Boat oldBoat2) {
+                            oldBoat2.eject();
+                            oldBoat2.remove();
+                            this.plugin.getDebugManager().logDuelSystem("[PREP] Removed old boat of " + p2.getName());
+                        }
+                    });
 
                     this.packet.resetBoatUtilsToVanilla(p1);
                     this.packet.resetBoatUtilsToVanilla(p2);
@@ -153,7 +156,21 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                         this.scoreboardDuelsUtils.applyDuelBoard(p1, duelId, laps, trackName);
                         this.scoreboardDuelsUtils.applyDuelBoard(p2, duelId, laps, trackName);
                         this.plugin.getLonelyController().updatePlayersVisibility(p1);
-                    }, 1L);
+                        this.plugin.getLonelyController().updatePlayersVisibility(p2);
+                        if (lonely) {
+                            String lang1 = this.dm.getPlayerLanguage(p1.getUniqueId());
+                            String lang2 = this.dm.getPlayerLanguage(p2.getUniqueId());
+                            p1.sendMessage(this.plugin.getDirectTranslation("duel_lonely_enabled", lang1));
+                            p2.sendMessage(this.plugin.getDirectTranslation("duel_lonely_enabled", lang2));
+                        }
+
+                        // Grid placement + countdown were lost in the Folia scheduler
+                        // migration — without them the duel NEVER starts (raceStarted
+                        // stays false and every START/END cross is ignored).
+                        this.setupPlayerInGrid(p1, spawnLoc.clone());
+                        this.setupPlayerInGrid(p2, spawnLoc.clone());
+                        this.startFullCountdownSequence(p1, p2, duelId, timeLimit);
+                    }, 5L);
                 }
             });
         }
@@ -326,7 +343,14 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                         for(UUID uuid : duelState.getPlayers()) {
                             PlayerDuelState playerState = (PlayerDuelState)TimeTrialDuels.this.playerStates.get(uuid);
                             if (playerState != null) {
-                                boolean playerReady = playerState.isFinished() || playerState.hasCompletedCurrentLapAfterTimeLimit();
+                                // Same readiness rule as checkIfAllPlayersCompletedAfterTimeLimit:
+                                // finished, or advanced at least one lap past the lap they were on
+                                // when the time ran out. (hasCompletedCurrentLapAfterTimeLimit is
+                                // never set to true, so it must not be used here.)
+                                int lapWhenTimeLimitReached = playerState.getLapWhenTimeLimitReached();
+                                int currentLap = playerState.getCurrentLap();
+                                boolean playerReady = playerState.isFinished()
+                                        || (lapWhenTimeLimitReached >= 0 && currentLap > lapWhenTimeLimitReached);
                                 if (!playerReady) {
                                     allPlayersReady = false;
                                     break;
@@ -513,17 +537,27 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
     }
 
     private void setupPlayerInGrid(Player player, Location baseLoc) {
-        SchedulerHelper.teleportAsync(this.plugin, player, baseLoc);
-        Location asLoc = baseLoc.clone().add((double)0.0F, (double)1.0F, (double)0.0F);
-        ArmorStand stand = (ArmorStand)baseLoc.getWorld().spawnEntity(asLoc, EntityType.ARMOR_STAND);
-        stand.setVisible(false);
-        stand.setGravity(false);
-        stand.setInvulnerable(true);
-        stand.setMarker(true);
-        Boat boat = (Boat)baseLoc.getWorld().spawnEntity(baseLoc, EntityType.OAK_BOAT);
-        stand.addPassenger(boat);
-        boat.addPassenger(player);
-        player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_LAND, 0.5F, 1.5F);
+        SchedulerHelper.teleportAsync(this.plugin, player, baseLoc).thenAccept(success -> {
+            if (!Boolean.TRUE.equals(success) || !player.isOnline()) {
+                return;
+            }
+            // Entity spawns must run on the destination region's thread (Folia).
+            SchedulerHelper.runTaskAtLocation(this.plugin, baseLoc, () -> {
+                if (!player.isOnline()) {
+                    return;
+                }
+                Location asLoc = baseLoc.clone().add((double)0.0F, (double)1.0F, (double)0.0F);
+                ArmorStand stand = (ArmorStand)baseLoc.getWorld().spawnEntity(asLoc, EntityType.ARMOR_STAND);
+                stand.setVisible(false);
+                stand.setGravity(false);
+                stand.setInvulnerable(true);
+                stand.setMarker(true);
+                Boat boat = (Boat)baseLoc.getWorld().spawnEntity(baseLoc, EntityType.OAK_BOAT);
+                stand.addPassenger(boat);
+                boat.addPassenger(player);
+                player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_LAND, 0.5F, 1.5F);
+            });
+        });
     }
 
     public void onPlayerCrossStart(Player player, int duelId) {
@@ -687,8 +721,7 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                                         SchedulerHelper.runTaskFor(this.plugin, player, () -> {
                                             Location boatLoc = spawnLoc.clone().add(0, 0.5, 0);
 
-                                            Boat newBoat = (Boat) spawnLoc.getWorld().spawnEntity(boatLoc, EntityType.OAK_BOAT);
-                                            newBoat.setBoatType(finalWoodType);
+                                            Boat newBoat = (Boat) spawnLoc.getWorld().spawnEntity(boatLoc, getEntityTypeFromBoatType(finalWoodType));
                                             newBoat.addPassenger(player);
 
                                     plugin.getDebugManager().logDuelSystem("[LAP RESET] Spawned new boat (" + finalWoodType + ") for " +
@@ -710,10 +743,8 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
                             });
                         });
 
-                            String langCode4 = this.dm.getPlayerLanguage(player.getUniqueId());
-                                TitleHelper.sendThemedTitle(player, "",
-                                    this.plugin.getTranslation("duel_lap_prefix", langCode4) + newLap, 0, 15, 5);
-                            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0F, 2.0F);
+                            // Title/sound are sent once by the shared block after the
+                            // if/else — sending them here too duplicated the notification.
                             this.plugin.getDebugManager().logDuelSystem(player.getName() + " started lap " + newLap + "/" + totalLaps);
                         } else {
                             this.plugin.getDebugManager().logDuelSystem("§c[DUEL] Spawn location is NULL for " + duelState.getTrackName());
@@ -1289,11 +1320,13 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
         private final boolean lonely;
         private final boolean timeTrialMode;
         private final boolean ranked;
+        // Mutated from player region threads (START/END crosses) and global tasks
+        // (countdown, time limit) on Folia — must be concurrent.
         private final Set<UUID> players;
         private final List<UUID> finishOrder;
-        private boolean raceStarted;
-        private long raceStartTime;
-        private boolean timeLimitReached;
+        private volatile boolean raceStarted;
+        private volatile long raceStartTime;
+        private volatile boolean timeLimitReached;
         private final Map<UUID, Double> bestLapTimes;
 
         public DuelState(int duelId, String trackName, int totalLaps, int timeLimit, boolean lonely, boolean timeTrialMode, boolean ranked) {
@@ -1304,12 +1337,12 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
             this.lonely = lonely;
             this.timeTrialMode = timeTrialMode;
             this.ranked = ranked;
-            this.players = new HashSet();
-            this.finishOrder = new ArrayList();
+            this.players = ConcurrentHashMap.newKeySet();
+            this.finishOrder = new CopyOnWriteArrayList();
             this.raceStarted = false;
             this.raceStartTime = 0L;
             this.timeLimitReached = false;
-            this.bestLapTimes = new HashMap();
+            this.bestLapTimes = new ConcurrentHashMap();
         }
 
         public void addPlayer(UUID uuid) {
@@ -1385,11 +1418,9 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
         }
 
         public void updateBestLapTime(UUID uuid, double lapTime) {
-            Double current = (Double)this.bestLapTimes.get(uuid);
-            if (current == null || lapTime < current) {
-                this.bestLapTimes.put(uuid, lapTime);
-            }
-
+            // Atomic check-and-set: two players finishing laps on different region
+            // threads must not lose the smaller time.
+            this.bestLapTimes.compute(uuid, (key, current) -> current == null || lapTime < current ? lapTime : current);
         }
 
         public double getBestLapTime(UUID uuid) {
@@ -1419,14 +1450,15 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
     private static class PlayerDuelState {
         private final UUID playerUUID;
         private final int duelId;
-        private int currentLap;
-        private boolean finished;
-        private long lastCrossTime;
-        private long firstLapStartTime;
-        private int lastKnownPosition;
-        private boolean needsLapTimerReset;
-        private boolean completedCurrentLapAfterTimeLimit;
-        private int lapWhenTimeLimitReached = -1;
+        // Written on the player's region thread, read from global tasks on Folia.
+        private volatile int currentLap;
+        private volatile boolean finished;
+        private volatile long lastCrossTime;
+        private volatile long firstLapStartTime;
+        private volatile int lastKnownPosition;
+        private volatile boolean needsLapTimerReset;
+        private volatile boolean completedCurrentLapAfterTimeLimit;
+        private volatile int lapWhenTimeLimitReached = -1;
 
         public PlayerDuelState(UUID playerUUID, int duelId) {
             this.playerUUID = playerUUID;

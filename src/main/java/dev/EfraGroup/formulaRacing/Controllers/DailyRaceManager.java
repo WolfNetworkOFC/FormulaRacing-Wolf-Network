@@ -374,7 +374,7 @@ public class DailyRaceManager {
             if (this.phase == DailyRaceManager.Phase.PRACTICE) {
                 this.phase = DailyRaceManager.Phase.QUALIFICATION;
                 this.writeRuntime(event.getId(), this.phase);
-                this.plugin.getDebugManager().logRaceSystem("[DailyRace] Ending practice. Waiting for Round System automation.");
+                this.plugin.getDebugManager().logRaceSystem("[DailyRace] Ending practice. Starting qualification round explicitly.");
                 Rounds practiceRound = event.getSchedule().getRound(1).orElse(null);
                 if (practiceRound != null) {
                     for(Heats heat : practiceRound.getHeats().values()) {
@@ -383,7 +383,9 @@ public class DailyRaceManager {
                         }
                     }
                 }
-
+                // Rounds no longer auto-schedule the next round — the scripted
+                // daily race advances its own phases explicitly.
+                event.getSchedule().nextRound();
             }
         }
     }
@@ -529,7 +531,7 @@ public class DailyRaceManager {
         if (this.phase == DailyRaceManager.Phase.QUALIFICATION) {
             this.phase = DailyRaceManager.Phase.FINAL;
             this.writeRuntime(event.getId(), this.phase);
-            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Ending qualification. Waiting for Round System automation.");
+            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Ending qualification. Starting final round explicitly.");
             Rounds qualRound = (Rounds)event.getSchedule().getRound(2).orElse(null);
             if (qualRound != null) {
                 for(Heats heat : qualRound.getHeats().values()) {
@@ -538,7 +540,9 @@ public class DailyRaceManager {
                     }
                 }
             }
-
+            // Rounds no longer auto-schedule the next round — the scripted
+            // daily race advances its own phases explicitly.
+            event.getSchedule().nextRound();
         }
     }
 

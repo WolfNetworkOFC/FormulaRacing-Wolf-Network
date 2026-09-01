@@ -49,6 +49,11 @@ public class SpawnBoatCleanupListener implements Listener {
             if (this.plugin.getRaceActionBarManager() != null) {
                 this.plugin.getRaceActionBarManager().removePlayer(player);
             }
+            
+            // Hide PB and medal ghost lines + stop recording when leaving to spawn
+            if (this.plugin.getGhostManager() != null) {
+                this.plugin.getGhostManager().cleanupPlayer(player);
+            }
             if (this.plugin.getScoreboardOwnershipCoordinator() != null) {
                 this.plugin.getScoreboardOwnershipCoordinator().clear(uuid);
             }

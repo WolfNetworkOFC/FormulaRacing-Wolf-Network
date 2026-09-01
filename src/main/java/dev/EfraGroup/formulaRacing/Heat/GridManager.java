@@ -5,10 +5,10 @@ import dev.EfraGroup.formulaRacing.Controllers.TrackIntegrationManager;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
@@ -17,20 +17,46 @@ public class GridManager {
     private final FormulaRacing plugin;
     private final Heats heat;
     private final List<Location> gridPositions;
-    private final Set<UUID> frozenPlayers;
+    // Read by region threads (jump-start flag) while the global thread
+    // mutates it on freeze/unfreeze — must be a concurrent set.
+    private final Set<UUID> frozenPlayers = ConcurrentHashMap.newKeySet();
+    /** Jump-start penalties (F1 start): ticks a driver stays anchored after lights out. */
+    private final java.util.Map<UUID, Long> jumpStartPenalties = new java.util.concurrent.ConcurrentHashMap<>();
 
     public GridManager(FormulaRacing plugin, Heats heat) {
         this.plugin = plugin;
         this.heat = heat;
         this.gridPositions = new ArrayList();
-        this.frozenPlayers = new HashSet();
+    }
+
+    /**
+     * Registers a jump-start penalty: the driver is released from the grid
+     * anchor {@code penaltyTicks} ticks after lights out, while everyone else
+     * launches immediately.
+     */
+    public void penalizeJumpStart(UUID uuid, long penaltyTicks) {
+        if (uuid != null && penaltyTicks > 0L) {
+            this.jumpStartPenalties.put(uuid, penaltyTicks);
+        }
+    }
+
+    /** Whether the driver is currently held on the grid (countdown phase). */
+    public boolean isFrozen(UUID uuid) {
+        return uuid != null && this.frozenPlayers.contains(uuid);
     }
 
     public boolean generateGrid() {
         String trackNameWS = this.heat.getTrackNameWS();
         if (trackNameWS != null && !trackNameWS.isEmpty()) {
             TrackIntegrationManager trackManager = this.plugin.getTrackIntegrationManager();
-            int maxDrivers = this.heat.getMaxDrivers();
+            // Never cap the grid by heat.getMaxDrivers(): that value is a stale
+            // snapshot taken when the track was assigned to the heat (0 when no
+            // grids existed yet), so grids added later were silently truncated to
+            // zero and the heat reported "no GRIDs defined" until a server restart
+            // rebuilt the heat and re-ran setTrackNameWS. The heat only needs one
+            // slot per enrolled driver; loadHeat already warns when the track has
+            // fewer slots than drivers.
+            int maxDrivers = Math.max(this.heat.getDrivers().size(), 1);
             this.gridPositions.clear();
             this.gridPositions.addAll(trackManager.generateGridPositions(trackNameWS, maxDrivers));
             if (this.gridPositions.isEmpty()) {
@@ -76,10 +102,6 @@ public class GridManager {
                         if (player != null && player.isOnline()) {
                             Location gridLoc = (Location)this.gridPositions.get(gridPosition);
 
-                            SchedulerHelper.runTaskFor(this.plugin, player, () -> {
-                                this.plugin.getAPI().recoverPlayerBoatState(player);
-                            });
-
                             this.spawnBoatWithTrackConfig(player, gridLoc, driver);
                             DebugManager var10000 = this.plugin.getDebugManager();
                             String var10001 = player.getName();
@@ -102,6 +124,8 @@ public class GridManager {
     }
 
     public void freezePlayers() {
+        // New start sequence: drop penalties from a previous start of this heat.
+        this.jumpStartPenalties.clear();
         for(Driver driver : this.heat.getDrivers().values()) {
             Player player = this.plugin.getServer().getPlayer(driver.getUuid());
             if (player != null && player.isOnline()) {
@@ -115,13 +139,25 @@ public class GridManager {
 
     public void unfreezePlayers() {
         for(UUID playerUUID : this.frozenPlayers) {
-            Player player = this.plugin.getServer().getPlayer(playerUUID);
-            if (player != null && player.isOnline()) {
-                this.plugin.getAPI().releaseBoat(player);
+            long penaltyTicks = this.jumpStartPenalties.getOrDefault(playerUUID, 0L);
+            if (penaltyTicks > 0L) {
+                // Jump starter: stay anchored while the rest of the grid launches.
+                SchedulerHelper.runTaskLater(this.plugin, () -> {
+                    Player penalized = this.plugin.getServer().getPlayer(playerUUID);
+                    if (penalized != null && penalized.isOnline()) {
+                        this.plugin.getAPI().releaseBoat(penalized);
+                    }
+                }, penaltyTicks);
+            } else {
+                Player player = this.plugin.getServer().getPlayer(playerUUID);
+                if (player != null && player.isOnline()) {
+                    this.plugin.getAPI().releaseBoat(player);
+                }
             }
         }
 
         this.frozenPlayers.clear();
+        this.jumpStartPenalties.clear();
         this.plugin.getDebugManager().logRaceSystem("Drivers released from grid");
     }
 
@@ -134,10 +170,6 @@ public class GridManager {
                 Player player = this.plugin.getServer().getPlayer(driver.getUuid());
                 if (player != null && player.isOnline()) {
                     Location gridLoc = (Location)this.gridPositions.get(gridPosition);
-
-                    SchedulerHelper.runTaskFor(this.plugin, player, () -> {
-                        this.plugin.getAPI().recoverPlayerBoatState(player);
-                    });
 
                     this.spawnBoatWithTrackConfig(player, gridLoc, driver);
                     HeatState state = this.heat.getHeatState();
@@ -189,19 +221,57 @@ public class GridManager {
     private void spawnBoatWithTrackConfig(final Player player, Location location, Driver driver) {
         final String trackNameWS = this.heat.getTrackNameWS();
         final Location gridLoc = location.clone();
-        // Player-entity work must run on the player's region thread (Folia).
+        // Folia: all player-entity work must run on the player's region thread.
+        // 1) Dismount and delete any boat the player is currently riding FIRST —
+        //    teleporting a player who is still a passenger of a boat is unreliable
+        //    on Paper/Folia (the rider does not arrive at the destination and can
+        //    get stuck), while the old boat gets removed anyway, so the driver
+        //    never reached the grid when they were already sitting in a boat.
+        // 2) Then teleport the (now boatless) player and WAIT for completion
+        //    (teleportAsync is thread-safe) so the player is already in the grid
+        //    region before the spawn runs. The previous fire-and-forget teleport
+        //    followed by an immediate spawn ran on the player's OLD region thread
+        //    and threw "Cannot add entity off-main thread" whenever the grid was
+        //    in a different region than the player.
         SchedulerHelper.runTaskFor(this.plugin, player, () -> {
-            if (player.isOnline()) {
-                SchedulerHelper.teleport(player, gridLoc);
-                GridManager.this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackNameWS);
-                GridManager.this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
-                GridManager.this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, trackNameWS);
-                HeatState state = GridManager.this.heat.getHeatState();
-                boolean locked = state == HeatState.LOADED || state == HeatState.STARTING;
-                boolean collidable = GridManager.this.heat.getCollisionMode() != CollisionMode.DISABLED;
-                GridManager.this.plugin.getAPI().spawnBoatAt(player, gridLoc, false, locked, false, collidable);
-                GridManager.this.plugin.getDebugManager().logRaceSystem("Boat spawned for " + player.getName() + " on grid (track: " + trackNameWS + ", locked: " + locked + ", collidable: " + collidable + ", yaw: " + gridLoc.getYaw() + ")");
+            if (!player.isOnline()) {
+                return;
             }
-        }, 10L);
+            GridManager.this.plugin.getAPI().recoverPlayerBoatState(player);
+            SchedulerHelper.teleportAsync(player, gridLoc).thenAccept(success -> {
+            if (Boolean.TRUE.equals(success) && player.isOnline()) {
+                // All player-entity work runs on the player's region thread (Folia),
+                // which is now the grid region.
+                SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                    if (player.isOnline()) {
+                        GridManager.this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackNameWS);
+                        GridManager.this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
+                        GridManager.this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, trackNameWS);
+                        HeatState state = GridManager.this.heat.getHeatState();
+                        boolean locked = state == HeatState.LOADED || state == HeatState.STARTING;
+                        boolean collidable = GridManager.this.heat.getCollisionMode() != CollisionMode.DISABLED;
+                        GridManager.this.plugin.getAPI().spawnBoatAt(player, gridLoc, false, locked, false, collidable);
+                        // Re-apply the visibility/collision policy AFTER the player is inside the
+                        // boat: loadHeat calls updatePlayersVisibility before the boat spawns, and
+                        // addPassenger does NOT fire VehicleEnterEvent, so a client that arrived
+                        // with nocol (e.g. from a time trial / open world with the OBU mod) would
+                        // stay collisionless for the whole race otherwise.
+                        // NOTE: spawnBoatAt defers the actual spawn via runTaskFor(player) with no
+                        // delay; this call queues right after it on the same player scheduler, so
+                        // FIFO ordering guarantees the boat exists before the policy is re-applied
+                        // (as long as spawnBoatAt takes the same-region path — the player is in
+                        // the grid region here because we waited for the teleport).
+                        // Do not add a delay to either call without re-checking this dependency.
+                        GridManager.this.plugin.getLonelyController().updatePlayersVisibility(player);
+                        GridManager.this.plugin.getDebugManager().logRaceSystem("Boat spawned for " + player.getName() + " on grid (track: " + trackNameWS + ", locked: " + locked + ", collidable: " + collidable + ", yaw: " + gridLoc.getYaw() + ")");
+                    }
+                });
+            } else {
+                GridManager.this.plugin.getDebugManager().logRaceSystem(
+                    "[GRID] Falha ao teleportar " + player.getName() + " para o grid (" + gridLoc.getWorld().getName() + "," + gridLoc.getBlockX() + "," + gridLoc.getBlockY() + "," + gridLoc.getBlockZ() + ") — sem barco."
+                );
+            }
+            });
+        });
     }
 }

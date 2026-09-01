@@ -38,7 +38,6 @@ public class SumoSession implements SessionLogic {
     @Override
     public void start(Heats heat) {
         heat.setHeatState(HeatState.RACING);
-        heat.startOfflineMonitoring();
 
         // Define the arena center based on the first driver's position
         for (Driver driver : heat.getDrivers().values()) {

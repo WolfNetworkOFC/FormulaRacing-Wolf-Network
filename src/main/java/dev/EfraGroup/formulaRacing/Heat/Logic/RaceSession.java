@@ -22,6 +22,16 @@ public class RaceSession implements SessionLogic {
     }
 
     public void start(Heats heat) {
+        // Endurance (timed) heats run under the time-based session — this hook
+        // covers every path that starts a race (round session logic included).
+        if (
+            !(this instanceof TimeBasedRaceSession) &&
+            heat.getHeatConfig() != null &&
+            heat.getHeatConfig().isTimeBased()
+        ) {
+            new TimeBasedRaceSession(this.plugin).start(heat);
+            return;
+        }
         heat.getPlugin().getDebugManager().logRaceSystem("[RACE DEBUG] Iniciando corrida heat " + heat.getId());
         if (heat.isDrsEnabled()) {
             heat.setupDrs();
@@ -63,7 +73,6 @@ public class RaceSession implements SessionLogic {
                 heat.getPlugin().getRaceEventManager().getDatabaseManager().updateHeatTimes(heat.getId(), heat.getStartTime(), (Instant)null);
             }
 
-            heat.startOfflineMonitoring();
             DebugManager var10000 = heat.getPlugin().getDebugManager();
             int var10001 = heat.getId();
             var10000.logRaceSystem("✓ Heat " + var10001 + " iniciado! LARGADA! DRS Enable: " + heat.isDrsEnabled());

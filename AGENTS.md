@@ -2,7 +2,7 @@
 
 ## Project Summary
 
-Minecraft Paper/Folia plugin for ice boat racing (F1-style). Built with Maven, Java 21, targets Paper API 1.21.8.
+Minecraft Paper/Folia plugin for ice boat racing (F1-style). Built with Gradle, Java 21, targets Paper API 1.21.8.
 
 ## Folia Compatibility
 
@@ -19,10 +19,11 @@ Minecraft Paper/Folia plugin for ice boat racing (F1-style). Built with Maven, J
 ## Build
 
 ```bash
-mvn package  # Build shaded JAR
+./gradlew build  # Compiles + runs the Shadow plugin to produce the shaded JAR
+# or just: ./gradlew shadowJar
 ```
 
-Output: `target/formularacing-${project.version}.jar`.
+Output: `build/libs/formularacing-${project.version}.jar`.
 
 No tests exist. There is no `test` directory and no test runner configured.
 

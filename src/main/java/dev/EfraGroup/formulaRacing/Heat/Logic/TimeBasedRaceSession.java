@@ -5,26 +5,27 @@ import dev.EfraGroup.formulaRacing.Heat.HeatConfig;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
-import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
-
 /**
- * Time-based race session
- * Manages races where time determines the end, not the number of laps
+ * Endurance race session: time determines the race length, not laps.
+ *
+ * <p>When the clock runs out every driver must complete one more lap — the
+ * FINAL LAP (endurance style, not F1 checkered-flag): each driver finishes
+ * individually when they cross the line on their final lap, and the heat ends
+ * when the last active driver has crossed (or DNF'd). The final-lap
+ * progression itself lives in {@link Heats#passLap} (see
+ * handleEnduranceFinalLap), because lap crossings are processed per call
+ * through fresh session instances.
  */
 public class TimeBasedRaceSession extends RaceSession {
 
     private FRTask timeMonitorTask;
-    private boolean lastLapAnnounced = false;
 
     public TimeBasedRaceSession(FormulaRacing plugin) {
         super(plugin);
@@ -35,21 +36,42 @@ public class TimeBasedRaceSession extends RaceSession {
         FormulaRacing plugin = heat.getPlugin();
         HeatConfig config = heat.getHeatConfig();
 
-        // Reset runtime states first
-        config.reset();
+        // The endurance limit reuses the heat's own timeLimit (/heat set
+        // timelimit) — the same config qualifying uses, persisted in the DB.
+        Integer timeLimit = heat.getTimeLimit();
+        if (timeLimit == null || timeLimit <= 0) {
+            plugin.getDebugManager().logRaceSystem(
+                "[TIME-BASED] Heat " + heat.getId() + " has no timelimit set — falling back to a normal laps race."
+            );
+            config.setTimeBased(false);
+            super.start(heat);
+            return;
+        }
 
-        // Set to time mode
-        config.setTimeBased(true);
+        // Reset only the RUNTIME flags — never the admin-configured limits.
+        config.setLastLapTriggered(false);
+        config.setRaceFinishedForAll(false);
 
-        heat.setHeatState(HeatState.RACING);
-        heat.startOfflineMonitoring();
+        // Endurance: the lap counter no longer ends the race — time does.
+        // totalLaps = 0 disables every lap-count based finish check. Runtime
+        // only: the DB keeps the admin's original value for normal races.
+        if (heat.getTotalLaps() == null || heat.getTotalLaps() > 0) {
+            heat.setTotalLapsRuntime(0);
+        }
+
+        // Only this session may own the clock during a race: the generic
+        // session timer hard-finishes heats on expiry, which would bypass
+        // the final-lap rule.
+        heat.stopSessionTimer();
+
+        // Normal race start (state, DRS/PTP/ERS, grid release, boat utils).
+        super.start(heat);
 
         plugin.getDebugManager().logRaceSystem(
-            "[TIME-BASED] Time-based session started for Heat " + heat.getId() +
-            " - Limit: " + config.getTimeLimitSeconds() + "s"
+            "[TIME-BASED] Endurance session started for Heat " + heat.getId() +
+            " - Limit: " + timeLimit + "s"
         );
 
-        // Start time monitoring
         startTimeMonitoring(heat);
     }
 
@@ -59,147 +81,86 @@ public class TimeBasedRaceSession extends RaceSession {
 
         stopTimeMonitoring();
 
-        // Optimization: Check every second (20 ticks)
         timeMonitorTask = SchedulerHelper.runTaskTimer(plugin, () -> {
             if (heat.getHeatState() != HeatState.RACING) {
                 stopTimeMonitoring();
                 return;
             }
 
-            // Optimization: Calculate remaining time efficiently
             long remainingTime = getTimeRemaining(heat);
 
-            // Announce time warnings
             announceTimeWarnings(heat, remainingTime);
 
-            // Check if time is up
             if (remainingTime <= 0 && !config.isLastLapTriggered()) {
-                triggerLastLap(heat);
+                triggerFinalLap(heat);
             }
-
         }, 20L, 20L);
 
-        plugin.getDebugManager().logRaceSystem(
-            "[TIME-BASED] Time monitoring started"
-        );
+        plugin.getDebugManager().logRaceSystem("[TIME-BASED] Time monitoring started");
     }
 
     private long getTimeRemaining(Heats heat) {
+        Integer limitSeconds = heat.getTimeLimit();
+        if (limitSeconds == null || limitSeconds <= 0) {
+            return 0L;
+        }
         if (heat.getStartTime() == null) {
-            return heat.getHeatConfig().getTimeLimitSeconds() * 1000L;
+            return limitSeconds * 1000L;
         }
 
-        // Optimization: Direct remaining time calculation
         long elapsed = System.currentTimeMillis() - heat.getStartTime().toEpochMilli();
-        long limitMs = (long) heat.getHeatConfig().getTimeLimitSeconds() * 1000L;
-        return Math.max(0L, limitMs - elapsed);
+        return Math.max(0L, limitSeconds * 1000L - elapsed);
     }
 
     private void announceTimeWarnings(Heats heat, long remainingMs) {
-        FormulaRacing plugin = heat.getPlugin();
         long remainingSeconds = remainingMs / 1000L;
 
-        // Announce at specific times
-        if (remainingSeconds == 60 || remainingSeconds == 30 ||
+        if (remainingSeconds == 300 || remainingSeconds == 60 || remainingSeconds == 30 ||
             remainingSeconds == 10 || remainingSeconds == 5 ||
             (remainingSeconds <= 3 && remainingSeconds > 0)) {
-
-            String message = ChatColor.YELLOW + "⏱ Remaining time: " + ChatColor.WHITE + remainingSeconds + "s";
-            Bukkit.broadcastMessage(message);
-
-            plugin.getDebugManager().logRaceSystem(
+            for (Driver driver : heat.getDrivers().values()) {
+                Player player = Bukkit.getPlayer(driver.getUuid());
+                if (player != null && player.isOnline()) {
+                    heat.getPlugin().sendMessage(player, "endurance_time_warning",
+                            new String[]{"{time}", String.valueOf(remainingSeconds)});
+                    player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 1.5F);
+                }
+            }
+            heat.getPlugin().getDebugManager().logRaceSystem(
                 "[TIME-BASED] Time warning: " + remainingSeconds + "s remaining"
             );
         }
     }
 
-    private void triggerLastLap(Heats heat) {
-        FormulaRacing plugin = heat.getPlugin();
+    /**
+     * The clock ran out: everyone completes the lap they are on, then runs one
+     * more — the final lap. Progression per driver is handled on their line
+     * crossings (Heats.handleEnduranceFinalLap).
+     */
+    private void triggerFinalLap(Heats heat) {
         HeatConfig config = heat.getHeatConfig();
-
         config.setLastLapTriggered(true);
 
-        Bukkit.broadcastMessage("");
-        Bukkit.broadcastMessage(ChatColor.GOLD + "⚠ LAST LAP ⚠");
-        Bukkit.broadcastMessage(ChatColor.GRAY + "The leader must cross the finish line to end the race!");
-        Bukkit.broadcastMessage("");
-
-        plugin.getDebugManager().logRaceSystem(
-            "[TIME-BASED] Last lap triggered - Leader must cross the line"
-        );
-    }
-
-    public boolean passLap(Heats heat, Driver driver) {
-        HeatConfig config = heat.getHeatConfig();
-
-        // If not in time mode, use normal logic
-        if (!config.isTimeBased()) {
-            return super.passLap(heat, driver);
-        }
-
-        // Time logic: check if this is the leader and if last lap was triggered
-        if (config.isLastLapTriggered() && !config.isRaceFinishedForAll()) {
-            // Check if this is the leader
-            Optional<Driver> leaderOpt = getLeader(heat);
-
-            if (leaderOpt.isPresent() && leaderOpt.get().getUuid().equals(driver.getUuid())) {
-                // Leader crossed the line - finish race for everyone
-                finishRaceForAll(heat);
+        for (Driver driver : heat.getDrivers().values()) {
+            Player player = Bukkit.getPlayer(driver.getUuid());
+            if (player != null && player.isOnline()) {
+                String langCode = heat.getPlugin().getDatabaseManager().getPlayerLanguage(player.getUniqueId());
+                TitleHelper.sendThemedTitle(player,
+                    heat.getPlugin().getTranslation("endurance_final_lap_title", langCode, new String[0]),
+                    heat.getPlugin().getTranslation("endurance_final_lap_subtitle", langCode, new String[0]),
+                    10, 70, 20);
+                heat.getPlugin().sendMessage(player, "endurance_final_lap_chat", new String[0]);
+                player.playSound(player.getLocation(), Sound.BLOCK_BELL_USE, 1.0F, 0.8F);
             }
         }
 
-        return true;
-    }
-
-    private Optional<Driver> getLeader(Heats heat) {
-        // Optimization: Use efficient stream to find the leader
-        return heat.getDrivers().values().stream()
-            .filter(d -> !d.isFinished() && !d.isDnf())
-            .min((d1, d2) -> {
-                // Quick comparison by lap
-                int lapCompare = Integer.compare(d2.getLapCount(), d1.getLapCount());
-                if (lapCompare != 0) return lapCompare;
-
-                // Comparison by checkpoint
-                int cpCompare = Integer.compare(d2.getCheckpointsReached(), d1.getCheckpointsReached());
-                if (cpCompare != 0) return cpCompare;
-
-                // Comparison by time (only if needed)
-                Long time1 = d1.getAbsoluteTimeAtProgress(d1.getLapCount(), d1.getCheckpointsReached());
-                Long time2 = d2.getAbsoluteTimeAtProgress(d2.getLapCount(), d2.getCheckpointsReached());
-
-                if (time1 != null && time2 != null) {
-                    return Long.compare(time1, time2);
-                }
-
-                return Long.compare(d1.getTotalTime(), d2.getTotalTime());
-            });
-    }
-
-    private void finishRaceForAll(Heats heat) {
-        FormulaRacing plugin = heat.getPlugin();
-        HeatConfig config = heat.getHeatConfig();
-
-        config.setRaceFinishedForAll(true);
-
-        Bukkit.broadcastMessage("");
-        Bukkit.broadcastMessage(ChatColor.GREEN + "🏁 RACE FINISHED 🏁");
-        Bukkit.broadcastMessage(ChatColor.GRAY + "All drivers must cross the finish line!");
-        Bukkit.broadcastMessage("");
-
-        plugin.getDebugManager().logRaceSystem(
-            "[TIME-BASED] Race finished for everyone - Drivers must cross the line"
+        heat.getPlugin().getDebugManager().logRaceSystem(
+            "[TIME-BASED] Time is up - final lap triggered for all drivers"
         );
+    }
 
-        // Finalize all drivers who completed the current lap
-        heat.getDrivers().values().forEach(driver -> {
-            if (!driver.isFinished() && !driver.isDnf()) {
-                driver.setFinished(true);
-                driver.setEndTime(System.currentTimeMillis());
-            }
-        });
-        heat.updateLivePositions();
-        heat.finishHeat();
+    public void cleanup() {
+        stopTimeMonitoring();
     }
 
     private void stopTimeMonitoring() {
@@ -207,11 +168,5 @@ public class TimeBasedRaceSession extends RaceSession {
             timeMonitorTask.cancel();
             timeMonitorTask = null;
         }
-    }
-
-    public void cleanup() {
-        stopTimeMonitoring();
-        lastLapAnnounced = false;
-        timeMonitorTask = null;
     }
 }

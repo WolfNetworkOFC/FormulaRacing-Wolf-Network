@@ -113,6 +113,17 @@ public class TrackIntegrationManager {
         });
     }
 
+    /**
+     * Checkpoint ids in track order (ascending). Checkpoint ids are NOT
+     * guaranteed to be sequential (deleting and re-creating a checkpoint
+     * leaves gaps, e.g. 1,3,5) — logic must map the lap ordinal (how many
+     * checkpoints were passed) to the real id through this list, never
+     * assume id == ordinal + 1.
+     */
+    public List<Integer> getOrderedCheckpointIds(String trackNameWS) {
+        return this.getCheckpointsById(trackNameWS).keySet().stream().sorted().toList();
+    }
+
     public List<DatabaseManager.RegionData> getCheckpointById(String trackNameWS, int checkpointId) {
         return getCheckpointsById(trackNameWS).get(checkpointId);
     }
@@ -174,29 +185,21 @@ public class TrackIntegrationManager {
     public List<Location> generateGridPositions(String trackNameWS, int maxPositions) {
         List<Location> gridLocations = this.getTrackGridLocations(trackNameWS);
         if (gridLocations.isEmpty()) {
-            this.plugin.getDebugManager().logRaceSystem("No GRID positions defined - generating automatically for " + trackNameWS);
-            return this.generateGridPositionsFromSpawn(trackNameWS, maxPositions);
-        } else {
-            DebugManager var10000 = this.plugin.getDebugManager();
-            int var10001 = gridLocations.size();
-            var10000.logRaceSystem("Using " + var10001 + " GRID positions defined in /trackedit for " + trackNameWS);
-            if (gridLocations.size() >= maxPositions) {
-                return gridLocations.subList(0, maxPositions);
-            } else {
-                var10000 = this.plugin.getDebugManager();
-                var10001 = gridLocations.size();
-                var10000.logRaceSystem("Track only has " + var10001 + " grid positions. Generating " + (maxPositions - gridLocations.size()) + " more automatically.");
-                List<Location> auto = this.generateGridPositionsFromSpawn(trackNameWS, maxPositions);
-                List<Location> combined = new ArrayList(maxPositions);
-                combined.addAll(gridLocations);
-
-                for(int i = gridLocations.size(); i < maxPositions && i < auto.size(); ++i) {
-                    combined.add((Location)auto.get(i));
-                }
-
-                return combined;
-            }
+            this.plugin.getDebugManager().logRaceSystem(
+                "No GRID positions defined for " + trackNameWS +
+                " — grid is NEVER auto-generated from spawn; define them in /trackedit."
+            );
+            return List.of();
         }
+        this.plugin.getDebugManager().logRaceSystem(
+            "Using " + gridLocations.size() + " GRID positions defined in /trackedit for " + trackNameWS
+        );
+        if (gridLocations.size() > maxPositions) {
+            return gridLocations.subList(0, maxPositions);
+        }
+        // Fewer positions than drivers: return what exists — the caller loads
+        // the drivers that fit and warns about the missing slots.
+        return gridLocations;
     }
 
     private List<Location> getTrackGridLocations(String trackNameWS) {
@@ -215,39 +218,6 @@ public class TrackIntegrationManager {
         }
 
         return gridLocations;
-    }
-
-    private List<Location> generateGridPositionsFromSpawn(String trackNameWS, int maxPositions) {
-        Location spawnPoint = this.getTrackSpawn(trackNameWS);
-        if (spawnPoint == null) {
-            this.plugin.getDebugManager().logRaceSystem("Could not generate grid: spawn point not found for " + trackNameWS);
-            return List.of();
-        } else {
-            List<Location> gridPositions = new ArrayList();
-            double lateralSpacing = (double)3.0F;
-            double forwardSpacing = (double)4.0F;
-            double yaw = (double)spawnPoint.getYaw();
-            double pitch = (double)spawnPoint.getPitch();
-            double radYaw = Math.toRadians(yaw);
-            double forwardX = -Math.sin(radYaw);
-            double forwardZ = Math.cos(radYaw);
-            double lateralX = Math.cos(radYaw);
-            double lateralZ = Math.sin(radYaw);
-
-            for(int i = 0; i < maxPositions; ++i) {
-                int row = i / 2;
-                int column = i % 2;
-                double lateralOffset = column == 0 ? -lateralSpacing / (double)2.0F : lateralSpacing / (double)2.0F;
-                double x = spawnPoint.getX() - (double)row * forwardSpacing * forwardX + lateralOffset * lateralX;
-                double y = spawnPoint.getY();
-                double z = spawnPoint.getZ() - (double)row * forwardSpacing * forwardZ + lateralOffset * lateralZ;
-                Location gridPos = new Location(spawnPoint.getWorld(), x, y, z, (float)yaw, (float)pitch);
-                gridPositions.add(gridPos);
-            }
-
-            this.plugin.getDebugManager().logRaceSystem("Starting grid generated for " + trackNameWS + ": " + gridPositions.size() + " positions");
-            return gridPositions;
-        }
     }
 
     public boolean isPlayerInCheckpoint(Location playerLocation, DatabaseManager.RegionData checkpoint) {
