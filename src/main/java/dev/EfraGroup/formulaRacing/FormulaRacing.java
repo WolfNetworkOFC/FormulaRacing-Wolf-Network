@@ -1419,6 +1419,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.medalManager.clearPending(uuid);
         }
 
+        // Limpar teste de física Bedrock se ativo
+        dev.EfraGroup.formulaRacing.Command.DebugCommand.stopTestByUUID(uuid);
+
         this.api.removePlayerBoat(uuid);
     }
 

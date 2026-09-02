@@ -2,16 +2,31 @@ package dev.EfraGroup.formulaRacing.Command;
 
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.CommandAlias;
+import co.aikar.commands.annotation.CommandCompletion;
 import co.aikar.commands.annotation.CommandPermission;
 import co.aikar.commands.annotation.Description;
 import co.aikar.commands.annotation.Subcommand;
 import co.aikar.commands.annotation.Syntax;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Pig;
+import org.bukkit.entity.Player;
 import org.bukkit.command.CommandSender;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.Vector;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @CommandAlias("debug|frdebug")
 @CommandPermission("formularacing.admin.debug")
@@ -40,9 +55,139 @@ public class DebugCommand extends BaseCommand {
         "file-system"
     );
 
+    // Armazena tarefas de teste de física de barco para jogadores
+    private static final Map<UUID, FRTask> testTasks = new HashMap<>();
+    private static final Map<UUID, Pig> testVehicles = new HashMap<>();
+
     public DebugCommand(FormulaRacing plugin) {
         this.plugin = plugin;
         this.debugManager = plugin.getDebugManager();
+    }
+
+    @Subcommand("test")
+    @Syntax("<player>")
+    @CommandCompletion("@players")
+    @Description("Testa física de barco alternativa para jogador Bedrock (living entity)")
+    public void onTest(CommandSender sender, String playerName) {
+        Player target = Bukkit.getPlayer(playerName);
+        if (target == null) {
+            sender.sendMessage("§cJogador não encontrado: §f" + playerName);
+            return;
+        }
+
+        // Se já está em teste, desativa
+        if (testTasks.containsKey(target.getUniqueId())) {
+            stopTest(target);
+            sender.sendMessage("§cTeste de física DESATIVADO para: §f" + target.getName());
+            return;
+        }
+
+        // Inicia teste
+        startTest(target);
+        sender.sendMessage("§aTeste de física ATIVADO para: §f" + target.getName());
+        sender.sendMessage("§7O jogador vai montar em um 'veículo living entity' com movimento suave.");
+        target.sendMessage("§a§l[Teste Física] §fModo de teste ativado! Use WASD para mover.");
+    }
+
+    private void startTest(Player player) {
+        Location loc = player.getLocation();
+
+        // Spawn porco invisível com NoAI (living entity = interpolação no Bedrock!)
+        Pig vehicle = loc.getWorld().spawn(loc, Pig.class, pig -> {
+            pig.setAI(false);
+            pig.setInvisible(true);
+            pig.setInvulnerable(true);
+            pig.setSilent(true);
+            pig.setGravity(false);
+            pig.setRemoveWhenFarAway(false);
+            pig.setSaddle(true);
+            pig.addPotionEffect(new PotionEffect(
+                PotionEffectType.INVISIBILITY,
+                Integer.MAX_VALUE,
+                1,
+                false,
+                false
+            ));
+        });
+
+        // Jogador monta no porco
+        vehicle.addPassenger(player);
+        testVehicles.put(player.getUniqueId(), vehicle);
+
+        // Inicia task de movement suave (20 ticks/sec)
+        FRTask task = SchedulerHelper.runTaskTimer(plugin, () -> {
+            if (!player.isOnline() || !testVehicles.containsKey(player.getUniqueId())) {
+                stopTest(player);
+                return;
+            }
+
+            Pig pig = testVehicles.get(player.getUniqueId());
+            if (pig == null || !pig.isValid()) {
+                stopTest(player);
+                return;
+            }
+
+            Location current = pig.getLocation();
+            Vector direction = player.getLocation().getDirection();
+
+            // Velocidade do "barco" (ajustável)
+            double speed = 0.6;
+            Vector velocity = direction.multiply(speed);
+
+            // Step-up: detecta bloco na frente e sobe
+            Location ahead = current.clone().add(direction.clone().multiply(1.5));
+            if (ahead.getBlock().getType().isSolid() && !current.clone().add(0, 1, 0).getBlock().getType().isSolid()) {
+                velocity.setY(0.6);
+            }
+
+            // Mantém na superfície se estiver na água
+            if (current.getBlock().isLiquid()) {
+                velocity.setY(0.1);
+            }
+
+            // Nova posição
+            Location newLoc = current.add(velocity);
+            newLoc.setYaw(player.getLocation().getYaw());
+            newLoc.setPitch(player.getLocation().getPitch());
+
+            // Teleport suave - cliente Bedrock INTERPOLA!
+            pig.teleport(newLoc);
+
+        }, 0L, 1L); // A cada tick = 20 vezes por segundo
+
+        testTasks.put(player.getUniqueId(), task);
+    }
+
+    private void stopTest(Player player) {
+        // Cancela task
+        FRTask task = testTasks.remove(player.getUniqueId());
+        if (task != null) {
+            task.cancel();
+        }
+
+        // Remove veículo
+        Pig vehicle = testVehicles.remove(player.getUniqueId());
+        if (vehicle != null && vehicle.isValid()) {
+            vehicle.remove();
+        }
+
+        if (player.isOnline()) {
+            player.sendMessage("§c§l[Teste Física] §cModo de teste desativado.");
+        }
+    }
+
+    /**
+     * Para o teste de um jogador (chamado quando desconecta)
+     */
+    public static void stopTestByUUID(UUID uuid) {
+        FRTask task = testTasks.remove(uuid);
+        if (task != null) {
+            task.cancel();
+        }
+        Pig vehicle = testVehicles.remove(uuid);
+        if (vehicle != null && vehicle.isValid()) {
+            vehicle.remove();
+        }
     }
 
     @Subcommand("list|status|ls")
