@@ -102,6 +102,9 @@ deploy.ps1
 secrets.yml
 credentials.yml
 
+# Local tool data
+.freebuff/
+
 # MinGW / MSYS2 toolchain (not project files)
 include/
 lib/

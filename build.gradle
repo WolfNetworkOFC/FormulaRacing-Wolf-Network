@@ -1,0 +1,101 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '9.6.1'
+}
+
+group = 'dev.EfraGroup'
+version = '0.2'
+
+// Java 25 — target Folia API 26.2
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
+repositories {
+    // Local Maven cache first (reuses previously downloaded artifacts)
+    mavenLocal()
+    mavenCentral()
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+    maven { url = 'https://repo.opencollab.dev/main/' }
+    maven { url = 'https://repo.aikar.co/content/groups/aikar/' }
+    maven { url = 'https://jitpack.io' }
+    maven { url = 'https://repo.codemc.io/repository/maven-public/' }
+    maven { url = 'https://maven.enginehub.org/repo/' }
+    maven { url = 'https://repo.rosewooddev.io/repository/public/' }
+    maven { url = 'https://repo.helpch.at/releases/' }
+    maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+}
+
+dependencies {
+    // ---- Provided (available on the server / plugin runtime) ----
+    compileOnly 'io.papermc.paper:paper-api:26.2.build.121-stable'
+    compileOnly 'com.github.NEZNAMY:TAB-API:6.0.0'
+    compileOnly 'com.sk89q.worldedit:worldedit-bukkit:7.3.0'
+    compileOnly 'com.github.decentsoftware-eu:decentholograms:2.9.6'
+    compileOnly 'org.geysermc.floodgate:api:2.2.0-SNAPSHOT'
+    compileOnly 'com.github.cryptomorin:XSeries:13.5.1'
+    compileOnly 'com.github.Gecolay.GSit:core:3.0.1'
+    compileOnly 'me.clip:placeholderapi:2.12.2'
+    compileOnly 'net.luckperms:api:5.4'
+    compileOnly 'me.filoghost.holographicdisplays:holographicdisplays-api:3.0.0'
+
+    // ---- Lombok ----
+    compileOnly 'org.projectlombok:lombok:1.18.40'
+    annotationProcessor 'org.projectlombok:lombok:1.18.40'
+
+    // ---- Shaded into the final JAR (same set as maven-shade) ----
+    implementation 'co.aikar:acf-paper:0.5.1-SNAPSHOT'
+    implementation 'co.aikar:taskchain-bukkit:3.7.2'
+    implementation 'co.aikar:taskchain-core:3.7.2'
+    implementation 'net.megavex:scoreboard-library-api:2.4.4'
+    implementation 'net.kyori:adventure-api:4.25.0'
+    implementation 'net.kyori:adventure-text-serializer-legacy:4.25.0'
+    implementation 'com.sparkjava:spark-core:2.9.4'
+    implementation 'com.zaxxer:HikariCP:5.1.0'
+    implementation 'org.bstats:bstats-bukkit:3.0.2'
+    implementation 'com.github.SparklingComet:java-mojang-api:592fabf3e2'
+    implementation 'com.googlecode.json-simple:json-simple:1.1.1'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.14'
+    implementation 'commons-codec:commons-codec:1.17.1'
+
+    // Runtime-only scoreboard implementations (still included in the shaded jar)
+    runtimeOnly 'net.megavex:scoreboard-library-implementation:2.4.4'
+    runtimeOnly 'net.megavex:scoreboard-library-modern:2.4.4'
+
+    // ---- Tests ----
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 25
+}
+
+// Replica do maven-shade: finalName = formularacing-0.2.jar
+shadowJar {
+    archiveBaseName = 'formularacing'
+    archiveVersion = project.version.toString()
+    archiveClassifier = ''
+
+    relocate 'co.aikar.commands', 'dev.efragroup.libs.acf'
+    relocate 'co.aikar.locales', 'dev.efragroup.libs.locales'
+    relocate 'co.aikar.taskchain', 'dev.efragroup.libs.taskchain'
+    relocate 'com.zaxxer.hikari', 'dev.efragroup.libs.hikari'
+    relocate 'org.bstats', 'dev.efragroup.libs.bstats'
+    relocate 'org.shanerx.mojang', 'dev.efragroup.libs.mojangapi'
+    relocate 'org.json.simple', 'dev.efragroup.libs.jsonsimple'
+    relocate 'org.apache.http', 'dev.efragroup.libs.apachehttp'
+    relocate 'org.apache.commons.codec', 'dev.efragroup.libs.commonscodec'
+    relocate 'com.mashape.unirest', 'dev.efragroup.libs.unirest'
+}
+
+// `gradlew build` (ou `gradlew shadowJar`) gera o JAR shaded
+build {
+    dependsOn shadowJar
+}

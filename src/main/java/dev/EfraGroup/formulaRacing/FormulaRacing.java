@@ -816,11 +816,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.commandManager.registerCommand(new ToggleRodsCommand(this));
             this.commandManager.registerCommand(new LeagueCommand(this));
             this.commandManager.registerCommand(new ApiCommand());
-            this.commandManager.registerCommand(new DebugCommand(this));
             this.commandManager.registerCommand(new EliminationCommand(this));
             this.commandManager.registerCommand(new GimmickCommand(this));
             this.commandManager.registerCommand(new OpenBoatUtilsCommand(this));
-            this.commandManager.registerCommand(new ReverseGridCommand(this));
             this.commandManager.registerCommand(new WeatherCommand(this));
         } catch (Exception e) {
             if (this.debugManager != null) {
@@ -1418,9 +1416,6 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         if (this.medalManager != null) {
             this.medalManager.clearPending(uuid);
         }
-
-        // Limpar teste de física Bedrock se ativo
-        dev.EfraGroup.formulaRacing.Command.DebugCommand.stopTestByUUID(uuid);
 
         this.api.removePlayerBoat(uuid);
     }

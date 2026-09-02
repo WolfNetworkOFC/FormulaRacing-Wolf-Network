@@ -609,7 +609,7 @@ public class HeatCommand extends BaseCommand {
             configRow4.addExtra(
                 this.formattedSetting(
                     "Grid Rev",
-                    heat.getreversegrid() ? "ON" : "OFF",
+                    heat.isGridReversed() ? "ON" : "OFF",
                     "/heat set reversegrid " + heat.getName() + " ",
                     isAdmin
                 )
@@ -912,14 +912,10 @@ public class HeatCommand extends BaseCommand {
         );
     }
 
-    @Subcommand("set reversegridenabled")
-    @CommandCompletion("@heat true|false")
+    @Subcommand("set reversegrid")
+    @CommandCompletion("@heats full|50%|75%|100%")
     @CommandPermission("formularacing.admin")
-    public void onSetReverseGridEnabled(
-        Player player,
-        Heats heat,
-        boolean val
-    ) {
+    public void onSetReverseGrid(Player player, Heats heat, String mode) {
         heat = this.resolveHeat(player, heat);
         if (heat == null) {
             player.sendMessage(
@@ -928,13 +924,47 @@ public class HeatCommand extends BaseCommand {
             return;
         }
 
-        heat.setreversegrid(val);
-        player.sendMessage(
-            "§a[Config] Grid Invertido " +
-                (val ? "§2ATIVADO" : "§cDESATIVADO") +
-                " §apara o heat §f" +
-                heat.getId()
-        );
+        if (heat.getHeatState() != HeatState.SETUP && heat.getHeatState() != HeatState.LOADED) {
+            player.sendMessage(ChatColor.RED + "O heat deve estar em SETUP ou LOADED para inverter o grid!");
+            return;
+        }
+
+        if (mode == null || mode.isBlank()) {
+            player.sendMessage(ChatColor.RED + "Uso: /heat set reversegrid <full|porcentagem>");
+            player.sendMessage(ChatColor.GRAY + "Exemplos: full, 50%, 75%, 100%");
+            return;
+        }
+
+        String lower = mode.toLowerCase().trim();
+
+        if (lower.equals("full") || lower.equals("100%")) {
+            heat.reverseFullGrid();
+            player.sendMessage(
+                "§a[Config] Grid 100% invertido para o heat §f" + heat.getName()
+            );
+        } else if (lower.equals("restore") || lower.equals("off") || lower.equals("0%")) {
+            heat.restoreOriginalGrid();
+            player.sendMessage(
+                "§a[Config] Grid restaurado para ordem original no heat §f" + heat.getName()
+            );
+        } else {
+            // Parse percentage like "75%"
+            String numStr = lower.replace("%", "").trim();
+            try {
+                int percentage = Integer.parseInt(numStr);
+                if (percentage < 1 || percentage > 100) {
+                    player.sendMessage(ChatColor.RED + "A porcentagem deve estar entre 1 e 100!");
+                    return;
+                }
+                heat.reverseGrid(percentage);
+                player.sendMessage(
+                    "§a[Config] Grid invertido em " + percentage + "% para o heat §f" + heat.getName()
+                );
+            } catch (NumberFormatException e) {
+                player.sendMessage(ChatColor.RED + "Valor inválido: " + mode);
+                player.sendMessage(ChatColor.GRAY + "Use: full, 50%, 75%, 100%, restore");
+            }
+        }
     }
 
     @Subcommand("set swap")
