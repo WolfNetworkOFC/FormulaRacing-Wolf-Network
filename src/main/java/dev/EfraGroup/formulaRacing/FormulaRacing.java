@@ -326,6 +326,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.dm.migrateNullPlayerColors();
             this.hologramManager = new HologramManager(this);
             this.translationUtil = new TranslationUtil(this, this.dm);
+
+            // Inicializar integração com WolfLang
+            dev.EfraGroup.formulaRacing.integration.WolfLangIntegration.init(this);
+            registerWolfLangTranslations();
             this.tu = new TimeUtils();
             this.worldEditSelect = new WorldEditSelect();
             this.trackExchangeManager = new TrackExchangeManager(this, this.dm);
@@ -2044,5 +2048,115 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         }
         // If Floodgate is not installed, technically no one is Bedrock
         return false;
+    }
+
+    /**
+     * Registra traduções do FormulaRacing no WolfLang
+     */
+    private void registerWolfLangTranslations() {
+        if (!dev.EfraGroup.formulaRacing.integration.WolfLangIntegration.isEnabled()) return;
+
+        Map<String, Map<String, String>> translations = new HashMap<>();
+
+        // Time Trial
+        Map<String, String> ttStart = new HashMap<>();
+        ttStart.put("pt_BR", "§aTime Trial iniciado na pista {track}!");
+        ttStart.put("en", "§aTime Trial started on track {track}!");
+        ttStart.put("es", "§a¡Time Trial iniciado en la pista {track}!");
+        translations.put("timetrial.start", ttStart);
+
+        Map<String, String> ttFinish = new HashMap<>();
+        ttFinish.put("pt_BR", "§aVolta completada em {time}!");
+        ttFinish.put("en", "§aLap completed in {time}!");
+        ttFinish.put("es", "§a¡Vuelta completada en {time}!");
+        translations.put("timetrial.finish", ttFinish);
+
+        Map<String, String> ttBest = new HashMap<>();
+        ttBest.put("pt_BR", "§6§lNOVO RECORDE PESSOAL! §a{time}");
+        ttBest.put("en", "§6§lNEW PERSONAL BEST! §a{time}");
+        ttBest.put("es", "§6§l¡NUEVO RÉCORD PERSONAL! §a{time}");
+        translations.put("timetrial.best", ttBest);
+
+        // Race
+        Map<String, String> raceStart = new HashMap<>();
+        raceStart.put("pt_BR", "§aCorrida iniciada!");
+        raceStart.put("en", "§aRace started!");
+        raceStart.put("es", "§a¡Carrera iniciada!");
+        translations.put("race.start", raceStart);
+
+        Map<String, String> raceFinish = new HashMap<>();
+        raceFinish.put("pt_BR", "§6§lCorrida finalizada! §aVocê ficou em {position}º lugar!");
+        raceFinish.put("en", "§6§lRace finished! §aYou finished in {position}th place!");
+        raceFinish.put("es", "§6§l¡Carrera finalizada! §a¡Terminaste en {position}º lugar!");
+        translations.put("race.finish", raceFinish);
+
+        Map<String, String> raceWin = new HashMap<>();
+        raceWin.put("pt_BR", "§6§l§k§r §6§lVITÓRIA! §6§k§r §aParabéns, você venceu!");
+        raceWin.put("en", "§6§l§k§r §6§lVICTORY! §6§k§r §aCongratulations, you won!");
+        raceWin.put("es", "§6§l§k§r §6§l¡VICTORIA! §6§k§r §a¡Felicidades, ganaste!");
+        translations.put("race.win", raceWin);
+
+        // Ready Check
+        Map<String, String> readyCheckTitle = new HashMap<>();
+        readyCheckTitle.put("pt_BR", "§e§lREADY CHECK");
+        readyCheckTitle.put("en", "§e§lREADY CHECK");
+        readyCheckTitle.put("es", "§e§lREADY CHECK");
+        translations.put("readycheck.title", readyCheckTitle);
+
+        Map<String, String> readyCheckPress = new HashMap<>();
+        readyCheckPress.put("pt_BR", "§7Pressione §eSHIFT §7para ficar pronto!");
+        readyCheckPress.put("en", "§7Press §eSHIFT §7to ready up!");
+        readyCheckPress.put("es", "§7¡Presiona §eSHIFT §7para estar listo!");
+        translations.put("readycheck.press", readyCheckPress);
+
+        Map<String, String> readyCheckReady = new HashMap<>();
+        readyCheckReady.put("pt_BR", "§aVocê está pronto!");
+        readyCheckReady.put("en", "§aYou are ready!");
+        readyCheckReady.put("es", "§a¡Estás listo!");
+        translations.put("readycheck.ready", readyCheckReady);
+
+        Map<String, String> readyCheckAll = new HashMap<>();
+        readyCheckAll.put("pt_BR", "§a§lTodos os pilotos estão prontos! A corrida vai começar!");
+        readyCheckAll.put("en", "§a§lAll pilots are ready! The race will begin!");
+        readyCheckAll.put("es", "§a§l¡Todos los pilotos están listos! ¡La carrera va a comenzar!");
+        translations.put("readycheck.all_ready", readyCheckAll);
+
+        // Heat
+        Map<String, String> heatStart = new HashMap<>();
+        heatStart.put("pt_BR", "§aHeat {heat} iniciado!");
+        heatStart.put("en", "§aHeat {heat} started!");
+        heatStart.put("es", "§a¡Heat {heat} iniciado!");
+        translations.put("heat.start", heatStart);
+
+        Map<String, String> heatFinish = new HashMap<>();
+        heatFinish.put("pt_BR", "§aHeat {heat} finalizado!");
+        heatFinish.put("en", "§aHeat {heat} finished!");
+        heatFinish.put("es", "§a¡Heat {heat} finalizado!");
+        translations.put("heat.finish", heatFinish);
+
+        // Checkpoint
+        Map<String, String> checkpoint = new HashMap<>();
+        checkpoint.put("pt_BR", "§aCheckpoint {current}/{total}!");
+        checkpoint.put("en", "§aCheckpoint {current}/{total}!");
+        checkpoint.put("es", "§a¡Checkpoint {current}/{total}!");
+        translations.put("checkpoint.pass", checkpoint);
+
+        // Errors
+        Map<String, String> errorInHeat = new HashMap<>();
+        errorInHeat.put("pt_BR", "§cVocê não está em um heat ativo!");
+        errorInHeat.put("en", "§cYou are not in an active heat!");
+        errorInHeat.put("es", "§c¡No estás en un heat activo!");
+        translations.put("error.no_heat", errorInHeat);
+
+        Map<String, String> errorNotFound = new HashMap<>();
+        errorNotFound.put("pt_BR", "§cPista não encontrada: {track}");
+        errorNotFound.put("en", "§cTrack not found: {track}");
+        errorNotFound.put("es", "§cPista no encontrada: {track}");
+        translations.put("error.track_not_found", errorNotFound);
+
+        // Register all translations
+        dev.EfraGroup.formulaRacing.integration.WolfLangIntegration.registerTranslations("FormulaRacing", translations);
+
+        getLogger().info("WolfLang: " + translations.size() + " traduções registradas.");
     }
 }
