@@ -578,6 +578,7 @@ public class QuickRaceManager {
     private void deleteQuickRace() {
         this.stopCompletionMonitor();
         if (this.currentQuickRace != null) {
+            // QuickRace é removido quando acaba (temporário)
             this.plugin.getRaceEventManager().removeEvent(this.currentQuickRace.getId());
             this.plugin.getDebugManager().logRaceSystem("Quick Race removida: " + this.currentQuickRace.getDisplayName());
         }
@@ -627,7 +628,7 @@ public class QuickRaceManager {
                 continue;
             }
 
-            this.plugin.getDebugManager().logRaceSystem("[QuickRace] Removing accumulated finished QuickRace: " + name);
+            this.plugin.getDebugManager().logRaceSystem("[QuickRace] QuickRace finalizado, removendo: " + name);
             this.eventManager.removeEvent(event.getId());
         }
     }
@@ -745,6 +746,7 @@ public class QuickRaceManager {
         this.stopLobbyTimer();
         this.stopCompletionMonitor();
         if (this.currentQuickRace != null) {
+            // QuickRace é removido no shutdown (temporário)
             this.plugin.getRaceEventManager().removeEvent(this.currentQuickRace.getId());
         }
         this.currentQuickRace = null;

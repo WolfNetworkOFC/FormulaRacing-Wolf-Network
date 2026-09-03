@@ -422,16 +422,17 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.wolfMod = new WolfMOD(this);
             this.raceEventManager.loadActiveEventsFromDatabase();
             SchedulerHelper.runTask(this, () -> {
-                List<Integer> staleEventIds = new java.util.ArrayList<>();
-                for (Events evt : this.raceEventManager.getActiveEvents()) {
-                    String name = evt.getDisplayName();
-                    if (name.startsWith("QuickRace_") || name.startsWith("PartyRace_") || name.startsWith("DuelRace_")) {
-                        staleEventIds.add(evt.getId());
-                    }
+            // Não remove eventos no startup - apenas log
+            int staleCount = 0;
+            for (Events evt : this.raceEventManager.getActiveEvents()) {
+                String name = evt.getDisplayName();
+                if (name.startsWith("QuickRace_") || name.startsWith("PartyRace_") || name.startsWith("DuelRace_")) {
+                    staleCount++;
                 }
-                for (int id : staleEventIds) {
-                    this.raceEventManager.removeEvent(id);
-                }
+            }
+            if (staleCount > 0) {
+                this.getLogger().info("[FormulaRacing] " + staleCount + " eventos ativos encontrados (não removidos automaticamente)");
+            }
                 try {
                     if (this.dm != null) {
                         this.dm.deleteAllParties();
@@ -626,14 +627,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         }
 
         if (this.raceEventManager != null) {
-            for (Events event : this.raceEventManager.getActiveEvents()) {
-                String name = event.getDisplayName();
-                if (name.startsWith("QuickRace_") || name.startsWith("PartyRace_") || name.startsWith("DuelRace_")) {
-                    this.raceEventManager.removeEvent(event.getId());
-                } else {
-                    this.raceEventManager.removeEvent(event.getId());
-                }
-            }
+            // Não remove eventos no disable - apenas desliga o manager
             this.raceEventManager.shutdown();
         }
 

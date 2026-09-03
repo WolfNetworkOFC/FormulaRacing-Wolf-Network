@@ -641,9 +641,10 @@ public class DailyRaceManager {
 
     private void unloadFromMemory(Events event) {
         try {
-            this.plugin.getRaceEventManager().removeEvent(event.getId());
+            // Não remove eventos automaticamente - apenas log
+            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Evento finalizado (não removido): " + event.getDisplayName());
         } catch (Throwable t) {
-            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Failed to unload event from memory: " + t.getMessage());
+            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Error: " + t.getMessage());
         }
     }
 
@@ -675,6 +676,10 @@ public class DailyRaceManager {
         Optional<Events> eventOpt = this.getActiveDailyEvent();
         if (!eventOpt.isEmpty()) {
             Events event = (Events)eventOpt.get();
+            // Só notifica se o evento NÃO estiver finished
+            if (event.getState() == EventState.FINISHED) {
+                return;
+            }
             if (event.getState() != EventState.RUNNING) {
                 if (this.activeEventId != null && this.activeEventId == event.getId()) {
                     this.plugin.getDebugManager().logRaceSystem("[DailyRace] Auto-Correction: Resetting non-existent/finished Daily.");
@@ -740,6 +745,10 @@ public class DailyRaceManager {
         String box = ChatColor.GOLD + "" + ChatColor.BOLD + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
 
         for(Events event : this.plugin.getRaceEventManager().getActiveEvents()) {
+            // Só notifica se o evento NÃO estiver finished
+            if (event.getState() == EventState.FINISHED) {
+                continue;
+            }
             if ((dailyId == null || event.getId() != dailyId) && event.getState() == EventState.RUNNING) {
                 String eventName = event.getDisplayName();
                 if (eventName.startsWith("QuickRace_") || eventName.startsWith("PartyRace_") || eventName.startsWith("DuelRace_")) {
