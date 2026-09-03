@@ -3,8 +3,13 @@ package dev.EfraGroup.formulaRacing.Command;
 import dev.EfraGroup.formulaRacing.APIFormulaRacing;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Heat.Heats;
+import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import java.util.List;
+import java.util.Optional;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -32,21 +37,75 @@ public class ResetCommand implements CommandExecutor {
             return true;
         }
 
+        // Verifica se está em um heat ativo
+        Optional<Heats> heatOpt = this.plugin.getRaceEventManager().getPlayerActiveHeat(player.getUniqueId());
+        if (heatOpt.isPresent()) {
+            Heats heat = heatOpt.get();
+            Driver driver = heat.getDriver(player.getUniqueId());
+
+            if (driver != null) {
+                // Se o heat NÃO permite reset OU é heat de corrida, manda pro checkpoint
+                if (!heat.isCanReset() || heat.getHeatState().name().equals("RACING")) {
+                    teleportToCheckpoint(player, heat, driver);
+                    return true;
+                }
+            }
+        }
+
+        // Reset normal (volta pro inicio)
+        resetToStart(player);
+        return true;
+    }
+
+    private void teleportToCheckpoint(Player player, Heats heat, Driver driver) {
+        String trackNameWS = heat.getTrackNameWS();
+        int checkpointsReached = driver.getCheckpointsReached();
+        Location targetLoc = null;
+
+        if (checkpointsReached > 0) {
+            List<DatabaseManager.RegionData> checkpointList =
+                this.plugin.getTrackIntegrationManager().getCheckpointById(trackNameWS, checkpointsReached - 1);
+            if (checkpointList != null && !checkpointList.isEmpty()) {
+                DatabaseManager.RegionData cp = checkpointList.get(0);
+                targetLoc = new Location(
+                    Bukkit.getWorld(cp.getWorld()),
+                    (cp.getMinX() + cp.getMaxX()) / 2.0,
+                    cp.getMaxY() - 0.5,
+                    (cp.getMinZ() + cp.getMaxZ()) / 2.0,
+                    player.getLocation().getYaw(),
+                    player.getLocation().getPitch()
+                );
+            }
+        }
+
+        if (targetLoc == null) {
+            targetLoc = this.plugin.getTrackIntegrationManager().getTrackSpawn(trackNameWS);
+        }
+
+        if (targetLoc == null) {
+            this.plugin.sendMessage(player, "resetcp_no_spawn", new String[0]);
+            return;
+        }
+
+        final Location finalLoc = targetLoc;
+        SchedulerHelper.teleport(player, finalLoc);
+        this.plugin.sendMessage(player, "resetcp_teleported", new String[0]);
+    }
+
+    private void resetToStart(Player player) {
         // Get the last track the player was on
         String lastTrack = plugin.getLastTimeTrialTrack(player.getUniqueId());
         if (lastTrack == null) {
             player.sendMessage("§cYou aren't in any Time Trial.");
-            return true;
+            return;
         }
 
         // Track spawn point
         Location spawn = mysql.getTrackSpawn(lastTrack);
         if (spawn == null) {
             player.sendMessage("§cCould not find the spawn point for track: " + lastTrack);
-            return true;
+            return;
         }
-
-
 
         // =========================
         // Save partial time up to last checkpoint (optional)
@@ -73,9 +132,6 @@ public class ResetCommand implements CommandExecutor {
         // Teleport and create boat
         // =========================
         api.recoverPlayerBoatState(player);
-        // Folia: teleportAsync é assíncrono — só spawnar o barco DEPOIS do teleport
-        // concluir, no destino (senão o barco nasce na posição antiga e o teleport
-        // falha com o player dentro de veículo).
         SchedulerHelper.teleportAsync(player, spawn).thenAccept(success -> {
             if (Boolean.TRUE.equals(success) && player.isOnline()) {
                 api.spawnBoatAt(player, spawn, false, false, false);
@@ -87,7 +143,5 @@ public class ResetCommand implements CommandExecutor {
                 }
             }
         });
-
-        return true;
     }
 }
