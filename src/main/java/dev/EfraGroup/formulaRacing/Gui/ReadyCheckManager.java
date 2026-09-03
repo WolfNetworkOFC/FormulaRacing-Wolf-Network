@@ -224,13 +224,21 @@ public class ReadyCheckManager implements Listener {
             Class<?> formWindowSimple = Class.forName("org.geysermc.cumulus.form.SimpleForm");
             Class<?> formBuilder = Class.forName("org.geysermc.cumulus.form.SimpleForm$Builder");
 
-            Object builder = formBuilder.getDeclaredConstructor().newInstance();
+            Object builder;
+            try {
+                // Tenta obter o builder via método estático builder() (API mais recente)
+                builder = formWindowSimple.getMethod("builder").invoke(null);
+            } catch (NoSuchMethodException e) {
+                // Fallback: tenta construtor direto (API antiga)
+                builder = formBuilder.getDeclaredConstructor().newInstance();
+            }
 
             // Titulo e conteudo
             String title = "Ready Check - Heat #" + heat.getId();
             String content = "Pressione Ready para confirmar que esta pronto para a corrida!";
 
             // Adicionar conteudo e botoes
+            formBuilder.getMethod("title", String.class).invoke(builder, title);
             formBuilder.getMethod("content", String.class).invoke(builder, content);
             formBuilder.getMethod("button", String.class).invoke(builder, "Ready");
 
@@ -270,5 +278,3 @@ public class ReadyCheckManager implements Listener {
     }
 }
 
-    }
-}

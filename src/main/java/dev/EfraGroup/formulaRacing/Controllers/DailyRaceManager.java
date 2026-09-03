@@ -648,8 +648,6 @@ public class DailyRaceManager {
         }
     }
 
-    }
-
     public void notifyPlayerOfAllActiveEvents(Player player) {
         this.notifyDailyRace(player);
         this.notifyManualEvents(player);
