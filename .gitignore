@@ -88,6 +88,9 @@ test-output/
 *.test
 
 # Build artifacts - keep only source
+target/
+build/
+.gradle/
 original-formularacing-*.jar
 formularacing-*.jar
 plugins/
