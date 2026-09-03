@@ -67,7 +67,7 @@ public class PartyRaceManager {
 
             int finalLaps = Math.max(1, laps);
             int finalPits = Math.min(Math.max(0, pits), finalLaps - 1);
-            String eventName = "PartyRace_" + owner.toString() + "_" + System.currentTimeMillis();
+            String eventName = "PartyRace_" + FormulaRacing.getInstance().getNextEventId();
 
             String membersRaw = database.getMembers(owner);
             List<UUID> memberList = new ArrayList<>();

@@ -118,6 +118,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private final Map<UUID, String> lastTimeTrialTrack = new HashMap();
     private final Map<UUID, String> lastDuelTrack = new HashMap();
     private final Map<UUID, Boolean> lastDuelLonelyStatus = new HashMap();
+    private int eventIdCounter = 0;
     private final Map<String, YamlConfiguration> langConfigCache = new ConcurrentHashMap();
     private static final Map<UUID, Boolean> playersWithMod = new HashMap();
     private static final Map<UUID, Integer> playersModVersion = new HashMap();
@@ -421,12 +422,13 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.ghostManager = new GhostManager(this);
             this.wolfMod = new WolfMOD(this);
             this.raceEventManager.loadActiveEventsFromDatabase();
+            initializeEventIdCounter();
             SchedulerHelper.runTask(this, () -> {
             // Não remove eventos no startup - apenas log
             int staleCount = 0;
             for (Events evt : this.raceEventManager.getActiveEvents()) {
                 String name = evt.getDisplayName();
-                if (name.startsWith("QuickRace_") || name.startsWith("PartyRace_") || name.startsWith("DuelRace_")) {
+                if (name != null && (name.startsWith("QuickRace_") || name.startsWith("PartyRace_") || name.startsWith("DuelRace_"))) {
                     staleCount++;
                 }
             }
@@ -2152,5 +2154,50 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         dev.EfraGroup.formulaRacing.integration.WolfLangIntegration.registerTranslations("FormulaRacing", translations);
 
         getLogger().info("WolfLang: " + translations.size() + " traduções registradas.");
+    }
+
+    /**
+     * Gera próximo ID sequencial para eventos (ex: "000001", "000002")
+     */
+    public synchronized String getNextEventId() {
+        eventIdCounter++;
+        return String.format("%06d", eventIdCounter);
+    }
+
+    /**
+     * Retorna o nome de exibição do evento sem o sufixo numérico
+     * Ex: "QuickRace_000001" → "QuickRace"
+     */
+    public String getEventDisplayName(String fullName) {
+        if (fullName == null) return fullName;
+
+        // Remove sufixo _XXXXXX (6 dígitos)
+        if (fullName.matches(".*_\\d{6}$")) {
+            return fullName.substring(0, fullName.lastIndexOf("_"));
+        }
+        return fullName;
+    }
+
+    /**
+     * Inicializa o contador de IDs baseado nos eventos existentes no banco
+     */
+    private void initializeEventIdCounter() {
+        try {
+            int maxId = 0;
+            for (Events event : raceEventManager.getActiveEvents()) {
+                String name = event.getDisplayName();
+                if (name != null && name.matches(".*_(\\d{6})$")) {
+                    String numStr = name.substring(name.lastIndexOf("_") + 1);
+                    try {
+                        int id = Integer.parseInt(numStr);
+                        if (id > maxId) maxId = id;
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+            eventIdCounter = maxId;
+            getLogger().info("[FormulaRacing] Event ID counter initialized at: " + eventIdCounter);
+        } catch (Exception e) {
+            getLogger().warning("[FormulaRacing] Error initializing event ID counter: " + e.getMessage());
+        }
     }
 }
