@@ -236,8 +236,10 @@ public class ReadyCheckManager implements Listener {
             // Titulo e conteudo
             String title = "Ready Check - Heat #" + heat.getId();
             String content = "Pressione Ready para confirmar que esta pronto para a corrida!";
+            String formId = "ready-check-" + heat.getId();
 
-            // Adicionar titulo, conteudo e botoes
+            // Adicionar ID, titulo, conteudo e botoes
+            formBuilder.getMethod("id", String.class).invoke(builder, formId);
             formBuilder.getMethod("title", String.class).invoke(builder, title);
             formBuilder.getMethod("content", String.class).invoke(builder, content);
             formBuilder.getMethod("button", String.class).invoke(builder, "Ready");
