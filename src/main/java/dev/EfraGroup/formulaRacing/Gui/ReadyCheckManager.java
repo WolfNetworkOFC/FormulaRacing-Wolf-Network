@@ -220,7 +220,7 @@ public class ReadyCheckManager implements Listener {
      */
     private void sendBedrockReadyCheck(Player player, Heats heat) {
         try {
-            // Criar form usando reflection (Cumulus Forms API)
+            // API Cumulus Forms - Floodgate 2.0+
             Class<?> formWindowSimple = Class.forName("org.geysermc.cumulus.form.SimpleForm");
             Class<?> formBuilder = Class.forName("org.geysermc.cumulus.form.SimpleForm$Builder");
 
@@ -237,7 +237,7 @@ public class ReadyCheckManager implements Listener {
             String title = "Ready Check - Heat #" + heat.getId();
             String content = "Pressione Ready para confirmar que esta pronto para a corrida!";
 
-            // Adicionar conteudo e botoes
+            // Adicionar titulo, conteudo e botoes
             formBuilder.getMethod("title", String.class).invoke(builder, title);
             formBuilder.getMethod("content", String.class).invoke(builder, content);
             formBuilder.getMethod("button", String.class).invoke(builder, "Ready");
@@ -245,12 +245,13 @@ public class ReadyCheckManager implements Listener {
             // Build form
             Object form = formBuilder.getMethod("build").invoke(builder);
 
-            // Enviar form via Floodgate
+            // Enviar form via Floodgate API 2.0
             Class<?> floodgateApi = Class.forName("org.geysermc.floodgate.api.FloodgateApi");
             Object instance = floodgateApi.getMethod("getInstance").invoke(null);
 
-            // Send form
-            floodgateApi.getMethod("sendForm", UUID.class, formWindowSimple).invoke(instance, player.getUniqueId(), form);
+            // Método correto: sendForm(UUID, Form) - passando o objeto form, não a classe
+            Class<?> formClass = Class.forName("org.geysermc.cumulus.form.Form");
+            floodgateApi.getMethod("sendForm", UUID.class, formClass).invoke(instance, player.getUniqueId(), form);
 
             // Som de notificacao
             player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 1.0F);
