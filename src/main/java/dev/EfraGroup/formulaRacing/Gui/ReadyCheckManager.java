@@ -220,38 +220,41 @@ public class ReadyCheckManager implements Listener {
      */
     private void sendBedrockReadyCheck(Player player, Heats heat) {
         try {
-            // API Cumulus Forms - Floodgate 2.0+
-            Class<?> formWindowSimple = Class.forName("org.geysermc.cumulus.form.SimpleForm");
-            Class<?> formBuilder = Class.forName("org.geysermc.cumulus.form.SimpleForm$Builder");
-
-            Object builder;
-            try {
-                // Tenta obter o builder via método estático builder() (API mais recente)
-                builder = formWindowSimple.getMethod("builder").invoke(null);
-            } catch (NoSuchMethodException e) {
-                // Fallback: tenta construtor direto (API antiga)
-                builder = formBuilder.getDeclaredConstructor().newInstance();
-            }
+            // Cumulus Forms API - Floodgate 2.0+
+            // SimpleForm.builder() retorna Builder
+            Class<?> simpleFormClass = Class.forName("org.geysermc.cumulus.form.SimpleForm");
+            Object builder = simpleFormClass.getMethod("builder").invoke(null);
 
             // Titulo e conteudo
             String title = "Ready Check - Heat #" + heat.getId();
             String content = "Pressione Ready para confirmar que esta pronto para a corrida!";
-            String formId = "ready-check-" + heat.getId();
 
-            // Adicionar ID, titulo, conteudo e botoes
-            formBuilder.getMethod("id", String.class).invoke(builder, formId);
-            formBuilder.getMethod("title", String.class).invoke(builder, title);
-            formBuilder.getMethod("content", String.class).invoke(builder, content);
-            formBuilder.getMethod("button", String.class).invoke(builder, "Ready");
+            // Adicionar titulo, conteudo e botao
+            Class<?> builderClass = builder.getClass();
+            builderClass.getMethod("title", String.class).invoke(builder, title);
+            builderClass.getMethod("content", String.class).invoke(builder, content);
+            builderClass.getMethod("button", String.class).invoke(builder, "Ready");
+
+            // Response handler - forma correta de processar resposta
+            // responseHandler(BiConsumer<? extends Form, String>)
+            Object responseHandler = java.lang.reflect.Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{Class.forName("java.util.function.BiConsumer")},
+                (proxy, method, args) -> {
+                    if (method.getName().equals("accept")) {
+                        handleFormResponse(args[0], args[1], player);
+                    }
+                    return null;
+                }
+            );
+            builderClass.getMethod("responseHandler", java.util.function.BiConsumer.class).invoke(builder, responseHandler);
 
             // Build form
-            Object form = formBuilder.getMethod("build").invoke(builder);
+            Object form = builderClass.getMethod("build").invoke(builder);
 
-            // Enviar form via Floodgate API 2.0
+            // Enviar form via Floodgate
             Class<?> floodgateApi = Class.forName("org.geysermc.floodgate.api.FloodgateApi");
             Object instance = floodgateApi.getMethod("getInstance").invoke(null);
-
-            // Método correto: sendForm(UUID, Form) - passando o objeto form, não a classe
             Class<?> formClass = Class.forName("org.geysermc.cumulus.form.Form");
             floodgateApi.getMethod("sendForm", UUID.class, formClass).invoke(instance, player.getUniqueId(), form);
 
@@ -268,6 +271,38 @@ public class ReadyCheckManager implements Listener {
                 plugin.getDirectTranslation("ready_check_press_text", playerLang),
                 10, 280, 10);
             plugin.getLogger().warning("Erro ao enviar Bedrock Form para " + player.getName() + ": " + e.getMessage());
+        }
+    }
+
+    private void handleFormResponse(Object form, Object responseData, Player player) {
+        try {
+            plugin.getLogger().info("[BedrockForm] Resposta recebida de " + player.getName() + ": " + responseData);
+            
+            if (responseData == null || responseData.toString().isEmpty()) {
+                // Form fechado sem resposta
+                return;
+            }
+
+            // Parse response usando o metodo do form
+            Object response = form.getClass().getMethod("parseResponse", String.class).invoke(form, responseData.toString());
+            
+            // Verificar se resposta e valida
+            Boolean isCorrect = (Boolean) response.getClass().getMethod("isCorrect").invoke(response);
+            if (!isCorrect) {
+                plugin.getLogger().info("[BedrockForm] Resposta invalida de " + player.getName());
+                return;
+            }
+
+            // SimpleForm retorna o indice do botao clicado
+            // Button "Ready" e o primeiro (indice 0)
+            plugin.getLogger().info("[BedrockForm] " + player.getName() + " clicou Ready!");
+            
+            if (player.isOnline()) {
+                handleReady(player);
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("Erro ao processar resposta: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 

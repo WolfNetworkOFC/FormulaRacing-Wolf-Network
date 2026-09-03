@@ -372,9 +372,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.raceEventManager = new RaceEventManager(this);
             this.spectatorManager = new SpectatorManager(this);
             this.readyCheckManager = new ReadyCheckManager(this);
-            // Registrar Bedrock Form Listener para ready checks
-            dev.EfraGroup.formulaRacing.Gui.BedrockFormListener bedrockFormListener = new dev.EfraGroup.formulaRacing.Gui.BedrockFormListener(this);
-            bedrockFormListener.register();
+            // Bedrock Form Listener nao mais necessario - response handler usado no form
             this.raceCheckpointListener = new RaceCheckpointListener(this);
             this.raceActionBarManager = new RaceActionBarManager(this);
             this.raceScoreboardManager = new RaceScoreboardV2Manager(
