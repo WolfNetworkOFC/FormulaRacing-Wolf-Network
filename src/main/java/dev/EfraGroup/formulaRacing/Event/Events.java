@@ -99,14 +99,12 @@ public class Events {
 
     public boolean finish() {
         if (this.state != EventState.FINISHED && this.state != EventState.SETUP) {
-            if (this.eventSchedule.isLastRound()) {
-                Optional<Rounds> currentRound = this.eventSchedule.getCurrentRound();
-                if (currentRound.isPresent() && ((Rounds)currentRound.get()).getRoundState() != RoundState.FINISHED) {
-                    this.plugin.getDebugManager().logRaceSystem("Evento " + this.id + " não pode ser finalizado: o último round ainda não terminou.");
-                    return false;
-                }
-            } else if (this.eventSchedule.hasMoreRounds()) {
-                this.plugin.getDebugManager().logRaceSystem("Evento " + this.id + " não pode ser finalizado: ainda existem rounds pendentes.");
+            List<Rounds> allRounds = this.eventSchedule.getRoundsOrdered();
+            Optional<Rounds> pendingRound = allRounds.stream()
+                .filter(r -> r.getRoundState() != RoundState.FINISHED)
+                .findFirst();
+            if (pendingRound.isPresent()) {
+                this.plugin.getDebugManager().logRaceSystem("Evento " + this.id + " não pode ser finalizado: o round " + pendingRound.get().getRoundIndex() + " (" + pendingRound.get().getRoundState() + ") ainda não terminou.");
                 return false;
             }
 
@@ -114,10 +112,9 @@ public class Events {
             this.setOpenSign(false);
             this.plugin.getDebugManager().logRaceSystem("Evento finalizado: " + this.displayName);
             this.announcements.broadcastEventFinish(this);
-            if (this.eventSchedule.getCurrentRound().isPresent()) {
-                Rounds lastRound = (Rounds)this.eventSchedule.getCurrentRound().get();
+            if (!allRounds.isEmpty()) {
+                Rounds lastRound = allRounds.get(allRounds.size() - 1);
                 List<Heats> heats = new ArrayList(lastRound.getHeats().values());
-                new ArrayList();
                 if (lastRound.getType() == RoundType.FINAL || lastRound.getType() == RoundType.SPRINT_RACE) {
                     List<Driver> results = EventResults.generateRoundResults(heats);
                     this.announcements.broadcastFinalStandings((Heats)heats.get(0), results, lastRound.getRoundState() == RoundState.FINISHED ? HeatState.FINISHED : HeatState.RACING);

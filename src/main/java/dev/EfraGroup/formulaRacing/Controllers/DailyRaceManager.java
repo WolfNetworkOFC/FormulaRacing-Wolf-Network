@@ -382,6 +382,11 @@ public class DailyRaceManager {
                             heat.finishHeat(false);
                         }
                     }
+                    // A regra de progressão exige o round anterior FINISHED antes
+                    // de iniciar o próximo.
+                    if (practiceRound.getState() == RoundState.RUNNING) {
+                        practiceRound.setRoundState(RoundState.FINISHED);
+                    }
                 }
                 // Rounds no longer auto-schedule the next round — the scripted
                 // daily race advances its own phases explicitly.
@@ -538,6 +543,11 @@ public class DailyRaceManager {
                     if (heat.getHeatState() != HeatState.FINISHED) {
                         heat.finishHeat(false);
                     }
+                }
+                // A regra de progressão exige o round anterior FINISHED antes
+                // de iniciar o próximo.
+                if (qualRound.getState() == RoundState.RUNNING) {
+                    qualRound.setRoundState(RoundState.FINISHED);
                 }
             }
             // Rounds no longer auto-schedule the next round — the scripted

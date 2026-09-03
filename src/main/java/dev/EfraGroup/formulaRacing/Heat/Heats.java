@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
@@ -620,7 +621,33 @@ public class Heats {
         );
     }
 
+    /**
+     * Regra de progressão: um heat só pode iniciar se todos os rounds anteriores
+     * do evento já estiverem FINISHED.
+     */
+    public Optional<Rounds> getPreviousUnfinishedRound() {
+        if (this.round == null) {
+            return Optional.empty();
+        }
+        Events event = this.round.getEvent();
+        if (event == null || event.getSchedule() == null) {
+            return Optional.empty();
+        }
+        int currentIndex = this.round.getRoundIndex();
+        return event.getSchedule().getRoundsOrdered().stream()
+            .filter(r -> r.getRoundIndex() < currentIndex)
+            .filter(r -> r.getRoundState() != RoundState.FINISHED)
+            .findFirst();
+    }
+
     public boolean startCountdown(int seconds) {
+        Optional<Rounds> blockingRound = this.getPreviousUnfinishedRound();
+        if (blockingRound.isPresent()) {
+            this.plugin.getDebugManager().logRaceSystem(
+                "Heat " + this.id + " (" + this.getName() + ") não pode iniciar: o round anterior R" + blockingRound.get().getRoundIndex() + " (" + blockingRound.get().getRoundState() + ") ainda não foi finalizado."
+            );
+            return false;
+        }
         if (this.round != null) {
             if (this.round.getRoundState() == RoundState.SETUP) {
                 this.round.setRoundState(RoundState.RUNNING);
@@ -710,6 +737,13 @@ public class Heats {
     }
 
     public void startPractice() {
+        Optional<Rounds> blockingRound = this.getPreviousUnfinishedRound();
+        if (blockingRound.isPresent()) {
+            this.plugin.getDebugManager().logRaceSystem(
+                "Heat " + this.id + " (" + this.getName() + ") não pode iniciar a prática: o round anterior R" + blockingRound.get().getRoundIndex() + " (" + blockingRound.get().getRoundState() + ") ainda não foi finalizado."
+            );
+            return;
+        }
         if (this.round != null) {
             if (this.round.getRoundState() == RoundState.SETUP) {
                 this.round.setRoundState(RoundState.RUNNING);

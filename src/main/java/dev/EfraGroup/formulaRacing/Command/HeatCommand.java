@@ -1378,7 +1378,21 @@ public class HeatCommand extends BaseCommand {
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo!"
             );
-        } else if (mode != null && mode.equalsIgnoreCase("force")) {
+            return;
+        }
+        Optional<Rounds> blockingRound = heat.getPreviousUnfinishedRound();
+        if (blockingRound.isPresent()) {
+            player.sendMessage(
+                String.valueOf(ChatColor.RED) +
+                    "✗ Não é possível iniciar o heat " +
+                    heat.getName() +
+                    ": o round R" +
+                    blockingRound.get().getRoundIndex() +
+                    " ainda não foi finalizado!"
+            );
+            return;
+        }
+        if (mode != null && mode.equalsIgnoreCase("force")) {
             // "/heat start <heat> <s> force" cai aqui quando o ACF resolve nesta
             // sobrecarga — mesmo comportamento do onStartForce.
             if (heat.startCountdown(seconds)) {
@@ -1473,7 +1487,17 @@ public class HeatCommand extends BaseCommand {
                         "✗ Nenhum heat selecionado ou ativo!"
                 );
             } else {
-                if (heat.startCountdown(seconds)) {
+                Optional<Rounds> blockingRound = heat.getPreviousUnfinishedRound();
+                if (blockingRound.isPresent()) {
+                    player.sendMessage(
+                        String.valueOf(ChatColor.RED) +
+                            "✗ Não é possível iniciar o heat " +
+                            heat.getName() +
+                            " (FORÇADO): o round R" +
+                            blockingRound.get().getRoundIndex() +
+                            " ainda não foi finalizado!"
+                    );
+                } else if (heat.startCountdown(seconds)) {
                     this.plugin.getReadyCheckManager().stopReadyCheck(
                         heat.getId()
                     );

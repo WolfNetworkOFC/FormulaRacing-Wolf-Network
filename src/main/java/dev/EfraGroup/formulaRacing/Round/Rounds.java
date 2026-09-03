@@ -79,7 +79,18 @@ public abstract class Rounds {
             this.plugin.getDebugManager().logRaceSystem("Round " + this.id + " não possui heats!");
             return false;
         } else {
+            if (this.event != null && this.event.getSchedule() != null) {
+                Optional<Rounds> blockingRound = this.event.getSchedule().getRoundsOrdered().stream()
+                    .filter(r -> r.getRoundIndex() < this.roundIndex)
+                    .filter(r -> r.getRoundState() != RoundState.FINISHED)
+                    .findFirst();
+                if (blockingRound.isPresent()) {
+                    this.plugin.getDebugManager().logRaceSystem("Round " + this.id + " não pode iniciar: o round anterior R" + blockingRound.get().getRoundIndex() + " ainda não foi finalizado.");
+                    return false;
+                }
+            }
             this.roundState = RoundState.RUNNING;
+            this.persistState();
             DebugManager var10000 = this.plugin.getDebugManager();
             int var10001 = this.id;
             var10000.logRaceSystem("Round " + var10001 + " (" + String.valueOf(this.roundType) + ") iniciado.");
@@ -130,6 +141,7 @@ public abstract class Rounds {
             return;
         }
         this.roundState = RoundState.FINISHED;
+        this.persistState();
         this.plugin.getDebugManager().logRaceSystem("Round " + this.id + " finalizado!");
         this.broadcastResults();
         // No automatic scheduling of the next round: progression between heats
@@ -186,6 +198,19 @@ public abstract class Rounds {
 
     public void setState(RoundState state) {
         this.setRoundState(state);
+    }
+
+    /** Define o estado ao carregar do banco — sem validação de transição nem escrita. */
+    public void setStateForLoad(RoundState state) {
+        this.roundState = state;
+    }
+
+    private void persistState() {
+        if (this.plugin != null && this.id > 0) {
+            this.plugin.getRaceEventManager()
+                .getDatabaseManager()
+                .updateRoundState(this.id, this.roundState);
+        }
     }
 
     public Map<Integer, Heats> getHeats() {
