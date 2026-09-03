@@ -233,7 +233,6 @@ public class ReadyCheckManager implements Listener {
             // Adicionar conteudo e botoes
             formBuilder.getMethod("content", String.class).invoke(builder, content);
             formBuilder.getMethod("button", String.class).invoke(builder, "Ready");
-            formBuilder.getMethod("button", String.class).invoke(builder, "Cancelar");
 
             // Build form
             Object form = formBuilder.getMethod("build").invoke(builder);
@@ -268,7 +267,6 @@ public class ReadyCheckManager implements Listener {
         if ("Ready".equalsIgnoreCase(buttonText)) {
             this.handleReady(player);
         }
-        // "Cancelar" nao faz nada
     }
 }
 
