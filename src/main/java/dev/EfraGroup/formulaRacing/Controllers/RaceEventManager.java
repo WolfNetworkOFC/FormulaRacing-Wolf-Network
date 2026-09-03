@@ -1007,28 +1007,6 @@ public class RaceEventManager {
         }
     }
 
-    public boolean unloadEvent(int eventId) {
-        Events event = (Events) this.activeEvents.remove(eventId);
-        if (event == null) {
-            return false;
-        } else {
-            this.eventsByName.remove(event.getDisplayName().toLowerCase());
-            this.playerActiveEvent.entrySet().removeIf(
-                entry -> ((Events) entry.getValue()).getId() == eventId
-            );
-            DebugManager var10000 = this.plugin.getDebugManager();
-            String var10001 = event.getDisplayName();
-            var10000.logRaceSystem(
-                "Event unloaded from memory: " +
-                    var10001 +
-                    " (ID=" +
-                    eventId +
-                    ")"
-            );
-            return true;
-        }
-    }
-
     public EventsDatabaseManager getDatabaseManager() {
         return this.dbManager;
     }
@@ -1236,10 +1214,6 @@ public class RaceEventManager {
             );
             return true;
         }
-    }
-
-    public boolean deleteEvent(int eventId) {
-        return this.removeEvent(eventId);
     }
 
     public void processQualification(Events event, Rounds qualificationRound) {

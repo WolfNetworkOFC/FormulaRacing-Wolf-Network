@@ -629,7 +629,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             for (Events event : this.raceEventManager.getActiveEvents()) {
                 String name = event.getDisplayName();
                 if (name.startsWith("QuickRace_") || name.startsWith("PartyRace_") || name.startsWith("DuelRace_")) {
-                    this.raceEventManager.unloadEvent(event.getId());
+                    this.raceEventManager.removeEvent(event.getId());
                 } else {
                     this.raceEventManager.removeEvent(event.getId());
                 }

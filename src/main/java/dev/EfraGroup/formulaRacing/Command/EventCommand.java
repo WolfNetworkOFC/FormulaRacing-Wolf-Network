@@ -289,7 +289,7 @@ public class EventCommand extends BaseCommand {
             return;
         }
 
-        if (this.eventManager.deleteEvent(event.getId())) {
+        if (this.eventManager.removeEvent(event.getId())) {
             String var10001 = String.valueOf(ChatColor.GREEN);
             player.sendMessage(
                 var10001 +

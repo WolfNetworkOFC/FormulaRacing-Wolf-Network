@@ -578,8 +578,7 @@ public class QuickRaceManager {
     private void deleteQuickRace() {
         this.stopCompletionMonitor();
         if (this.currentQuickRace != null) {
-            this.plugin.getRaceEventManager().unloadEvent(this.currentQuickRace.getId());
-            this.eventsDb.deleteEvent(this.currentQuickRace.getId());
+            this.plugin.getRaceEventManager().removeEvent(this.currentQuickRace.getId());
             this.plugin.getDebugManager().logRaceSystem("Quick Race removida: " + this.currentQuickRace.getDisplayName());
         }
 
@@ -629,8 +628,7 @@ public class QuickRaceManager {
             }
 
             this.plugin.getDebugManager().logRaceSystem("[QuickRace] Removing accumulated finished QuickRace: " + name);
-            this.eventManager.unloadEvent(event.getId());
-            this.eventsDb.deleteEvent(event.getId());
+            this.eventManager.removeEvent(event.getId());
         }
     }
 
@@ -747,8 +745,7 @@ public class QuickRaceManager {
         this.stopLobbyTimer();
         this.stopCompletionMonitor();
         if (this.currentQuickRace != null) {
-            this.plugin.getRaceEventManager().unloadEvent(this.currentQuickRace.getId());
-            this.eventsDb.deleteEvent(this.currentQuickRace.getId());
+            this.plugin.getRaceEventManager().removeEvent(this.currentQuickRace.getId());
         }
         this.currentQuickRace = null;
         this.currentRound = null;

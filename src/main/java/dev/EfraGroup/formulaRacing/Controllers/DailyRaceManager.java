@@ -641,10 +641,11 @@ public class DailyRaceManager {
 
     private void unloadFromMemory(Events event) {
         try {
-            this.plugin.getRaceEventManager().unloadEvent(event.getId());
+            this.plugin.getRaceEventManager().removeEvent(event.getId());
         } catch (Throwable t) {
             this.plugin.getDebugManager().logRaceSystem("[DailyRace] Failed to unload event from memory: " + t.getMessage());
         }
+    }
 
     }
 
