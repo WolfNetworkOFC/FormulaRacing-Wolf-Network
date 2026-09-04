@@ -220,8 +220,11 @@ public class ReadyCheckManager implements Listener {
      */
     private void sendBedrockReadyCheck(Player player, Heats heat) {
         try {
-            // Cumulus Forms API - Floodgate 2.0+
-            // SimpleForm.builder() retorna Builder
+            // Cumulus Forms API do Floodgate 2.2.x (org.geysermc.cumulus 1.1.x)
+            // SimpleForm.builder() retorna Builder. ATENÇÃO: o Builder NÃO possui
+            // responseHandler — a API correta são os "result handlers". Para uma
+            // resposta válida (botão clicado) use:
+            //   validResultHandler(BiConsumer<Form, Response>)
             Class<?> simpleFormClass = Class.forName("org.geysermc.cumulus.form.SimpleForm");
             Object builder = simpleFormClass.getMethod("builder").invoke(null);
 
@@ -235,19 +238,22 @@ public class ReadyCheckManager implements Listener {
             builderClass.getMethod("content", String.class).invoke(builder, content);
             builderClass.getMethod("button", String.class).invoke(builder, "Ready");
 
-            // Response handler - forma correta de processar resposta
-            // responseHandler(BiConsumer<? extends Form, String>)
-            Object responseHandler = java.lang.reflect.Proxy.newProxyInstance(
+            // Handler de resposta valida — so e chamado quando o jogador clica em
+            // um botao. Como o unico botao e "Ready", resposta valida = Ready.
+            Object validHandler = java.lang.reflect.Proxy.newProxyInstance(
                 getClass().getClassLoader(),
                 new Class<?>[]{Class.forName("java.util.function.BiConsumer")},
                 (proxy, method, args) -> {
                     if (method.getName().equals("accept")) {
-                        handleFormResponse(args[0], args[1], player);
+                        plugin.getLogger().info("[BedrockForm] " + player.getName() + " clicou Ready!");
+                        if (player.isOnline()) {
+                            handleReady(player);
+                        }
                     }
                     return null;
                 }
             );
-            builderClass.getMethod("responseHandler", java.util.function.BiConsumer.class).invoke(builder, responseHandler);
+            builderClass.getMethod("validResultHandler", java.util.function.BiConsumer.class).invoke(builder, validHandler);
 
             // Build form
             Object form = builderClass.getMethod("build").invoke(builder);
@@ -271,38 +277,6 @@ public class ReadyCheckManager implements Listener {
                 plugin.getDirectTranslation("ready_check_press_text", playerLang),
                 10, 280, 10);
             plugin.getLogger().warning("Erro ao enviar Bedrock Form para " + player.getName() + ": " + e.getMessage());
-        }
-    }
-
-    private void handleFormResponse(Object form, Object responseData, Player player) {
-        try {
-            plugin.getLogger().info("[BedrockForm] Resposta recebida de " + player.getName() + ": " + responseData);
-            
-            if (responseData == null || responseData.toString().isEmpty()) {
-                // Form fechado sem resposta
-                return;
-            }
-
-            // Parse response usando o metodo do form
-            Object response = form.getClass().getMethod("parseResponse", String.class).invoke(form, responseData.toString());
-            
-            // Verificar se resposta e valida
-            Boolean isCorrect = (Boolean) response.getClass().getMethod("isCorrect").invoke(response);
-            if (!isCorrect) {
-                plugin.getLogger().info("[BedrockForm] Resposta invalida de " + player.getName());
-                return;
-            }
-
-            // SimpleForm retorna o indice do botao clicado
-            // Button "Ready" e o primeiro (indice 0)
-            plugin.getLogger().info("[BedrockForm] " + player.getName() + " clicou Ready!");
-            
-            if (player.isOnline()) {
-                handleReady(player);
-            }
-        } catch (Exception e) {
-            plugin.getLogger().warning("Erro ao processar resposta: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
