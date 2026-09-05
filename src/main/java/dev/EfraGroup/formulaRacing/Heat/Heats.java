@@ -409,7 +409,15 @@ public class Heats {
                     String.valueOf(this.heatState) +
                     " - resetting automatically..."
             );
+            // Salva config antes do reset
+            HeatConfig savedConfig = this.getHeatConfig() != null ? this.getHeatConfig().copy() : null;
+            Integer savedMaxDrivers = this.maxDrivers;
             this.resetHeat();
+            // Restaura config após o reset
+            if (savedConfig != null) {
+                this.setHeatConfig(savedConfig);
+            }
+            this.maxDrivers = savedMaxDrivers;
             this.plugin.getDebugManager().logRaceSystem(
                 "Heat " + this.id + " reset, continuing load..."
             );
