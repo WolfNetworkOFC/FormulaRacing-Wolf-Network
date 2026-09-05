@@ -870,7 +870,8 @@ public class RegionListener implements Listener {
             }
 
             // --- Medal System: start colored medal line replay if faster than PB ---
-            if (this.plugin.getMedalManager() != null) {
+            // Não mostra linhas de medalha para jogadores Bedrock
+            if (this.plugin.getMedalManager() != null && !this.plugin.isBedrockPlayer(player)) {
                 this.plugin.getMedalManager().startMedalReplayIfBetter(player, regionTrackWS);
             }
 

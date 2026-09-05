@@ -16,8 +16,7 @@ public class QualifyingViewModelBuilder implements StateViewModelBuilder {
     public ScoreboardViewModel build(ScoreboardContext context) {
         List<String> lines = new ArrayList<>();
         int fixedLines = 6;
-        // Não mostra linha de PB para jogadores Bedrock
-        if (!context.spectator() && context.viewerDriver() != null && !context.plugin().isBedrockPlayer(context.viewer())) {
+        if (!context.spectator() && context.viewerDriver() != null) {
             lines.add(BuilderSupport.formatBestLap(context, context.viewerDriver()));
             fixedLines++;
         }
