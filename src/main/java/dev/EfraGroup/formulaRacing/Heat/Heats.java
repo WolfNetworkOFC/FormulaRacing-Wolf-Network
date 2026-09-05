@@ -2213,7 +2213,8 @@ public class Heats {
 
     public void setTrackNameWS(String trackNameWS) {
         this.trackNameWS = trackNameWS;
-        if (trackNameWS != null && !trackNameWS.isEmpty() && this.plugin != null) {
+        // Só define maxDrivers se for null (não sobrescreve valor configurado)
+        if (trackNameWS != null && !trackNameWS.isEmpty() && this.plugin != null && this.maxDrivers == null) {
             this.maxDrivers = this.plugin.getTrackIntegrationManager().getGridPositionCount(trackNameWS);
         }
     }
