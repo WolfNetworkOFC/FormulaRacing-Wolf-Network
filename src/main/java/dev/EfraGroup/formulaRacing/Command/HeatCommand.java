@@ -1072,6 +1072,48 @@ public class HeatCommand extends BaseCommand {
         );
     }
 
+    @Subcommand("set ersrecharge")
+    @CommandCompletion("@heats")
+    @CommandPermission("formularacing.admin")
+    public void onSetErsRecharge(Player player, Heats heat, double speed) {
+        heat = this.resolveHeat(player, heat);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+
+        heat.getHeatConfig().setErsRechargeSpeed(speed);
+        player.sendMessage("§a[Config] Velocidade de recarga ERS definida para: §f" + speed + " §ano heat §f" + heat.getId());
+    }
+
+    @Subcommand("set ersdrain")
+    @CommandCompletion("@heats")
+    @CommandPermission("formularacing.admin")
+    public void onSetErsDrain(Player player, Heats heat, double speed) {
+        heat = this.resolveHeat(player, heat);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+
+        heat.getHeatConfig().setErsDrainSpeed(speed);
+        player.sendMessage("§a[Config] Velocidade de gasto ERS definida para: §f" + speed + " §ano heat §f" + heat.getId());
+    }
+
+    @Subcommand("set erspower")
+    @CommandCompletion("@heats")
+    @CommandPermission("formularacing.admin")
+    public void onSetErsPower(Player player, Heats heat, double power) {
+        heat = this.resolveHeat(player, heat);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+
+        heat.getHeatConfig().setErsDeployPower(power);
+        player.sendMessage("§a[Config] Potência do ERS definida para: §f" + power + " §ano heat §f" + heat.getId());
+    }
+
     @Subcommand("set deltaghosting")
     @CommandCompletion("@heat <seconds>")
     @CommandPermission("formularacing.admin")

@@ -53,16 +53,17 @@ public class ERSManager {
 
         double energy = driver.getErsEnergy();
         String mode = driver.getErsMode(); // "Disabled", "Recharging", "Deploy"
+        HeatConfig config = heat.getHeatConfig();
 
         if (mode.equalsIgnoreCase("Deploy")) {
-            energy -= 0.6; // Battery drain in Deploy mode
+            energy -= config.getErsDrainSpeed(); // Battery drain in Deploy mode (configurável)
             if (energy <= 0.0) {
                 energy = 0.0;
                 driver.setErsMode("Disabled");
                 this.applyErsPacket(player, 0.04F);
             }
         } else if (mode.equalsIgnoreCase("Recharging")) {
-            energy += 0.4; // Fast recharge
+            energy += config.getErsRechargeSpeed(); // Fast recharge (configurável)
             if (energy > 100.0) energy = 100.0;
         } else {
             // Disabled - Slow passive recovery
@@ -94,6 +95,7 @@ public class ERSManager {
 
     public void cycleERSMode(Player player, Driver driver, Heats heat) {
         String currentMode = driver.getErsMode();
+        HeatConfig config = heat.getHeatConfig();
 
         if (currentMode.equalsIgnoreCase("Disabled")) {
             driver.setErsMode("Recharging");
@@ -102,7 +104,7 @@ public class ERSManager {
         } else if (currentMode.equalsIgnoreCase("Recharging")) {
             if (driver.getErsEnergy() > 5.0) {
                 driver.setErsMode("Deploy");
-                this.applyErsPacket(player, (float)0.047F);
+                this.applyErsPacket(player, (float)config.getErsDeployPower()); // Potência configurável
                 player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 2.0F);
             } else {
                 driver.setErsMode("Disabled");
