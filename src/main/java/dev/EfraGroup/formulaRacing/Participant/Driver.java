@@ -502,6 +502,13 @@ public class Driver {
         // Reset ERS
         this.ersenergy = 50.0;
         this.ersmode = "Disabled";
+        // Reset DRS
+        this.hasDrsPermission = false;
+        this.hasdrs = false;
+        if (this.drsBossBar != null) {
+            this.drsBossBar.removeAll();
+            this.drsBossBar = null;
+        }
     }
 
     public int getResetCount() {

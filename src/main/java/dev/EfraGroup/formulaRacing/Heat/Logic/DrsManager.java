@@ -39,13 +39,20 @@ public class DrsManager {
         // Now we get the list of regions (DrsRegion is the object we created with type, min and max)
         final List<Heats.DrsRegion> regions = heat.getPlugin().getRaceEventManager().getDatabaseManager().getDrsRegionsList(heat.getTrackNameWS());
 
+        // Se não tem regiões configuradas, não inicia o DRS
+        if (regions == null || regions.isEmpty()) {
+            this.plugin.getLogger().info("§e[DRS-Debug] Nenhuma região DRS configurada para: §f" + heat.getTrackNameWS());
+            return;
+        }
+
         // Check if there is at least one deactivation region configured on the track
         final boolean hasFinishRegion = regions.stream().anyMatch(r -> r.getType().equalsIgnoreCase("end"));
 
         this.plugin.getLogger().info("§e[DRS-Debug] Task started. Processing " + regions.size() + " regions for: §f" + heat.getTrackNameWS());
 
         SchedulerHelper.runTaskTimer(heat.getPlugin(), (scheduledTask) -> {
-            if (heat.getHeatState() != HeatState.RACING) {
+            // Para se o heat não está RACING ou DRS está desabilitado
+            if (heat.getHeatState() != HeatState.RACING || !heat.isDrsEnabled()) {
                 heat.getDrivers().values().forEach(d -> {
                     if (d.getDrsBossBar() != null) d.getDrsBossBar().removeAll();
                 });
