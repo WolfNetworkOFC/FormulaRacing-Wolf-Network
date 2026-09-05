@@ -35,6 +35,16 @@ public class DrsManager {
         this.ps = ps;
     }
 
+    private void createBarForDriver(Driver driver, Player player) {
+        if (driver.getDrsBossBar() == null) {
+            BossBar bar = Bukkit.createBossBar("§9§lDRS", BarColor.BLUE, BarStyle.SOLID, new BarFlag[0]);
+            bar.addPlayer(player);
+            driver.setDrsBossBar(bar);
+        } else if (!driver.getDrsBossBar().getPlayers().contains(player)) {
+            driver.getDrsBossBar().addPlayer(player);
+        }
+    }
+
     public void startDrsTask(final Heats heat) {
         // Now we get the list of regions (DrsRegion is the object we created with type, min and max)
         final List<Heats.DrsRegion> regions = heat.getPlugin().getRaceEventManager().getDatabaseManager().getDrsRegionsList(heat.getTrackNameWS());
@@ -49,6 +59,14 @@ public class DrsManager {
         final boolean hasFinishRegion = regions.stream().anyMatch(r -> r.getType().equalsIgnoreCase("end"));
 
         this.plugin.getLogger().info("§e[DRS-Debug] Task started. Processing " + regions.size() + " regions for: §f" + heat.getTrackNameWS());
+
+        // Cria bars na thread principal primeiro (necessario para Folia)
+        for (Driver driver : heat.getDrivers().values()) {
+            Player player = Bukkit.getPlayer(driver.getUuid());
+            if (player != null && player.isOnline()) {
+                createBarForDriver(driver, player);
+            }
+        }
 
         SchedulerHelper.runTaskTimer(heat.getPlugin(), (scheduledTask) -> {
             // Para se o heat não está RACING ou DRS está desabilitado

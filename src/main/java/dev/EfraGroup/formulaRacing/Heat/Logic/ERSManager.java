@@ -26,6 +26,15 @@ public class ERSManager {
     }
 
     public void startERSTask(final Heats heat) {
+        // Cria bars na thread principal primeiro
+        for (Driver driver : heat.getDrivers().values()) {
+            Player player = Bukkit.getPlayer(driver.getUuid());
+            if (player != null && player.isOnline()) {
+                createBarForPlayer(player);
+            }
+        }
+        
+        // Usa runTaskAtEntity para garantir thread correta no Folia
         SchedulerHelper.runTaskTimer(this.plugin, (scheduledTask) -> {
             if (heat.getHeatState() != HeatState.RACING) {
                 ERSManager.this.clearAllBars();
@@ -42,6 +51,11 @@ public class ERSManager {
                 }
             }
         }, 0L, 2L);
+    }
+    
+    private void createBarForPlayer(Player player) {
+        this.ersBars.computeIfAbsent(player.getUniqueId(), (id) ->
+                Bukkit.createBossBar("§7§lERS: 0%", BarColor.WHITE, BarStyle.SOLID, new BarFlag[0]));
     }
 
     private void updateERS(Player player, Driver driver, Heats heat) {
