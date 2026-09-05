@@ -110,6 +110,17 @@ public class HeatConfigGui extends BaseGui {
                 0.01, 2.0, 0.01, "§7Força do DRS.",
                 v -> this.heat.setDrsdownpower(v));
 
+        // --- Row 5: ERS settings ---
+        this.addAdjustable(40, Material.DIAMOND, "ERS Recharge", cfg.getErsRechargeSpeed(),
+                0.01, 2.0, 0.01, "§7Velocidade de recarga do ERS.",
+                v -> cfg.setErsRechargeSpeed(v));
+        this.addAdjustable(41, Material.REDSTONE, "ERS Drain", cfg.getErsDrainSpeed(),
+                0.01, 2.0, 0.01, "§7Velocidade de gasto em Deploy.",
+                v -> cfg.setErsDrainSpeed(v));
+        this.addAdjustable(42, Material.EMERALD, "ERS Power", cfg.getErsDeployPower(),
+                0.01, 0.1, 0.001, "§7Potência do boost ERS.",
+                v -> cfg.setErsDeployPower(v));
+
         // --- Bottom: reset / close ---
         this.setItem(45, this.createItem(Material.TNT, "§cResetar config avançada",
                 Arrays.asList("§7Endurance, Fuel, Checkered,", "§7React Start voltam ao padrão.")),
