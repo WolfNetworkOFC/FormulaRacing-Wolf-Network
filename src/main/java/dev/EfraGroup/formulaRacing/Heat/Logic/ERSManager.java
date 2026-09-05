@@ -54,16 +54,17 @@ public class ERSManager {
         double energy = driver.getErsEnergy();
         String mode = driver.getErsMode(); // "Disabled", "Recharging", "Deploy"
         HeatConfig config = heat.getHeatConfig();
+        if (config == null) return; // Segurança
 
         if (mode.equalsIgnoreCase("Deploy")) {
-            energy -= config.getErsDrainSpeed(); // Battery drain in Deploy mode (configurável)
+            energy -= config.getErsDrainSpeed();
             if (energy <= 0.0) {
                 energy = 0.0;
                 driver.setErsMode("Disabled");
                 this.applyErsPacket(player, 0.04F);
             }
         } else if (mode.equalsIgnoreCase("Recharging")) {
-            energy += config.getErsRechargeSpeed(); // Fast recharge (configurável)
+            energy += config.getErsRechargeSpeed();
             if (energy > 100.0) energy = 100.0;
         } else {
             // Disabled - Slow passive recovery
@@ -72,7 +73,8 @@ public class ERSManager {
         }
 
         driver.setErsEnergy(energy);
-        bar.setProgress(energy / 100.0);
+        // Clamp para evitar progress negativo
+        bar.setProgress(Math.max(0.0, Math.min(1.0, energy / 100.0)));
         this.updateBarAppearance(bar, mode, (int)energy);
     }
 
@@ -96,6 +98,7 @@ public class ERSManager {
     public void cycleERSMode(Player player, Driver driver, Heats heat) {
         String currentMode = driver.getErsMode();
         HeatConfig config = heat.getHeatConfig();
+        if (config == null) return; // Segurança
 
         if (currentMode.equalsIgnoreCase("Disabled")) {
             driver.setErsMode("Recharging");

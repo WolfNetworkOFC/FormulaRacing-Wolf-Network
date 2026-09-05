@@ -499,6 +499,9 @@ public class Driver {
         this.resetCount = 0;
         this.lagStartPassed = false;
         this.lagEndPassed = false;
+        // Reset ERS
+        this.ersenergy = 50.0;
+        this.ersmode = "Disabled";
     }
 
     public int getResetCount() {
