@@ -2058,13 +2058,15 @@ public class Heats {
             this.id > 0 &&
             this.plugin.getRaceEventManager() != null
         ) {
+            // Usa valor padrao (1000) se maxDrivers for null
+            int maxDriversValue = (this.maxDrivers != null) ? this.maxDrivers : 1000;
             this.plugin.getRaceEventManager()
                 .getDatabaseManager()
                 .updateHeatConfig(
                     this.id,
                     this.totalLaps,
                     this.totalPits,
-                    this.maxDrivers
+                    maxDriversValue
                 );
         }
     }
