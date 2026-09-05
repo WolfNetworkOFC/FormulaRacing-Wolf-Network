@@ -166,7 +166,7 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("select")
-    @CommandCompletion("@heat_codes")
+    @CommandCompletion("@heat")
     @CommandPermission("formularacing.event.admin")
     @Description("Selects a specific heat to focus commands on")
     public void onSelect(Player player, String heatCodeOrId) {
