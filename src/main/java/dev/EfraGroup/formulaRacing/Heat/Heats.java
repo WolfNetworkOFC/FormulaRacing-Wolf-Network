@@ -53,7 +53,7 @@ public class Heats {
     private Integer totalLaps;
     private Integer totalPits;
     private Integer startDelay;
-    private Integer maxDrivers;
+    private Integer maxDrivers = null; // null = limite é a quantidade de grids
     private CollisionMode collisionMode;
     private boolean canReset;
     private boolean lonely;
@@ -1376,9 +1376,11 @@ public class Heats {
     public boolean addDriver(UUID uuid, int gridPosition) {
         if (this.drivers.containsKey(uuid)) {
             return false;
-        } else if (this.drivers.size() >= this.maxDrivers) {
-            return false;
         } else {
+            int maxAllowed = this.getMaxDriversLimit();
+            if (this.drivers.size() >= maxAllowed) {
+                return false;
+            }
             if (this.round != null) {
                 for (Heats heat : this.round.getHeats().values()) {
                     if (heat != this && heat.getDrivers().containsKey(uuid)) {
@@ -2011,7 +2013,33 @@ public class Heats {
         return this.maxDrivers;
     }
 
+    /**
+     * Retorna o limite efetivo de pilotos.
+     * Se maxDrivers for null, retorna a quantidade de grids.
+     */
+    public int getMaxDriversLimit() {
+        if (this.maxDrivers != null) {
+            return this.maxDrivers;
+        }
+        // Se null, limite é a quantidade de grids
+        String trackNameWS = this.getTrackNameWS();
+        if (trackNameWS != null && !trackNameWS.isEmpty()) {
+            return this.plugin.getTrackIntegrationManager().getGridPositionCount(trackNameWS);
+        }
+        return 1000; // fallback
+    }
+
     public void setMaxDrivers(Integer maxDrivers) {
+        // Valida: não permite valor maior que a quantidade de grids
+        if (maxDrivers != null) {
+            String trackNameWS = this.getTrackNameWS();
+            if (trackNameWS != null && !trackNameWS.isEmpty()) {
+                int gridCount = this.plugin.getTrackIntegrationManager().getGridPositionCount(trackNameWS);
+                if (maxDrivers > gridCount) {
+                    maxDrivers = gridCount;
+                }
+            }
+        }
         this.maxDrivers = maxDrivers;
         this.updateDatabaseConfig();
     }
