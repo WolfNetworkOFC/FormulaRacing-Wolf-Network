@@ -16,7 +16,8 @@ public class PracticeViewModelBuilder implements StateViewModelBuilder {
     public ScoreboardViewModel build(ScoreboardContext context) {
         List<String> lines = new ArrayList<>();
         int fixedLines = 6;
-        if (!context.spectator() && context.viewerDriver() != null) {
+        // Não mostra linha de PB para jogadores Bedrock
+        if (!context.spectator() && context.viewerDriver() != null && !context.plugin().isBedrockPlayer(context.viewer())) {
             lines.add(BuilderSupport.formatBestLap(context, context.viewerDriver()));
             fixedLines++;
         }
