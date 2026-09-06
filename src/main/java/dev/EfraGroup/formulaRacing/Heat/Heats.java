@@ -1383,10 +1383,13 @@ public class Heats {
 
     public boolean addDriver(UUID uuid, int gridPosition) {
         if (this.drivers.containsKey(uuid)) {
+            plugin.getLogger().info("[Heat] Cannot add driver " + uuid + " to heat " + this.id + ": already registered");
             return false;
         } else {
             int maxAllowed = this.getMaxDriversLimit();
+            plugin.getLogger().info("[Heat] Adding driver " + uuid + " to heat " + this.id + " (current: " + this.drivers.size() + "/" + maxAllowed + ", maxDrivers: " + this.maxDrivers + ", grids: " + (this.trackNameWS != null ? plugin.getTrackIntegrationManager().getGridPositionCount(this.trackNameWS) : "null") + ")");
             if (this.drivers.size() >= maxAllowed) {
+                plugin.getLogger().warning("[Heat] Cannot add driver " + uuid + " to heat " + this.id + ": heat is full (" + this.drivers.size() + "/" + maxAllowed + ")");
                 return false;
             }
             if (this.round != null) {
