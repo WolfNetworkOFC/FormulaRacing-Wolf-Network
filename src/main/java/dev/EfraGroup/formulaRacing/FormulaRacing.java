@@ -492,14 +492,12 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.registerCommands();
             this.getCommand("resetcp").setExecutor(new ResetCheckpointCommand(this, this.dm));
             this.registerPlaceholders();
+            // Remove orphan hologram stands BEFORE loading leaderboards
+            HologramManager.removeOrphanStands();
             this.loadLeaderboards();
             this.startLeaderboardUpdater();
             SchedulerHelper.runAsync(this, () ->
                 this.dm.cleanOrphanedCheckpoints()
-            );
-            // Delayed safety net: remove any orphan hologram armor stands left from failed shutdown cleanup
-            SchedulerHelper.runDelayedTask(this, () ->
-                HologramManager.removeOrphanStands(), 100L
             );
             // bStats telemetry — the plugin ID now comes from config.yml (bstats.plugin-id).
             // Register the plugin at https://bstats.org to get an ID, then set it there.
