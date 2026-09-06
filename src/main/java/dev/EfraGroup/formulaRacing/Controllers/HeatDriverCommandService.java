@@ -79,7 +79,7 @@ public class HeatDriverCommandService {
         }
 
         int currentSize = heat.getDrivers().size();
-        int maxDrivers = heat.getMaxDrivers();
+        int maxDrivers = heat.getMaxDriversLimit(); // Usa o método que trata null corretamente
         if (maxDrivers > 0 && currentSize >= maxDrivers) {
             return DriverMutationResult.of(DriverMutationStatus.HEAT_FULL);
         }
