@@ -98,8 +98,8 @@ public class HeatConfigGui extends BaseGui {
         this.addAdjustable(31, Material.HOPPER, "Start Delay", orZero(this.heat.getStartDelay()),
                 0, 60, 1, "§7Delay de largada em segundos.",
                 v -> this.heat.setStartDelay(v.intValue()));
-        this.addAdjustable(32, Material.ARMOR_STAND, "Max Pilotos", this.heat.getMaxDrivers() != null ? this.heat.getMaxDrivers() : this.heat.getMaxDriversLimit(),
-                0, 64, 1, "§7Máximo de pilotos (0 = grids).",
+        this.addAdjustable(32, Material.ARMOR_STAND, "Max Pilotos", this.heat.getMaxDrivers() != null ? this.heat.getMaxDrivers() : 0,
+                0, 64, 1, "§7Máximo de pilotos (0 = usar grids da pista).",
                 v -> this.heat.setMaxDrivers(v.intValue() == 0 ? null : v.intValue()));
 
         // --- Row 4: powers ---
