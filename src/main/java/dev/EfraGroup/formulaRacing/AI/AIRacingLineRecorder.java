@@ -6,6 +6,8 @@ import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.entity.Boat;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
@@ -226,6 +228,16 @@ public class AIRacingLineRecorder {
                     return;
                 }
 
+                // Only record while actually riding a Boat: a driver who crashed,
+                // respawned or is walking back would pollute the line with
+                // off-track points — and walking speed (~0.2 b/t) normalized
+                // against the land surface max (0.1) clamps to 1.0, teaching the
+                // AI to take those sections at full speed.
+                Entity vehicle = currentPlayer.getVehicle();
+                if (!(vehicle instanceof Boat) || !vehicle.isValid()) {
+                    return;
+                }
+
                 Location currentLoc = currentPlayer.getLocation();
                 lastUpdateTime = System.currentTimeMillis();
 
@@ -309,8 +321,11 @@ public class AIRacingLineRecorder {
                 return;
             }
 
-            AIRacingLine line = racingLineManager.getRacingLine(trackName);
-            line.clear();
+            // Build the new line in a LOCAL instance and swap it into the
+            // manager only when fully built: clearing the SHARED line mid-race
+            // left every AI already running on this track without a usable line
+            // (they park) until the rebuild finished.
+            AIRacingLine line = new AIRacingLine(trackName);
 
             // Normalize each recorded speed against the surface it was measured
             // on, so line speeds stay true to the real pace per section: a fast
@@ -335,6 +350,13 @@ public class AIRacingLineRecorder {
             // Markers must match the (possibly trimmed) line: derive them from
             // the smoothed speeds instead of trusting noisy per-tick samples.
             racingLineManager.deriveMarkersFor(line);
+
+            // Swap the fully-built line into the manager (atomic replace of the
+            // shared instance). Only when usable — a failed trim keeps whatever
+            // line the track already had instead of replacing it with a stub.
+            if (line.isUsable()) {
+                racingLineManager.setRacingLine(trackName, line);
+            }
 
             // Save to file (incremental — only this track, async to avoid blocking the tick)
             String finalTrackName = trackName;

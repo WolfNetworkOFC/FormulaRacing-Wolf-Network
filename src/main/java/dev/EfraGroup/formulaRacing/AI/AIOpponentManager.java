@@ -223,9 +223,15 @@ public class AIOpponentManager {
         if (task != null && !task.isCancelled()) {
             task.cancel();
         }
-        for (AIOpponent ai : aiOpponents.values()) {
+        // Despawn AND unregister the opponents of this heat: only despawning
+        // left the AIOpponent (and its Driver) in the map forever after every
+        // heat, leaking memory until plugin disable and polluting
+        // findByDisplayName/isAIOpponent with stale entries.
+        for (Map.Entry<UUID, AIOpponent> entry : aiOpponents.entrySet()) {
+            AIOpponent ai = entry.getValue();
             if (ai.getDriver().getHeatId() == heatId) {
                 ai.despawnEntity();
+                aiOpponents.remove(entry.getKey(), ai);
             }
         }
     }
