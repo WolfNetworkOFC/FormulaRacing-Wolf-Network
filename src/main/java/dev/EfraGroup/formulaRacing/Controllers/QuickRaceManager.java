@@ -153,6 +153,9 @@ public class QuickRaceManager {
                 return;
             }
 
+            // Set max drivers to grid count (allow all grid positions)
+            currentHeat.setMaxDrivers(gridCount);
+
             // 6. Finalization and Logs
             database.setPlayerSelectedEvent(creator.getUniqueId(), currentQuickRace);
             startLobbyTimer();
