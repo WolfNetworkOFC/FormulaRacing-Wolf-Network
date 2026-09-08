@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'dev.EfraGroup'
-version = '0.2'
+version = '2.0'
 
 // Java 25 — target Folia API 26.2
 java {
