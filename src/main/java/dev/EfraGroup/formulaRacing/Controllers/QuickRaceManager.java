@@ -269,8 +269,8 @@ public class QuickRaceManager {
                 } else if (this.currentHeat.getDriver(player.getUniqueId()) != null) {
                     this.plugin.sendMessage(player, "quickrace_already_in", new String[0]);
                     return false;
-                } else if (this.currentHeat.getDriverCount() >= this.currentHeat.getMaxDrivers()) {
-                    this.plugin.sendMessage(player, "quickrace_full", new String[]{"{max}", String.valueOf(this.currentHeat.getMaxDrivers())});
+                } else if (this.currentHeat.getDriverCount() >= this.currentHeat.getMaxDriversLimit()) {
+                    this.plugin.sendMessage(player, "quickrace_full", new String[]{"{max}", String.valueOf(this.currentHeat.getMaxDriversLimit())});
                     return false;
                 } else {
                     if (this.plugin.getTimeTrialController() != null && this.plugin.getTimeTrialController().hasActiveSession(player)) {
@@ -328,14 +328,14 @@ public class QuickRaceManager {
                         this.database.setPlayerSelectedEvent(player.getUniqueId(), this.currentQuickRace);
                         this.plugin.sendMessage(player, "quickrace_info_track", new String[]{"{track}", this.currentQuickRace.getTrackNameWS()});
                         this.plugin.sendMessage(player, "quickrace_info_laps_pits", new String[]{"{laps}", String.valueOf(this.currentHeat.getTotalLaps()), "{pits}", String.valueOf(this.currentHeat.getTotalPits())});
-                        this.plugin.sendMessage(player, "quickrace_info_drivers", new String[]{"{current}", String.valueOf(this.currentHeat.getDriverCount()), "{max}", String.valueOf(this.currentHeat.getMaxDrivers())});
+                        this.plugin.sendMessage(player, "quickrace_info_drivers", new String[]{"{current}", String.valueOf(this.currentHeat.getDriverCount()), "{max}", String.valueOf(this.currentHeat.getMaxDriversLimit())});
                         this.plugin.getTranslationUtil().sendTranslated(player, "quickrace_leave_hint", new String[0]);
                         if (this.lobbyTimerSeconds > 0) {
                             this.plugin.sendMessage(player, "quickrace_timer_status", new String[]{"{time}", String.valueOf(this.lobbyTimerSeconds)});
                         }
 
                         EventAnnouncements announcements = this.currentQuickRace != null ? this.currentQuickRace.getAnnouncements() : this.plugin.getEventAnnouncements();
-                        announcements.broadcastDriverJoin(this.currentHeat, player.getName(), this.currentHeat.getDriverCount(), this.currentHeat.getMaxDrivers());
+                        announcements.broadcastDriverJoin(this.currentHeat, player.getName(), this.currentHeat.getDriverCount(), this.currentHeat.getMaxDriversLimit());
                         return true;
                     } else {
                         this.plugin.sendMessage(player, "quickrace_join_error", new String[0]);
@@ -446,7 +446,7 @@ public class QuickRaceManager {
 
                     this.plugin.sendMessage(player, "quickrace_left", new String[0]);
                     EventAnnouncements announcements = this.currentQuickRace != null ? this.currentQuickRace.getAnnouncements() : this.plugin.getEventAnnouncements();
-                    announcements.broadcastDriverLeave(this.currentHeat, player.getName(), this.currentHeat.getDriverCount(), this.currentHeat.getMaxDrivers());
+                    announcements.broadcastDriverLeave(this.currentHeat, player.getName(), this.currentHeat.getDriverCount(), this.currentHeat.getMaxDriversLimit());
                     if (this.currentHeat.getDriverCount() == 0) {
                         this.lobbyTimerSeconds = 60;
                     }
@@ -567,7 +567,7 @@ public class QuickRaceManager {
             int laps = this.currentHeat.getTotalLaps();
             int pits = this.currentHeat.getTotalPits();
             int currentDrivers = this.currentHeat.getDriverCount();
-            int maxDrivers = this.currentHeat.getMaxDrivers();
+            int maxDrivers = this.currentHeat.getMaxDriversLimit();
 
             for(Player player : players) {
                 if (this.currentHeat.getDriver(player.getUniqueId()) == null) {
