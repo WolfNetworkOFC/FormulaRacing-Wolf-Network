@@ -69,61 +69,58 @@ public class EventCommand extends BaseCommand {
             .filter(Events::isActive)
             .sorted(Comparator.comparingLong(Events::getDate))
             .toList();
+
         sender.sendMessage("");
-        this.plugin.sendMessage(
-            sender instanceof Player ? (Player) sender : null,
-            "event_list_header",
-            new String[0]
-        );
+        sender.sendMessage("§8§m                              §r §6§lEVENTOS §8§m                              ");
         sender.sendMessage("");
+
         if (activeEvents.isEmpty()) {
-            this.plugin.sendMessage(
-                sender instanceof Player ? (Player) sender : null,
-                "event_list_empty",
-                new String[0]
-            );
+            sender.sendMessage("  §7Nenhum evento ativo no momento.");
+            sender.sendMessage("  §8Crie um evento com §f/event create <nome>");
+            sender.sendMessage("");
+            return;
         }
+
+        sender.sendMessage("  §8Total: §f" + activeEvents.size() + " §8evento" + (activeEvents.size() > 1 ? "s" : ""));
+        sender.sendMessage("");
 
         for (Events event : activeEvents) {
             String creatorName = event.getCreatorName();
             String dateStr = ApiUtilities.formatDate(event.getDate());
-            TextComponent message = new TextComponent("  ");
+            String stateName = event.getState().name();
+
+            // Cor baseada no estado
+            String stateColor;
+            switch (event.getState()) {
+                case SETUP: stateColor = "§e"; break;    // Amarelo
+                case RUNNING: stateColor = "§a"; break;   // Verde
+                case FINISHED: stateColor = "§7"; break; // Cinza
+                default: stateColor = "§f"; break;       // Branco
+            }
+
+            TextComponent message = new TextComponent("  §8• ");
+
+            // Nome do evento (clicável)
             TextComponent nameBtn = new TextComponent(event.getDisplayName());
             nameBtn.setColor(ChatColor.AQUA);
             nameBtn.setBold(true);
-            nameBtn.setClickEvent(
-                new ClickEvent(
-                    Action.RUN_COMMAND,
-                    "/event info " + event.getDisplayName()
-                )
-            );
-            nameBtn.setHoverEvent(
-                new HoverEvent(
-                    net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
-                    new Content[] { new Text("§aClique para gerenciar") }
-                )
-            );
+            nameBtn.setClickEvent(new ClickEvent(Action.RUN_COMMAND, "/event info " + event.getDisplayName()));
+            nameBtn.setHoverEvent(new HoverEvent(net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
+                new Content[] { new Text("§aClique para ver detalhes do evento") }));
             message.addExtra(nameBtn);
-            String var10003 = String.valueOf(ChatColor.GRAY);
-            message.addExtra(
-                new TextComponent(
-                    var10003 + " (" + event.getState().name() + ")"
-                )
-            );
-            message.addExtra(
-                new TextComponent(String.valueOf(ChatColor.DARK_GRAY) + " - ")
-            );
-            var10003 = String.valueOf(ChatColor.YELLOW);
-            message.addExtra(new TextComponent(var10003 + dateStr));
-            message.addExtra(
-                new TextComponent(String.valueOf(ChatColor.DARK_GRAY) + " > ")
-            );
-            var10003 = String.valueOf(ChatColor.WHITE);
-            message.addExtra(new TextComponent(var10003 + creatorName));
+
+            // Estado
+            message.addExtra(new TextComponent(" " + stateColor + "[" + stateName + "]"));
+
+            // Data e criador
+            message.addExtra(new TextComponent(" §8| §7" + dateStr));
+            message.addExtra(new TextComponent(" §8por §f" + creatorName));
+
             sender.spigot().sendMessage(message);
         }
 
         sender.sendMessage("");
+        sender.sendMessage("§8§m                                                                     ");
     }
 
     @Subcommand("select")
