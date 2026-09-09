@@ -892,7 +892,7 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("set realistic")
-    @CommandCompletion("@heats true|false")
+    @CommandCompletion("@heat true|false")
     @CommandPermission("formularacing.admin")
     public void onSetRealistic(Player player, Heats heat, boolean val) {
         heat = this.resolveHeat(player, heat);
@@ -913,7 +913,7 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("set reversegrid")
-    @CommandCompletion("@heats full|50%|75%|100%")
+    @CommandCompletion("@heat full|50%|75%|100%")
     @CommandPermission("formularacing.admin")
     public void onSetReverseGrid(Player player, Heats heat, String mode) {
         heat = this.resolveHeat(player, heat);
@@ -968,7 +968,7 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("set swap")
-    @CommandCompletion("@heats true|false")
+    @CommandCompletion("@heat true|false")
     @CommandPermission("formularacing.admin")
     public void onSetDriverSwap(Player player, Heats heat, boolean val) {
         heat = this.resolveHeat(player, heat);
@@ -989,7 +989,7 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("set p2ppower")
-    @CommandCompletion("@heats")
+    @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
     public void onSetP2PPower(Player player, Heats heat, double power) {
         heat = this.resolveHeat(player, heat);
@@ -1010,7 +1010,7 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("set drspower")
-    @CommandCompletion("@heats")
+    @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
     public void onSetDRSPower(Player player, Heats heat, double power) {
         heat = this.resolveHeat(player, heat);
@@ -1031,7 +1031,7 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("set drsdowntime")
-    @CommandCompletion("@heats")
+    @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
     public void onSetDRSTime(Player player, Heats heat, double seconds) {
         heat = this.resolveHeat(player, heat);
@@ -1052,7 +1052,7 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("set ers")
-    @CommandCompletion("@heats")
+    @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
     public void onSetErs(Player player, Heats heat, boolean seconds) {
         heat = this.resolveHeat(player, heat);
@@ -1073,7 +1073,7 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("set ersrecharge")
-    @CommandCompletion("@heats")
+    @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
     public void onSetErsRecharge(Player player, Heats heat, double speed) {
         heat = this.resolveHeat(player, heat);
@@ -1087,7 +1087,7 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("set ersdrain")
-    @CommandCompletion("@heats")
+    @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
     public void onSetErsDrain(Player player, Heats heat, double speed) {
         heat = this.resolveHeat(player, heat);
@@ -1101,7 +1101,7 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("set erspower")
-    @CommandCompletion("@heats")
+    @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
     public void onSetErsPower(Player player, Heats heat, double power) {
         heat = this.resolveHeat(player, heat);
