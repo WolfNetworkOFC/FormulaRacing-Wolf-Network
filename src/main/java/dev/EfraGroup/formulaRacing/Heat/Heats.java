@@ -398,7 +398,8 @@ public class Heats {
         );
         if (
             this.heatState != HeatState.SETUP &&
-            this.heatState != HeatState.IDLE
+            this.heatState != HeatState.IDLE &&
+            this.heatState != HeatState.LOADED
         ) {
             var10000 = this.plugin.getDebugManager();
             var10001 = this.id;
