@@ -904,8 +904,11 @@ public class RaceCheckpointListener implements Listener {
                 if (teleported) {
                     this.plugin.getAPI().recoverPlayerBoatState(player);
                 }
+                // Não reseta o OpenBoatUtils aqui: o jogador terminou a corrida e
+                // deve manter o modo OBU ativo. Qualquer entrada em pista (tt, race,
+                // grid) reaplica a config correta antes de iniciar, então não há
+                // risco de física errada nas próximas corridas.
                 if (this.plugin.getPacketSender() != null) {
-                    this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
                     boolean dbLonely = this.plugin.getDatabaseManager().getLonelyModePlayer(player.getUniqueId());
                     this.plugin.getLonelyController().setLonelyMode(player, dbLonely);
                 }

@@ -284,7 +284,10 @@ public class AICommand extends BaseCommand {
         int added = 0;
         for (int i = 0; i < count; i++) {
             UUID aiUuid = UUID.randomUUID();
-            String aiName = "AI-" + difficulty.name() + "-" + aiUuid.toString().substring(0, 8);
+            // ≤16 chars: this name goes into the fake player's tab-list entry and
+            // vanilla caps usernames at 16 — a longer name fails to encode and
+            // KICKS the viewer ("String too big, max 16").
+            String aiName = "AI-" + shortTag(difficulty) + "-" + aiUuid.toString().substring(0, 8);
             int startPosition = heat.getDrivers().size() + 1;
 
             var result = heatDriverService.addDriverSync(heat, aiUuid, aiName, startPosition);
@@ -308,6 +311,15 @@ public class AICommand extends BaseCommand {
         } else {
             player.sendMessage(tr(player, "ai_add_failed"));
         }
+    }
+
+    /** Short difficulty tag so "AI-<tag>-<8 hex>" stays within the 16-char tab-list username cap. */
+    private static String shortTag(AIOpponentManager.AIDifficulty difficulty) {
+        return switch (difficulty) {
+            case EASY -> "EAS";
+            case MEDIUM -> "MED";
+            case HARD -> "HRD";
+        };
     }
 
     @Subcommand("remove")

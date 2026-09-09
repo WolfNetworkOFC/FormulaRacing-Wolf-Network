@@ -176,6 +176,14 @@ public class AIRacingLineRecorder {
         private final Object recordingLock = new Object();
         private final List<Location> recordedPoints;
         private final List<Double> recordedSpeeds;
+        /**
+         * Surface max speed (blocks/tick) captured WHEN each point was recorded.
+         * complete() runs on the GLOBAL scheduler (heat-state polling), and
+         * getSurfaceMaxSpeed reads block types — illegal off-region on Folia —
+         * so the surface must be sampled here, on the player's region thread,
+         * while the point is being taken.
+         */
+        private final List<Double> recordedSurfaceMaxes;
         private final long registerTime;
         private long lastUpdateTime;
         private long recordingStartTime;
@@ -190,6 +198,7 @@ public class AIRacingLineRecorder {
             this.trackName = trackName == null ? "" : trackName.replace(" ", "").toLowerCase();
             this.recordedPoints = new ArrayList<>();
             this.recordedSpeeds = new ArrayList<>();
+            this.recordedSurfaceMaxes = new ArrayList<>();
             this.registerTime = System.currentTimeMillis();
             this.lastUpdateTime = registerTime;
             this.recordingStartTime = 0L;
@@ -284,6 +293,9 @@ public class AIRacingLineRecorder {
                     speed = currentPlayer.getVehicle().getVelocity().length();
                 }
                 recordedSpeeds.add(speed);
+                // Sample the surface max HERE (region thread): complete() runs on the
+                // global scheduler and cannot read block types on Folia.
+                recordedSurfaceMaxes.add(Math.max(0.1D, AIOpponentManager.getSurfaceMaxSpeed(loc)));
                 // Braking/acceleration markers are NOT recorded per-tick: raw
                 // single-tick speeds are too noisy. They are derived from the
                 // smoothed, surface-normalized speeds when the recording
@@ -394,10 +406,11 @@ public class AIRacingLineRecorder {
             List<Double> normalized = new ArrayList<>(rawSpeeds.size());
             for (int i = 0; i < rawSpeeds.size(); i++) {
                 double surfaceMax = 1.0D;
-                if (i < recordedPoints.size() && recordedPoints.get(i) != null) {
-                    // 0.1 floor matches the lowest runtime surface max (solid ground)
-                    // so recording and playback use the same scale.
-                    surfaceMax = Math.max(0.1D, AIOpponentManager.getSurfaceMaxSpeed(recordedPoints.get(i)));
+                // Use the surface max captured at RECORD time (same index as the
+                // point): reading blocks here would be an off-region access on
+                // Folia — complete() runs on the global scheduler.
+                if (i < recordedSurfaceMaxes.size()) {
+                    surfaceMax = recordedSurfaceMaxes.get(i);
                 }
                 normalized.add(clampSpeed(rawSpeeds.get(i) / surfaceMax));
             }
