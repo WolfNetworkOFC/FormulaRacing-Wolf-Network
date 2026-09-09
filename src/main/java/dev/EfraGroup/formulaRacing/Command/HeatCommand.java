@@ -336,7 +336,7 @@ public class HeatCommand extends BaseCommand {
             TextComponent header = new TextComponent("");
             header.addExtra(
                 ClickableMessageUtil.getRefreshButton(
-                    "/heat info " + heat.getId(),
+                    "/heat info " + heat.getName(),
                     "Atualizar"
                 )
             );
@@ -1156,7 +1156,7 @@ public class HeatCommand extends BaseCommand {
                     "§c, mas o heat não tem timelimit!"
                 );
                 player.sendMessage(
-                    ChatColor.GRAY + "Defina com: " + ChatColor.WHITE + "/heat set timelimit " + heat.getId() + " <segundos>"
+                    ChatColor.GRAY + "Defina com: " + ChatColor.WHITE + "/heat set timelimit " + heat.getName() + " <segundos>"
                 );
                 player.sendMessage(ChatColor.GRAY + "Sem timelimit, a corrida cai no modo normal de voltas.");
             } else {
@@ -1482,7 +1482,7 @@ public class HeatCommand extends BaseCommand {
                 String.valueOf(ChatColor.GRAY) + "Deseja forçar o início? ",
                 String.valueOf(ChatColor.RED) + "[FORÇAR INÍCIO]",
                 "",
-                "/heat start " + heat.getId() + " " + seconds + " force",
+                "/heat start " + heat.getName() + " " + seconds + " force",
                 "§cClique para ignorar o Ready Check e iniciar",
                 false
             );
