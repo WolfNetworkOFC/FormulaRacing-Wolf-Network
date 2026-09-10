@@ -27,6 +27,13 @@ public class TrackCommand extends BaseCommand {
         this.dbManager = plugin.getDatabaseManager();
     }
 
+    private String formatTime(double timeInSeconds) {
+        long minutes = (long) (timeInSeconds / 60.0);
+        long seconds = (long) (timeInSeconds % 60.0);
+        long millis = (long) ((timeInSeconds - Math.floor(timeInSeconds)) * 1000.0);
+        return String.format("%d:%02d.%03d", minutes, seconds, millis);
+    }
+
     @Default
     public void onDefault(Player player) {
         CommandHelpService.sendHelp(player, this, "/track");
@@ -78,7 +85,8 @@ public class TrackCommand extends BaseCommand {
                     double time = (Double)entry.get("time");
                     int cp = (Integer)entry.get("checkpoints");
                     boolean finished = (Boolean)entry.get("finished");
-                    String formatted = finished ? String.format("§e#%d §7» §a%s §8— §f%.3fs §8(✓)", pos, pname, time) : String.format("§e#%d §7» §a%s §8— §f%.3fs §7(%dCP)", pos, pname, time, cp);
+                    String timeStr = formatTime(time);
+                    String formatted = finished ? String.format("§e#%d §7» §a%s §8— §f%s §8(✓)", pos, pname, timeStr) : String.format("§e#%d §7» §a%s §8— §f%s §7(%dCP)", pos, pname, timeStr, cp);
                     player.sendMessage(formatted);
                 }
 
@@ -121,7 +129,8 @@ public class TrackCommand extends BaseCommand {
                     int cp = (Integer)entry.get("checkpoints");
                     boolean finished = (Boolean)entry.get("finished");
                     String date = (String)entry.get("date");
-                    String formatted = finished ? String.format("§e#%d §8— §f%.3fs §8(✓) §7[%s]", pos, time, date) : String.format("§e#%d §8— §f%.3fs §7(%dCP) §7[%s]", pos, time, cp, date);
+                    String timeStr = formatTime(time);
+                    String formatted = finished ? String.format("§e#%d §8— §f%s §8(✓) §7[%s]", pos, timeStr, date) : String.format("§e#%d §8— §f%s §7(%dCP) §7[%s]", pos, timeStr, cp, date);
                     player.sendMessage(formatted);
                 }
 

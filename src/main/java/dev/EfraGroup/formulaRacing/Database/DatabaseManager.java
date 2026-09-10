@@ -3200,8 +3200,8 @@ public class DatabaseManager {
         String sql =
             "SELECT bestTime, checkpointsReached, finished, created_at FROM fr_player_times " +
             "WHERE LOWER(trackNameWS) = LOWER(?) AND player_name = ? ORDER BY finished DESC, " +
-            "CASE WHEN finished = 1 THEN bestTime END ASC, " +
-            "CASE WHEN finished = 0 THEN checkpointsReached END DESC, created_at ASC LIMIT ? OFFSET ?";
+            "CASE WHEN finished = 0 THEN checkpointsReached END DESC, " +
+            "CASE WHEN finished = 1 THEN bestTime END ASC, created_at ASC LIMIT ? OFFSET ?";
 
         try {
             Connection conn = getOrConnect();
@@ -3244,9 +3244,11 @@ public class DatabaseManager {
         String sql =
             "SELECT ranked.player_name, ranked.bestTime, ranked.checkpointsReached, ranked.finished, ranked.created_at " +
             "FROM (SELECT t.*, ROW_NUMBER() OVER (PARTITION BY t.player_name ORDER BY t.finished DESC, " +
-            "CASE WHEN t.finished = 1 THEN t.bestTime END ASC, t.checkpointsReached DESC) AS rn " +
+            "CASE WHEN t.finished = 0 THEN t.checkpointsReached END DESC, " +
+            "CASE WHEN t.finished = 1 THEN t.bestTime END ASC) AS rn " +
             "FROM fr_player_times t WHERE LOWER(t.trackNameWS) = LOWER(?)) ranked WHERE ranked.rn = 1 " +
-            "ORDER BY finished DESC, CASE WHEN finished = 1 THEN bestTime END ASC LIMIT ? OFFSET ?";
+            "ORDER BY finished DESC, CASE WHEN finished = 0 THEN checkpointsReached END DESC, " +
+            "CASE WHEN finished = 1 THEN bestTime END ASC LIMIT ? OFFSET ?";
 
         try {
             Connection conn = getOrConnect();
