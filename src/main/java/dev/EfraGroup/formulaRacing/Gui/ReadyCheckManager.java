@@ -72,14 +72,20 @@ public class ReadyCheckManager implements Listener {
                     if (!ready.contains(driver.getUuid())) {
                         Player p = Bukkit.getPlayer(driver.getUuid());
                         if (p != null && p.isOnline()) {
-                            String playerLang = plugin.getDatabaseManager().getPlayerLanguage(p.getUniqueId());
-                            p.sendMessage(plugin.getDirectTranslation("ready_check_ready_text", playerLang));
-                            p.sendMessage(plugin.getDirectTranslation("ready_check_press_text", playerLang));
-                            TitleHelper.sendThemedTitle(p,
-                                plugin.getTranslation("ready_check_title", playerLang),
-                                plugin.getDirectTranslation("ready_check_press_text", playerLang),
-                                10, 280, 10);
-                            p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 1.0F);
+                            // Enviar Bedrock Form para jogadores Bedrock
+                            if (isBedrockPlayer(p)) {
+                                sendBedrockReadyCheck(p, heat);
+                            } else {
+                                // Java: comportamento original
+                                String playerLang = plugin.getDatabaseManager().getPlayerLanguage(p.getUniqueId());
+                                p.sendMessage(plugin.getDirectTranslation("ready_check_ready_text", playerLang));
+                                p.sendMessage(plugin.getDirectTranslation("ready_check_press_text", playerLang));
+                                TitleHelper.sendThemedTitle(p,
+                                    plugin.getTranslation("ready_check_title", playerLang),
+                                    plugin.getDirectTranslation("ready_check_press_text", playerLang),
+                                    10, 280, 10);
+                                p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 1.0F);
+                            }
                         }
                     }
                 }
@@ -194,6 +200,93 @@ public class ReadyCheckManager implements Listener {
         if (task != null) {
             task.cancel();
         }
+    }
 
+    /**
+     * Verifica se um jogador e Bedrock via Floodgate
+     */
+    private boolean isBedrockPlayer(Player player) {
+        try {
+            Class<?> floodgateApi = Class.forName("org.geysermc.floodgate.api.FloodgateApi");
+            Object instance = floodgateApi.getMethod("getInstance").invoke(null);
+            return (Boolean) floodgateApi.getMethod("isFloodgatePlayer", UUID.class).invoke(instance, player.getUniqueId());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Envia Ready Check via Bedrock Forms para jogador Bedrock
+     */
+    private void sendBedrockReadyCheck(Player player, Heats heat) {
+        try {
+            // Cumulus Forms API do Floodgate 2.2.x (org.geysermc.cumulus 1.1.x)
+            // SimpleForm.builder() retorna Builder. ATENÇÃO: o Builder NÃO possui
+            // responseHandler — a API correta são os "result handlers". Para uma
+            // resposta válida (botão clicado) use:
+            //   validResultHandler(BiConsumer<Form, Response>)
+            Class<?> simpleFormClass = Class.forName("org.geysermc.cumulus.form.SimpleForm");
+            Object builder = simpleFormClass.getMethod("builder").invoke(null);
+
+            // Titulo e conteudo
+            String title = "Ready Check - Heat #" + heat.getId();
+            String content = "Pressione Ready para confirmar que esta pronto para a corrida!";
+
+            // Adicionar titulo, conteudo e botao
+            Class<?> builderClass = builder.getClass();
+            builderClass.getMethod("title", String.class).invoke(builder, title);
+            builderClass.getMethod("content", String.class).invoke(builder, content);
+            builderClass.getMethod("button", String.class).invoke(builder, "Ready");
+
+            // Handler de resposta valida — so e chamado quando o jogador clica em
+            // um botao. Como o unico botao e "Ready", resposta valida = Ready.
+            Object validHandler = java.lang.reflect.Proxy.newProxyInstance(
+                getClass().getClassLoader(),
+                new Class<?>[]{Class.forName("java.util.function.BiConsumer")},
+                (proxy, method, args) -> {
+                    if (method.getName().equals("accept")) {
+                        plugin.getLogger().info("[BedrockForm] " + player.getName() + " clicou Ready!");
+                        if (player.isOnline()) {
+                            handleReady(player);
+                        }
+                    }
+                    return null;
+                }
+            );
+            builderClass.getMethod("validResultHandler", java.util.function.BiConsumer.class).invoke(builder, validHandler);
+
+            // Build form
+            Object form = builderClass.getMethod("build").invoke(builder);
+
+            // Enviar form via Floodgate
+            Class<?> floodgateApi = Class.forName("org.geysermc.floodgate.api.FloodgateApi");
+            Object instance = floodgateApi.getMethod("getInstance").invoke(null);
+            Class<?> formClass = Class.forName("org.geysermc.cumulus.form.Form");
+            floodgateApi.getMethod("sendForm", UUID.class, formClass).invoke(instance, player.getUniqueId(), form);
+
+            // Som de notificacao
+            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 1.0F);
+
+        } catch (Exception e) {
+            // Fallback: enviar mensagem normal se Forms nao disponivel
+            String playerLang = plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
+            player.sendMessage(plugin.getDirectTranslation("ready_check_ready_text", playerLang));
+            player.sendMessage(plugin.getDirectTranslation("ready_check_press_text", playerLang));
+            TitleHelper.sendThemedTitle(player,
+                plugin.getTranslation("ready_check_title", playerLang),
+                plugin.getDirectTranslation("ready_check_press_text", playerLang),
+                10, 280, 10);
+            plugin.getLogger().warning("Erro ao enviar Bedrock Form para " + player.getName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Processa resposta do Bedrock Form (chamado pelo listener de Forms)
+     */
+    public void handleBedrockFormResponse(Player player, String buttonText) {
+        if ("Ready".equalsIgnoreCase(buttonText)) {
+            this.handleReady(player);
+        }
     }
 }
+

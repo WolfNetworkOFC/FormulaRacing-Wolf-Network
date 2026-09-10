@@ -75,6 +75,24 @@ public class FormulaRacingListener implements Listener {
                             Driver d = heat.getDriver(player.getUniqueId());
 
                             if (d != null && heat.getHeatState() == HeatState.RACING) {
+                                // PRT tem prioridade se ambos estiverem ativos
+                                if (heat.isPushtopass() && heat.isErsEnabled()) {
+                                    // Se ambos ativos, alterna entre PTP e ERS
+                                    if (d.getErsMode().equalsIgnoreCase("Disabled")) {
+                                        // PTP tem prioridade quando ERS está desativado
+                                        event.setCancelled(true);
+                                        if (this.plugin.getPTP() != null) {
+                                            this.plugin.getPTP().togglePTP(player, d, heat);
+                                        }
+                                    } else {
+                                        // ERS tem prioridade quando está ativo
+                                        event.setCancelled(true);
+                                        if (this.plugin.getERS() != null) {
+                                            this.plugin.getERS().cycleERSMode(player, d, heat);
+                                        }
+                                    }
+                                    return;
+                                }
                                 if (heat.isPushtopass()) {
                                     event.setCancelled(true);
                                     if (this.plugin.getPTP() != null) {
@@ -82,7 +100,9 @@ public class FormulaRacingListener implements Listener {
                                     }
                                     return;
                                 }
-                                if (this.plugin.getERS() != null) {
+                                // Só ativa ERS se estiver habilitado no heat
+                                if (heat.isErsEnabled() && this.plugin.getERS() != null) {
+                                    event.setCancelled(true);
                                     this.plugin.getERS().cycleERSMode(player, d, heat);
                                 }
                                 return;

@@ -1,6 +1,7 @@
 package dev.EfraGroup.formulaRacing.Heat.Logic;
 
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Heat.HeatConfig;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
@@ -25,6 +26,15 @@ public class ERSManager {
     }
 
     public void startERSTask(final Heats heat) {
+        // Cria bars na thread principal primeiro
+        for (Driver driver : heat.getDrivers().values()) {
+            Player player = Bukkit.getPlayer(driver.getUuid());
+            if (player != null && player.isOnline()) {
+                createBarForPlayer(player);
+            }
+        }
+        
+        // Usa runTaskAtEntity para garantir thread correta no Folia
         SchedulerHelper.runTaskTimer(this.plugin, (scheduledTask) -> {
             if (heat.getHeatState() != HeatState.RACING) {
                 ERSManager.this.clearAllBars();
@@ -42,6 +52,11 @@ public class ERSManager {
             }
         }, 0L, 2L);
     }
+    
+    private void createBarForPlayer(Player player) {
+        this.ersBars.computeIfAbsent(player.getUniqueId(), (id) ->
+                Bukkit.createBossBar("§7§lERS: 0%", BarColor.WHITE, BarStyle.SOLID, new BarFlag[0]));
+    }
 
     private void updateERS(Player player, Driver driver, Heats heat) {
         BossBar bar = this.ersBars.computeIfAbsent(player.getUniqueId(), (id) ->
@@ -53,16 +68,18 @@ public class ERSManager {
 
         double energy = driver.getErsEnergy();
         String mode = driver.getErsMode(); // "Disabled", "Recharging", "Deploy"
+        HeatConfig config = heat.getHeatConfig();
+        if (config == null) return; // Segurança
 
         if (mode.equalsIgnoreCase("Deploy")) {
-            energy -= 0.6; // Battery drain in Deploy mode
+            energy -= config.getErsDrainSpeed();
             if (energy <= 0.0) {
                 energy = 0.0;
                 driver.setErsMode("Disabled");
                 this.applyErsPacket(player, 0.04F);
             }
         } else if (mode.equalsIgnoreCase("Recharging")) {
-            energy += 0.4; // Fast recharge
+            energy += config.getErsRechargeSpeed();
             if (energy > 100.0) energy = 100.0;
         } else {
             // Disabled - Slow passive recovery
@@ -71,7 +88,8 @@ public class ERSManager {
         }
 
         driver.setErsEnergy(energy);
-        bar.setProgress(energy / 100.0);
+        // Clamp para evitar progress negativo
+        bar.setProgress(Math.max(0.0, Math.min(1.0, energy / 100.0)));
         this.updateBarAppearance(bar, mode, (int)energy);
     }
 
@@ -94,6 +112,8 @@ public class ERSManager {
 
     public void cycleERSMode(Player player, Driver driver, Heats heat) {
         String currentMode = driver.getErsMode();
+        HeatConfig config = heat.getHeatConfig();
+        if (config == null) return; // Segurança
 
         if (currentMode.equalsIgnoreCase("Disabled")) {
             driver.setErsMode("Recharging");
@@ -102,7 +122,7 @@ public class ERSManager {
         } else if (currentMode.equalsIgnoreCase("Recharging")) {
             if (driver.getErsEnergy() > 5.0) {
                 driver.setErsMode("Deploy");
-                this.applyErsPacket(player, (float)0.047F);
+                this.applyErsPacket(player, (float)config.getErsDeployPower()); // Potência configurável
                 player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 2.0F);
             } else {
                 driver.setErsMode("Disabled");

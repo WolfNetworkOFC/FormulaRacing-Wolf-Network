@@ -963,6 +963,7 @@ public class RaceEventManager {
     }
 
     public void tryDeleteEventForHeat(Heats heat) {
+        // Não deleta evento quando todos DNF - apenas log
         Rounds round = heat.getRound();
         if (round == null) return;
         Events event = round.getEvent();
@@ -972,9 +973,8 @@ public class RaceEventManager {
             .allMatch(Driver::isDnf);
         if (allDnf) {
             this.plugin.getDebugManager().logRaceSystem(
-                "All drivers DNF in heat " + heat.getId() + " - deleting event " + event.getId()
+                "All drivers DNF in heat " + heat.getId() + " - event NOT deleted (only via /event delete)"
             );
-            this.removeEvent(event.getId());
         }
     }
 
@@ -1004,28 +1004,6 @@ public class RaceEventManager {
 
         if (this.plugin.getSpectatorManager() != null) {
             this.plugin.getSpectatorManager().removeEventSpectators(event);
-        }
-    }
-
-    public boolean unloadEvent(int eventId) {
-        Events event = (Events) this.activeEvents.remove(eventId);
-        if (event == null) {
-            return false;
-        } else {
-            this.eventsByName.remove(event.getDisplayName().toLowerCase());
-            this.playerActiveEvent.entrySet().removeIf(
-                entry -> ((Events) entry.getValue()).getId() == eventId
-            );
-            DebugManager var10000 = this.plugin.getDebugManager();
-            String var10001 = event.getDisplayName();
-            var10000.logRaceSystem(
-                "Event unloaded from memory: " +
-                    var10001 +
-                    " (ID=" +
-                    eventId +
-                    ")"
-            );
-            return true;
         }
     }
 
@@ -1236,10 +1214,6 @@ public class RaceEventManager {
             );
             return true;
         }
-    }
-
-    public boolean deleteEvent(int eventId) {
-        return this.removeEvent(eventId);
     }
 
     public void processQualification(Events event, Rounds qualificationRound) {

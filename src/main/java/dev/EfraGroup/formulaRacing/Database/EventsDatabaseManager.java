@@ -77,6 +77,37 @@ public class EventsDatabaseManager {
         });
     }
 
+    /**
+     * Executa a operação imediatamente, na thread atual. Usado para as
+     * persistências de estado (evento/round/heat) que precisam sobreviver a um
+     * restart do servidor — escritas async (fire-and-forget) podem ser perdidas
+     * no shutdown, fazendo estados já finalizados voltarem como RUNNING.
+     */
+    private void executeSync(
+        String sql,
+        String operationName,
+        Consumer<PreparedStatement> binder
+    ) {
+        try {
+            Connection conn = this.databaseManager.getOrConnect();
+            if (conn == null) {
+                return;
+            }
+
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                binder.accept(stmt);
+                stmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[EventsDB] Sync error in " +
+                    operationName +
+                    ": " +
+                    e.getMessage()
+            );
+        }
+    }
+
     public CompletableFuture<Integer> createEvent(
         UUID creatorUUID,
         String name,
@@ -295,7 +326,7 @@ public class EventsDatabaseManager {
 
     public void updateEventState(int eventId, EventState state) {
         String sql = "UPDATE fr_events SET state = ? WHERE id = ?";
-        this.executeAsync(sql, "updateEventState", stmt -> {
+        this.executeSync(sql, "updateEventState", stmt -> {
             try {
                 stmt.setString(1, state.name());
                 stmt.setInt(2, eventId);
@@ -379,7 +410,7 @@ public class EventsDatabaseManager {
 
     public void updateEventOpenSign(int eventId, boolean openSign) {
         String sql = "UPDATE fr_events SET openSign = ? WHERE id = ?";
-        this.executeAsync(sql, "updateEventOpenSign", stmt -> {
+        this.executeSync(sql, "updateEventOpenSign", stmt -> {
             try {
                 stmt.setInt(1, openSign ? 1 : 0);
                 stmt.setInt(2, eventId);
@@ -512,7 +543,7 @@ public class EventsDatabaseManager {
                     roundType
                 );
                 round.setEventId((Integer) data.get("eventId"));
-                round.setState(RoundState.valueOf((String) data.get("state")));
+                round.setStateForLoad(RoundState.valueOf((String) data.get("state")));
                 round.setEvent(event);
                 roundMap.put(roundId, round);
                 event.getEventSchedule().getRounds().put(roundIndex, round);
@@ -799,7 +830,7 @@ public class EventsDatabaseManager {
                     roundType
                 );
                 round.setEventId(eventId);
-                round.setState(RoundState.valueOf((String) data.get("state")));
+                round.setStateForLoad(RoundState.valueOf((String) data.get("state")));
                 roundMap.put(roundId, round);
                 Events event = (Events) eventMap.get(eventId);
                 if (event != null) {
@@ -1425,7 +1456,7 @@ public class EventsDatabaseManager {
 
     public void updateRoundState(int roundId, RoundState state) {
         String sql = "UPDATE fr_rounds SET state = ? WHERE id = ?";
-        this.executeAsync(sql, "updateRoundState", stmt -> {
+        this.executeSync(sql, "updateRoundState", stmt -> {
             try {
                 stmt.setString(1, state.name());
                 stmt.setInt(2, roundId);
@@ -1474,7 +1505,7 @@ public class EventsDatabaseManager {
             roundType
         );
         round.setEventId(eventId);
-        round.setState(RoundState.valueOf(rs.getString("state")));
+        round.setStateForLoad(RoundState.valueOf(rs.getString("state")));
 
         for (Heats heat : this.loadHeatsByRoundId(round.getId())) {
             heat.setRound(round);
@@ -1486,7 +1517,7 @@ public class EventsDatabaseManager {
 
     public void updateHeatState(int heatId, HeatState state) {
         String sql = "UPDATE fr_heats SET state = ? WHERE id = ?";
-        this.executeAsync(sql, "updateHeatState", stmt -> {
+        this.executeSync(sql, "updateHeatState", stmt -> {
             try {
                 stmt.setString(1, state.name());
                 stmt.setInt(2, heatId);

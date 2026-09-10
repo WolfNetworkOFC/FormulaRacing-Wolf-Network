@@ -1,5 +1,7 @@
 package dev.EfraGroup.formulaRacing.Controllers;
 
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
@@ -79,7 +81,7 @@ public class HeatDriverCommandService {
         }
 
         int currentSize = heat.getDrivers().size();
-        int maxDrivers = heat.getMaxDrivers();
+        int maxDrivers = heat.getMaxDriversLimit(); // Usa o método que trata null corretamente
         if (maxDrivers > 0 && currentSize >= maxDrivers) {
             return DriverMutationResult.of(DriverMutationStatus.HEAT_FULL);
         }
@@ -96,6 +98,28 @@ public class HeatDriverCommandService {
 
         if (!this.syncHeatDriversFromDatabase(heat)) {
             return DriverMutationResult.of(DriverMutationStatus.SYNC_ERROR);
+        }
+
+        // Teleport the newly added player to the grid
+        Player onlinePlayer = Bukkit.getPlayer(targetUuid);
+        if (onlinePlayer != null && onlinePlayer.isOnline()) {
+            final Heats finalHeat = heat;
+            final int finalPosition = insertPosition;
+            SchedulerHelper.runTaskFor(plugin, onlinePlayer, () -> {
+                // Get the grid location for the player's position
+                List<org.bukkit.Location> gridPositions = finalHeat.getGridManager().getGridPositions();
+                if (gridPositions != null && !gridPositions.isEmpty()) {
+                    int gridIndex = Math.max(0, finalPosition - 1);
+                    if (gridIndex < gridPositions.size()) {
+                        org.bukkit.Location gridLoc = gridPositions.get(gridIndex);
+                        onlinePlayer.teleport(gridLoc);
+                        // Stop any active timer
+                        this.plugin.getRaceScoreboardManager().addPlayer(onlinePlayer, finalHeat);
+                        this.plugin.getRaceActionBarManager().addPlayer(onlinePlayer, finalHeat);
+                        this.plugin.getHotbarController().giveHeatHotbar(onlinePlayer, finalHeat);
+                    }
+                }
+            });
         }
 
         return DriverMutationResult.success(insertPosition, targetName);

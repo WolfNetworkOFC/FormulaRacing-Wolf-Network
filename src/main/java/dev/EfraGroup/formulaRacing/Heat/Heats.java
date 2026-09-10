@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
@@ -52,7 +53,7 @@ public class Heats {
     private Integer totalLaps;
     private Integer totalPits;
     private Integer startDelay;
-    private Integer maxDrivers;
+    private Integer maxDrivers = null; // null = limite é a quantidade de grids
     private CollisionMode collisionMode;
     private boolean canReset;
     private boolean lonely;
@@ -397,7 +398,8 @@ public class Heats {
         );
         if (
             this.heatState != HeatState.SETUP &&
-            this.heatState != HeatState.IDLE
+            this.heatState != HeatState.IDLE &&
+            this.heatState != HeatState.LOADED
         ) {
             var10000 = this.plugin.getDebugManager();
             var10001 = this.id;
@@ -408,7 +410,15 @@ public class Heats {
                     String.valueOf(this.heatState) +
                     " - resetting automatically..."
             );
+            // Salva config antes do reset
+            HeatConfig savedConfig = this.getHeatConfig() != null ? this.getHeatConfig().copy() : null;
+            Integer savedMaxDrivers = this.maxDrivers;
             this.resetHeat();
+            // Restaura config após o reset
+            if (savedConfig != null) {
+                this.setHeatConfig(savedConfig);
+            }
+            this.maxDrivers = savedMaxDrivers;
             this.plugin.getDebugManager().logRaceSystem(
                 "Heat " + this.id + " reset, continuing load..."
             );
@@ -620,7 +630,33 @@ public class Heats {
         );
     }
 
+    /**
+     * Regra de progressão: um heat só pode iniciar se todos os rounds anteriores
+     * do evento já estiverem FINISHED.
+     */
+    public Optional<Rounds> getPreviousUnfinishedRound() {
+        if (this.round == null) {
+            return Optional.empty();
+        }
+        Events event = this.round.getEvent();
+        if (event == null || event.getSchedule() == null) {
+            return Optional.empty();
+        }
+        int currentIndex = this.round.getRoundIndex();
+        return event.getSchedule().getRoundsOrdered().stream()
+            .filter(r -> r.getRoundIndex() < currentIndex)
+            .filter(r -> r.getRoundState() != RoundState.FINISHED)
+            .findFirst();
+    }
+
     public boolean startCountdown(int seconds) {
+        Optional<Rounds> blockingRound = this.getPreviousUnfinishedRound();
+        if (blockingRound.isPresent()) {
+            this.plugin.getDebugManager().logRaceSystem(
+                "Heat " + this.id + " (" + this.getName() + ") não pode iniciar: o round anterior R" + blockingRound.get().getRoundIndex() + " (" + blockingRound.get().getRoundState() + ") ainda não foi finalizado."
+            );
+            return false;
+        }
         if (this.round != null) {
             if (this.round.getRoundState() == RoundState.SETUP) {
                 this.round.setRoundState(RoundState.RUNNING);
@@ -710,6 +746,13 @@ public class Heats {
     }
 
     public void startPractice() {
+        Optional<Rounds> blockingRound = this.getPreviousUnfinishedRound();
+        if (blockingRound.isPresent()) {
+            this.plugin.getDebugManager().logRaceSystem(
+                "Heat " + this.id + " (" + this.getName() + ") não pode iniciar a prática: o round anterior R" + blockingRound.get().getRoundIndex() + " (" + blockingRound.get().getRoundState() + ") ainda não foi finalizado."
+            );
+            return;
+        }
         if (this.round != null) {
             if (this.round.getRoundState() == RoundState.SETUP) {
                 this.round.setRoundState(RoundState.RUNNING);
@@ -1341,10 +1384,15 @@ public class Heats {
 
     public boolean addDriver(UUID uuid, int gridPosition) {
         if (this.drivers.containsKey(uuid)) {
-            return false;
-        } else if (this.drivers.size() >= this.maxDrivers) {
+            plugin.getLogger().info("[Heat] Cannot add driver " + uuid + " to heat " + this.id + ": already registered");
             return false;
         } else {
+            int maxAllowed = this.getMaxDriversLimit();
+            plugin.getLogger().info("[Heat] Adding driver " + uuid + " to heat " + this.id + " (current: " + this.drivers.size() + "/" + maxAllowed + ", maxDrivers: " + this.maxDrivers + ", grids: " + (this.trackNameWS != null ? plugin.getTrackIntegrationManager().getGridPositionCount(this.trackNameWS) : "null") + ")");
+            if (this.drivers.size() >= maxAllowed) {
+                plugin.getLogger().warning("[Heat] Cannot add driver " + uuid + " to heat " + this.id + ": heat is full (" + this.drivers.size() + "/" + maxAllowed + ")");
+                return false;
+            }
             if (this.round != null) {
                 for (Heats heat : this.round.getHeats().values()) {
                     if (heat != this && heat.getDrivers().containsKey(uuid)) {
@@ -1977,7 +2025,33 @@ public class Heats {
         return this.maxDrivers;
     }
 
+    /**
+     * Retorna o limite efetivo de pilotos.
+     * Se maxDrivers for null, retorna a quantidade de grids.
+     */
+    public int getMaxDriversLimit() {
+        if (this.maxDrivers != null) {
+            return this.maxDrivers;
+        }
+        // Se null, limite é a quantidade de grids
+        String trackNameWS = this.getTrackNameWS();
+        if (trackNameWS != null && !trackNameWS.isEmpty()) {
+            return this.plugin.getTrackIntegrationManager().getGridPositionCount(trackNameWS);
+        }
+        return 1000; // fallback
+    }
+
     public void setMaxDrivers(Integer maxDrivers) {
+        // Valida: não permite valor maior que a quantidade de grids
+        if (maxDrivers != null) {
+            String trackNameWS = this.getTrackNameWS();
+            if (trackNameWS != null && !trackNameWS.isEmpty()) {
+                int gridCount = this.plugin.getTrackIntegrationManager().getGridPositionCount(trackNameWS);
+                if (maxDrivers > gridCount) {
+                    maxDrivers = gridCount;
+                }
+            }
+        }
         this.maxDrivers = maxDrivers;
         this.updateDatabaseConfig();
     }
@@ -1988,13 +2062,15 @@ public class Heats {
             this.id > 0 &&
             this.plugin.getRaceEventManager() != null
         ) {
+            // Usa valor padrao (1000) se maxDrivers for null
+            int maxDriversValue = (this.maxDrivers != null) ? this.maxDrivers : 1000;
             this.plugin.getRaceEventManager()
                 .getDatabaseManager()
                 .updateHeatConfig(
                     this.id,
                     this.totalLaps,
                     this.totalPits,
-                    this.maxDrivers
+                    maxDriversValue
                 );
         }
     }
@@ -2151,7 +2227,8 @@ public class Heats {
 
     public void setTrackNameWS(String trackNameWS) {
         this.trackNameWS = trackNameWS;
-        if (trackNameWS != null && !trackNameWS.isEmpty() && this.plugin != null) {
+        // Só define maxDrivers se for null (não sobrescreve valor configurado)
+        if (trackNameWS != null && !trackNameWS.isEmpty() && this.plugin != null && this.maxDrivers == null) {
             this.maxDrivers = this.plugin.getTrackIntegrationManager().getGridPositionCount(trackNameWS);
         }
     }

@@ -246,7 +246,7 @@ public class RoundCommand extends BaseCommand {
                     ClickableMessageUtil.getButton(
                         "Info",
                         ChatColor.AQUA,
-                        "/heat info " + heat.getId(),
+                        "/heat info " + heat.getName(),
                         "Ver detalhes do heat",
                         Action.RUN_COMMAND
                     )
@@ -257,7 +257,7 @@ public class RoundCommand extends BaseCommand {
                         ClickableMessageUtil.getButton(
                             "✖",
                             ChatColor.RED,
-                            "/heat delete " + heat.getId(),
+                            "/heat delete " + heat.getName(),
                             "Excluir heat",
                             Action.SUGGEST_COMMAND
                         )

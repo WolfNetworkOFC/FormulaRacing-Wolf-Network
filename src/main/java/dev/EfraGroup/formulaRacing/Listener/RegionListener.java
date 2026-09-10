@@ -858,7 +858,8 @@ public class RegionListener implements Listener {
             }
 
             // --- Ghost System: load and start replay if ghost exists ---
-            if (this.plugin.getGhostManager() != null) {
+            // Não mostra ghost/PB para jogadores Bedrock
+            if (this.plugin.getGhostManager() != null && !this.plugin.isBedrockPlayer(player)) {
                 this.plugin.getGhostManager().loadGhostAsync(uuid, regionTrackWS, frames -> {
                     if (frames != null && !frames.isEmpty() && player.isOnline()) {
                         this.plugin.getGhostManager().startReplay(player, frames);
@@ -870,7 +871,8 @@ public class RegionListener implements Listener {
             }
 
             // --- Medal System: start colored medal line replay if faster than PB ---
-            if (this.plugin.getMedalManager() != null) {
+            // Não mostra linhas de medalha para jogadores Bedrock
+            if (this.plugin.getMedalManager() != null && !this.plugin.isBedrockPlayer(player)) {
                 this.plugin.getMedalManager().startMedalReplayIfBetter(player, regionTrackWS);
             }
 

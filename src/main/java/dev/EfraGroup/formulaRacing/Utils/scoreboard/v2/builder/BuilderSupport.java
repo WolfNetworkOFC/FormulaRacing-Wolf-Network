@@ -527,6 +527,16 @@ final class BuilderSupport {
             return "";
         }
 
+        // Usa método do FormulaRacing para remover sufixo numérico
+        FormulaRacing plugin = FormulaRacing.getInstance();
+        if (plugin != null) {
+            String displayName = plugin.getEventDisplayName(rawName);
+            if (!displayName.equals(rawName)) {
+                return displayName;
+            }
+        }
+
+        // Fallback para formato antigo
         if (rawName.startsWith("QuickRace_") || rawName.toLowerCase().startsWith("quickrace")) {
             return "QuickRace";
         }

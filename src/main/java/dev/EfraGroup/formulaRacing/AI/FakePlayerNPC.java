@@ -120,10 +120,26 @@ public class FakePlayerNPC {
                     }
                     try {
                         Location loc = boat.getLocation();
-                        send(connection, buildPlayerInfoAdd());
-                        send(connection, buildSpawnPlayer(loc));
-                        send(connection, buildSetPassengers());
+                        // Build ALL packets before sending ANY: a failure between sends
+                        // would leave the client with a half-spawned NPC (tab entry
+                        // without an entity), which corrupts subsequent player_info
+                        // payloads and can kick the viewer.
+                        Object infoAdd = buildPlayerInfoAdd();
+                        Object spawn = buildSpawnPlayer(loc);
+                        Object passengers = buildSetPassengers();
+                        send(connection, infoAdd);
+                        send(connection, spawn);
+                        send(connection, passengers);
                     } catch (Exception e) {
+                        // Best-effort rollback: drop the tab entry / entity we may
+                        // already have sent, and allow a retry later.
+                        try {
+                            Object conn = getConnection(viewer);
+                            send(conn, buildPlayerInfoRemove());
+                            send(conn, buildRemoveEntity());
+                        } catch (Exception ignored) {
+                        }
+                        viewers.remove(viewer.getUniqueId());
                         warn(e);
                     }
                 });
@@ -289,6 +305,11 @@ public class FakePlayerNPC {
 
         // Variant A (1.21.5+): ClientboundAddEntityPacket(int, UUID, double, double, double,
         // float, float, EntityType<?>, int, Vec3, double)
+        //
+        // Scan candidate constructor signatures instead of pinning ONE exact
+        // signature: the (int,UUID,3×double,2×float,EntityType,int,Vec3,double)
+        // form assumed here did NOT exist on 1.21.9+ builds (26.2), so the NPC
+        // was silently skipped ("Player spawn packet constructor not found").
         try {
             Class<?> packetClass = Class.forName("net.minecraft.network.protocol.game.ClientboundAddEntityPacket");
             Class<?> entityTypeClass = Class.forName("net.minecraft.world.entity.EntityType");
@@ -296,10 +317,46 @@ public class FakePlayerNPC {
             Class<?> vec3Class = Class.forName("net.minecraft.world.phys.Vec3");
             Constructor<?> vecCtor = vec3Class.getConstructor(double.class, double.class, double.class);
             Object zeroVec = vecCtor.newInstance(0.0, 0.0, 0.0);
-            Constructor<?> ctor = packetClass.getConstructor(
-                    int.class, UUID.class, double.class, double.class, double.class,
-                    float.class, float.class, entityTypeClass, int.class, vec3Class, double.class);
-            return ctor.newInstance(entityId, profileUuid, x, y, z, yaw, pitch, playerType, 0, zeroVec, (double) yaw);
+            for (Constructor<?> ctor : packetClass.getConstructors()) {
+                Class<?>[] p = ctor.getParameterTypes();
+                // Must contain (int, UUID) first-ish and at least one double group;
+                // any signature that mixes id+uuid+coords matches this shape.
+                boolean hasInt = false, hasUuid = false, hasDouble = false, hasFloat = false, hasEntityType = false;
+                for (Class<?> c : p) {
+                    if (c == int.class) hasInt = true;
+                    else if (c == UUID.class) hasUuid = true;
+                    else if (c == double.class) hasDouble = true;
+                    else if (c == float.class) hasFloat = true;
+                    else if (c == entityTypeClass) hasEntityType = true;
+                }
+                if (!hasInt || !hasUuid || !hasDouble || !hasEntityType) {
+                    continue;
+                }
+                Object[] args = new Object[p.length];
+                boolean idUsed = false, uuidUsed = false, typeUsed = false;
+                int yawIdx = -1, pitchIdx = -1, velIdx = -1, headYawIdx = -1;
+                for (int i = 0; i < p.length; i++) {
+                    Class<?> c = p[i];
+                    if (c == int.class && !idUsed) { args[i] = entityId; idUsed = true; }
+                    else if (c == UUID.class && !uuidUsed) { args[i] = profileUuid; uuidUsed = true; }
+                    else if (c == entityTypeClass && !typeUsed) { args[i] = playerType; typeUsed = true; }
+                    else if (c == double.class && yawIdx == -1) { args[i] = x; yawIdx = i; }
+                    else if (c == double.class && pitchIdx == -1) { args[i] = y; pitchIdx = i; }
+                    else if (c == double.class && velIdx == -1) { args[i] = z; velIdx = i; }
+                    else if (c == double.class && headYawIdx == -1) { args[i] = 0.0D; headYawIdx = i; }
+                    else if (c == float.class && yawIdx != -1 && pitchIdx == -1) { args[i] = yaw; pitchIdx = i; }
+                    else if (c == float.class) { args[i] = pitch; pitchIdx = i; }
+                    else if (c == vec3Class && velIdx == -1) { args[i] = zeroVec; velIdx = i; }
+                    else if (c == int.class) { args[i] = 0; }
+                    else if (c == double.class) { args[i] = (double) yaw; }
+                    else { args[i] = null; }
+                }
+                try {
+                    return ctor.newInstance(args);
+                } catch (Exception ignored) {
+                    // Try the next candidate signature.
+                }
+            }
         } catch (Exception ignored) {
             // Variant B (1.21.4): ClientboundAddPlayerPacket(int, UUID, Vector3d, float, float)
         }
@@ -390,8 +447,12 @@ public class FakePlayerNPC {
 
     private Object gameProfile() throws Exception {
         Class<?> profileClass = Class.forName("com.mojang.authlib.GameProfile");
+        // Vanilla caps tab-list usernames at 16 chars. A longer name fails to
+        // ENCODE on the netty thread (uncatchable) and kicks the viewer client:
+        // "String too big (was 18 characters, max 16)".
+        String safeName = name.length() > 16 ? name.substring(0, 16) : name;
         Constructor<?> ctor = profileClass.getConstructor(UUID.class, String.class);
-        return ctor.newInstance(profileUuid, name);
+        return ctor.newInstance(profileUuid, safeName);
     }
 
     private Object gameMode() throws Exception {
@@ -446,8 +507,11 @@ public class FakePlayerNPC {
     private void warn(Exception e) {
         if (!warned) {
             warned = true;
+            // Name + length included so a stale-jar situation is obvious in the
+            // log: names longer than 16 chars can only come from old code.
             plugin.getLogger().warning("[FormulaRacing] Falha ao criar NPC de IA (player falso no barco): "
-                    + e.getClass().getSimpleName() + ": " + e.getMessage());
+                    + e.getClass().getSimpleName() + ": " + e.getMessage()
+                    + " (npcName=" + name + ", len=" + name.length() + ")");
             plugin.getLogger().warning("[FormulaRacing] O barco da IA continua funcionando sem o NPC visível.");
         }
     }

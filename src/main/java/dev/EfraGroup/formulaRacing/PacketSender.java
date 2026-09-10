@@ -153,7 +153,6 @@ public class PacketSender {
                 float value = e.getKey();
                 String blocks = String.join(",", e.getValue());
                 sendBoatSetting(player, (short)3, value, blocks);
-                FormulaRacing.getInstance().getLogger().info("[DEBUG] Set custom slipperiness -> Value: " + value + ", Blocks: " + blocks);
             }
         }
 

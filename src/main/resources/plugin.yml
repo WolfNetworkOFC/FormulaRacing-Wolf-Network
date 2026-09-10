@@ -46,7 +46,7 @@ commands:
   formularacingreload:
     description: Recarrega as configurações do FormulaRacing
     usage: /formularacingreload
-    aliases: [frr, frreload]
+    aliases: [frreload]
   timetrial:
     description: Começe uma TimeTrial
     usage: /timetrial

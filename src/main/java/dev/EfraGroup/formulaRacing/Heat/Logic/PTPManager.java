@@ -34,6 +34,14 @@ public class PTPManager {
     }
 
     public void startPTPTask(final Heats heat) {
+        // Cria bars na thread principal primeiro (necessario para Folia)
+        for (Driver driver : heat.getDrivers().values()) {
+            Player player = Bukkit.getPlayer(driver.getUuid());
+            if (player != null && player.isOnline()) {
+                createBarForPlayer(player);
+            }
+        }
+        
         SchedulerHelper.runTaskTimer(this.plugin, (scheduledTask) -> {
             if (heat.getHeatState() != HeatState.RACING) {
                 for (Driver driver : heat.getDrivers().values()) {
@@ -67,6 +75,14 @@ public class PTPManager {
                 }
             }
         }, 0L, 2L);
+    }
+    
+    private void createBarForPlayer(Player player) {
+        UUID uuid = player.getUniqueId();
+        if (!playerData.containsKey(uuid)) {
+            PtpData data = new PtpData(player);
+            playerData.put(uuid, data);
+        }
     }
 
     private void updatePTP(Player player, Driver driver) {

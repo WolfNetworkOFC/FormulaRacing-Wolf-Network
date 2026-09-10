@@ -84,6 +84,20 @@ public class AIRacingLineManager {
         return racingLines.computeIfAbsent(getTrackKey(trackName), AIRacingLine::new);
     }
 
+    /**
+     * Atomically replaces the in-memory line for a track with a fully-built
+     * one. Callers that rebuild a line from scratch (e.g. the recorder) must
+     * use this instead of {@code getRacingLine(...).clear()} — clearing the
+     * shared instance mid-race leaves any AI on that track without a usable
+     * line until the rebuild finishes.
+     */
+    public void setRacingLine(String trackName, AIRacingLine line) {
+        if (line == null) {
+            return;
+        }
+        racingLines.put(getTrackKey(trackName), line);
+    }
+
     public void removeRacingLine(String trackName) {
         racingLines.remove(getTrackKey(trackName));
     }

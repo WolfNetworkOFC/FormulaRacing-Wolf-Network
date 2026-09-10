@@ -117,6 +117,7 @@ public class TrackLeaderboard {
         SchedulerHelper.runAsync(this.plugin, () -> {
             if (this.removed || !this.javaEnabled) return;
             List<DatabaseManager.PlayerTime> leaderboard = this.mySQLManager.getLeaderboardJava(this.trackName);
+            plugin.getLogger().info("[Leaderboard] Java update for " + this.trackName + ": " + leaderboard.size() + " entries");
             processAndShow(leaderboard, "java");
         });
     }
@@ -126,6 +127,7 @@ public class TrackLeaderboard {
         SchedulerHelper.runAsync(this.plugin, () -> {
             if (this.removed || !this.bedrockEnabled) return;
             List<DatabaseManager.PlayerTime> leaderboard = this.mySQLManager.getLeaderboardBedrock(this.trackName);
+            plugin.getLogger().info("[Leaderboard] Bedrock update for " + this.trackName + ": " + leaderboard.size() + " entries");
             processAndShow(leaderboard, "bedrock");
         });
     }

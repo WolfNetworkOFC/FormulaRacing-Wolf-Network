@@ -98,9 +98,9 @@ public class HeatConfigGui extends BaseGui {
         this.addAdjustable(31, Material.HOPPER, "Start Delay", orZero(this.heat.getStartDelay()),
                 0, 60, 1, "§7Delay de largada em segundos.",
                 v -> this.heat.setStartDelay(v.intValue()));
-        this.addAdjustable(32, Material.ARMOR_STAND, "Max Pilotos", orZero(this.heat.getMaxDrivers()),
-                1, 64, 1, "§7Máximo de pilotos no heat.",
-                v -> this.heat.setMaxDrivers(v.intValue()));
+        this.addAdjustable(32, Material.ARMOR_STAND, "Max Pilotos", this.heat.getMaxDrivers() != null ? this.heat.getMaxDrivers() : 0,
+                0, 64, 1, "§7Máximo de pilotos (0 = usar grids da pista).",
+                v -> this.heat.setMaxDrivers(v.intValue() == 0 ? null : v.intValue()));
 
         // --- Row 4: powers ---
         this.addAdjustable(37, Material.GOLD_NUGGET, "P2P Power", this.heat.getpushtopasspower(),
@@ -109,6 +109,17 @@ public class HeatConfigGui extends BaseGui {
         this.addAdjustable(38, Material.GOLD_INGOT, "DRS Power", this.heat.getDrsdownpower(),
                 0.01, 2.0, 0.01, "§7Força do DRS.",
                 v -> this.heat.setDrsdownpower(v));
+
+        // --- Row 5: ERS settings ---
+        this.addAdjustable(40, Material.DIAMOND, "ERS Recharge", cfg.getErsRechargeSpeed(),
+                0.01, 2.0, 0.01, "§7Velocidade de recarga do ERS.",
+                v -> cfg.setErsRechargeSpeed(v));
+        this.addAdjustable(41, Material.REDSTONE, "ERS Drain", cfg.getErsDrainSpeed(),
+                0.01, 2.0, 0.01, "§7Velocidade de gasto em Deploy.",
+                v -> cfg.setErsDrainSpeed(v));
+        this.addAdjustable(42, Material.EMERALD, "ERS Power", cfg.getErsDeployPower(),
+                0.01, 0.1, 0.001, "§7Potência do boost ERS.",
+                v -> cfg.setErsDeployPower(v));
 
         // --- Bottom: reset / close ---
         this.setItem(45, this.createItem(Material.TNT, "§cResetar config avançada",

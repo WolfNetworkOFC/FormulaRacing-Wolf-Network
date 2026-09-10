@@ -59,20 +59,27 @@ public class HologramManager {
     }
 
     public void createHologram(String name, Location loc, List<String> lines) {
+        plugin.getLogger().info("[Hologram] Creating hologram '" + name + "' at " + loc + " with " + lines.size() + " lines");
         SchedulerHelper.runTaskAt(plugin, loc, () -> {
             createHologramSync(name, loc, lines);
         });
     }
 
     public void createHologramSync(String name, Location loc, List<String> lines) {
-        if (loc.getWorld() == null) return;
+        if (loc == null || loc.getWorld() == null) {
+            plugin.getLogger().warning("[Hologram] Cannot create hologram '" + name + "': location or world is null");
+            return;
+        }
 
         // Reuse existing stands: just update names in-place (avoids Folia deferred entity removal)
         List<Entity> stands = holograms.get(name);
         if (stands != null && !stands.isEmpty() && stands.get(0) != null && stands.get(0).isValid()) {
+            plugin.getLogger().info("[Hologram] Reusing existing stands for '" + name + "'");
             updateHologramList(stands, name, loc, lines);
             return;
         }
+
+        plugin.getLogger().info("[Hologram] Creating new stands for '" + name + "' at " + loc.getWorld().getName());
 
         // Ensure chunk is loaded so getNearbyEntities can find orphan stands from prior sessions
         if (!loc.getChunk().isLoaded()) {
@@ -93,18 +100,23 @@ public class HologramManager {
         stands = new ArrayList<>();
         for (int i = 0; i < lines.size(); i++) {
             Location standLoc = loc.clone().add(0, (lines.size() - 1 - i) * LINE_SPACING, 0);
-            ArmorStand stand = (ArmorStand) loc.getWorld().spawnEntity(standLoc, EntityType.ARMOR_STAND);
-            stand.setVisible(false);
-            stand.setMarker(true);
-            stand.setGravity(false);
-            stand.setInvulnerable(true);
-            stand.setCustomNameVisible(true);
-            stand.setCustomName(resolvePAPI(lines.get(i)));
-            stand.getPersistentDataContainer().set(HOLO_TAG, PersistentDataType.BYTE, (byte) 1);
-            stands.add(stand);
+            try {
+                ArmorStand stand = (ArmorStand) loc.getWorld().spawnEntity(standLoc, EntityType.ARMOR_STAND);
+                stand.setVisible(false);
+                stand.setMarker(true);
+                stand.setGravity(false);
+                stand.setInvulnerable(true);
+                stand.setCustomNameVisible(true);
+                stand.setCustomName(resolvePAPI(lines.get(i)));
+                stand.getPersistentDataContainer().set(HOLO_TAG, PersistentDataType.BYTE, (byte) 1);
+                stands.add(stand);
+            } catch (Exception e) {
+                plugin.getLogger().warning("[Hologram] Failed to create stand " + i + " for '" + name + "': " + e.getMessage());
+            }
         }
         holograms.put(name, stands);
         hologramLocations.put(name, loc.clone());
+        plugin.getLogger().info("[Hologram] Created " + stands.size() + " stands for '" + name + "'");
     }
 
     private void updateHologramList(List<Entity> stands, String name, Location baseLoc, List<String> lines) {

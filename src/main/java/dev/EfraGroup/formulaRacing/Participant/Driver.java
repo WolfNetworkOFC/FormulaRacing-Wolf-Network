@@ -499,6 +499,16 @@ public class Driver {
         this.resetCount = 0;
         this.lagStartPassed = false;
         this.lagEndPassed = false;
+        // Reset ERS
+        this.ersenergy = 50.0;
+        this.ersmode = "Disabled";
+        // Reset DRS
+        this.hasDrsPermission = false;
+        this.hasdrs = false;
+        if (this.drsBossBar != null) {
+            this.drsBossBar.removeAll();
+            this.drsBossBar = null;
+        }
     }
 
     public int getResetCount() {

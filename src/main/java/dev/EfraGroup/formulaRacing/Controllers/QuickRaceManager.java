@@ -98,7 +98,7 @@ public class QuickRaceManager {
         // Value normalization
         int finalLaps = Math.max(1, laps);
         int finalPits = Math.min(Math.max(0, pits), finalLaps - 1);
-        String eventName = "QuickRace_" + System.currentTimeMillis();
+        String eventName = "QuickRace_" + FormulaRacing.getInstance().getNextEventId();
 
         // 1. Received as Object, as that's what the method provides
         java.util.concurrent.CompletableFuture<Object> future = eventManager.createQuickRace(
@@ -153,6 +153,9 @@ public class QuickRaceManager {
                 return;
             }
 
+            // Set max drivers to grid count (allow all grid positions)
+            currentHeat.setMaxDrivers(gridCount);
+
             // 6. Finalization and Logs
             database.setPlayerSelectedEvent(creator.getUniqueId(), currentQuickRace);
             startLobbyTimer();
@@ -191,7 +194,7 @@ public class QuickRaceManager {
 
         int finalLaps = Math.max(1, laps);
         int finalPits = Math.min(Math.max(0, pits), finalLaps - 1);
-        String eventName = "DuelRace_" + System.currentTimeMillis();
+        String eventName = "DuelRace_" + FormulaRacing.getInstance().getNextEventId();
 
         java.util.concurrent.CompletableFuture<Object> future = eventManager.createQuickRace(
                 p1.getUniqueId(), eventName, finalTrackName, finalLaps, finalPits
@@ -578,9 +581,8 @@ public class QuickRaceManager {
     private void deleteQuickRace() {
         this.stopCompletionMonitor();
         if (this.currentQuickRace != null) {
-            this.plugin.getRaceEventManager().unloadEvent(this.currentQuickRace.getId());
-            this.eventsDb.deleteEvent(this.currentQuickRace.getId());
-            this.plugin.getDebugManager().logRaceSystem("Quick Race removida: " + this.currentQuickRace.getDisplayName());
+            // QuickRace NÃO é removido quando acaba - apenas limpa referências locais
+            this.plugin.getDebugManager().logRaceSystem("Quick Race finalizado: " + this.currentQuickRace.getDisplayName());
         }
 
         this.currentQuickRace = null;
@@ -628,9 +630,8 @@ public class QuickRaceManager {
                 continue;
             }
 
-            this.plugin.getDebugManager().logRaceSystem("[QuickRace] Removing accumulated finished QuickRace: " + name);
-            this.eventManager.unloadEvent(event.getId());
-            this.eventsDb.deleteEvent(event.getId());
+            this.plugin.getDebugManager().logRaceSystem("[QuickRace] QuickRace finalizado: " + name);
+            // QuickRace NÃO é removido quando acaba - apenas log
         }
     }
 
@@ -747,8 +748,8 @@ public class QuickRaceManager {
         this.stopLobbyTimer();
         this.stopCompletionMonitor();
         if (this.currentQuickRace != null) {
-            this.plugin.getRaceEventManager().unloadEvent(this.currentQuickRace.getId());
-            this.eventsDb.deleteEvent(this.currentQuickRace.getId());
+            // QuickRace NÃO é removido no shutdown - apenas limpa referências locais
+            this.plugin.getDebugManager().logRaceSystem("Quick Race shutdown: " + (this.currentQuickRace != null ? this.currentQuickRace.getDisplayName() : "null"));
         }
         this.currentQuickRace = null;
         this.currentRound = null;

@@ -116,6 +116,8 @@ import dev.EfraGroup.formulaRacing.PacketSender;
 
         private void startTrack(Player player, String trackName, String ownerName) {
             if (isBusy(player)) return;
+
+            // Save partial time asynchronously (non-blocking)
             String lastTrack = this.plugin.getLastTimeTrialTrack(player.getUniqueId());
             if (lastTrack != null) {
                 TimerUtils.PlayerTimerData data = this.timerUtils.getTimerData(player, lastTrack);
@@ -123,7 +125,11 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                     double elapsedTime = this.timerUtils.getPlayerElapsedTimeUntilLastCheckpoint(player, lastTrack);
                     int checkpoints = data.getCheckpointsReached();
                     if (checkpoints > 0) {
-                        this.mysql.savePartialTime(player.getUniqueId(), player.getName(), lastTrack, elapsedTime, checkpoints);
+                        final double finalElapsed = elapsedTime;
+                        final int finalCheckpoints = checkpoints;
+                        SchedulerHelper.runAsync(this.plugin, () ->
+                            this.mysql.savePartialTime(player.getUniqueId(), player.getName(), lastTrack, finalElapsed, finalCheckpoints)
+                        );
                     }
                 }
             }
@@ -137,8 +143,11 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                 if (loc == null) {
                     this.plugin.sendMessage(player, "tt_track_no_spawn", new String[0]);
                 } else {
+                    // Enable time trial asynchronously (non-blocking)
                     if (!this.mysql.getTimeTrialEnabled(player.getUniqueId())) {
-                        this.mysql.setTimeTrialEnabled(player.getUniqueId(), true);
+                        SchedulerHelper.runAsync(this.plugin, () ->
+                            this.mysql.setTimeTrialEnabled(player.getUniqueId(), true)
+                        );
                         this.plugin.sendMessage(player, "tt_auto_enabled", new String[0]);
                     }
 
@@ -198,7 +207,7 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                                      }
                                  });
                              }
-                        }
+                         }
                     });
                 }
             }

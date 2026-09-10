@@ -223,9 +223,15 @@ public class AIOpponentManager {
         if (task != null && !task.isCancelled()) {
             task.cancel();
         }
-        for (AIOpponent ai : aiOpponents.values()) {
+        // Despawn AND unregister the opponents of this heat: only despawning
+        // left the AIOpponent (and its Driver) in the map forever after every
+        // heat, leaking memory until plugin disable and polluting
+        // findByDisplayName/isAIOpponent with stale entries.
+        for (Map.Entry<UUID, AIOpponent> entry : aiOpponents.entrySet()) {
+            AIOpponent ai = entry.getValue();
             if (ai.getDriver().getHeatId() == heatId) {
                 ai.despawnEntity();
+                aiOpponents.remove(entry.getKey(), ai);
             }
         }
     }
@@ -262,7 +268,7 @@ public class AIOpponentManager {
 
     private void checkAICollisions(List<AIOpponent> opponents) {
         final double collisionDistanceSquared = 4.0;
-        final double bumpForce = 0.18;
+        final double bumpForce = 0.35; // Increased from 0.18 for more noticeable collisions
 
         for (int i = 0; i < opponents.size(); i++) {
             for (int j = i + 1; j < opponents.size(); j++) {
@@ -577,7 +583,8 @@ public class AIOpponentManager {
         private void adjustDifficultyBasedOnLearning() {
             double speedBonus = learningProgress * 0.12;
             double accuracyBonus = learningProgress * 0.15;
-            learnedSpeedMultiplier = difficulty.getSpeedMultiplier() + speedBonus;
+            // Cap speed multiplier at 1.3 to prevent AI from becoming impossible
+            learnedSpeedMultiplier = Math.min(1.3, difficulty.getSpeedMultiplier() + speedBonus);
             learnedLineAccuracy = Math.min(1.0, difficulty.getLineAccuracy() + accuracyBonus);
             learnedErrorRate = Math.max(0.01, difficulty.getErrorRate() - (learningProgress * 0.08));
         }
@@ -987,6 +994,26 @@ public class AIOpponentManager {
             return currentLineIndex;
         }
 
+        private boolean isSafeSpawnLocation(Location loc) {
+            if (loc == null || loc.getWorld() == null) return false;
+            Block block = loc.getBlock();
+            // Allow water, ice, and air (boats can be on ice/water)
+            Material type = block.getType();
+            return type == Material.WATER || type == Material.ICE ||
+                   type == Material.BLUE_ICE || type == Material.PACKED_ICE ||
+                   type == Material.FROSTED_ICE || type.isAir();
+        }
+
+        private Location findSafeSpawnLocation(Heats heat, Location original) {
+            if (isSafeSpawnLocation(original)) return original;
+            // Try to find nearby safe location
+            for (int y = -2; y <= 2; y++) {
+                Location check = original.clone().add(0, y, 0);
+                if (isSafeSpawnLocation(check)) return check;
+            }
+            return original; // Fallback to original if no safe location found
+        }
+
         private Location resolveSpawnLocation(Heats heat) {
             if (heat.getGridManager().getGridPositions().isEmpty()) {
                 heat.getGridManager().generateGrid();
@@ -995,9 +1022,11 @@ public class AIOpponentManager {
             List<Location> gridPositions = heat.getGridManager().getGridPositions();
             int gridIndex = Math.max(0, driver.getStartPosition() - 1);
             if (gridIndex < gridPositions.size()) {
-                return gridPositions.get(gridIndex).clone();
+                Location spawn = gridPositions.get(gridIndex).clone();
+                return findSafeSpawnLocation(heat, spawn);
             }
-            return heat.getPlugin().getTrackIntegrationManager().getTrackSpawn(heat.getTrackNameWS());
+            Location trackSpawn = heat.getPlugin().getTrackIntegrationManager().getTrackSpawn(heat.getTrackNameWS());
+            return findSafeSpawnLocation(heat, trackSpawn);
         }
 
         private void resetLearnedValues() {
