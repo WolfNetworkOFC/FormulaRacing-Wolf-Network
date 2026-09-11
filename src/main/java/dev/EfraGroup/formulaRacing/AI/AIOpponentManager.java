@@ -79,17 +79,52 @@ public class AIOpponentManager {
      * Returns how fast (blocks/tick) a boat can realistically travel on the
      * surface below {@code loc}, so the AI drives like a player: ice is fast
      * (low friction, velocity builds), water is drag-limited, land is slow.
+     *
+     * <p>If the block directly under the boat is snow or another non-driving
+     * block, the AI should still detect ice or water beneath it, because snow
+     * layers on top of ice do not change how a boat actually moves.
      */
     public static double getSurfaceMaxSpeed(Location loc) {
         if (loc == null || loc.getWorld() == null) {
             return 1.0D;
         }
+
         Block block = loc.getBlock();
         double max = surfaceMaxFor(block.getType());
         if (max < 0.0D) {
-            max = surfaceMaxFor(block.getRelative(BlockFace.DOWN).getType());
+            max = surfaceMaxForSkippingSnow(block);
         }
         return max < 0.0D ? 1.0D : max;
+    }
+
+    /**
+     * Checks the block under {@code block} and keeps going downward while the
+     * block is snow, until an ice/water/land block is found or the build limit
+     * is reached. This avoids treating snow layers on top of ice as land.
+     */
+    private static double surfaceMaxForSkippingSnow(Block block) {
+        if (block == null || block.getWorld() == null) {
+            return -1.0D;
+        }
+
+        int maxDepth = 5;
+        Block current = block.getRelative(BlockFace.DOWN);
+        for (int i = 0; i < maxDepth; i++) {
+            if (current == null || current.getWorld() == null) {
+                return -1.0D;
+            }
+
+            Material type = current.getType();
+            if (type == Material.SNOW || type == Material.SNOW_BLOCK) {
+                current = current.getRelative(BlockFace.DOWN);
+                continue;
+            }
+
+            return surfaceMaxFor(type);
+        }
+
+        // If we only found snow for several blocks, fall back to a generic solid surface.
+        return surfaceMaxFor(Material.STONE);
     }
 
     private static double surfaceMaxFor(Material type) {
@@ -420,8 +455,9 @@ public class AIOpponentManager {
                 return;
             }
 
-            // Entity creation must run on the world's region thread (Folia).
-            // Boat is an interface, so we spawn the concrete OAK_BOAT entity type.
+            // Entity creation AND the block reads of the safe-Y search must run on
+            // the world's region thread (Folia). Boat is an interface, so we spawn
+            // the concrete OAK_BOAT entity type.
             final Location finalSpawn = spawn.clone();
             final CollisionMode heatCollisionMode = heat != null ? heat.getCollisionMode() : CollisionMode.HIGH;
             final int generation = spawnGeneration;
@@ -434,14 +470,17 @@ public class AIOpponentManager {
                     if (generation != spawnGeneration) {
                         return;
                     }
-                    Boat boat = (Boat) finalSpawn.getWorld().spawnEntity(finalSpawn, EntityType.OAK_BOAT);
+                    // Block reads (safe-Y search) are only legal here, on the region
+                    // thread that owns this chunk — never on the global scheduler.
+                    Location safeSpawn = findSafeSpawnLocation(finalSpawn);
+                    Boat boat = (Boat) safeSpawn.getWorld().spawnEntity(safeSpawn, EntityType.OAK_BOAT);
                     boat.customName(Component.text(displayName));
                     boat.setCustomNameVisible(true);
                     boat.setInvulnerable(true);
                     boat.setGravity(true);
                     boat.setPersistent(false);
                     boat.setSilent(true);
-                    boat.setRotation(finalSpawn.getYaw(), finalSpawn.getPitch());
+                    boat.setRotation(safeSpawn.getYaw(), safeSpawn.getPitch());
                     // Match the same server-side collision rule used for player boats
                     // (Heats/GridManager spawn player boats with collidable = collisionMode != DISABLED).
                     // This keeps AI boats colliding with players when the heat has collisions enabled.
@@ -994,26 +1033,56 @@ public class AIOpponentManager {
             return currentLineIndex;
         }
 
+        /**
+         * Checks whether a block is safe for boat spawn. This must be called on the
+         * region thread for the block's world, because Folia forbids reading
+         * {@code Block} from unrelated scheduler threads.
+         */
         private boolean isSafeSpawnLocation(Location loc) {
-            if (loc == null || loc.getWorld() == null) return false;
+            if (loc == null || loc.getWorld() == null) {
+                return false;
+            }
+
             Block block = loc.getBlock();
-            // Allow water, ice, and air (boats can be on ice/water)
             Material type = block.getType();
             return type == Material.WATER || type == Material.ICE ||
                    type == Material.BLUE_ICE || type == Material.PACKED_ICE ||
                    type == Material.FROSTED_ICE || type.isAir();
         }
 
-        private Location findSafeSpawnLocation(Heats heat, Location original) {
-            if (isSafeSpawnLocation(original)) return original;
-            // Try to find nearby safe location
-            for (int y = -2; y <= 2; y++) {
-                Location check = original.clone().add(0, y, 0);
-                if (isSafeSpawnLocation(check)) return check;
+        /**
+         * Finds a nearby safe spawn by testing multiple Y offsets. MUST be called
+         * on the region thread that owns this location's chunk — Folia forbids
+         * block reads ({@link #isSafeSpawnLocation}) from any other thread. Callers
+         * schedule this inside runTaskAtLocation; it never blocks and falls back
+         * to the original location when no offset is safe.
+         */
+        private Location findSafeSpawnLocation(Location original) {
+            if (original == null || original.getWorld() == null) {
+                return original;
             }
-            return original; // Fallback to original if no safe location found
+
+            // Prefer the configured position first, then ABOVE it (falling onto
+            // the surface is harmless), and only then below. Scanning bottom-up
+            // matched deep water BELOW the surface first and boats appeared
+            // submerged ("under the map") on water tracks.
+            int[] yOffsets = {0, 1, 2, -1, -2};
+            for (int y : yOffsets) {
+                Location candidate = original.clone().add(0, y, 0);
+                if (isSafeSpawnLocation(candidate)) {
+                    return candidate;
+                }
+            }
+            return original;
         }
 
+        /**
+         * Resolves the raw spawn candidate for this AI driver. Grid positions are
+         * preferred, falling back to the track spawn. This performs NO block/world
+         * access: it runs on the global scheduler thread, where Folia forbids
+         * reading blocks — the safe-Y search happens later, on the region thread
+         * (see {@link #findSafeSpawnLocation}).
+         */
         private Location resolveSpawnLocation(Heats heat) {
             if (heat.getGridManager().getGridPositions().isEmpty()) {
                 heat.getGridManager().generateGrid();
@@ -1022,11 +1091,9 @@ public class AIOpponentManager {
             List<Location> gridPositions = heat.getGridManager().getGridPositions();
             int gridIndex = Math.max(0, driver.getStartPosition() - 1);
             if (gridIndex < gridPositions.size()) {
-                Location spawn = gridPositions.get(gridIndex).clone();
-                return findSafeSpawnLocation(heat, spawn);
+                return gridPositions.get(gridIndex).clone();
             }
-            Location trackSpawn = heat.getPlugin().getTrackIntegrationManager().getTrackSpawn(heat.getTrackNameWS());
-            return findSafeSpawnLocation(heat, trackSpawn);
+            return heat.getPlugin().getTrackIntegrationManager().getTrackSpawn(heat.getTrackNameWS());
         }
 
         private void resetLearnedValues() {

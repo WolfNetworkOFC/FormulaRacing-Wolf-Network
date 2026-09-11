@@ -1814,12 +1814,6 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                         .map(Events::getDisplayName)
                         .toList()
                 );
-                if (
-                    this.quickRaceManager != null &&
-                    this.quickRaceManager.isQuickRaceActive()
-                ) {
-                    events.add("quickrace");
-                }
 
                 return events;
             }

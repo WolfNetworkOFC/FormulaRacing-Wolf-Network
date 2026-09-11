@@ -303,30 +303,52 @@ public class FakePlayerNPC {
         float yaw = loc.getYaw();
         float pitch = loc.getPitch();
 
-        // Variant A (1.21.5+): ClientboundAddEntityPacket(int, UUID, double, double, double,
-        // float, float, EntityType<?>, int, Vec3, double)
-        //
-        // Scan candidate constructor signatures instead of pinning ONE exact
-        // signature: the (int,UUID,3×double,2×float,EntityType,int,Vec3,double)
-        // form assumed here did NOT exist on 1.21.9+ builds (26.2), so the NPC
-        // was silently skipped ("Player spawn packet constructor not found").
+        // Variant A (1.21.5+): ClientboundAddEntityPacket — players no longer have
+        // a dedicated AddPlayerPacket and spawn through the generic AddEntity packet.
+        // Canonical Mojang-mappings constructor, called explicitly IN ORDER:
+        // (int id, UUID uuid, double x, double y, double z, float xRot, float yRot,
+        //  EntityType<?> type, int data, Vec3 deltaMovement, double yHeadRot)
+        // NOTE: xRot = PITCH and yRot = YAW (vanilla convention); the trailing
+        // double is the head yaw.
         try {
             Class<?> packetClass = Class.forName("net.minecraft.network.protocol.game.ClientboundAddEntityPacket");
             Class<?> entityTypeClass = Class.forName("net.minecraft.world.entity.EntityType");
             Object playerType = entityTypeClass.getField("PLAYER").get(null);
             Class<?> vec3Class = Class.forName("net.minecraft.world.phys.Vec3");
-            Constructor<?> vecCtor = vec3Class.getConstructor(double.class, double.class, double.class);
-            Object zeroVec = vecCtor.newInstance(0.0, 0.0, 0.0);
+            Object zeroVec = vec3Class.getConstructor(double.class, double.class, double.class)
+                    .newInstance(0.0, 0.0, 0.0);
+            Constructor<?> ctor = packetClass.getConstructor(
+                    int.class, UUID.class,
+                    double.class, double.class, double.class,
+                    float.class, float.class,
+                    entityTypeClass, int.class, vec3Class, double.class);
+            return ctor.newInstance(entityId, profileUuid,
+                    x, y, z,
+                    pitch, yaw,
+                    playerType, 0, zeroVec, (double) yaw);
+        } catch (Exception ignored) {
+            // Signature drifted on this server version — fall through to the scan.
+        }
+        // Fallback: scan candidate constructors and assign arguments by type, in
+        // declared order, never leaving a slot null. The previous scan assigned
+        // the z coordinate to the "velocity" slot, so the real Vec3 parameter
+        // received null and the constructor threw on EVERY candidate — the NPC
+        // was skipped on every spawn ("Player spawn packet constructor not found").
+        try {
+            Class<?> packetClass = Class.forName("net.minecraft.network.protocol.game.ClientboundAddEntityPacket");
+            Class<?> entityTypeClass = Class.forName("net.minecraft.world.entity.EntityType");
+            Object playerType = entityTypeClass.getField("PLAYER").get(null);
+            Class<?> vec3Class = Class.forName("net.minecraft.world.phys.Vec3");
+            Object zeroVec = vec3Class.getConstructor(double.class, double.class, double.class)
+                    .newInstance(0.0, 0.0, 0.0);
             for (Constructor<?> ctor : packetClass.getConstructors()) {
                 Class<?>[] p = ctor.getParameterTypes();
-                // Must contain (int, UUID) first-ish and at least one double group;
-                // any signature that mixes id+uuid+coords matches this shape.
-                boolean hasInt = false, hasUuid = false, hasDouble = false, hasFloat = false, hasEntityType = false;
+                // Any signature that mixes id+uuid+coords matches this shape.
+                boolean hasInt = false, hasUuid = false, hasDouble = false, hasEntityType = false;
                 for (Class<?> c : p) {
                     if (c == int.class) hasInt = true;
                     else if (c == UUID.class) hasUuid = true;
                     else if (c == double.class) hasDouble = true;
-                    else if (c == float.class) hasFloat = true;
                     else if (c == entityTypeClass) hasEntityType = true;
                 }
                 if (!hasInt || !hasUuid || !hasDouble || !hasEntityType) {
@@ -334,26 +356,29 @@ public class FakePlayerNPC {
                 }
                 Object[] args = new Object[p.length];
                 boolean idUsed = false, uuidUsed = false, typeUsed = false;
-                int yawIdx = -1, pitchIdx = -1, velIdx = -1, headYawIdx = -1;
+                boolean pitchUsed = false, yawUsed = false;
+                int xIdx = -1, yIdx = -1, zIdx = -1, velIdx = -1;
                 for (int i = 0; i < p.length; i++) {
                     Class<?> c = p[i];
                     if (c == int.class && !idUsed) { args[i] = entityId; idUsed = true; }
                     else if (c == UUID.class && !uuidUsed) { args[i] = profileUuid; uuidUsed = true; }
                     else if (c == entityTypeClass && !typeUsed) { args[i] = playerType; typeUsed = true; }
-                    else if (c == double.class && yawIdx == -1) { args[i] = x; yawIdx = i; }
-                    else if (c == double.class && pitchIdx == -1) { args[i] = y; pitchIdx = i; }
-                    else if (c == double.class && velIdx == -1) { args[i] = z; velIdx = i; }
-                    else if (c == double.class && headYawIdx == -1) { args[i] = 0.0D; headYawIdx = i; }
-                    else if (c == float.class && yawIdx != -1 && pitchIdx == -1) { args[i] = yaw; pitchIdx = i; }
-                    else if (c == float.class) { args[i] = pitch; pitchIdx = i; }
+                    // Vec3 BEFORE the remaining doubles: it is the delta movement,
+                    // and it must never be left null (the constructor dereferences it).
                     else if (c == vec3Class && velIdx == -1) { args[i] = zeroVec; velIdx = i; }
-                    else if (c == int.class) { args[i] = 0; }
-                    else if (c == double.class) { args[i] = (double) yaw; }
+                    else if (c == double.class && xIdx == -1) { args[i] = x; xIdx = i; }
+                    else if (c == double.class && yIdx == -1) { args[i] = y; yIdx = i; }
+                    else if (c == double.class && zIdx == -1) { args[i] = z; zIdx = i; }
+                    // First float is xRot (pitch), second is yRot (yaw).
+                    else if (c == float.class && !pitchUsed) { args[i] = pitch; pitchUsed = true; }
+                    else if (c == float.class && !yawUsed) { args[i] = yaw; yawUsed = true; }
+                    else if (c == int.class) { args[i] = 0; }               // data
+                    else if (c == double.class) { args[i] = (double) yaw; } // head yaw
                     else { args[i] = null; }
                 }
                 try {
                     return ctor.newInstance(args);
-                } catch (Exception ignored) {
+                } catch (Exception ignored2) {
                     // Try the next candidate signature.
                 }
             }

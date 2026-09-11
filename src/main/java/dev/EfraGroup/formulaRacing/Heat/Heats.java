@@ -33,6 +33,18 @@ import org.bukkit.entity.Player;
 import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.boss.BossBar;
+import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarStyle;
+import org.bukkit.entity.Player;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 public class Heats {
 
@@ -73,6 +85,13 @@ public class Heats {
     private boolean configDirty = false;
     /** Countdown currently running for this heat (jump-start listener reaches it). */
     private volatile RaceCountdown activeCountdown;
+    private final Object finalRaceBossbarLock = new Object();
+    private final AtomicInteger finishedDriverCount = new AtomicInteger(0);
+    private final AtomicInteger finalRaceRemainingSeconds = new AtomicInteger(120);
+    private final Set<UUID> finalRaceBossbarRecipients = new HashSet<>();
+    private volatile boolean finalRaceBossbarActive = false;
+    private volatile FRTask finalRaceBossbarTask;
+    private volatile BossBar finalRaceBossbar;
     private boolean onlyBedrock = false;
     private boolean ErsEnabled = false;
     private boolean gridReversed = false;
@@ -80,6 +99,7 @@ public class Heats {
     private int eliminationIntervalSeconds = 30;
     private int minimumDrivers = 2;
     private boolean elimination = false;
+    private int finalRaceTimeoutSeconds = 120;
 
     public Heats(FormulaRacing plugin, int id, Rounds round, int heatNumber) {
         this.plugin = plugin;
@@ -176,7 +196,8 @@ public class Heats {
                 this.pushtopasspower,
                 this.realistc,
                 this.eliminationIntervalSeconds,
-                this.minimumDrivers
+                this.minimumDrivers,
+                this.finalRaceTimeoutSeconds
             );
         this.configDirty = false;
     }
@@ -280,6 +301,15 @@ public class Heats {
 
     public void setElimination(boolean elimination) {
         this.elimination = elimination;
+    }
+
+    public int getFinalRaceTimeoutSeconds() {
+        return this.finalRaceTimeoutSeconds;
+    }
+
+    public void setFinalRaceTimeoutSeconds(int seconds) {
+        this.finalRaceTimeoutSeconds = Math.max(10, seconds);
+        this.markConfigDirty();
     }
 
     public List<Driver> getLivePositions() {
@@ -722,7 +752,8 @@ public class Heats {
                         this.pushtopasspower,
                         this.realistc,
                         this.eliminationIntervalSeconds,
-                        this.minimumDrivers
+                        this.minimumDrivers,
+                        this.finalRaceTimeoutSeconds
                     );
                 this.configDirty = false;
             }
@@ -776,6 +807,149 @@ public class Heats {
     /** The countdown currently running for this heat, if any (used by the jump-start listener). */
     public RaceCountdown getActiveCountdown() {
         return this.activeCountdown;
+    }
+
+    public AtomicInteger getFinishedDriverCount() {
+        return this.finishedDriverCount;
+    }
+
+    public void notifyDriverFinished(Driver driver) {
+        if (driver == null) {
+            return;
+        }
+
+        int before = this.finishedDriverCount.incrementAndGet();
+        this.plugin.getDebugManager().logRaceSystem(
+            "[FINAL RACE] Driver finished check: " + before + "/" + this.drivers.size()
+        );
+
+        if (before == 1) {
+            this.startFinalRaceBossbar();
+        }
+
+        if (before >= this.drivers.size()) {
+            this.cancelFinalRaceBossbar();
+            this.finishHeat();
+        }
+    }
+
+    private void startFinalRaceBossbar() {
+        if (this.plugin == null) {
+            return;
+        }
+
+        if (!this.isDriverRaceSessionActive()) {
+            return;
+        }
+
+        HeatConfig config = this.getHeatConfig();
+        if (config != null && !config.isFinalRaceBossbarEnabled()) {
+            return;
+        }
+
+        synchronized (this.finalRaceBossbarLock) {
+            if (this.finalRaceBossbarActive) {
+                return;
+            }
+            this.finalRaceBossbarActive = true;
+        }
+
+        int timeout = Math.max(10, this.getFinalRaceTimeoutSeconds());
+        this.finalRaceRemainingSeconds.set(timeout);
+
+        List<Player> recipients = new ArrayList<>();
+        for (UUID uuid : this.drivers.keySet()) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null && player.isOnline()) {
+                recipients.add(player);
+            }
+        }
+
+        this.finalRaceBossbar = Bukkit.createBossBar(
+            "Race will Finish in: " + timeout + "s",
+            BarColor.RED,
+            BarStyle.SOLID
+        );
+        this.finalRaceBossbar.setProgress(1.0);
+
+        for (Player player : recipients) {
+            if (player != null && player.isOnline()) {
+                this.finalRaceBossbar.addPlayer(player);
+            }
+        }
+
+        Events event = (this.round != null) ? this.round.getEvent() : null;
+        if (event != null && this.plugin.getSpectatorManager() != null) {
+            for (UUID specId : this.plugin.getSpectatorManager().getSpectatorsInEvent(event.getId())) {
+                Player specPlayer = Bukkit.getPlayer(specId);
+                if (specPlayer != null && specPlayer.isOnline()) {
+                    this.finalRaceBossbar.addPlayer(specPlayer);
+                    this.finalRaceBossbarRecipients.add(specId);
+                }
+            }
+        }
+
+        this.finalRaceBossbarTask = SchedulerHelper.runTaskTimer(this.plugin, () -> {
+            int remaining;
+            synchronized (this.finalRaceBossbarLock) {
+                if (!this.finalRaceBossbarActive) {
+                    return;
+                }
+
+                int current = this.finalRaceRemainingSeconds.get();
+                if (current <= 0) {
+                    this.cancelFinalRaceBossbarLocked();
+                    this.finishHeat();
+                    return;
+                }
+
+                remaining = current - 1;
+                this.finalRaceRemainingSeconds.set(remaining);
+            }
+
+            String title = "Race will Finish in: " + remaining + "s";
+            if (this.finalRaceBossbar != null) {
+                this.finalRaceBossbar.setTitle(title);
+                double progress = (double) (timeout - remaining) / (double) timeout;
+                this.finalRaceBossbar.setProgress(progress);
+            }
+        }, 20L, 20L);
+
+        this.plugin.getDebugManager().logRaceSystem(
+            "[FINAL RACE] Bossbar started for heat id=" + this.id + " timeout=" + timeout
+        );
+    }
+
+    private void cancelFinalRaceBossbar() {
+        synchronized (this.finalRaceBossbarLock) {
+            this.cancelFinalRaceBossbarLocked();
+        }
+    }
+
+    private void cancelFinalRaceBossbarLocked() {
+        if (!this.finalRaceBossbarActive) {
+            return;
+        }
+
+        this.finalRaceBossbarActive = false;
+
+        if (this.finalRaceBossbar != null) {
+            this.finalRaceBossbar.removeAll();
+            this.finalRaceBossbar = null;
+        }
+
+        if (this.finalRaceBossbarTask != null) {
+            this.finalRaceBossbarTask.cancel();
+            this.finalRaceBossbarTask = null;
+        }
+
+        this.finalRaceBossbarRecipients.clear();
+    }
+
+    private boolean isDriverRaceSessionActive() {
+        return this.heatState == HeatState.RACING
+            && this.drivers != null
+            && !this.drivers.isEmpty();
     }
 
     public boolean passLap(Driver driver) {
@@ -907,6 +1081,7 @@ public class Heats {
 
             this.setHeatState(HeatState.FINISHED);
             this.endTime = Instant.now();
+            this.cancelFinalRaceBossbar();
             this.stopSessionTimer();
             this.updateLivePositions();
             if (this.plugin.getPitStopManager() != null) {
@@ -1172,6 +1347,7 @@ public class Heats {
         this.startTime = null;
         this.endTime = null;
         this.fastestLapUUID = null;
+        this.finishedDriverCount.set(0);
         if (this.startPositions != null) this.startPositions.clear();
         if (this.livePositions != null) this.livePositions.clear();
 
@@ -2027,25 +2203,44 @@ public class Heats {
 
     /**
      * Retorna o limite efetivo de pilotos.
-     * Se maxDrivers for null, retorna a quantidade de grids.
+     * Se maxDrivers for null, retorna a quantidade de grids quando disponível.
+     * Esse método nunca deve lançar NPE; retorna um limite conservador em caso de heat
+     * mal-formado ou em estado transitório (ex.: heat ainda sem track pronta).
      */
     public int getMaxDriversLimit() {
         if (this.maxDrivers != null) {
             return this.maxDrivers;
         }
-        // Se null, limite é a quantidade de grids
-        String trackNameWS = this.getTrackNameWS();
-        if (trackNameWS != null && !trackNameWS.isEmpty()) {
-            return this.plugin.getTrackIntegrationManager().getGridPositionCount(trackNameWS);
+
+        // Se null, limite é a quantidade de grids quando possível
+        try {
+            String trackNameWS = this.getTrackNameWS();
+            if (trackNameWS != null && !trackNameWS.isEmpty()) {
+                int gridCount = this.plugin != null
+                    ? this.plugin.getTrackIntegrationManager().getGridPositionCount(trackNameWS)
+                    : 0;
+
+                if (gridCount > 0) {
+                    return gridCount;
+                }
+            }
+        } catch (Exception ignored) {
+            // Heat em estado ruidoso: não trava o servidor
         }
-        return 1000; // fallback
+
+        // Fallback conservador: impede regressão para valores <=0 em contas de capacidade
+        return Math.max(1, this.getDriverCount() + 4);
     }
 
     public void setMaxDrivers(Integer maxDrivers) {
-        // Valida: não permite valor maior que a quantidade de grids
+        // Valida: não permite valor maior que a quantidade de grids nem negativo
         if (maxDrivers != null) {
+            if (maxDrivers < 0) {
+                maxDrivers = 0;
+            }
+
             String trackNameWS = this.getTrackNameWS();
-            if (trackNameWS != null && !trackNameWS.isEmpty()) {
+            if (trackNameWS != null && !trackNameWS.isEmpty() && this.plugin != null) {
                 int gridCount = this.plugin.getTrackIntegrationManager().getGridPositionCount(trackNameWS);
                 if (maxDrivers > gridCount) {
                     maxDrivers = gridCount;

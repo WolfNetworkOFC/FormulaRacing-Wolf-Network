@@ -47,6 +47,11 @@ public class DriverFinishUtils {
             DebugManager var10000 = plugin.getDebugManager();
             String var10001 = String.valueOf(driver.getUuid());
             var10000.logRaceSystem("Driver finalizado: " + var10001 + " - Posição: " + driver.getPosition());
+
+            if (heat.getHeatState() == HeatState.RACING) {
+                heat.notifyDriverFinished(driver);
+            }
+
             return true;
         }
     }

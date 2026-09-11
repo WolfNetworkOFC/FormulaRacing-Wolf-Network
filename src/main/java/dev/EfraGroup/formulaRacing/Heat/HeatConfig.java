@@ -16,6 +16,8 @@ public class HeatConfig {
     private volatile boolean fuelSystemEnabled = false;
     private double startingFuel = 100.0D;
     private double fuelConsumptionPerSecond = 0.45D;
+    private volatile boolean finalRaceBossbarEnabled = true;
+    private volatile int finalRaceBossbarTimeoutSeconds = 120;
     /** F1 start: random hold after the 5th light + jump-start penalty. */
     private volatile boolean f1StartEnabled = false;
     private volatile int f1StartPenaltySeconds = 3;
@@ -139,6 +141,22 @@ public class HeatConfig {
         this.fuelConsumptionPerSecond = Math.max(0.01D, fuelConsumptionPerSecond);
     }
 
+    public boolean isFinalRaceBossbarEnabled() {
+        return finalRaceBossbarEnabled;
+    }
+
+    public void setFinalRaceBossbarEnabled(boolean enabled) {
+        finalRaceBossbarEnabled = enabled;
+    }
+
+    public int getFinalRaceBossbarTimeoutSeconds() {
+        return finalRaceBossbarTimeoutSeconds;
+    }
+
+    public void setFinalRaceBossbarTimeoutSeconds(int seconds) {
+        this.finalRaceBossbarTimeoutSeconds = Math.max(10, seconds);
+    }
+
     public void reset() {
         this.isTimeBased = false;
         this.timeLimitSeconds = 0;
@@ -153,6 +171,8 @@ public class HeatConfig {
         this.ersRechargeSpeed = 0.4;
         this.ersDrainSpeed = 0.6;
         this.ersDeployPower = 0.047;
+        this.finalRaceBossbarEnabled = true;
+        this.finalRaceBossbarTimeoutSeconds = 120;
     }
 
     public HeatConfig copy() {
@@ -168,6 +188,8 @@ public class HeatConfig {
         copy.ersRechargeSpeed = this.ersRechargeSpeed;
         copy.ersDrainSpeed = this.ersDrainSpeed;
         copy.ersDeployPower = this.ersDeployPower;
+        copy.finalRaceBossbarEnabled = this.finalRaceBossbarEnabled;
+        copy.finalRaceBossbarTimeoutSeconds = this.finalRaceBossbarTimeoutSeconds;
         return copy;
     }
 }
