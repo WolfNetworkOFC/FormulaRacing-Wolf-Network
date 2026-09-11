@@ -11,6 +11,7 @@ import org.bukkit.entity.Player;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -252,7 +253,7 @@ public class FakePlayerNPC {
                         UUID.class, gameProfile.getClass(), boolean.class, int.class,
                         gameMode.getClass(), componentClass, boolean.class, int.class, chatSessionClass);
                 return ctor.newInstance(profileUuid, gameProfile, true, 0, gameMode, null, false, 0, null);
-            } catch (Exception ignored) {
+            } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | InstantiationException ignored) {
                 // Variant B (1.21.2+): (int, GameProfile, boolean, int, GameMode, Component, chatSession, remoteData)
             }
         }
@@ -262,7 +263,7 @@ public class FakePlayerNPC {
                         int.class, gameProfile.getClass(), boolean.class, int.class,
                         gameMode.getClass(), componentClass, chatSessionClass, remoteDataClass);
                 return ctor.newInstance(0, gameProfile, true, 0, gameMode, null, null, null);
-            } catch (Exception ignored) {
+            } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | InstantiationException ignored) {
                 // Variant C (1.20.x): (GameProfile, int, GameMode, Component, chatSession, remoteData)
             }
         }
@@ -272,7 +273,7 @@ public class FakePlayerNPC {
                         gameProfile.getClass(), int.class, gameMode.getClass(),
                         componentClass, chatSessionClass, remoteDataClass);
                 return ctor.newInstance(gameProfile, 0, gameMode, null, null, null);
-            } catch (Exception ignored) {
+            } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | InstantiationException ignored) {
                 // Variant D (1.19.3): (GameProfile, int, GameMode, Component, chatSession)
             }
         }
@@ -282,8 +283,10 @@ public class FakePlayerNPC {
                         gameProfile.getClass(), int.class, gameMode.getClass(),
                         componentClass, chatSessionClass);
                 return ctor.newInstance(gameProfile, 0, gameMode, null, null);
-            } catch (Exception e) {
+            } catch (NoSuchMethodException e) {
                 throw new IllegalStateException("ClientboundPlayerInfoUpdatePacket$Entry constructor not found", e);
+            } catch (InvocationTargetException | IllegalAccessException | InstantiationException e) {
+                throw new IllegalStateException("ClientboundPlayerInfoUpdatePacket$Entry constructor failed: " + e.getCause().getMessage(), e);
             }
         }
         throw new IllegalStateException("Chat session class not found on this server version");
@@ -313,70 +316,43 @@ public class FakePlayerNPC {
         try {
             Class<?> packetClass = Class.forName("net.minecraft.network.protocol.game.ClientboundAddEntityPacket");
             Class<?> entityTypeClass = Class.forName("net.minecraft.world.entity.EntityType");
-            Object playerType = entityTypeClass.getField("PLAYER").get(null);
+            Field playerField = entityTypeClass.getField("PLAYER");
+            playerField.setAccessible(true);
+            Object playerType = playerField.get(null);
             Class<?> vec3Class = Class.forName("net.minecraft.world.phys.Vec3");
             Constructor<?> vecCtor = vec3Class.getConstructor(double.class, double.class, double.class);
+            vecCtor.setAccessible(true);
             Object zeroVec = vecCtor.newInstance(0.0, 0.0, 0.0);
-            for (Constructor<?> ctor : packetClass.getConstructors()) {
-                Class<?>[] p = ctor.getParameterTypes();
-                // Must contain (int, UUID) first-ish and at least one double group;
-                // any signature that mixes id+uuid+coords matches this shape.
-                boolean hasInt = false, hasUuid = false, hasDouble = false, hasFloat = false, hasEntityType = false;
-                for (Class<?> c : p) {
-                    if (c == int.class) hasInt = true;
-                    else if (c == UUID.class) hasUuid = true;
-                    else if (c == double.class) hasDouble = true;
-                    else if (c == float.class) hasFloat = true;
-                    else if (c == entityTypeClass) hasEntityType = true;
-                }
-                if (!hasInt || !hasUuid || !hasDouble || !hasEntityType) {
-                    continue;
-                }
-                Object[] args = new Object[p.length];
-                boolean idUsed = false, uuidUsed = false, typeUsed = false;
-                int yawIdx = -1, pitchIdx = -1, velIdx = -1, headYawIdx = -1;
-                for (int i = 0; i < p.length; i++) {
-                    Class<?> c = p[i];
-                    if (c == int.class && !idUsed) { args[i] = entityId; idUsed = true; }
-                    else if (c == UUID.class && !uuidUsed) { args[i] = profileUuid; uuidUsed = true; }
-                    else if (c == entityTypeClass && !typeUsed) { args[i] = playerType; typeUsed = true; }
-                    else if (c == double.class && yawIdx == -1) { args[i] = x; yawIdx = i; }
-                    else if (c == double.class && pitchIdx == -1) { args[i] = y; pitchIdx = i; }
-                    else if (c == double.class && velIdx == -1) { args[i] = z; velIdx = i; }
-                    else if (c == double.class && headYawIdx == -1) { args[i] = 0.0D; headYawIdx = i; }
-                    else if (c == float.class && yawIdx != -1 && pitchIdx == -1) { args[i] = yaw; pitchIdx = i; }
-                    else if (c == float.class) { args[i] = pitch; pitchIdx = i; }
-                    else if (c == vec3Class && velIdx == -1) { args[i] = zeroVec; velIdx = i; }
-                    else if (c == int.class) { args[i] = 0; }
-                    else if (c == double.class) { args[i] = (double) yaw; }
-                    else { args[i] = null; }
-                }
-                try {
-                    return ctor.newInstance(args);
-                } catch (Exception ignored) {
-                    // Try the next candidate signature.
-                }
-            }
-        } catch (Exception ignored) {
+            Constructor<?> ctor = packetClass.getConstructor(
+                    int.class, UUID.class, double.class, double.class, double.class,
+                    float.class, float.class, entityTypeClass, int.class, vec3Class, double.class);
+            ctor.setAccessible(true);
+            return ctor.newInstance(entityId, profileUuid, x, y, z, yaw, pitch, playerType, 0, zeroVec, (double) yaw);
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | InstantiationException ignored) {
             // Variant B (1.21.4): ClientboundAddPlayerPacket(int, UUID, Vector3d, float, float)
         }
         try {
             Class<?> packetClass = Class.forName("net.minecraft.network.protocol.game.ClientboundAddPlayerPacket");
             Class<?> vecClass = Class.forName("org.joml.Vector3d");
             Constructor<?> vecCtor = vecClass.getConstructor(double.class, double.class, double.class);
+            vecCtor.setAccessible(true);
             Object vec = vecCtor.newInstance(x, y, z);
             Constructor<?> ctor = packetClass.getConstructor(int.class, UUID.class, vecClass, float.class, float.class);
+            ctor.setAccessible(true);
             return ctor.newInstance(entityId, profileUuid, vec, yaw, pitch);
-        } catch (Exception ignored) {
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | InstantiationException ignored) {
             // Variant C (≤1.21.3): ClientboundAddPlayerPacket(int, UUID, double, double, double, float, float)
         }
         try {
             Class<?> packetClass = Class.forName("net.minecraft.network.protocol.game.ClientboundAddPlayerPacket");
             Constructor<?> ctor = packetClass.getConstructor(
                     int.class, UUID.class, double.class, double.class, double.class, float.class, float.class);
+            ctor.setAccessible(true);
             return ctor.newInstance(entityId, profileUuid, x, y, z, yaw, pitch);
-        } catch (Exception e) {
+        } catch (NoSuchMethodException e) {
             throw new IllegalStateException("Player spawn packet constructor not found", e);
+        } catch (InvocationTargetException | IllegalAccessException | InstantiationException e) {
+            throw new IllegalStateException("Player spawn packet constructor failed: " + e.getCause().getMessage(), e);
         }
     }
 
@@ -403,7 +379,7 @@ public class FakePlayerNPC {
             Constructor<?> ctor = packetClass.getDeclaredConstructor(bufClass);
             ctor.setAccessible(true);
             return ctor.newInstance(buf);
-        } catch (Exception ignored) {
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | InstantiationException ignored) {
             // Older: (int, int[])
         }
         try {

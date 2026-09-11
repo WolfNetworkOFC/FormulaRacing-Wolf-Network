@@ -5297,6 +5297,67 @@ public class DatabaseManager {
         return null;
     }
 
+    /**
+     * Returns a map of trackNameWS -> bestTime (WR) for ALL tracks in a single query.
+     * Much faster than calling getBestTime() in a loop for hundreds of tracks.
+     */
+    public synchronized Map<String, Double> getAllBestTimes() {
+        Map<String, Double> bestTimes = new HashMap<>();
+        String sql =
+            "SELECT t.trackNameWS, MIN(pt.bestTime) as wr " +
+            "FROM fr_tracks t LEFT JOIN fr_player_times pt " +
+            "ON LOWER(t.trackNameWS) = LOWER(pt.trackNameWS) AND pt.finished = TRUE " +
+            "GROUP BY t.trackNameWS";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        String trackNameWS = rs.getString("trackNameWS");
+                        double wr = rs.getDouble("wr");
+                        if (!rs.wasNull()) {
+                            bestTimes.put(trackNameWS.toLowerCase(), wr);
+                        }
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return bestTimes;
+    }
+
+    /**
+     * Returns a map of trackNameWS -> PB for a single player across ALL tracks in one query.
+     * Much faster than calling getPlayerBestTime() in a loop.
+     */
+    public synchronized Map<String, Double> getPlayerAllBestTimes(String playerName) {
+        Map<String, Double> pbTimes = new HashMap<>();
+        String sql =
+            "SELECT pt.trackNameWS, MIN(pt.bestTime) as pb " +
+            "FROM fr_player_times pt " +
+            "WHERE pt.player_name = ? AND pt.finished = TRUE " +
+            "GROUP BY pt.trackNameWS";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, playerName);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        String trackNameWS = rs.getString("trackNameWS");
+                        double pb = rs.getDouble("pb");
+                        if (!rs.wasNull()) {
+                            pbTimes.put(trackNameWS.toLowerCase(), pb);
+                        }
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return pbTimes;
+    }
+
     public synchronized TrackData getTrackData(String trackName) {
         // ✅ Uses LOWER() in the query
         String sql =

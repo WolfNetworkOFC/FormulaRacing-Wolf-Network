@@ -72,9 +72,11 @@ public class HologramManager {
         }
 
         // Reuse existing stands: just update names in-place (avoids Folia deferred entity removal)
+        // On Folia, isValid() can return false due to region thread entity references.
+        // Use isDead() + getWorld() which are more reliable across threads.
         List<Entity> stands = holograms.get(name);
-        if (stands != null && !stands.isEmpty() && stands.get(0) != null && stands.get(0).isValid()) {
-            plugin.getLogger().info("[Hologram] Reusing existing stands for '" + name + "'");
+if (stands != null && !stands.isEmpty() && stands.get(0) != null
+                && !stands.get(0).isDead() && stands.get(0).getWorld() != null) {
             updateHologramList(stands, name, loc, lines);
             return;
         }
@@ -94,7 +96,8 @@ public class HologramManager {
             } catch (Throwable ignored) {}
         }
 
-        holograms.remove(name);
+        // Do NOT remove from map here — put() at the end overwrites anyway.
+        // Removing before creation causes concurrent calls to create duplicates.
         hologramLocations.remove(name);
 
         stands = new ArrayList<>();

@@ -71,6 +71,10 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                     mysql.getAllTracksWithData();
                 List<TrackMenuInfo> loadedTracks = new ArrayList<>();
 
+                // Batch load ALL WRs and PBs in 2 queries instead of 900+ individual queries
+                Map<String, Double> allWRs = mysql.getAllBestTimes();
+                Map<String, Double> allPBs = mysql.getPlayerAllBestTimes(player.getName());
+
                 // Now the loop can iterate correctly with defined types
                 for (Map.Entry<
                     String,
@@ -83,14 +87,9 @@ public class TimeTrialMenuUtilsV2 implements Listener {
 
                     DatabaseManager.TrackData data = entry.getValue();
                     String icon = data.getIconName();
-                    Double wr = mysql.getBestTime(trackName);
-
-                    // Fetch the player's Personal Best (PB)
-                    Object[] pbData = this.mysql.getPlayerBestTime(
-                        player.getName(),
-                        trackName
-                    );
-                    Double pb = (pbData != null) ? (Double) pbData[0] : null;
+                    String trackNameWS = trackName.replaceAll("\\s+", "").toLowerCase();
+                    Double wr = allWRs.get(trackNameWS);
+                    Double pb = allPBs.get(trackNameWS);
 
                     int pos = -1; // Default position (can be calculated later in sort)
 
