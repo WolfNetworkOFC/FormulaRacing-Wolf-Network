@@ -1652,13 +1652,14 @@ public class EventsDatabaseManager {
         double pushToPassPower,
         boolean realistic,
         int eliminationIntervalSeconds,
-        int minimumDrivers
+        int minimumDrivers,
+        int finalRaceTimeoutSeconds
     ) {
         String sql =
             "UPDATE fr_heats SET totalLaps = ?, totalPitstops = ?, timeLimit = ?, startDelay = ?, " +
             "maxDrivers = ?, lonely = ?, canReset = ?, lapReset = ?, colisao = ?, drs = ?, " +
             "driverswap = ?, drsdowntime = ?, drsdownpower = ?, reversegrid = ?, ghostingdelta = ?, " +
-            "pushtopass = ?, pushtopasspower = ?, realistc = ?, eliminationInterval = ?, minimumDrivers = ? WHERE id = ?";
+            "pushtopass = ?, pushtopasspower = ?, realistc = ?, eliminationInterval = ?, minimumDrivers = ?, finalRaceTimeout = ? WHERE id = ?";
         this.executeAsync(sql, "updateHeatFullConfig", stmt -> {
             try {
                 if (totalLaps != null) {
@@ -1701,7 +1702,8 @@ public class EventsDatabaseManager {
                 stmt.setInt(18, realistic ? 1 : 0);
                 stmt.setInt(19, eliminationIntervalSeconds);
                 stmt.setInt(20, minimumDrivers);
-                stmt.setInt(21, heatId);
+                stmt.setInt(21, finalRaceTimeoutSeconds);
+                stmt.setInt(22, heatId);
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }

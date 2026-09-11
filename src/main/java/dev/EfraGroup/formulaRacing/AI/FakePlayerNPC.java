@@ -306,13 +306,13 @@ public class FakePlayerNPC {
         float yaw = loc.getYaw();
         float pitch = loc.getPitch();
 
-        // Variant A (1.21.5+): ClientboundAddEntityPacket(int, UUID, double, double, double,
-        // float, float, EntityType<?>, int, Vec3, double)
-        //
-        // Scan candidate constructor signatures instead of pinning ONE exact
-        // signature: the (int,UUID,3×double,2×float,EntityType,int,Vec3,double)
-        // form assumed here did NOT exist on 1.21.9+ builds (26.2), so the NPC
-        // was silently skipped ("Player spawn packet constructor not found").
+        // Variant A (1.21.5+): ClientboundAddEntityPacket — players no longer have
+        // a dedicated AddPlayerPacket and spawn through the generic AddEntity packet.
+        // Canonical Mojang-mappings constructor, called explicitly IN ORDER:
+        // (int id, UUID uuid, double x, double y, double z, float xRot, float yRot,
+        //  EntityType<?> type, int data, Vec3 deltaMovement, double yHeadRot)
+        // NOTE: xRot = PITCH and yRot = YAW (vanilla convention); the trailing
+        // double is the head yaw.
         try {
             Class<?> packetClass = Class.forName("net.minecraft.network.protocol.game.ClientboundAddEntityPacket");
             Class<?> entityTypeClass = Class.forName("net.minecraft.world.entity.EntityType");
