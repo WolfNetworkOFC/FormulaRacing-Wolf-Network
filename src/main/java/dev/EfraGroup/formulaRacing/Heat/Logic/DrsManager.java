@@ -13,6 +13,7 @@ import net.md_5.bungee.api.chat.TextComponent;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -28,6 +29,8 @@ public class DrsManager {
     private final RaceSession rs;
     private final FormulaRacing plugin;
     private final PacketSender ps;
+    // Track DRS task per heat to allow proper cleanup
+    private volatile boolean taskRunning = false;
 
     public DrsManager(RaceSession rs, FormulaRacing plugin, PacketSender ps) {
         this.rs = rs;
@@ -35,6 +38,9 @@ public class DrsManager {
         this.ps = ps;
     }
 
+    /**
+     * Creates a BossBar for a driver. Must be called on main thread.
+     */
     private void createBarForDriver(Driver driver, Player player) {
         if (driver.getDrsBossBar() == null) {
             BossBar bar = Bukkit.createBossBar("§9§lDRS", BarColor.BLUE, BarStyle.SOLID, new BarFlag[0]);
@@ -45,99 +51,151 @@ public class DrsManager {
         }
     }
 
+    /**
+     * Safely destroys a driver's BossBar. Must be called on main thread.
+     */
+    private void destroyBossBar(Driver driver) {
+        BossBar bar = driver.getDrsBossBar();
+        if (bar != null) {
+            bar.removeAll();
+            driver.setDrsBossBar(null);
+        }
+    }
+
     public void startDrsTask(final Heats heat) {
-        // Now we get the list of regions (DrsRegion is the object we created with type, min and max)
         final List<Heats.DrsRegion> regions = heat.getPlugin().getRaceEventManager().getDatabaseManager().getDrsRegionsList(heat.getTrackNameWS());
 
-        // Se não tem regiões configuradas, não inicia o DRS
         if (regions == null || regions.isEmpty()) {
             this.plugin.getLogger().info("§e[DRS-Debug] Nenhuma região DRS configurada para: §f" + heat.getTrackNameWS());
             return;
         }
 
-        // Check if there is at least one deactivation region configured on the track
         final boolean hasFinishRegion = regions.stream().anyMatch(r -> r.getType().equalsIgnoreCase("end"));
 
         this.plugin.getLogger().info("§e[DRS-Debug] Task started. Processing " + regions.size() + " regions for: §f" + heat.getTrackNameWS());
 
-        // Cria bars na thread principal primeiro (necessario para Folia)
-        for (Driver driver : heat.getDrivers().values()) {
-            Player player = Bukkit.getPlayer(driver.getUuid());
-            if (player != null && player.isOnline()) {
-                createBarForDriver(driver, player);
-            }
-        }
+        taskRunning = true;
 
+        // Create BossBars on main thread (required for Folia/Bukkit)
+        SchedulerHelper.runTask(plugin, () -> {
+            for (Driver driver : heat.getDrivers().values()) {
+                Player player = Bukkit.getPlayer(driver.getUuid());
+                if (player != null && player.isOnline()) {
+                    createBarForDriver(driver, player);
+                }
+            }
+        });
+
+        // DRS detection/activation loop - runs on global scheduler
         SchedulerHelper.runTaskTimer(heat.getPlugin(), (scheduledTask) -> {
-            // Para se o heat não está RACING ou DRS está desabilitado
-            if (heat.getHeatState() != HeatState.RACING || !heat.isDrsEnabled()) {
-                heat.getDrivers().values().forEach(d -> {
-                    if (d.getDrsBossBar() != null) d.getDrsBossBar().removeAll();
-                });
+            if (!taskRunning) {
                 scheduledTask.cancel();
                 return;
             }
 
-            for (Driver driver : heat.getDrivers().values()) {
-                Player player = Bukkit.getPlayer(driver.getUuid());
-                if (player == null || !player.isOnline()) continue;
+            // Stop if heat is not RACING or DRS is disabled
+            if (heat.getHeatState() != HeatState.RACING || !heat.isDrsEnabled()) {
+                // Clean up all BossBars on main thread
+                SchedulerHelper.runTask(plugin, () -> {
+                    for (Driver d : heat.getDrivers().values()) {
+                        destroyBossBar(d);
+                    }
+                });
+                taskRunning = false;
+                scheduledTask.cancel();
+                return;
+            }
 
-                Location loc = player.getLocation();
-                FRTheme theme = FRThemeResolver.resolveTheme(player);
+            // Snapshot drivers to avoid concurrent modification
+            List<Driver> driversSnapshot;
+            try {
+                driversSnapshot = List.copyOf(heat.getDrivers().values());
+            } catch (Exception e) {
+                // Heat drivers map was modified, skip this tick
+                return;
+            }
 
-                // Iterate through all registered regions for this track
-                for (Heats.DrsRegion region : regions) {
-                    String type = region.getType();
+            for (Driver driver : driversSnapshot) {
+                // Synchronize on driver to prevent race conditions
+                synchronized (driver) {
+                    Player player = Bukkit.getPlayer(driver.getUuid());
+                    if (player == null || !player.isOnline()) continue;
 
-                    // 1. DETECTION LOGIC
-                    switch (type) {
-                        case "detect" -> {
-                            if (DrsManager.this.rs.isInside(loc, region.getMin(), region.getMax())) {
-                                if (!driver.hasDrsPermission() && !driver.isDrsActive()) {
-                                    Driver target = DrsManager.this.rs.getDriverAhead(driver, heat);
+                    // Get location on the player's region thread (thread-safe on Folia);
+                    // dispatch the rest of the logic back there too to avoid cross-region reads.
+                    final Driver finalDriver = driver;
+                    SchedulerHelper.runTaskFor(plugin, player, () -> {
+                        Player freshPlayer = Bukkit.getPlayer(finalDriver.getUuid());
+                        if (freshPlayer == null || !freshPlayer.isOnline()) return;
 
-                                    if (target != null) {
-                                        double gapValue = DrsManager.this.rs.calculateGap(driver, target, heat);
-                                        if (gapValue >= 0.01 && gapValue <= 1.3) {
-                                            driver.setDrsPermission(true);
-                                            DrsManager.this.showDrsAvailableBar(player, driver);
-                                            sendThemedMessage(player, theme, "&a[DRS] Permission granted! Gap: &f" + String.format("%.3f", gapValue) + "s");
+                        Location loc = freshPlayer.getLocation();
+                        if (loc == null || loc.getWorld() == null) return;
+
+                        FRTheme theme = FRThemeResolver.resolveTheme(freshPlayer);
+
+                        for (Heats.DrsRegion region : regions) {
+                            String type = region.getType();
+
+                            switch (type) {
+                                case "detect" -> {
+                                    if (rs.isInside(loc, region.getMin(), region.getMax())) {
+                                        if (!finalDriver.hasDrsPermission() && !finalDriver.isDrsActive()) {
+                                            Driver target = rs.getDriverAhead(finalDriver, heat);
+
+                                            if (target != null) {
+                                                double gapValue = rs.calculateGap(finalDriver, target, heat);
+                                                if (gapValue >= 0.01 && gapValue <= 1.3) {
+                                                    finalDriver.setDrsPermission(true);
+                                                    showDrsAvailableBar(freshPlayer, finalDriver);
+                                                    sendThemedMessage(freshPlayer, theme, "&a[DRS] Permission granted! Gap: &f" + String.format("%.3f", gapValue) + "s");
+                                                }
+                                            } else if (freshPlayer.getTicksLived() % 40 == 0) {
+                                                sendThemedMessage(freshPlayer, theme, "&a[DRS] In detection zone, but no target ahead.");
+                                            }
                                         }
-                                    } else if (player.getTicksLived() % 40 == 0) {
-                                        sendThemedMessage(player, theme, "&a[DRS] In detection zone, but no target ahead.");
+                                    }
+                                }
+
+                                case "drs" -> {
+                                    if (finalDriver.hasDrsPermission() && !finalDriver.isDrsActive()) {
+                                        if (rs.isInside(loc, region.getMin(), region.getMax())) {
+                                            finalDriver.setDrsPermission(false);
+                                            applyDrsBoost(freshPlayer, heat, finalDriver, hasFinishRegion);
+                                            sendThemedMessage(freshPlayer, theme, "&a[DRS] Wing Open!");
+                                        }
+                                    }
+                                }
+
+                                case "end" -> {
+                                    if (finalDriver.isDrsActive()) {
+                                        if (rs.isInside(loc, region.getMin(), region.getMax())) {
+                                            stopDrsBoost(freshPlayer, finalDriver, heat);
+                                            sendThemedMessage(freshPlayer, theme, "&c[DRS] Wing Closed.");
+                                        }
                                     }
                                 }
                             }
                         }
-
-                        // 2. ACTIVATION LOGIC
-                        case "drs" -> {
-                            if (driver.hasDrsPermission() && !driver.isDrsActive()) {
-                                if (DrsManager.this.rs.isInside(loc, region.getMin(), region.getMax())) {
-                                    driver.setDrsPermission(false);
-                                    DrsManager.this.applyDrsBoost(player, heat, driver, hasFinishRegion);
-                                    sendThemedMessage(player, theme, "&a[DRS] Wing Open!");
-                                }
-                            }
-                        }
-
-                        // 3. DEACTIVATION LOGIC
-                        case "end" -> {
-                            if (driver.isDrsActive()) {
-                                if (DrsManager.this.rs.isInside(loc, region.getMin(), region.getMax())) {
-                                    DrsManager.this.stopDrsBoost(player, driver, heat);
-                                    sendThemedMessage(player, theme, "&c[DRS] Wing Closed.");
-                                }
-                            }
-                        }
-                    }
+                    });
                 }
             }
         }, 0L, 2L);
     }
 
+    /**
+     * Stops the DRS task and cleans up all BossBars. Must be called on main thread or dispatches to it.
+     */
+    public void stopDrsTask(Heats heat) {
+        taskRunning = false;
+        SchedulerHelper.runTask(plugin, () -> {
+            if (heat != null && heat.getDrivers() != null) {
+                for (Driver d : heat.getDrivers().values()) {
+                    destroyBossBar(d);
+                }
+            }
+        });
+    }
 
-    // Helper method to clean up repetitive message code
     private void sendThemedMessage(Player player, FRTheme theme, String rawMsg) {
         String themed = LegacyComponentSerializer.legacySection()
                 .serialize(FRThemeParser.parseWithLegacy(rawMsg, theme));
@@ -145,8 +203,10 @@ public class DrsManager {
     }
 
     private void showDrsAvailableBar(Player player, Driver driver) {
+        // Destroy old bar first to prevent leak
         if (driver.getDrsBossBar() != null) {
             driver.getDrsBossBar().removeAll();
+            driver.setDrsBossBar(null);
         }
 
         FRTheme theme = FRThemeResolver.resolveTheme(player);
@@ -159,6 +219,7 @@ public class DrsManager {
 
     public void applyDrsBoost(Player player, Heats heat, Driver driver, boolean useRegion) {
         if (heat.getPlugin().getPacketSender() != null) {
+            // BossBar update on main thread
             if (driver.getDrsBossBar() != null) {
                 FRTheme theme = FRThemeResolver.resolveTheme(player);
                 String title = LegacyComponentSerializer.legacySection().serialize(
@@ -176,22 +237,28 @@ public class DrsManager {
                     if (player.isOnline()) {
                         this.stopDrsBoost(player, driver, heat);
                     }
-
                 }, 140L);
             }
-
         }
     }
 
     public void stopDrsBoost(Player player, Driver driver, Heats heat) {
-        heat.getPlugin().getPacketSender().sendBoatSetting(player, 11, new Object[]{0.04F});
-        driver.setDrsActive(false);
-        if (driver.getDrsBossBar() != null) {
-            driver.getDrsBossBar().removeAll();
-            driver.setDrsBossBar(null);
-        }
+        // Synchronize to prevent race conditions with detection
+        synchronized (driver) {
+            if (!driver.isDrsActive()) return; // Already stopped
 
-        player.sendMessage(plugin.getTranslation("drs_finished", plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId())));
+            heat.getPlugin().getPacketSender().sendBoatSetting(player, 11, new Object[]{0.04F});
+            driver.setDrsActive(false);
+            driver.setDrsPermission(false);
+
+            // Destroy BossBar properly
+            if (driver.getDrsBossBar() != null) {
+                driver.getDrsBossBar().removeAll();
+                driver.setDrsBossBar(null);
+            }
+
+            player.sendMessage(plugin.getTranslation("drs_finished", plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId())));
+        }
     }
 }
 
