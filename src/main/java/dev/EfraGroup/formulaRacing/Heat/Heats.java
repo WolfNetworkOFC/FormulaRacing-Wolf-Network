@@ -2509,16 +2509,19 @@ public class Heats {
     }
 
     public static class DrsRegion {
+        private final int id;
         private final String type;
         private final Location min;
         private final Location max;
 
-        public DrsRegion(String type, Location min, Location max) {
+        public DrsRegion(int id, String type, Location min, Location max) {
+            this.id = id;
             this.type = type;
             this.min = min;
             this.max = max;
         }
 
+        public int getId() { return id; }
         public String getType() { return type; }
         public Location getMin() { return min; }
         public Location getMax() { return max; }

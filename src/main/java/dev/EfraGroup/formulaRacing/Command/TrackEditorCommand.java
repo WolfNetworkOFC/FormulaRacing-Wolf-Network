@@ -1685,13 +1685,21 @@ public class TrackEditorCommand extends BaseCommand {
         Location min = WorldEditSelect.getMin(player);
         Location max = WorldEditSelect.getMax(player);
 
-        // Now send the data to MySQL for the new fr_drs table
-        // Note that we pass 'type' so the database knows which part to update/insert
+        if (min == null || max == null) {
+            player.sendMessage("§c[DRS] Invalid selection. Please reselect with WorldEdit.");
+            return;
+        }
+
+        if (min.getWorld() == null) {
+            player.sendMessage("§c[DRS] Selection is missing world data.");
+            return;
+        }
+
         if (this.mysql.saveDrsZone(trackName, type, min, max)) {
-            player.sendMessage("§a[DRS] Part §f" + type.toUpperCase() + " §aset for track: §e" + trackName);
+            player.sendMessage("§a[DRS] Region §f" + type.toUpperCase() + " §asalva para a pista: §e" + trackName);
             player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.0F);
         } else {
-            player.sendMessage("§cError saving DRS region to database.");
+            player.sendMessage("§c[DRS] Erro ao salvar região no banco de dados.");
         }
     }
 

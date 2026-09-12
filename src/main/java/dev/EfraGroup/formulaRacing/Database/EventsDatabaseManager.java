@@ -2538,16 +2538,21 @@ public class EventsDatabaseManager {
             ResultSet rs = stmt.executeQuery();
 
             while (rs.next()) {
-                World world = Bukkit.getWorld(rs.getString("world"));
-                if (world == null) continue;
+                int id = rs.getInt("id");
+                String worldName = rs.getString("world");
+                World world = Bukkit.getWorld(worldName);
+                if (world == null) {
+                    Bukkit.getLogger().warning("[FormulaRacing] DRS region ID " + id + " references non-existent world: " + worldName);
+                    continue;
+                }
 
                 Location min = new Location(world, rs.getDouble("regionMinX"), rs.getDouble("regionMinY"), rs.getDouble("regionMinZ"));
                 Location max = new Location(world, rs.getDouble("regionMaxX"), rs.getDouble("regionMaxY"), rs.getDouble("regionMaxZ"));
 
-                list.add(new Heats.DrsRegion(rs.getString("type").toLowerCase(), min, max));
+                list.add(new Heats.DrsRegion(id, rs.getString("type").toLowerCase(), min, max));
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            Bukkit.getLogger().severe("[FormulaRacing] Erro ao carregar regiões DRS: " + e.getMessage());
         }
         return list;
     }

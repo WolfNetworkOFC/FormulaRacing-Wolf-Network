@@ -158,22 +158,48 @@ public class DatabaseManager {
             Location min,
             Location max
     ) {
-        // Now we always use INSERT. The 'id' (AUTOINCREMENT) will differentiate the zones.
+        // Validate inputs
+        if (trackName == null || trackName.isBlank()) {
+            Bukkit.getLogger().warning("[FormulaRacing] saveDrsZone: trackName is null or blank");
+            return false;
+        }
+        if (type == null || type.isBlank()) {
+            Bukkit.getLogger().warning("[FormulaRacing] saveDrsZone: type is null or blank");
+            return false;
+        }
+        if (min == null || max == null) {
+            Bukkit.getLogger().warning("[FormulaRacing] saveDrsZone: min or max location is null");
+            return false;
+        }
+        if (min.getWorld() == null) {
+            Bukkit.getLogger().warning("[FormulaRacing] saveDrsZone: min location has no world");
+            return false;
+        }
+
+        // Normalize coordinates (ensure min is actually the minimum)
+        double minX = Math.min(min.getX(), max.getX());
+        double minY = Math.min(min.getY(), max.getY());
+        double minZ = Math.min(min.getZ(), max.getZ());
+        double maxX = Math.max(min.getX(), max.getX());
+        double maxY = Math.max(min.getY(), max.getY());
+        double maxZ = Math.max(min.getZ(), max.getZ());
+
         String sql = "INSERT INTO fr_drs (trackNameWS, world, type, " +
                 "regionMinX, regionMinY, regionMinZ, " +
                 "regionMaxX, regionMaxY, regionMaxZ) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
 
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            ps.setString(1, trackName.toLowerCase());
+        try (Connection conn = getOrConnect();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, trackName.toLowerCase().replaceAll("\\s+", ""));
             ps.setString(2, min.getWorld().getName());
             ps.setString(3, type.toLowerCase());
-            ps.setDouble(4, min.getX());
-            ps.setDouble(5, min.getY());
-            ps.setDouble(6, min.getZ());
-            ps.setDouble(7, max.getX());
-            ps.setDouble(8, max.getY());
-            ps.setDouble(9, max.getZ());
+            ps.setDouble(4, minX);
+            ps.setDouble(5, minY);
+            ps.setDouble(6, minZ);
+            ps.setDouble(7, maxX);
+            ps.setDouble(8, maxY);
+            ps.setDouble(9, maxZ);
 
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
