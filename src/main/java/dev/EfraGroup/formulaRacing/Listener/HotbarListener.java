@@ -37,12 +37,13 @@ public class HotbarListener implements Listener {
     )
     public void onInteract(PlayerInteractEvent event) {
         if (event.getHand() == EquipmentSlot.HAND) {
-            if (event.getAction() != Action.PHYSICAL) {
+            // Only trigger on right-click (air or block)
+            Action action = event.getAction();
+            if (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK) {
                 if (event.getItem() != null && event.getItem().getType() != Material.AIR && this.controller.isHotbarItem(event.getItem())) {
                     event.setCancelled(true);
                     this.controller.handleInteraction(event.getPlayer(), event.getItem());
                 }
-
             }
         }
     }
