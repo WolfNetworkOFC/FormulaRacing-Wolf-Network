@@ -853,8 +853,10 @@ public class DatabaseManager {
 
             // 6. Others
             stmt.executeUpdate(
-                "CREATE TABLE IF NOT EXISTS fr_holograms (trackNameWS TEXT PRIMARY KEY, world TEXT, x REAL, y REAL, z REAL, java_enabled INTEGER DEFAULT 1, bedrock_enabled INTEGER DEFAULT 1)"
+                "CREATE TABLE IF NOT EXISTS fr_holograms (trackNameWS TEXT PRIMARY KEY, world TEXT, x REAL, y REAL, z REAL, java_enabled INTEGER DEFAULT 1, bedrock_enabled INTEGER DEFAULT 1, bedrock_world TEXT, bedrock_x REAL, bedrock_y REAL, bedrock_z REAL)"
             );
+            // Migration: add bedrock columns if missing (older databases)
+            migrateHologramTable(stmt);
             stmt.executeUpdate(
                 "CREATE TABLE IF NOT EXISTS fr_duel_elo (" +
                 "uuid TEXT PRIMARY KEY, elo INTEGER DEFAULT 1200, wins INTEGER DEFAULT 0, losses INTEGER DEFAULT 0)"
@@ -5779,14 +5781,18 @@ public class DatabaseManager {
         Location location
     ) {
         if (trackName == null || location == null) return false;
+        if (location.getWorld() == null) return false;
 
         String trackNameWS = trackName.replaceAll("\\s+", "");
-        String sqlSelect =
-            "SELECT x, y, z, world FROM fr_holograms WHERE LOWER(trackNameWS) = LOWER(?)";
-        String sqlInsertOrUpdate =
-            "INSERT INTO fr_holograms (trackNameWS, world, x, y, z) " +
-            "VALUES (?, ?, ?, ?, ?) " +
-            "ON CONFLICT(trackNameWS) DO UPDATE SET world=excluded.world, x=excluded.x, y=excluded.y, z=excluded.z";
+        boolean isBedrock = "bedrock".equalsIgnoreCase(type);
+
+        // Use separate columns for Java and Bedrock locations
+        String worldCol = isBedrock ? "bedrock_world" : "world";
+        String xCol = isBedrock ? "bedrock_x" : "x";
+        String yCol = isBedrock ? "bedrock_y" : "y";
+        String zCol = isBedrock ? "bedrock_z" : "z";
+
+        String sqlSelect = "SELECT " + xCol + ", " + yCol + ", " + zCol + ", " + worldCol + " FROM fr_holograms WHERE LOWER(trackNameWS) = LOWER(?)";
 
         try {
             Connection conn = getOrConnect();
@@ -5798,16 +5804,16 @@ public class DatabaseManager {
                 psSelect.setString(1, trackNameWS);
                 try (ResultSet rs = psSelect.executeQuery()) {
                     if (rs.next()) {
-                        double oldX = rs.getDouble("x");
-                        double oldY = rs.getDouble("y");
-                        double oldZ = rs.getDouble("z");
-                        String oldWorld = rs.getString("world");
+                        double oldX = rs.getDouble(xCol);
+                        double oldY = rs.getDouble(yCol);
+                        double oldZ = rs.getDouble(zCol);
+                        String oldWorld = rs.getString(worldCol);
 
                         if (
                             oldX == location.getX() &&
                             oldY == location.getY() &&
                             oldZ == location.getZ() &&
-                            oldWorld.equals(location.getWorld().getName())
+                            location.getWorld().getName().equals(oldWorld)
                         ) {
                             needsUpdate = false;
                         }
@@ -5817,36 +5823,48 @@ public class DatabaseManager {
 
             if (!needsUpdate) return false;
 
+            // Update only the columns for the specific type
+            String sqlUpdate = "UPDATE fr_holograms SET " +
+                worldCol + " = ?, " +
+                xCol + " = ?, " +
+                yCol + " = ?, " +
+                zCol + " = ? " +
+                "WHERE LOWER(trackNameWS) = LOWER(?)";
+
             try (
-                PreparedStatement psUpdate = conn.prepareStatement(
-                    sqlInsertOrUpdate
-                )
+                PreparedStatement psUpdate = conn.prepareStatement(sqlUpdate)
             ) {
-                psUpdate.setString(1, trackNameWS);
-                psUpdate.setString(2, location.getWorld().getName());
-                psUpdate.setDouble(3, location.getX());
-                psUpdate.setDouble(4, location.getY());
-                psUpdate.setDouble(5, location.getZ());
+                psUpdate.setString(1, location.getWorld().getName());
+                psUpdate.setDouble(2, location.getX());
+                psUpdate.setDouble(3, location.getY());
+                psUpdate.setDouble(4, location.getZ());
+                psUpdate.setString(5, trackNameWS);
 
                 int rows = psUpdate.executeUpdate();
                 if (rows > 0) {
-                    plugin
-                        .getDebugManager()
-                        .logDatabaseOperation(
-                            "[FormulaRacing] Holograma da pista '" +
-                                trackName +
-                                "' salvo/atualizado com sucesso."
-                        );
+                    plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Leaderboard " + type + " location saved for: " + trackNameWS);
                     return true;
+                }
+
+                // Row doesn't exist yet, insert new
+                String sqlInsert = isBedrock
+                    ? "INSERT INTO fr_holograms (trackNameWS, bedrock_world, bedrock_x, bedrock_y, bedrock_z) VALUES (?, ?, ?, ?, ?)"
+                    : "INSERT INTO fr_holograms (trackNameWS, world, x, y, z) VALUES (?, ?, ?, ?, ?)";
+
+                try (
+                    PreparedStatement psInsert = conn.prepareStatement(sqlInsert)
+                ) {
+                    psInsert.setString(1, trackNameWS);
+                    psInsert.setString(2, location.getWorld().getName());
+                    psInsert.setDouble(3, location.getX());
+                    psInsert.setDouble(4, location.getY());
+                    psInsert.setDouble(5, location.getZ());
+
+                    return psInsert.executeUpdate() > 0;
                 }
             }
         } catch (SQLException e) {
-            plugin
-                .getDebugManager()
-                .logDatabaseOperation(
-                    "[FormulaRacing] Erro ao salvar holograma: " +
-                        e.getMessage()
-                );
+            plugin.getDebugManager().logDatabaseOperation("[FormulaRacing] Erro ao salvar holograma (" + type + "): " + e.getMessage());
             handleSqlError(e);
         }
         return false;
@@ -5948,6 +5966,21 @@ public class DatabaseManager {
         return this.databaseType;
     }
 
+    /**
+     * Migration: adds bedrock_world, bedrock_x, bedrock_y, bedrock_z columns
+     * to fr_holograms table if they don't exist (for older databases).
+     */
+    private static void migrateHologramTable(Statement stmt) {
+        String[] bedrockColumns = {"bedrock_world", "bedrock_x", "bedrock_y", "bedrock_z"};
+        for (String col : bedrockColumns) {
+            try {
+                stmt.executeUpdate("ALTER TABLE fr_holograms ADD COLUMN " + col + (col.equals("bedrock_world") ? " TEXT" : " REAL"));
+            } catch (SQLException ignored) {
+                // Column already exists – ignore
+            }
+        }
+    }
+
     public synchronized Location getHologramLocation(String trackName) {
         return getHologramLocation(trackName, "java");
     }
@@ -5955,8 +5988,10 @@ public class DatabaseManager {
     public synchronized Location getHologramLocation(String trackName, String type) {
         if (trackName == null) return null;
         String trackNameWS = trackName.replaceAll("\\s+", "");
-        String sql =
-            "SELECT world, x, y, z FROM fr_holograms WHERE LOWER(trackNameWS) = LOWER(?)";
+        boolean isBedrock = "bedrock".equalsIgnoreCase(type);
+        String sql = isBedrock
+            ? "SELECT bedrock_world AS world, bedrock_x AS x, bedrock_y AS y, bedrock_z AS z FROM fr_holograms WHERE LOWER(trackNameWS) = LOWER(?)"
+            : "SELECT world, x, y, z FROM fr_holograms WHERE LOWER(trackNameWS) = LOWER(?)";
 
         try {
             Connection conn = getOrConnect();

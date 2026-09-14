@@ -295,12 +295,9 @@ public class LonelyController implements Listener {
             boolean inScope = participants.contains(other.getUniqueId());
 
             if (!heatLonely) {
-                // Heat NOT lonely: show ONLY participants (regardless of personalLonely)
-                if (inScope) {
-                    showPlayer(viewer, other);
-                } else {
-                    hidePlayer(viewer, other);
-                }
+                // Heat NOT lonely: show ALL players (TimeTrial, open racing)
+                // Collision is handled separately via packets, not visibility
+                showPlayer(viewer, other);
             } else {
                 // Heat IS lonely
                 if (personalLonely) {
@@ -379,12 +376,9 @@ public class LonelyController implements Listener {
         }
 
         if (!heatLonely) {
-            // Heat NOT lonely: show only participants
-            if (inScope) {
-                showPlayer(viewer, target);
-            } else {
-                hidePlayer(viewer, target);
-            }
+            // Heat NOT lonely: show ALL players (TimeTrial, open racing)
+            // Collision is handled separately via packets, not visibility
+            showPlayer(viewer, target);
         } else {
             // Heat IS lonely
             if (personalLonely) {
