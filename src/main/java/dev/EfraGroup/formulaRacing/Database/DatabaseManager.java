@@ -7932,9 +7932,21 @@ public class DatabaseManager {
         String blockId,
         float value
     ) {
+        trackNameWS = trackNameWS.toLowerCase();
         Map<String, Float> map = getCustomSlipperiness(trackNameWS);
         map.put(blockId.toLowerCase(), value);
         saveCustomSlipperiness(trackNameWS, map);
+    }
+
+    public synchronized boolean removeCustomSlipperiness(
+        String trackNameWS,
+        String blockId
+    ) {
+        trackNameWS = trackNameWS.toLowerCase();
+        Map<String, Float> map = getCustomSlipperiness(trackNameWS);
+        boolean removed = map.remove(blockId.toLowerCase()) != null;
+        if (removed) saveCustomSlipperiness(trackNameWS, map);
+        return removed;
     }
 
     public synchronized void resetCustomSlipperiness(String trackNameWS) {
@@ -7944,8 +7956,9 @@ public class DatabaseManager {
     public synchronized Map<String, Float> getCustomSlipperiness(
         String trackNameWS
     ) {
+        trackNameWS = trackNameWS.toLowerCase();
         String sql =
-            "SELECT customSlipperiness FROM fr_boatutils WHERE trackNameWS = ?";
+            "SELECT customSlipperiness FROM fr_boatutils WHERE LOWER(trackNameWS) = LOWER(?)";
         Map<String, Float> result = new HashMap<>();
 
         try {
@@ -7961,8 +7974,8 @@ public class DatabaseManager {
                                 String[] parts = entry.split(";");
                                 if (parts.length == 2) {
                                     result.put(
-                                        parts[0],
-                                        Float.parseFloat(parts[1])
+                                        parts[0].toLowerCase(),
+                                        Float.parseFloat(parts[1].trim())
                                     );
                                 }
                             }

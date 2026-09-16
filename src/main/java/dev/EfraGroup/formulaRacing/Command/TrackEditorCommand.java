@@ -1237,6 +1237,53 @@ public class TrackEditorCommand extends BaseCommand {
         }
     }
 
+    @Subcommand("boatutils config customslipperiness list")
+    @Description("Lists all custom slipperiness entries of a track")
+    @CommandCompletion("@tracks")
+    public void onBoatUtilsListSlipperiness(Player player, @Optional String trackArg) {
+        String trackName = this.getTargetTrack(player, trackArg);
+        if (trackName != null) {
+            String normalized = trackName.replace(" ", "");
+            Map<String, Float> map = this.mysql.getCustomSlipperiness(normalized);
+            if (map == null || map.isEmpty()) {
+                player.sendMessage("§eNo custom slipperiness entries on track §f" + trackName);
+                return;
+            }
+            player.sendMessage("§6§lCustom Slipperiness §7(§f" + trackName + "§7) §8- §7" + map.size() + " entries:");
+            map.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(e -> player.sendMessage("§7 - §e" + e.getKey() + " §8→ §b" + e.getValue()));
+        }
+    }
+
+    @Subcommand("boatutils config customslipperiness remove")
+    @Description("Removes a custom slipperiness entry from a track")
+    @CommandCompletion("@materials @tracks")
+    public void onBoatUtilsRemoveSlipperiness(Player player, String materialName, @Optional String trackArg) {
+        String trackName = this.getTargetTrack(player, trackArg);
+        if (trackName != null) {
+            String normalized = trackName.replace(" ", "");
+            Material mat = Material.matchMaterial(materialName);
+            String blockId = mat != null ? mat.getKey().toString().toLowerCase() : materialName.toLowerCase();
+            Map<String, Float> map = this.mysql.getCustomSlipperiness(normalized);
+            String removedKey = null;
+            if (map != null) {
+                for (String key : map.keySet()) {
+                    if (key.equalsIgnoreCase(blockId)) {
+                        removedKey = key;
+                        break;
+                    }
+                }
+            }
+            if (removedKey == null) {
+                player.sendMessage("§c✘ No entry for §f" + materialName + " §con track §f" + trackName);
+                return;
+            }
+            this.mysql.removeCustomSlipperiness(normalized, removedKey);
+            player.sendMessage("§a✔ Removed §e" + removedKey + " §afrom track §f" + trackName);
+        }
+    }
+
     @Subcommand("boatutils config customslipperiness reset")
     @Description("Removes all block slipperiness customizations")
     @CommandCompletion("@tracks")
