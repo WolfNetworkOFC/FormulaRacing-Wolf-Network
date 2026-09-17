@@ -546,9 +546,10 @@ public class Heats {
                             int gridIndex = driver.getStartPosition() - 1;
                             if (gridIndex >= 0 && gridIndex < qualiGridPositions.size()) {
                                 Location qualiLoc = qualiGridPositions.get(gridIndex);
-                                SchedulerHelper.runTaskFor(this.plugin, player, () -> {
-                                    this.plugin.getAPI().recoverPlayerBoatState(player);
-                                });
+                                // NOTE: the old boat must be removed INSIDE spawnQualiDriver, before
+                                // the teleport. Scheduling recoverPlayerBoatState as a separate task
+                                // here races with the teleport and left drivers who were already in a
+                                // boat without a new one (see the race grid fix in GridManager).
                                 this.spawnQualiDriver(player, driver, qualiLoc);
                             } else if (player.isOnline()) {
                                 player.sendMessage("§cSem qualigrid para sua posição (" + driver.getStartPosition() + ").");
@@ -1529,32 +1530,49 @@ public class Heats {
 
     private void spawnQualiDriver(Player player, Driver driver, Location gridLoc) {
         this.plugin.getLonelyController().updatePlayersVisibility(player);
-        // Folia: teleport first and WAIT for completion, then spawn the boat on the
-        // player's (now grid-region) thread. The old fire-and-forget teleport +
-        // immediate spawn ran on the player's OLD region thread and threw
-        // "Cannot add entity off-main thread" when the quali grid was in another
-        // region than the player.
-        SchedulerHelper.teleportAsync(player, gridLoc).thenAccept(success -> {
-            if (Boolean.TRUE.equals(success) && player.isOnline()) {
-                SchedulerHelper.runTaskFor(this.plugin, player, () -> {
-                    if (!player.isOnline()) {
-                        return;
-                    }
-                    if (this.plugin.getPacketSender() != null) {
-                        this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
-                        this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, this.trackNameWS);
-                        this.applyCollisionModeToPlayer(player);
-                    }
-                    // Apply track game time (day/night cycle)
-                    this.plugin.applyTrackGameTime(player, this.trackNameWS);
-                    boolean collidable = this.collisionMode != CollisionMode.DISABLED;
-                    this.plugin.getAPI().spawnBoatAt(player, gridLoc, false, true, false, collidable);
-                });
-            } else {
-                this.plugin.getDebugManager().logRaceSystem(
-                    "[QUALI] Falha ao teleportar " + player.getName() + " para o quali grid — sem barco."
-                );
+        // Folia: all player-entity work must run on the player's region thread.
+        // 1) Dismount and delete any boat the player is currently riding FIRST —
+        //    teleporting a player who is still a passenger of a boat is unreliable
+        //    (the rider keeps being synced back to the boat, while the old boat is
+        //    deleted anyway), so a driver who arrived at the quali grid sitting in a
+        //    boat ended up without the new one. This is the same ordering fix that
+        //    GridManager#spawnBoatWithTrackConfig uses for race/sprint/final grids.
+        // 2) Then teleport the (now boatless) player and WAIT for completion so the
+        //    player is already in the quali grid region before the spawn runs. The old
+        //    fire-and-forget teleport + immediate spawn ran on the player's OLD region
+        //    thread and threw "Cannot add entity off-main thread" when the quali grid
+        //    was in another region than the player.
+        SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+            if (!player.isOnline()) {
+                return;
             }
+            this.plugin.getAPI().recoverPlayerBoatState(player);
+            SchedulerHelper.teleportAsync(player, gridLoc).thenAccept(success -> {
+                if (Boolean.TRUE.equals(success) && player.isOnline()) {
+                    SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                        if (!player.isOnline()) {
+                            return;
+                        }
+                        if (this.plugin.getPacketSender() != null) {
+                            this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
+                            this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, this.trackNameWS);
+                            this.applyCollisionModeToPlayer(player);
+                        }
+                        // Apply track game time (day/night cycle)
+                        this.plugin.applyTrackGameTime(player, this.trackNameWS);
+                        boolean collidable = this.collisionMode != CollisionMode.DISABLED;
+                        this.plugin.getAPI().spawnBoatAt(player, gridLoc, false, true, false, collidable);
+                        // updatePlayersVisibility ran before the boat existed, and addPassenger
+                        // does NOT fire VehicleEnterEvent, so re-apply the visibility/collision
+                        // policy now that the driver is actually seated (same as the race grid).
+                        this.plugin.getLonelyController().updatePlayersVisibility(player);
+                    });
+                } else {
+                    this.plugin.getDebugManager().logRaceSystem(
+                        "[QUALI] Falha ao teleportar " + player.getName() + " para o quali grid — sem barco."
+                    );
+                }
+            });
         });
     }
 

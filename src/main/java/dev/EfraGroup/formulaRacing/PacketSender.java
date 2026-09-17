@@ -119,7 +119,6 @@ public class PacketSender {
         }
         if (defaultSlip != VANILLA_DEFAULT_SLIPPERINESS) {
             sendBoatSetting(player, (short)2, defaultSlip);
-            FormulaRacing.getInstance().getLogger().info("[DEBUG] Set default slipperiness -> " + defaultSlip);
         }
 
         String customSlip = (String) data.get("customSlipperiness");
