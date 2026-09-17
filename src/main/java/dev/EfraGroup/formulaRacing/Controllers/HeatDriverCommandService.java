@@ -112,11 +112,11 @@ public class HeatDriverCommandService {
                     int gridIndex = Math.max(0, finalPosition - 1);
                     if (gridIndex < gridPositions.size()) {
                         org.bukkit.Location gridLoc = gridPositions.get(gridIndex);
-                        onlinePlayer.teleport(gridLoc);
-                        // Stop any active timer
-                        this.plugin.getRaceScoreboardManager().addPlayer(onlinePlayer, finalHeat);
-                        this.plugin.getRaceActionBarManager().addPlayer(onlinePlayer, finalHeat);
-                        this.plugin.getHotbarController().giveHeatHotbar(onlinePlayer, finalHeat);
+                        SchedulerHelper.teleportAsync(onlinePlayer, gridLoc).thenRun(() -> {
+                            this.plugin.getRaceScoreboardManager().addPlayer(onlinePlayer, finalHeat);
+                            this.plugin.getRaceActionBarManager().addPlayer(onlinePlayer, finalHeat);
+                            this.plugin.getHotbarController().giveHeatHotbar(onlinePlayer, finalHeat);
+                        });
                     }
                 }
             });

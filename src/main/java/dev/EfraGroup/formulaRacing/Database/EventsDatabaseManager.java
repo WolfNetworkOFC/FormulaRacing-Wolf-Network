@@ -108,6 +108,78 @@ public class EventsDatabaseManager {
         }
     }
 
+    /**
+     * Same as {@link #executeSync} but returns how many rows were affected.
+     *
+     * @return the number of affected rows, or -1 when the update could not be executed
+     */
+    private int executeSyncUpdate(
+        String sql,
+        String operationName,
+        Consumer<PreparedStatement> binder
+    ) {
+        try {
+            Connection conn = this.databaseManager.getOrConnect();
+            if (conn == null) {
+                return -1;
+            }
+
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                binder.accept(stmt);
+                return stmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[EventsDB] Sync error in " +
+                    operationName +
+                    ": " +
+                    e.getMessage()
+            );
+            return -1;
+        }
+    }
+
+    /**
+     * Sends every heat that is still in use (loaded on a grid, starting or running) back to SETUP.
+     * Used on shutdown: a heat interrupted by the server stopping must not come back as
+     * LOADED/STARTING/RACING on the next start. Heats that already finished, and those that are
+     * already at rest (SETUP/IDLE), are left alone.
+     *
+     * <p>Works on every heat in the table, including the ones whose event is not loaded in
+     * memory, and is written synchronously so it cannot be lost during the shutdown.</p>
+     *
+     * @return the number of heats that were reset, or -1 when the update could not be executed
+     */
+    public int resetInUseHeatStates() {
+        List<HeatState> inUseStates = new ArrayList<>();
+        for (HeatState state : HeatState.values()) {
+            if (state.isInUse()) {
+                inUseStates.add(state);
+            }
+        }
+
+        StringBuilder inClause = new StringBuilder();
+        for (int i = 0; i < inUseStates.size(); i++) {
+            if (i > 0) {
+                inClause.append(", ");
+            }
+            inClause.append("?");
+        }
+
+        String sql = "UPDATE fr_heats SET state = ? WHERE state IN (" + inClause + ")";
+
+        return this.executeSyncUpdate(sql, "resetInUseHeatStates", stmt -> {
+            try {
+                stmt.setString(1, HeatState.SETUP.name());
+                for (int i = 0; i < inUseStates.size(); i++) {
+                    stmt.setString(2 + i, inUseStates.get(i).name());
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
     public CompletableFuture<Integer> createEvent(
         UUID creatorUUID,
         String name,

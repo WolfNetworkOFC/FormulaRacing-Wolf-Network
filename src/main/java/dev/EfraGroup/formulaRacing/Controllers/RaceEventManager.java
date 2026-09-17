@@ -978,18 +978,6 @@ public class RaceEventManager {
         }
     }
 
-    /**
-     * Whether the heat still has players loaded on its grid or a session running, i.e. whether
-     * deleting the event has to reset it so nobody is left behind on its grid.
-     */
-    private static boolean isHeatInUse(HeatState state) {
-        return state == HeatState.PRACTICE
-            || state == HeatState.QUALIFYING
-            || state == HeatState.LOADED
-            || state == HeatState.STARTING
-            || state == HeatState.RACING;
-    }
-
     private void cleanupEventInMemory(Events event) {
         event.getEventCountdown().stop();
 
@@ -1003,7 +991,7 @@ public class RaceEventManager {
                 // drivers stayed locked on the grid anchors of an event that no longer
                 // existed. resetHeat() releases the grid anchors/boats, stops the session
                 // timers, drops the scoreboard/action bar and puts the heat back to SETUP.
-                if (isHeatInUse(state)) {
+                if (state.isInUse()) {
                     heat.resetHeat();
                 }
 
@@ -1241,6 +1229,28 @@ public class RaceEventManager {
         this.qualificationManager.processQualificationResults(
             event,
             qualificationRound
+        );
+    }
+
+    /**
+     * Sends every heat that is still in use back to SETUP, so a server shutdown does not leave a
+     * heat persisting as LOADED/STARTING/RACING/QUALIFYING/PRACTICE and coming back loaded on the
+     * next start. Heats that already finished (and those that are already at rest) are untouched.
+     *
+     * <p>Call it while the database connection is still open. The write is synchronous on purpose:
+     * async writes can be lost during shutdown.</p>
+     *
+     * <p>The in-memory heat states are deliberately left alone so the other managers' shutdown
+     * logic keeps behaving exactly as before (QuickRaceManager#shutdown resets its own
+     * loaded/starting/racing heat). Across a restart only the persisted state matters, and that
+     * is what this updates.</p>
+     */
+    public void prepareForShutdown() {
+        int reset = this.dbManager.resetInUseHeatStates();
+        this.plugin.getDebugManager().logRaceSystem(
+            reset < 0
+                ? "Shutdown: failed to send the loaded/running heats back to SETUP"
+                : "Shutdown: " + reset + " heat(s) that were loaded/running were sent back to SETUP"
         );
     }
 

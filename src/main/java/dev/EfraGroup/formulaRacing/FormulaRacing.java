@@ -554,6 +554,22 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.getLogger().info("[FormulaRacing] Disabling plugin...");
         }
 
+        // A heat that was still loaded/running when the server stops must not come back as
+        // LOADED/STARTING/RACING on the next start — send it back to SETUP. This has to run
+        // BEFORE the database connection is closed below (the write is synchronous on purpose,
+        // async writes can be lost during shutdown). Heats that already finished are left alone.
+        if (this.raceEventManager != null) {
+            try {
+                this.raceEventManager.prepareForShutdown();
+            } catch (Throwable t) {
+                if (this.debugManager != null) {
+                    this.debugManager.logRaceSystem(
+                        "[FormulaRacing] Failed to send the loaded/running heats back to SETUP on disable: " + t
+                    );
+                }
+            }
+        }
+
         if (this.dm != null) {
             this.dm.closePool();
         }
