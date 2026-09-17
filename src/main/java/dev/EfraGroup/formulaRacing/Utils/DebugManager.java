@@ -48,23 +48,6 @@ public class DebugManager {
         this.spectatorSystem = config.getBoolean("debug.spectator-system", false);
         this.guiSystem = config.getBoolean("debug.gui-system", false);
         this.fileSystem = config.getBoolean("debug.file-system", false);
-        this.plugin.getLogger().info("[DebugManager] Debug settings reloaded:");
-        this.plugin.getLogger().info("  - Region Detection: " + (this.regionDetection ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - Duel System: " + (this.duelSystem ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - Duel System Verbose: " + (this.duelSystemVerbose ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - Time Trial System: " + (this.timeTrialSystem ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - Boat Utils: " + (this.boatUtils ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - Database Operations: " + (this.databaseOperations ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - Event System: " + (this.eventSystem ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - Packet Handling: " + (this.packetHandling ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - Performance Metrics: " + (this.performanceMetrics ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - Race System: " + (this.raceSystem ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - Race System Verbose: " + (this.raceSystemVerbose ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - Qualification System: " + (this.qualificationSystem ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - Pit Stop System: " + (this.pitStopSystem ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - Spectator System: " + (this.spectatorSystem ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - GUI System: " + (this.guiSystem ? "ON" : "OFF"));
-        this.plugin.getLogger().info("  - File System: " + (this.fileSystem ? "ON" : "OFF"));
     }
 
     public boolean isRegionDetectionEnabled() { return this.regionDetection; }
