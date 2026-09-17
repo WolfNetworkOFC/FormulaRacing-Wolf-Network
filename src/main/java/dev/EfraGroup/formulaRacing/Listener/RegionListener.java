@@ -786,7 +786,7 @@ public class RegionListener implements Listener {
         }
 
         Player player = Bukkit.getPlayer(uuid);
-        return player != null && player.getName().startsWith("*");
+        return player != null && (player.getName().startsWith("*") || player.getName().startsWith("."));
     }
 
     private Location normalizeRegionLocation(Location location, boolean bedrockBoatDetection) {

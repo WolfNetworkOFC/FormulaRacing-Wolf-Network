@@ -35,7 +35,7 @@ public class DatabaseManager {
             }
         } catch (NoClassDefFoundError | Exception ignored) {
         }
-        return (playerName != null && playerName.startsWith("*")) ? "BEDROCK" : "JAVA";
+        return (playerName != null && (playerName.startsWith("*") || playerName.startsWith("."))) ? "BEDROCK" : "JAVA";
     }
 
     private final FormulaRacing plugin;
