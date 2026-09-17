@@ -47,32 +47,38 @@ public class GridManager {
 
     public boolean generateGrid() {
         String trackNameWS = this.heat.getTrackNameWS();
-        if (trackNameWS != null && !trackNameWS.isEmpty()) {
-            TrackIntegrationManager trackManager = this.plugin.getTrackIntegrationManager();
-            // Never cap the grid by heat.getMaxDrivers(): that value is a stale
-            // snapshot taken when the track was assigned to the heat (0 when no
-            // grids existed yet), so grids added later were silently truncated to
-            // zero and the heat reported "no GRIDs defined" until a server restart
-            // rebuilt the heat and re-ran setTrackNameWS. The heat only needs one
-            // slot per enrolled driver; loadHeat already warns when the track has
-            // fewer slots than drivers.
-            int maxDrivers = Math.max(this.heat.getDrivers().size(), 1);
-            this.gridPositions.clear();
-            this.gridPositions.addAll(trackManager.generateGridPositions(trackNameWS, maxDrivers));
-            if (this.gridPositions.isEmpty()) {
-                this.plugin.getDebugManager().logRaceSystem("Could not generate grid for track: " + trackNameWS);
-                return false;
-            } else {
-                this.heat.setMaxDrivers(this.gridPositions.size());
-                DebugManager var10000 = this.plugin.getDebugManager();
-                int var10001 = this.heat.getId();
-                var10000.logRaceSystem("Grid generated for Heat " + var10001 + ": " + this.gridPositions.size() + " positions");
-                return true;
-            }
-        } else {
+        if (trackNameWS == null || trackNameWS.isEmpty()) {
             this.plugin.getDebugManager().logRaceSystem("Heat " + this.heat.getId() + " has no track configured!");
             return false;
         }
+
+        TrackIntegrationManager trackManager = this.plugin.getTrackIntegrationManager();
+        // The cache must hold EVERY grid the track has:
+        //  * never cap it by heat.getMaxDrivers() — that value is a stale snapshot taken
+        //    when the track was assigned to the heat (0 when no grids existed yet), so
+        //    grids added later were silently truncated to zero and the heat reported
+        //    "no GRIDs defined" until a server restart rebuilt the heat and re-ran
+        //    setTrackNameWS.
+        //  * never cap it by the current driver count either. load/teleport run as soon as
+        //    the FIRST driver joins, so capping by the driver count cached a single
+        //    position and then pinned the heat capacity to it (see below), which rejected
+        //    every later driver with "heat full" and made late joiners fail to be placed.
+        this.gridPositions.clear();
+        this.gridPositions.addAll(trackManager.generateGridPositions(trackNameWS, Integer.MAX_VALUE));
+        if (this.gridPositions.isEmpty()) {
+            this.plugin.getDebugManager().logRaceSystem("Could not generate grid for track: " + trackNameWS);
+            return false;
+        }
+
+        // NOTE: deliberately NOT calling heat.setMaxDrivers() here. setMaxDrivers stores a
+        // non-null value that always wins in getMaxDriversLimit(), so deriving the capacity
+        // from this snapshot pinned it to whatever was enrolled at the time (1 for the first
+        // driver of a Quick Race / voterace event). Capacity belongs to the heat, not to a
+        // transient view of the grid.
+        DebugManager var10000 = this.plugin.getDebugManager();
+        int var10001 = this.heat.getId();
+        var10000.logRaceSystem("Grid generated for Heat " + var10001 + ": " + this.gridPositions.size() + " positions");
+        return true;
     }
 
     public int teleportDriversToGrid() {

@@ -978,24 +978,45 @@ public class RaceEventManager {
         }
     }
 
+    /**
+     * Whether the heat still has players loaded on its grid or a session running, i.e. whether
+     * deleting the event has to reset it so nobody is left behind on its grid.
+     */
+    private static boolean isHeatInUse(HeatState state) {
+        return state == HeatState.PRACTICE
+            || state == HeatState.QUALIFYING
+            || state == HeatState.LOADED
+            || state == HeatState.STARTING
+            || state == HeatState.RACING;
+    }
+
     private void cleanupEventInMemory(Events event) {
         event.getEventCountdown().stop();
 
         for (Rounds round : event.getEventSchedule().getRounds().values()) {
             for (Heats heat : round.getHeats().values()) {
                 HeatState state = heat.getHeatState();
-                if (state == HeatState.RACING || state == HeatState.PRACTICE || state == HeatState.QUALIFYING) {
-                    heat.finishHeat(true);
-                } else {
-                    for (UUID uuid : heat.getDrivers().keySet()) {
-                        this.plugin.getDriverLookup().unregister(uuid);
-                    }
-                    if (this.plugin.getRegionListener() != null) {
-                        this.plugin.getRegionListener().cleanupHeatPlayers(heat.getDrivers().keySet());
-                    }
-                    if (this.plugin.getRaceCheckpointListener() != null) {
-                        this.plugin.getRaceCheckpointListener().cleanupHeatPlayers(heat.getDrivers().keySet());
-                    }
+
+                // Deleting an event has to reset every heat that is still in use (loaded
+                // on the grid, starting or running). Previously only RACING/PRACTICE/
+                // QUALIFYING heats were ended and everything else was left as it was, so
+                // drivers stayed locked on the grid anchors of an event that no longer
+                // existed. resetHeat() releases the grid anchors/boats, stops the session
+                // timers, drops the scoreboard/action bar and puts the heat back to SETUP.
+                if (isHeatInUse(state)) {
+                    heat.resetHeat();
+                }
+
+                // The same cleanup the non-active branch always did, also applied to the
+                // heats that were just reset, so nothing survives the deleted event.
+                for (UUID uuid : heat.getDrivers().keySet()) {
+                    this.plugin.getDriverLookup().unregister(uuid);
+                }
+                if (this.plugin.getRegionListener() != null) {
+                    this.plugin.getRegionListener().cleanupHeatPlayers(heat.getDrivers().keySet());
+                }
+                if (this.plugin.getRaceCheckpointListener() != null) {
+                    this.plugin.getRaceCheckpointListener().cleanupHeatPlayers(heat.getDrivers().keySet());
                 }
             }
             round.getHeats().clear();

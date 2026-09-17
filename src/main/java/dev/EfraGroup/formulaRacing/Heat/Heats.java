@@ -858,66 +858,80 @@ public class Heats {
         int timeout = Math.max(10, this.getFinalRaceTimeoutSeconds());
         this.finalRaceRemainingSeconds.set(timeout);
 
-        List<Player> recipients = new ArrayList<>();
-        for (UUID uuid : this.drivers.keySet()) {
-            Player player = Bukkit.getPlayer(uuid);
-            if (player != null && player.isOnline()) {
-                recipients.add(player);
-            }
-        }
-
-        this.finalRaceBossbar = Bukkit.createBossBar(
-            "Race will Finish in: " + timeout + "s",
-            BarColor.RED,
-            BarStyle.SOLID
-        );
-        this.finalRaceBossbar.setProgress(1.0);
-
-        for (Player player : recipients) {
-            if (player != null && player.isOnline()) {
-                this.finalRaceBossbar.addPlayer(player);
-            }
-        }
-
-        Events event = (this.round != null) ? this.round.getEvent() : null;
-        if (event != null && this.plugin.getSpectatorManager() != null) {
-            for (UUID specId : this.plugin.getSpectatorManager().getSpectatorsInEvent(event.getId())) {
-                Player specPlayer = Bukkit.getPlayer(specId);
-                if (specPlayer != null && specPlayer.isOnline()) {
-                    this.finalRaceBossbar.addPlayer(specPlayer);
-                    this.finalRaceBossbarRecipients.add(specId);
-                }
-            }
-        }
-
-        this.finalRaceBossbarTask = SchedulerHelper.runTaskTimer(this.plugin, () -> {
-            int remaining;
+        // Folia: create BossBar synchronously on main thread, then schedule updates.
+        SchedulerHelper.runTask(this.plugin, () -> {
             synchronized (this.finalRaceBossbarLock) {
                 if (!this.finalRaceBossbarActive) {
                     return;
                 }
 
-                int current = this.finalRaceRemainingSeconds.get();
-                if (current <= 0) {
-                    this.cancelFinalRaceBossbarLocked();
-                    this.finishHeat();
-                    return;
+                List<Player> recipients = new ArrayList<>();
+                for (UUID uuid : this.drivers.keySet()) {
+                    Player player = Bukkit.getPlayer(uuid);
+                    if (player != null && player.isOnline()) {
+                        recipients.add(player);
+                    }
                 }
 
-                remaining = current - 1;
-                this.finalRaceRemainingSeconds.set(remaining);
+                this.finalRaceBossbar = Bukkit.createBossBar(
+                    "Race will Finish in: " + timeout + "s",
+                    BarColor.RED,
+                    BarStyle.SOLID
+                );
+                this.finalRaceBossbar.setProgress(1.0);
+
+                for (Player player : recipients) {
+                    if (player != null && player.isOnline()) {
+                        this.finalRaceBossbar.addPlayer(player);
+                    }
+                }
+
+                Events event = (this.round != null) ? this.round.getEvent() : null;
+                if (event != null && this.plugin.getSpectatorManager() != null) {
+                    for (UUID specId : this.plugin.getSpectatorManager().getSpectatorsInEvent(event.getId())) {
+                        Player specPlayer = Bukkit.getPlayer(specId);
+                        if (specPlayer != null && specPlayer.isOnline()) {
+                            this.finalRaceBossbar.addPlayer(specPlayer);
+                            this.finalRaceBossbarRecipients.add(specId);
+                        }
+                    }
+                }
+
+                this.plugin.getDebugManager().logRaceSystem(
+                    "[FINAL RACE] Bossbar created on main thread for heat id=" + this.id + " timeout=" + timeout
+                );
             }
 
-            String title = "Race will Finish in: " + remaining + "s";
-            if (this.finalRaceBossbar != null) {
-                this.finalRaceBossbar.setTitle(title);
-                double progress = (double) (timeout - remaining) / (double) timeout;
-                this.finalRaceBossbar.setProgress(progress);
-            }
-        }, 20L, 20L);
+            // Schedule the countdown task
+            SchedulerHelper.runTaskTimer(this.plugin, () -> {
+                int remaining;
+                synchronized (this.finalRaceBossbarLock) {
+                    if (!this.finalRaceBossbarActive) {
+                        return;
+                    }
+
+                    int current = this.finalRaceRemainingSeconds.get();
+                    if (current <= 0) {
+                        this.cancelFinalRaceBossbarLocked();
+                        this.finishHeat();
+                        return;
+                    }
+
+                    remaining = current - 1;
+                    this.finalRaceRemainingSeconds.set(remaining);
+                }
+
+                String title = "Race will Finish in: " + remaining + "s";
+                if (this.finalRaceBossbar != null) {
+                    this.finalRaceBossbar.setTitle(title);
+                    double progress = (double) (timeout - remaining) / (double) timeout;
+                    this.finalRaceBossbar.setProgress(progress);
+                }
+            }, 20L, 20L);
+        });
 
         this.plugin.getDebugManager().logRaceSystem(
-            "[FINAL RACE] Bossbar started for heat id=" + this.id + " timeout=" + timeout
+            "[FINAL RACE] Bossbar start requested for heat id=" + this.id + " timeout=" + timeout
         );
     }
 
