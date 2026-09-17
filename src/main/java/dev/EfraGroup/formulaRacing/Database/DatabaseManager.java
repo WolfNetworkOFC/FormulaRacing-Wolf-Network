@@ -24,6 +24,20 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 public class DatabaseManager {
 
+    private String resolvePlatform(UUID playerUUID, String playerName) {
+        try {
+            if (Bukkit.getPluginManager().isPluginEnabled("Floodgate")
+                    || Bukkit.getPluginManager().isPluginEnabled("floodgate")) {
+                if (org.geysermc.floodgate.api.FloodgateApi.getInstance().isFloodgatePlayer(playerUUID)) {
+                    return "BEDROCK";
+                }
+                return "JAVA";
+            }
+        } catch (NoClassDefFoundError | Exception ignored) {
+        }
+        return (playerName != null && playerName.startsWith("*")) ? "BEDROCK" : "JAVA";
+    }
+
     private final FormulaRacing plugin;
     private Connection connection;
     private final Map<String, List<RegionData>> checkpointsCache =
@@ -4845,8 +4859,8 @@ public class DatabaseManager {
 
                 Integer generatedId = null;
 
-                // Determines the platform based on the name
-                String platform = playerName.startsWith("*") ? "BEDROCK" : "JAVA";
+                // Determines the platform via Floodgate (falls back to name prefix)
+                String platform = resolvePlatform(playerUUID, playerName);
 
                 if (shouldSaveTime) {
                     // Saves the time normally (it's a new personal record)
@@ -4963,8 +4977,8 @@ public class DatabaseManager {
                 if (roundedTime < prevTime) {
                     Integer generatedId = null;
 
-                    // Determines the platform based on the player's name
-                    String platform = playerName.startsWith("*") ? "BEDROCK" : "JAVA";
+                    // Determines the platform via Floodgate (falls back to name prefix)
+                    String platform = resolvePlatform(playerUUID, playerName);
 
                     String insertSql =
                             "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, plataforma) VALUES (?, ?, ?, ?, ?, FALSE, ?)";
