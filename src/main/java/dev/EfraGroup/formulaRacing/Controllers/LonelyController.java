@@ -294,7 +294,11 @@ public class LonelyController implements Listener {
 
             boolean inScope = participants.contains(other.getUniqueId());
 
-            if (!heatLonely) {
+            // Personal lonely takes precedence: if the viewer has it enabled,
+            // hide everyone regardless of heat lonely setting.
+            if (personalLonely) {
+                hidePlayer(viewer, other);
+            } else if (!heatLonely) {
                 // Heat NOT lonely: show ALL players (TimeTrial, open racing)
                 // Collision is handled separately via packets, not visibility
                 showPlayer(viewer, other);
