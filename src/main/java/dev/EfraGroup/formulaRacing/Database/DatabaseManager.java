@@ -4051,7 +4051,7 @@ public class DatabaseManager {
         Map<String, TrackData> trackDataMap = new HashMap<>();
         String sql =
             "SELECT trackName, trackNameWS, worldName, spawnPoint_x, spawnPoint_y, spawnPoint_z, " +
-            "spawnPoint_yaw, spawnPoint_pitch, creatorName, icon_name, game_time FROM fr_tracks";
+            "spawnPoint_yaw, spawnPoint_pitch, creatorName, icon_name, game_time, open FROM fr_tracks";
         try {
             Connection conn = getOrConnect();
             try (
@@ -4099,7 +4099,8 @@ public class DatabaseManager {
                             getCheckpointCount(
                                 trackNameWS.replaceAll("\\s+", "").toLowerCase()
                             ),
-                            getGameTimeFromResultSet(rs)
+                            getGameTimeFromResultSet(rs),
+                            getOpenFromResultSet(rs)
                         )
                     );
                 }
@@ -5441,7 +5442,8 @@ public class DatabaseManager {
                             rs.getString("creatorName"),
                             rs.getString("icon_name"),
                             getCheckpointCount(trackNameWS),
-                            getGameTimeFromResultSet(rs)
+                            getGameTimeFromResultSet(rs),
+                            getOpenFromResultSet(rs)
                         );
                     }
                 }
@@ -9029,6 +9031,7 @@ public class DatabaseManager {
         private final String iconName; // Icon name (Material) used in menu
         private final int totalCheckpoints; // Total number of track checkpoints
         private final Long gameTime; // Fixed day time (ticks), null = use server default
+        private final boolean open; // Whether the track is open for racing
 
         // --- Constructor ---
         public TrackData(
@@ -9038,7 +9041,8 @@ public class DatabaseManager {
             String ownerName,
             String iconName,
             int totalCheckpoints,
-            Long gameTime
+            Long gameTime,
+            boolean open
         ) {
             this.trackName = trackName;
             this.spawnLocation = spawnLocation;
@@ -9047,6 +9051,7 @@ public class DatabaseManager {
             this.iconName = iconName;
             this.totalCheckpoints = totalCheckpoints;
             this.gameTime = gameTime;
+            this.open = open;
         }
 
         // --- Getters ---
@@ -9076,6 +9081,10 @@ public class DatabaseManager {
 
         public Long getGameTime() {
             return gameTime;
+        }
+
+        public boolean isOpen() {
+            return open;
         }
     }
 
@@ -9644,8 +9653,17 @@ public class DatabaseManager {
             rs.getString("creatorName"),
             rs.getString("icon_name"),
             getCheckpointCount(effectiveTrackWS),
-            getGameTimeFromResultSet(rs)
+            getGameTimeFromResultSet(rs),
+            getOpenFromResultSet(rs)
         );
+    }
+
+    private boolean getOpenFromResultSet(ResultSet rs) {
+        try {
+            return rs.getBoolean("open");
+        } catch (SQLException e) {
+            return true;
+        }
     }
 
     private Long getGameTimeFromResultSet(ResultSet rs) throws SQLException {

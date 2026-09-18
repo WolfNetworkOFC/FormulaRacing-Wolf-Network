@@ -82,10 +82,11 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                 > entry : tracksData.entrySet()) {
                     String trackName = entry.getKey();
 
-                    // Skip tracks that are not open
-                    if (!this.mysql.isTrackOpen(trackName)) continue;
-
                     DatabaseManager.TrackData data = entry.getValue();
+
+                    // Skip tracks that are not open (flag já vem na query principal, sem query extra)
+                    if (!data.isOpen()) continue;
+
                     String icon = data.getIconName();
                     String trackNameWS = trackName.replaceAll("\\s+", "").toLowerCase();
                     Double wr = allWRs.get(trackNameWS);
