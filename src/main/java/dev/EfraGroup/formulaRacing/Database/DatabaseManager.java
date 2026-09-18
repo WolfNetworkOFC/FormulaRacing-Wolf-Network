@@ -6059,6 +6059,31 @@ public class DatabaseManager {
 
     // ── ELO (ranked duels) ────────────────────────────────────────────────────
 
+    public synchronized Map<String, Object> getEloRecord(UUID uuid) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("elo", 1200);
+        row.put("wins", 0);
+        row.put("losses", 0);
+        if (uuid == null) return row;
+        String sql = "SELECT elo, wins, losses FROM fr_duel_elo WHERE uuid = ?";
+        try (
+            Connection conn = getOrConnect();
+            PreparedStatement ps = conn.prepareStatement(sql)
+        ) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    row.put("elo", rs.getInt("elo"));
+                    row.put("wins", rs.getInt("wins"));
+                    row.put("losses", rs.getInt("losses"));
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return row;
+    }
+
     public synchronized int getElo(UUID uuid) {
         if (uuid == null) return 1200;
         String sql = "SELECT elo FROM fr_duel_elo WHERE uuid = ?";
@@ -6116,6 +6141,41 @@ public class DatabaseManager {
                     row.put("elo", rs.getInt("elo"));
                     row.put("wins", rs.getInt("wins"));
                     row.put("losses", rs.getInt("losses"));
+                    result.add(row);
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return result;
+    }
+
+    public synchronized List<Map<String, Object>> getRecentDuelsForPlayer(String uuid, int limit) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        String sql =
+            "SELECT d.id, d.owner, d.trackNameWS, d.started_in, d.finished_in, d.laps, d.state, d.winner, p.players " +
+            "FROM fr_timetrial_duels d LEFT JOIN fr_timetrial_duel_players p ON p.duel_id = d.id " +
+            "WHERE d.owner = ? OR p.players LIKE ? ORDER BY d.id DESC LIMIT ?";
+        try (
+            Connection conn = getOrConnect();
+            PreparedStatement ps = conn.prepareStatement(sql)
+        ) {
+            ps.setString(1, uuid);
+            ps.setString(2, "%" + uuid + "%");
+            ps.setInt(3, Math.max(1, Math.min(limit, 100)));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("id", rs.getInt("id"));
+                    row.put("owner", rs.getString("owner"));
+                    row.put("track", rs.getString("trackNameWS"));
+                    row.put("started", String.valueOf(rs.getObject("started_in")));
+                    Object finished = rs.getObject("finished_in");
+                    row.put("finished", finished == null ? null : String.valueOf(finished));
+                    row.put("laps", rs.getInt("laps"));
+                    row.put("state", rs.getString("state"));
+                    row.put("winner", rs.getString("winner"));
+                    row.put("players", rs.getString("players"));
                     result.add(row);
                 }
             }

@@ -253,8 +253,140 @@ public class ApiManager {
         return driverObj;
     }
 
-    private String formatTime(long milliseconds) {
-        long minutes = (milliseconds / 60000) % 60;
+    private int parseLimit(spark.Request request, int def, int max) {
+        try {
+            String param = request.queryParams("limit");
+            if (param != null) {
+                int limit = Integer.parseInt(param);
+                if (limit > 0) return Math.min(limit, max);
+            }
+        } catch (NumberFormatException ignored) {}
+        return def;
+    }
+
+    private UUID resolvePlayerUuid(String uuidOrUsername) {
+        if (uuidOrUsername == null) {
+            halt(400, createErrorResponse("UUID or username is required"));
+        }
+        UUID uuid;
+        try {
+            uuid = UUID.fromString(uuidOrUsername);
+        } catch (IllegalArgumentException e) {
+            OfflinePlayer offline = Bukkit.getOfflinePlayer(uuidOrUsername);
+            if (offline == null) {
+                halt(404, createErrorResponse("Player not found: " + uuidOrUsername));
+                return null;
+            }
+            uuid = offline.getUniqueId();
+        }
+        OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
+        if (player == null || !player.hasPlayedBefore()) {
+            halt(404, createErrorResponse("Player not found"));
+        }
+        return uuid;
+    }
+
+    private String offlineName(UUID uuid) {
+        if (uuid == null) return "unknown";
+        try {
+            OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
+            String name = player == null ? null : player.getName();
+            return name != null ? name : uuid.toString();
+        } catch (Exception e) {
+            return uuid.toString();
+        }
+    }
+
+    private String offlineName(String uuidOrName) {
+        try {
+            return offlineName(UUID.fromString(uuidOrName));
+        } catch (IllegalArgumentException e) {
+            return uuidOrName;
+        }
+    }
+
+    private dev.EfraGroup.formulaRacing.League.League requireLeague(String name) {
+        if (name == null) {
+            halt(400, createErrorResponse("League name is required"));
+        }
+        var leagueOpt = plugin.getLeagueManager().getLeagueByName(name);
+        if (leagueOpt.isEmpty()) {
+            halt(404, createErrorResponse("League not found: " + name));
+        }
+        return leagueOpt.get();
+    }
+
+    private JsonObject serializeLeague(dev.EfraGroup.formulaRacing.League.League league, boolean detailed) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("id", league.getId());
+        obj.addProperty("name", league.getName());
+        obj.addProperty("status", league.getStatus().name());
+        obj.addProperty("team_mode", league.getTeamMode().name());
+        obj.addProperty("scoring_system", league.getScoringSystem());
+        obj.addProperty("teams", league.getTeamsView().size());
+        obj.addProperty("drivers", league.getDriversView().size());
+        if (!detailed) return obj;
+
+        obj.addProperty("creator", league.getCreatorUUID().toString());
+        obj.addProperty("mulligan", league.getMulliganCount());
+
+        JsonArray teams = new JsonArray();
+        for (var team : league.getTeamsView()) {
+            JsonObject t = new JsonObject();
+            t.addProperty("id", team.getId());
+            t.addProperty("name", team.getName());
+            t.addProperty("color", team.getColorHex());
+            teams.add(t);
+        }
+        obj.add("teams_list", teams);
+
+        JsonArray categories = new JsonArray();
+        for (var category : league.getCategories().values()) {
+            JsonObject c = new JsonObject();
+            c.addProperty("id", category.getId());
+            c.addProperty("name", category.getName());
+            c.addProperty("display_name", category.getDisplayName());
+            categories.add(c);
+        }
+        obj.add("categories", categories);
+
+        JsonArray calendar = new JsonArray();
+        for (var entry : league.getCalendar().values()) {
+            JsonObject c = new JsonObject();
+            c.addProperty("event_id", entry.getEventId());
+            c.addProperty("category", entry.hasCategory() ? entry.getCategoryName() : null);
+            if (entry.hasPinnedHeat()) {
+                c.addProperty("pinned_heat", entry.getPinnedHeatId());
+            }
+            calendar.add(c);
+        }
+        obj.add("calendar", calendar);
+
+        return obj;
+    }
+
+    private JsonObject serializeDriverResult(dev.EfraGroup.formulaRacing.Participant.Driver driver) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("uuid", driver.getUuid().toString());
+        String name = driver.getName();
+        obj.addProperty("name", name != null ? name : offlineName(driver.getUuid()));
+        obj.addProperty("position", driver.getPosition());
+        obj.addProperty("start_position", driver.getStartPosition());
+        obj.addProperty("finished", driver.isFinished());
+        obj.addProperty("dnf", driver.isDnf());
+        long totalTime = driver.getTotalTime();
+        obj.addProperty("total_time_ms", totalTime);
+        obj.addProperty("total_time", totalTime > 0 ? formatTime(totalTime) : "--:--:---");
+        if (driver.getFastestLap() != null) {
+            obj.addProperty("fastest_lap_ms", driver.getFastestLap().getLapTime());
+            obj.addProperty("fastest_lap", formatTime(driver.getFastestLap().getLapTime()));
+        } else {
+            obj.addProperty("fastest_lap", "--:--:---");
+        }
+        return obj;
+    }
+
+    private String formatTime(long milliseconds) {        long minutes = (milliseconds / 60000) % 60;
         long seconds = (milliseconds / 1000) % 60;
         long millis = milliseconds % 1000;
         return String.format("%02d:%02d:%03d", minutes, seconds, millis);
@@ -597,6 +729,520 @@ public class ApiManager {
         // ============================================================
         //  3. SERVER STATUS (v1)
         // ============================================================
+        // ============================================================
+        //  8. LEAGUES (v1)
+        // ============================================================
+        // GET /api/v1/readonly/leagues - All leagues
+        get("/api/v1/readonly/leagues", (request, response) -> {
+            try {
+                JsonObject responseObject = new JsonObject();
+                JsonArray leagues = new JsonArray();
+
+                for (var league : plugin.getLeagueManager().getAllLeagues()) {
+                    leagues.add(serializeLeague(league, false));
+                }
+
+                responseObject.add("leagues", leagues);
+                responseObject.addProperty("total", leagues.size());
+
+                if (logRequests) {
+                    plugin.getLogger().info("API: GET /api/v1/readonly/leagues - " + leagues.size() + " leagues returned");
+                }
+
+                return responseObject.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /leagues endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading leagues: " + e.getMessage());
+            }
+        });
+
+        // GET /api/v1/readonly/leagues/:name - League details
+        get("/api/v1/readonly/leagues/:name", (request, response) -> {
+            try {
+                var league = requireLeague(request.params("name"));
+                return serializeLeague(league, true).toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /leagues/:name endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading league: " + e.getMessage());
+            }
+        });
+
+        // GET /api/v1/readonly/leagues/:name/standings/drivers - Driver standings
+        get("/api/v1/readonly/leagues/:name/standings/drivers", (request, response) -> {
+            try {
+                var league = requireLeague(request.params("name"));
+                JsonObject responseObject = new JsonObject();
+                JsonArray standings = new JsonArray();
+
+                for (var standing : plugin.getLeagueManager().getDriverStandings(league)) {
+                    JsonObject obj = new JsonObject();
+                    obj.addProperty("uuid", standing.getPlayerUUID().toString());
+                    obj.addProperty("name", offlineName(standing.getPlayerUUID()));
+                    obj.addProperty("points", standing.getPoints());
+                    obj.addProperty("wins", standing.getWins());
+                    obj.addProperty("podiums", standing.getPodiums());
+                    obj.addProperty("events", standing.getEventsCount());
+                    standings.add(obj);
+                }
+
+                responseObject.addProperty("league", league.getName());
+                responseObject.add("standings", standings);
+                responseObject.addProperty("total", standings.size());
+
+                return responseObject.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /leagues/:name/standings/drivers endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading driver standings: " + e.getMessage());
+            }
+        });
+
+        // GET /api/v1/readonly/leagues/:name/standings/teams - Team standings
+        get("/api/v1/readonly/leagues/:name/standings/teams", (request, response) -> {
+            try {
+                var league = requireLeague(request.params("name"));
+                JsonObject responseObject = new JsonObject();
+                JsonArray standings = new JsonArray();
+
+                for (var standing : plugin.getLeagueManager().getTeamStandings(league)) {
+                    JsonObject obj = new JsonObject();
+                    obj.addProperty("team_id", standing.getTeamId());
+                    obj.addProperty("team_name", standing.getTeamName());
+                    obj.addProperty("points", standing.getPoints());
+                    obj.addProperty("wins", standing.getWins());
+                    obj.addProperty("podiums", standing.getPodiums());
+                    standings.add(obj);
+                }
+
+                responseObject.addProperty("league", league.getName());
+                responseObject.add("standings", standings);
+                responseObject.addProperty("total", standings.size());
+
+                return responseObject.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /leagues/:name/standings/teams endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading team standings: " + e.getMessage());
+            }
+        });
+
+        // GET /api/v1/readonly/leagues/:name/calendar - League calendar
+        get("/api/v1/readonly/leagues/:name/calendar", (request, response) -> {
+            try {
+                var league = requireLeague(request.params("name"));
+                JsonObject responseObject = new JsonObject();
+                JsonArray calendar = new JsonArray();
+
+                for (var entry : league.getCalendar().values()) {
+                    JsonObject obj = new JsonObject();
+                    obj.addProperty("event_id", entry.getEventId());
+                    obj.addProperty("category", entry.hasCategory() ? entry.getCategoryName() : null);
+                    if (entry.hasPinnedHeat()) {
+                        obj.addProperty("pinned_heat", entry.getPinnedHeatId());
+                    }
+                    calendar.add(obj);
+                }
+
+                responseObject.addProperty("league", league.getName());
+                responseObject.add("calendar", calendar);
+                responseObject.addProperty("total", calendar.size());
+
+                return responseObject.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /leagues/:name/calendar endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading league calendar: " + e.getMessage());
+            }
+        });
+
+        // GET /api/v1/readonly/leagues/:name/team/:team - Team details
+        get("/api/v1/readonly/leagues/:name/team/:team", (request, response) -> {
+            try {
+                var league = requireLeague(request.params("name"));
+                String teamName = request.params("team");
+
+                var team = league.getTeamsView().stream()
+                        .filter(t -> t.getName().equalsIgnoreCase(teamName))
+                        .findFirst()
+                        .orElse(null);
+                if (team == null) {
+                    halt(404, createErrorResponse("Team not found: " + teamName));
+                }
+
+                JsonObject obj = new JsonObject();
+                obj.addProperty("id", team.getId());
+                obj.addProperty("name", team.getName());
+                obj.addProperty("color", team.getColorHex());
+
+                JsonArray drivers = new JsonArray();
+                for (var driver : league.getDriversView()) {
+                    if (team.getId() == (driver.getTeamId() == null ? -1 : driver.getTeamId())) {
+                        JsonObject d = new JsonObject();
+                        d.addProperty("uuid", driver.getPlayerUUID().toString());
+                        d.addProperty("name", offlineName(driver.getPlayerUUID()));
+                        drivers.add(d);
+                    }
+                }
+                obj.add("drivers", drivers);
+                obj.addProperty("driver_count", drivers.size());
+
+                return obj.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /leagues/:name/team/:team endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading team: " + e.getMessage());
+            }
+        });
+
+        // GET /api/v1/readonly/leagues/:name/categories - League categories
+        get("/api/v1/readonly/leagues/:name/categories", (request, response) -> {
+            try {
+                var league = requireLeague(request.params("name"));
+                JsonObject responseObject = new JsonObject();
+                JsonArray categories = new JsonArray();
+
+                for (var category : league.getCategories().values()) {
+                    JsonObject obj = new JsonObject();
+                    obj.addProperty("id", category.getId());
+                    obj.addProperty("name", category.getName());
+                    obj.addProperty("display_name", category.getDisplayName());
+                    categories.add(obj);
+                }
+
+                responseObject.addProperty("league", league.getName());
+                responseObject.add("categories", categories);
+                responseObject.addProperty("total", categories.size());
+
+                return responseObject.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /leagues/:name/categories endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading categories: " + e.getMessage());
+            }
+        });
+
+        // ============================================================
+        //  9. DUELS (v1)
+        // ============================================================
+        // GET /api/v1/readonly/duels/leaderboard - ELO leaderboard
+        get("/api/v1/readonly/duels/leaderboard", (request, response) -> {
+            try {
+                int limit = parseLimit(request, 50, 500);
+                JsonObject responseObject = new JsonObject();
+                JsonArray board = new JsonArray();
+
+                for (Map<String, Object> row : plugin.getDatabaseManager().getEloLeaderboard(limit)) {
+                    JsonObject obj = new JsonObject();
+                    String uuid = String.valueOf(row.get("uuid"));
+                    obj.addProperty("uuid", uuid);
+                    obj.addProperty("name", offlineName(uuid));
+                    obj.addProperty("elo", ((Number) row.getOrDefault("elo", 1200)).intValue());
+                    obj.addProperty("wins", ((Number) row.getOrDefault("wins", 0)).intValue());
+                    obj.addProperty("losses", ((Number) row.getOrDefault("losses", 0)).intValue());
+                    board.add(obj);
+                }
+
+                responseObject.add("leaderboard", board);
+                responseObject.addProperty("total", board.size());
+
+                if (logRequests) {
+                    plugin.getLogger().info("API: GET /api/v1/readonly/duels/leaderboard - " + board.size() + " entries returned");
+                }
+
+                return responseObject.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /duels/leaderboard endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading duel leaderboard: " + e.getMessage());
+            }
+        });
+
+        // GET /api/v1/readonly/duels/players/:uuidorusername - Duel stats for a player
+        get("/api/v1/readonly/duels/players/:uuidorusername", (request, response) -> {
+            try {
+                UUID uuid = resolvePlayerUuid(request.params("uuidorusername"));
+                Map<String, Object> record = plugin.getDatabaseManager().getEloRecord(uuid);
+
+                JsonObject obj = new JsonObject();
+                obj.addProperty("uuid", uuid.toString());
+                obj.addProperty("name", offlineName(uuid));
+                obj.addProperty("elo", ((Number) record.getOrDefault("elo", 1200)).intValue());
+                obj.addProperty("wins", ((Number) record.getOrDefault("wins", 0)).intValue());
+                obj.addProperty("losses", ((Number) record.getOrDefault("losses", 0)).intValue());
+
+                return obj.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /duels/players/:uuidorusername endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading duel stats: " + e.getMessage());
+            }
+        });
+
+        // GET /api/v1/readonly/duels/players/:uuidorusername/matches - Recent duel matches
+        get("/api/v1/readonly/duels/players/:uuidorusername/matches", (request, response) -> {
+            try {
+                UUID uuid = resolvePlayerUuid(request.params("uuidorusername"));
+                int limit = parseLimit(request, 20, 100);
+
+                JsonObject responseObject = new JsonObject();
+                JsonArray matches = new JsonArray();
+
+                for (Map<String, Object> row : plugin.getDatabaseManager().getRecentDuelsForPlayer(uuid.toString(), limit)) {
+                    JsonObject obj = new JsonObject();
+                    obj.addProperty("id", ((Number) row.getOrDefault("id", 0)).intValue());
+                    obj.addProperty("track", String.valueOf(row.get("track")));
+                    obj.addProperty("state", String.valueOf(row.get("state")));
+                    obj.addProperty("owner", String.valueOf(row.get("owner")));
+                    obj.addProperty("winner", row.get("winner") == null ? null : String.valueOf(row.get("winner")));
+                    obj.addProperty("laps", ((Number) row.getOrDefault("laps", 0)).intValue());
+                    obj.addProperty("started", String.valueOf(row.get("started")));
+                    obj.addProperty("finished", row.get("finished") == null ? null : String.valueOf(row.get("finished")));
+                    String players = row.get("players") == null ? "" : String.valueOf(row.get("players"));
+                    JsonArray playerArray = new JsonArray();
+                    for (String part : players.split(",")) {
+                        String trimmed = part.trim();
+                        if (trimmed.isEmpty()) continue;
+                        JsonObject p = new JsonObject();
+                        p.addProperty("uuid", trimmed);
+                        p.addProperty("name", offlineName(trimmed));
+                        playerArray.add(p);
+                    }
+                    obj.add("players", playerArray);
+                    matches.add(obj);
+                }
+
+                responseObject.addProperty("uuid", uuid.toString());
+                responseObject.add("matches", matches);
+                responseObject.addProperty("total", matches.size());
+
+                return responseObject.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /duels/players/:uuidorusername/matches endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading duel matches: " + e.getMessage());
+            }
+        });
+
+        // ============================================================
+        //  10. DAILY RACE (v1)
+        // ============================================================
+        // GET /api/v1/readonly/dailyrace - Active daily race info
+        get("/api/v1/readonly/dailyrace", (request, response) -> {
+            try {
+                var daily = plugin.getDailyRaceManager();
+                if (daily == null) {
+                    halt(503, createErrorResponse("Daily race system not available"));
+                }
+
+                JsonObject obj = new JsonObject();
+                var activeOpt = daily.getActiveDailyEvent();
+                obj.addProperty("active", activeOpt.isPresent());
+                if (activeOpt.isPresent()) {
+                    var event = activeOpt.get();
+                    obj.addProperty("event_id", event.getId());
+                    obj.addProperty("event_name", event.getDisplayName());
+                    obj.addProperty("track", event.getTrackNameWS());
+                    obj.addProperty("state", event.getState().name());
+                    obj.addProperty("phase", daily.getPhase().name());
+                    obj.addProperty("practice_remaining_ms", daily.getPracticeTimeRemaining());
+                }
+
+                JsonArray excluded = new JsonArray();
+                for (String track : daily.getExcludedTracks()) {
+                    excluded.add(track);
+                }
+                obj.add("excluded_tracks", excluded);
+
+                return obj.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /dailyrace endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading daily race: " + e.getMessage());
+            }
+        });
+
+        // GET /api/v1/readonly/dailyrace/results/latest - Latest finished heat results
+        get("/api/v1/readonly/dailyrace/results/latest", (request, response) -> {
+            try {
+                var daily = plugin.getDailyRaceManager();
+                if (daily == null) {
+                    halt(503, createErrorResponse("Daily race system not available"));
+                }
+                var activeOpt = daily.getActiveDailyEvent();
+                if (activeOpt.isEmpty()) {
+                    halt(404, createErrorResponse("No active daily race"));
+                }
+
+                var event = activeOpt.get();
+                dev.EfraGroup.formulaRacing.Heat.Heats latest = null;
+                for (var round : event.getSchedule().getRoundsList()) {
+                    for (var heat : round.getHeats().values()) {
+                        if (heat.getHeatState() == dev.EfraGroup.formulaRacing.Heat.HeatState.FINISHED) {
+                            if (latest == null || heat.getId() > latest.getId()) {
+                                latest = heat;
+                            }
+                        }
+                    }
+                }
+                if (latest == null) {
+                    halt(404, createErrorResponse("No finished heats in the daily race yet"));
+                }
+
+                JsonObject obj = new JsonObject();
+                obj.addProperty("event_id", event.getId());
+                obj.addProperty("event_name", event.getDisplayName());
+                obj.addProperty("heat_id", latest.getId());
+                obj.addProperty("track", latest.getTrackNameWS());
+
+                JsonArray results = new JsonArray();
+                for (var driver : dev.EfraGroup.formulaRacing.Event.EventResults.generateHeatResults(latest)) {
+                    results.add(serializeDriverResult(driver));
+                }
+                obj.add("results", results);
+                obj.addProperty("total", results.size());
+
+                return obj.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /dailyrace/results/latest endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading daily race results: " + e.getMessage());
+            }
+        });
+
+        // GET /api/v1/readonly/dailyrace/stats - Daily race stats overview
+        get("/api/v1/readonly/dailyrace/stats", (request, response) -> {
+            try {
+                var daily = plugin.getDailyRaceManager();
+                if (daily == null) {
+                    halt(503, createErrorResponse("Daily race system not available"));
+                }
+
+                JsonObject obj = new JsonObject();
+                var activeOpt = daily.getActiveDailyEvent();
+                obj.addProperty("active", activeOpt.isPresent());
+                if (activeOpt.isPresent()) {
+                    var event = activeOpt.get();
+                    obj.addProperty("event_id", event.getId());
+                    obj.addProperty("event_name", event.getDisplayName());
+                    obj.addProperty("track", event.getTrackNameWS());
+                    obj.addProperty("phase", daily.getPhase().name());
+                }
+                obj.addProperty("excluded_tracks", daily.getExcludedTracks().size());
+                obj.addProperty("total_events", plugin.getRaceEventManager().getAllEvents().size());
+
+                return obj.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /dailyrace/stats endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading daily race stats: " + e.getMessage());
+            }
+        });
+
+        // GET /api/v1/readonly/dailyrace/stats/:uuidorusername - Player daily/duel stats
+        get("/api/v1/readonly/dailyrace/stats/:uuidorusername", (request, response) -> {
+            try {
+                UUID uuid = resolvePlayerUuid(request.params("uuidorusername"));
+                Map<String, Object> record = plugin.getDatabaseManager().getEloRecord(uuid);
+
+                JsonObject obj = new JsonObject();
+                obj.addProperty("uuid", uuid.toString());
+                obj.addProperty("name", offlineName(uuid));
+                obj.addProperty("elo", ((Number) record.getOrDefault("elo", 1200)).intValue());
+                obj.addProperty("wins", ((Number) record.getOrDefault("wins", 0)).intValue());
+                obj.addProperty("losses", ((Number) record.getOrDefault("losses", 0)).intValue());
+
+                return obj.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /dailyrace/stats/:uuidorusername endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading player stats: " + e.getMessage());
+            }
+        });
+
+        // GET /api/v1/readonly/dailyrace/excluded-tracks - Excluded tracks
+        get("/api/v1/readonly/dailyrace/excluded-tracks", (request, response) -> {
+            try {
+                var daily = plugin.getDailyRaceManager();
+                if (daily == null) {
+                    halt(503, createErrorResponse("Daily race system not available"));
+                }
+
+                JsonObject responseObject = new JsonObject();
+                JsonArray tracks = new JsonArray();
+                for (String track : daily.getExcludedTracks()) {
+                    tracks.add(track);
+                }
+                responseObject.add("excluded_tracks", tracks);
+                responseObject.addProperty("total", tracks.size());
+
+                return responseObject.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /dailyrace/excluded-tracks endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading excluded tracks: " + e.getMessage());
+            }
+        });
+
+        // ============================================================
+        //  11. EVENT RESULTS (v1)
+        // ============================================================
+        // GET /api/v1/readonly/events/results/:eventname - Full results for an event
+        get("/api/v1/readonly/events/results/:eventname", (request, response) -> {
+            try {
+                String eventName = request.params("eventname");
+                var eventOpt = plugin.getRaceEventManager().getEventByName(eventName);
+                if (eventOpt.isEmpty()) {
+                    halt(404, createErrorResponse("Event not found: " + eventName));
+                }
+                var event = eventOpt.get();
+
+                JsonObject obj = new JsonObject();
+                obj.addProperty("id", event.getId());
+                obj.addProperty("name", event.getDisplayName());
+                obj.addProperty("track", event.getTrackNameWS());
+                obj.addProperty("state", event.getState().name());
+
+                JsonArray rounds = new JsonArray();
+                for (var round : event.getSchedule().getRoundsList()) {
+                    JsonObject roundObj = new JsonObject();
+                    roundObj.addProperty("name", round.getDisplayName());
+                    roundObj.addProperty("type", round.getRoundType().name());
+                    roundObj.addProperty("state", round.getRoundState().name());
+
+                    JsonArray heats = new JsonArray();
+                    for (var heat : round.getHeats().values()) {
+                        JsonObject heatObj = new JsonObject();
+                        heatObj.addProperty("id", heat.getId());
+                        heatObj.addProperty("track", heat.getTrackNameWS());
+                        heatObj.addProperty("state", heat.getHeatState().name());
+                        heatObj.addProperty("laps", heat.getTotalLaps());
+
+                        JsonArray results = new JsonArray();
+                        for (var driver : dev.EfraGroup.formulaRacing.Event.EventResults.generateHeatResults(heat)) {
+                            results.add(serializeDriverResult(driver));
+                        }
+                        heatObj.add("results", results);
+                        heats.add(heatObj);
+                    }
+                    roundObj.add("heats", heats);
+                    rounds.add(roundObj);
+                }
+                obj.add("rounds", rounds);
+
+                if (logRequests) {
+                    plugin.getLogger().info("API: GET /api/v1/readonly/events/results/" + eventName);
+                }
+
+                return obj.toString();
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error in /events/results/:eventname endpoint: " + e.getMessage());
+                e.printStackTrace();
+                return createErrorResponse("Error loading event results: " + e.getMessage());
+            }
+        });
+
         // GET /api/v1/admin/ping - Auth check (requires token when auth.enabled=true)
         get("/api/v1/admin/ping", (request, response) -> {
             JsonObject obj = new JsonObject();
@@ -1099,6 +1745,26 @@ public class ApiManager {
                 "### Ao Vivo\n" +
                 "- `GET /api/v1/readonly/live/positions`\n" +
                 "- `GET /api/v1/readonly/live/events`\n\n" +
+                "### Ligas\n" +
+                "- `GET /api/v1/readonly/leagues`\n" +
+                "- `GET /api/v1/readonly/leagues/:nome`\n" +
+                "- `GET /api/v1/readonly/leagues/:nome/standings/drivers`\n" +
+                "- `GET /api/v1/readonly/leagues/:nome/standings/teams`\n" +
+                "- `GET /api/v1/readonly/leagues/:nome/calendar`\n" +
+                "- `GET /api/v1/readonly/leagues/:nome/team/:time`\n" +
+                "- `GET /api/v1/readonly/leagues/:nome/categories`\n\n" +
+                "### Duelos\n" +
+                "- `GET /api/v1/readonly/duels/leaderboard`\n" +
+                "- `GET /api/v1/readonly/duels/players/:uuid`\n" +
+                "- `GET /api/v1/readonly/duels/players/:uuid/matches`\n\n" +
+                "### Corrida diária\n" +
+                "- `GET /api/v1/readonly/dailyrace`\n" +
+                "- `GET /api/v1/readonly/dailyrace/results/latest`\n" +
+                "- `GET /api/v1/readonly/dailyrace/stats`\n" +
+                "- `GET /api/v1/readonly/dailyrace/stats/:uuid`\n" +
+                "- `GET /api/v1/readonly/dailyrace/excluded-tracks`\n\n" +
+                "### Resultados\n" +
+                "- `GET /api/v1/readonly/events/results/:nome-do-evento`\n\n" +
                 "### Admin (exige token se auth.enabled=true)\n" +
                 "- `GET /api/v1/admin/ping`\n\n" +
                 "## Autenticação\n\n" +
