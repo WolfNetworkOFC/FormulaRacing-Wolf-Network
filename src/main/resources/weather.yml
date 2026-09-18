@@ -1,0 +1,29 @@
+# =========================================================#
+#                     FORMULARACING WEATHER                   #
+# =========================================================#
+# Clima dinâmico por pista. Formato das condições: TIPO:voltas[:segundos]
+# Tipos: CLEAR, CLOUDY, LIGHT_RAIN, RAIN, HEAVY_RAIN, STORM, FOG, WIND
+# Exemplo: "RAIN:3" = chuva por 3 voltas.
+
+# Sistema de clima ligado/desligado
+enabled: true
+
+# Velocidade de secagem/molhamento da pista (0-100 por volta)
+track_drying_rate: 2
+track_wetting_rate: 5
+
+# Clima padrão para pistas sem sequência própria
+default_weather: "CLEAR:999"
+
+# Exemplo de sequência dinâmica (troca a cada volta)
+dynamic_weather:
+  ExampleTrack:
+    - "CLEAR:3"
+    - "CLOUDY:2"
+    - "LIGHT_RAIN:3"
+    - "RAIN:2"
+    - "HEAVY_RAIN:2"
+    - "RAIN:3"
+    - "LIGHT_RAIN:2"
+    - "CLOUDY:2"
+    - "CLEAR:999"

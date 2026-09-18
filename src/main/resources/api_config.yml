@@ -1,0 +1,27 @@
+# =========================================================#
+#                    FORMULARACING API                      #
+# =========================================================#
+# Configuração do servidor web interno (dashboard + live-map).
+# Este arquivo é empacotado no .jar e copiado para a pasta do
+# plugin na primeira inicialização. Única fonte de config da API.
+
+# Porta do servidor web (dashboard em /dashboard/)
+port: 8080
+
+# Habilita CORS para a dashboard/web
+enable_cors: true
+
+# Limite de requisições por minuto por IP
+rate_limit:
+  enabled: true
+  requests_per_minute: 60
+
+# Logs de requisições e erros da API
+log_requests: true
+log_errors: true
+
+# Timeout de conexão em milissegundos
+connection_timeout: 30000
+
+# Tamanho máximo de requisição em bytes
+max_request_size: 1048576

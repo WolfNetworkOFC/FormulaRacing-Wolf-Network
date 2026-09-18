@@ -88,7 +88,7 @@ public class FileManager {
 
     private void copyLangFiles() {
         String folderName = "lang";
-        String[] langFiles = new String[]{"en_US.yml", "pt_BR.yml", "pt_PT.yml"};
+        String[] langFiles = new String[]{"en_US.yml", "pt_BR.yml", "pt_PT.yml", "es_ES.yml", "es_MX.yml", "es_AR.yml", "de_DE.yml", "fr_FR.yml", "it_IT.yml", "ru_RU.yml", "ja_JP.yml", "zh_CN.yml", "zh_TW.yml", "ko_KR.yml", "tr_TR.yml", "nl_NL.yml", "pl_PL.yml", "uk_UA.yml", "sv_SE.yml", "nb_NO.yml", "da_DK.yml", "fi_FI.yml", "el_GR.yml", "cs_CZ.yml", "hu_HU.yml", "ro_RO.yml", "th_TH.yml", "vi_VN.yml", "id_ID.yml", "ms_MY.yml", "hi_IN.yml", "ar_SA.yml"};
         File langFolder = new File(this.plugin.getDataFolder(), folderName);
         if (!langFolder.exists()) {
             langFolder.mkdirs();

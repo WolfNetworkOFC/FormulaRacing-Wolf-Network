@@ -29,12 +29,9 @@ public class PitStopConfigManager {
 
     private void load() {
         if (!this.configFile.exists()) {
-            try {
-                this.configFile.getParentFile().mkdirs();
-                this.configFile.createNewFile();
-            } catch (IOException e) {
-                this.plugin.getDebugManager().logPitStopSystem("[PitStopConfig] Could not create pitstop_config.yml: " + e.getMessage());
-            }
+            this.configFile.getParentFile().mkdirs();
+            // Defaults vêm do recurso empacotado (fonte da verdade)
+            this.plugin.saveResource("pitstop_config.yml", false);
         }
 
         this.yaml = YamlConfiguration.loadConfiguration(this.configFile);

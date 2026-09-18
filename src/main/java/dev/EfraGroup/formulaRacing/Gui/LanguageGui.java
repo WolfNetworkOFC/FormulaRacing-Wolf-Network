@@ -80,6 +80,7 @@ public class LanguageGui extends BaseGui {
                             clickCooldown.put(this.player.getUniqueId(), now);
                             this.db.setPlayerLanguage(this.player.getUniqueId(), langCode);
                             this.plugin.getTranslationUtil().updatePlayerLanguage(this.player.getUniqueId(), langCode);
+                            dev.EfraGroup.formulaRacing.integration.WolfLangIntegration.setLanguage(this.player, langCode);
                             this.player.closeInventory();
                             File lFile = new File(this.plugin.getDataFolder(), "lang/" + langCode + ".yml");
                             YamlConfiguration langConfig = YamlConfiguration.loadConfiguration(lFile);

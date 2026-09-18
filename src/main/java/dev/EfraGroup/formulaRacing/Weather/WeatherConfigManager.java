@@ -35,39 +35,15 @@ public class WeatherConfigManager {
     }
 
     /**
-     * Creates the default configuration file
+     * Creates the default configuration file from the bundled resource
      */
     private void createDefaultConfig() {
         try {
             configFile.getParentFile().mkdirs();
-            configFile.createNewFile();
-
-            FileConfiguration defaultConfig = YamlConfiguration.loadConfiguration(configFile);
-
-            // Default weather configuration
-            defaultConfig.set("enabled", true);
-            defaultConfig.set("track_drying_rate", 2); // How fast the track dries (0-100 per lap)
-            defaultConfig.set("track_wetting_rate", 5); // How fast the track wets (0-100 per lap)
-
-            // Default weather for each track
-            defaultConfig.set("default_weather", "CLEAR:999");
-
-            // Example dynamic weather for a track
-            List<String> dynamicWeather = new ArrayList<>();
-            dynamicWeather.add("CLEAR:3");
-            dynamicWeather.add("CLOUDY:2");
-            dynamicWeather.add("LIGHT_RAIN:3");
-            dynamicWeather.add("RAIN:2");
-            dynamicWeather.add("HEAVY_RAIN:2");
-            dynamicWeather.add("RAIN:3");
-            dynamicWeather.add("LIGHT_RAIN:2");
-            dynamicWeather.add("CLOUDY:2");
-            dynamicWeather.add("CLEAR:999");
-            defaultConfig.set("dynamic_weather.ExampleTrack", dynamicWeather);
-
-            defaultConfig.save(configFile);
+            // Defaults vêm do recurso empacotado (fonte da verdade)
+            plugin.saveResource("weather.yml", false);
             plugin.getLogger().info("Default weather file created: " + configFile.getAbsolutePath());
-        } catch (IOException e) {
+        } catch (Exception e) {
             plugin.getLogger().severe("Error creating weather file: " + e.getMessage());
         }
     }

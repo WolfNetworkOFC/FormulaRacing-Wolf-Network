@@ -978,22 +978,11 @@ public class ApiManager {
             copyResourceFromJar("/dashboard/CONFIG_EXAMPLES.md", new File(dashboardDir, "CONFIG_EXAMPLES.md"));
         }
 
-        // Create api_config.yml if it doesn't exist
+        // Create api_config.yml from the bundled resource if it doesn't exist
         File apiConfigFile = new File(dataFolder, "api_config.yml");
         if (!apiConfigFile.exists()) {
-            YamlConfiguration apiConfig = new YamlConfiguration();
-
-            apiConfig.set("port", 8080);
-            apiConfig.set("enable_cors", true);
-            apiConfig.set("rate_limit.enabled", true);
-            apiConfig.set("rate_limit.requests_per_minute", 60);
-            apiConfig.set("log_requests", true);
-            apiConfig.set("log_errors", true);
-            apiConfig.set("connection_timeout", 30000);
-            apiConfig.set("max_request_size", 1048576);
-
             try {
-                apiConfig.save(apiConfigFile);
+                plugin.saveResource("api_config.yml", false);
                 plugin.getLogger().info("========================================");
                 plugin.getLogger().info("Created api_config.yml");
                 plugin.getLogger().info("========================================");
@@ -1003,25 +992,12 @@ public class ApiManager {
 
                 // Create DASHBOARD_SETUP.md file
                 createDashboardSetupFile(dataFolder);
-            } catch (IOException e) {
+            } catch (Exception e) {
                 plugin.getLogger().severe("Failed to create api_config.yml: " + e.getMessage());
             }
         } else {
             // File already exists, just notify
             plugin.getLogger().info("api_config.yml already exists, using existing configuration");
-        }
-
-        // Check if config.yml has the API section
-        File configFile = new File(dataFolder, "config.yml");
-        if (configFile.exists()) {
-            try {
-                YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
-                if (config.getConfigurationSection("api") == null) {
-                    plugin.getLogger().info("Using api_config.yml for API configuration");
-                }
-            } catch (Exception e) {
-                plugin.getLogger().warning("Failed to check config.yml: " + e.getMessage());
-            }
         }
     }
 
@@ -1077,7 +1053,7 @@ public class ApiManager {
 
     private void loadConfig() {
         try {
-            // Try reading from api_config.yml first
+            // API config lives only in api_config.yml (bundled resource, no config.yml fallback)
             File apiConfigFile = new File(plugin.getDataFolder(), "api_config.yml");
             if (apiConfigFile.exists()) {
                 config = YamlConfiguration.loadConfiguration(apiConfigFile);
@@ -1088,16 +1064,6 @@ public class ApiManager {
                 logRequests = config.getBoolean("log_requests", true);
                 logErrors = config.getBoolean("log_errors", true);
                 plugin.getLogger().info("Loaded API config from api_config.yml");
-            } else if (plugin.getConfig().getConfigurationSection("api") != null) {
-                // Fallback to config.yml
-                config = plugin.getConfig();
-                port = config.getInt("api.port", 8080);
-                corsEnabled = config.getBoolean("api.enable_cors", true);
-                rateLimitEnabled = config.getBoolean("api.rate_limit.enabled", true);
-                requestsPerMinute = config.getInt("api.rate_limit.requests_per_minute", 60);
-                logRequests = config.getBoolean("api.log_requests", true);
-                logErrors = config.getBoolean("api.log_errors", true);
-                plugin.getLogger().info("Loaded API config from config.yml");
             } else {
                 // Use default values
                 port = 8080;

@@ -19,6 +19,8 @@ public class WolfLangIntegration {
     private static Method getLanguageMethod;
     private static Method setLanguageMethod;
     private static Method registerTranslationsMethod;
+    private static Method hasTranslationMethod;
+    private static Method unregisterTranslationsMethod;
     private static boolean enabled = false;
 
     /**
@@ -42,6 +44,15 @@ public class WolfLangIntegration {
             getLanguageMethod = wolfLangAPI.getMethod("getLanguage", UUID.class);
             setLanguageMethod = wolfLangAPI.getMethod("setLanguage", UUID.class, String.class);
             registerTranslationsMethod = wolfLangAPI.getMethod("registerTranslations", String.class, Map.class);
+
+            try {
+                hasTranslationMethod = wolfLangAPI.getMethod("hasTranslation", String.class);
+            } catch (NoSuchMethodException ignored) {
+            }
+            try {
+                unregisterTranslationsMethod = wolfLangAPI.getMethod("unregisterTranslations", String.class);
+            } catch (NoSuchMethodException ignored) {
+            }
 
             enabled = true;
             plugin.getLogger().info("WolfLang integrado com sucesso!");
@@ -120,6 +131,31 @@ public class WolfLangIntegration {
         if (!enabled || api == null) return;
         try {
             registerTranslationsMethod.invoke(api, pluginName, translations);
+        } catch (Exception e) {
+            // ignore
+        }
+    }
+
+    /**
+     * Verifica se uma chave de tradução existe no WolfLang
+     */
+    public static boolean hasTranslation(String key) {
+        if (!enabled || api == null || hasTranslationMethod == null || key == null) return false;
+        try {
+            Object result = hasTranslationMethod.invoke(api, key);
+            return result instanceof Boolean && (Boolean) result;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Remove as traduções do plugin (usar no onDisable)
+     */
+    public static void unregisterTranslations(String pluginName) {
+        if (!enabled || api == null || unregisterTranslationsMethod == null) return;
+        try {
+            unregisterTranslationsMethod.invoke(api, pluginName);
         } catch (Exception e) {
             // ignore
         }
