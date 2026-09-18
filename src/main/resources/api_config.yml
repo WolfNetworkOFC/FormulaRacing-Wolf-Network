@@ -25,3 +25,27 @@ connection_timeout: 30000
 
 # Tamanho máximo de requisição em bytes
 max_request_size: 1048576
+
+# =========================================================#
+#                      AUTENTICAÇÃO                         #
+# =========================================================#
+# Com enabled:false (padrão) a API continua pública como antes.
+# Com enabled:true:
+#   - /api/v1/admin/* exige token (header "Authorization: Bearer <token>"
+#     ou query "?token=<token>");
+#   - readonly continua público para a dashboard não quebrar;
+#   - se protect_logs:true, /api/v1/readonly/logs também exige token.
+# Se enabled:true sem token, um token aleatório é gerado, salvo aqui
+# e exibido no console UMA vez.
+auth:
+  enabled: false
+  token: ""
+  # Chaves extras nomeadas (várias integrações, cada uma com seu token).
+  # Vale qualquer uma delas OU o token único acima. Exemplo:
+  # tokens:
+  #   - name: "site"
+  #     token: "troque-por-um-token-longo"
+  #   - name: "bot-discord"
+  #     token: "outro-token-longo"
+  tokens: []
+  protect_logs: false

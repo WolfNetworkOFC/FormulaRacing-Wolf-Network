@@ -36,6 +36,10 @@ public class ApiManager {
     private int requestsPerMinute;
     private boolean logRequests;
     private boolean logErrors;
+    private boolean authEnabled;
+    private String authToken;
+    private boolean authProtectLogs;
+    private final Map<String, String> authTokensByValue = new ConcurrentHashMap<>();
     private final List<JsonObject> systemLogs;
     private static final int MAX_LOGS = 100;
 
@@ -115,7 +119,73 @@ public class ApiManager {
     }
 
     private void setupAuthentication() {
-        // Authentication disabled - Public API
+        // Rotas /api/v1/admin/* sempre exigem token quando auth.enabled=true.
+        // Rotas readonly continuam públicas (dashboard não quebra); /readonly/logs
+        // só exige token se auth.protect_logs=true.
+        before("/api/*", (request, response) -> {
+            if (!authEnabled) return;
+
+            String path = request.pathInfo();
+            boolean protectedPath = path.startsWith("/api/v1/admin/")
+                    || (authProtectLogs && path.equals("/api/v1/readonly/logs"));
+            if (!protectedPath) return;
+
+            String provided = extractBearerToken(request);
+            if (!isAuthorized(provided)) {
+                halt(401, createErrorResponse("Unauthorized: valid API token required"));
+            }
+        });
+    }
+
+    private String extractBearerToken(spark.Request request) {
+        String header = request.headers("Authorization");
+        if (header != null && header.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            String token = header.substring(7).trim();
+            if (!token.isEmpty()) return token;
+        }
+        String query = request.queryParams("token");
+        if (query != null && !query.isEmpty()) return query;
+        return null;
+    }
+
+    private static boolean constantTimeEquals(String a, String b) {
+        byte[] ab = a.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] bb = b.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return java.security.MessageDigest.isEqual(ab, bb);
+    }
+
+    /**
+     * Aceita o token único legado (auth.token) ou qualquer chave nomeada (auth.tokens).
+     */
+    private boolean isAuthorized(String provided) {
+        if (provided == null || provided.isEmpty()) return false;
+        if (authToken != null && !authToken.isEmpty() && constantTimeEquals(provided, authToken)) {
+            return true;
+        }
+        for (String token : authTokensByValue.keySet()) {
+            if (constantTimeEquals(provided, token)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Nome da chave usada (para logs). Retorna "legacy", o nome configurado ou "unknown".
+     */
+    private String resolveKeyName(String provided) {
+        if (provided == null) return "none";
+        if (authToken != null && !authToken.isEmpty() && constantTimeEquals(provided, authToken)) {
+            return "legacy";
+        }
+        for (Map.Entry<String, String> entry : authTokensByValue.entrySet()) {
+            if (constantTimeEquals(provided, entry.getKey())) return entry.getValue();
+        }
+        return "unknown";
+    }
+
+    private static String generateToken() {
+        byte[] bytes = new byte[32];
+        new java.security.SecureRandom().nextBytes(bytes);
+        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     private void setupRateLimiting() {
@@ -527,6 +597,15 @@ public class ApiManager {
         // ============================================================
         //  3. SERVER STATUS (v1)
         // ============================================================
+        // GET /api/v1/admin/ping - Auth check (requires token when auth.enabled=true)
+        get("/api/v1/admin/ping", (request, response) -> {
+            JsonObject obj = new JsonObject();
+            obj.addProperty("ok", true);
+            obj.addProperty("auth", authEnabled ? "enabled" : "disabled");
+            obj.addProperty("timestamp", System.currentTimeMillis());
+            return gson.toJson(obj);
+        });
+
         // GET /api/v1/readonly/status - API status
         get("/api/v1/readonly/status", (request, response) -> {
             try {
@@ -1020,6 +1099,23 @@ public class ApiManager {
                 "### Ao Vivo\n" +
                 "- `GET /api/v1/readonly/live/positions`\n" +
                 "- `GET /api/v1/readonly/live/events`\n\n" +
+                "### Admin (exige token se auth.enabled=true)\n" +
+                "- `GET /api/v1/admin/ping`\n\n" +
+                "## Autenticação\n\n" +
+                "Por padrão a API é pública. Para proteger, edite `api_config.yml`:\n\n" +
+                "```yaml\n" +
+                "auth:\n" +
+                "  enabled: true\n" +
+                "  token: \"seu-token-aqui\"\n" +
+                "  tokens:\n" +
+                "    - name: \"site\"\n" +
+                "      token: \"outro-token\"\n" +
+                "  protect_logs: false\n" +
+                "```\n\n" +
+                "Com `enabled: true`, `/api/v1/admin/*` exige o token via header\n" +
+                "`Authorization: Bearer <token>` ou query `?token=<token>`.\n" +
+                "Com `protect_logs: true`, `/api/v1/readonly/logs` também exige.\n" +
+                "Se habilitar sem token, um token aleatório é gerado e exibido no console.\n\n" +
                 "## Solução de Problemas\n\n" +
                 "### Dashboard não carrega\n" +
                 "1. Verifique se o servidor está rodando\n" +
@@ -1051,6 +1147,77 @@ public class ApiManager {
         }
     }
 
+    /**
+     * Carrega as chaves nomeadas (auth.tokens: [{name, token}, ...]) para o mapa token->nome.
+     */
+    @SuppressWarnings("unchecked")
+    private void loadNamedTokens() {
+        authTokensByValue.clear();
+        if (config == null) return;
+        try {
+            for (Map<?, ?> entry : config.getMapList("auth.tokens")) {
+                Object name = entry.get("name");
+                Object token = entry.get("token");
+                if (name instanceof String && token instanceof String
+                        && !((String) name).isEmpty() && !((String) token).isEmpty()) {
+                    authTokensByValue.put((String) token, (String) name);
+                }
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to load auth.tokens: " + e.getMessage());
+        }
+        if (authEnabled) {
+            plugin.getLogger().info("API auth: " + authTokensByValue.size() + " chave(s) nomeada(s) + "
+                    + ((authToken != null && !authToken.isEmpty()) ? "token legado" : "sem token legado"));
+        }
+    }
+
+    /**
+     * Completa chaves de auth ausentes em api_config.yml de instalações antigas.
+     * Se auth.enabled=true sem token, gera um token aleatório, salva e exibe no console.
+     */
+    private void ensureAuthDefaults(File apiConfigFile) {
+        try {
+            boolean changed = false;
+            if (!config.contains("auth.enabled")) {
+                config.set("auth.enabled", false);
+                changed = true;
+            }
+            if (!config.contains("auth.token")) {
+                config.set("auth.token", "");
+                changed = true;
+            }
+            if (!config.contains("auth.protect_logs")) {
+                config.set("auth.protect_logs", false);
+                changed = true;
+            }
+            if (!config.contains("auth.tokens")) {
+                config.set("auth.tokens", new java.util.ArrayList<>());
+                changed = true;
+            }
+            authEnabled = config.getBoolean("auth.enabled", false);
+            authToken = config.getString("auth.token", "");
+            authProtectLogs = config.getBoolean("auth.protect_logs", false);
+            loadNamedTokens();
+
+            if (authEnabled && (authToken == null || authToken.isEmpty()) && authTokensByValue.isEmpty()) {
+                authToken = generateToken();
+                config.set("auth.token", authToken);
+                changed = true;
+                plugin.getLogger().info("========================================");
+                plugin.getLogger().info("API auth enabled: generated token");
+                plugin.getLogger().info("Token: " + authToken);
+                plugin.getLogger().info("Guarde este token, ele não será exibido de novo!");
+                plugin.getLogger().info("========================================");
+            }
+            if (changed) {
+                config.save(apiConfigFile);
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to update auth defaults: " + e.getMessage());
+        }
+    }
+
     private void loadConfig() {
         try {
             // API config lives only in api_config.yml (bundled resource, no config.yml fallback)
@@ -1063,7 +1230,12 @@ public class ApiManager {
                 requestsPerMinute = config.getInt("rate_limit.requests_per_minute", 60);
                 logRequests = config.getBoolean("log_requests", true);
                 logErrors = config.getBoolean("log_errors", true);
+                authEnabled = config.getBoolean("auth.enabled", false);
+                authToken = config.getString("auth.token", "");
+                authProtectLogs = config.getBoolean("auth.protect_logs", false);
+                loadNamedTokens();
                 plugin.getLogger().info("Loaded API config from api_config.yml");
+                ensureAuthDefaults(apiConfigFile);
             } else {
                 // Use default values
                 port = 8080;
@@ -1072,8 +1244,23 @@ public class ApiManager {
                 requestsPerMinute = 60;
                 logRequests = true;
                 logErrors = true;
+                authEnabled = false;
+                authToken = "";
+                authProtectLogs = false;
                 plugin.getLogger().warning("No API config found, using defaults");
             }
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to load API config, using defaults: " + e.getMessage());
+            port = 8080;
+            corsEnabled = true;
+            rateLimitEnabled = true;
+            requestsPerMinute = 60;
+            logRequests = true;
+            logErrors = true;
+            authEnabled = false;
+            authToken = "";
+            authProtectLogs = false;
+        }
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to load API config, using defaults: " + e.getMessage());
             port = 8080;
