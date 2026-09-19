@@ -777,6 +777,18 @@ public class RegionListener implements Listener {
         }
     }
 
+    private boolean isDrivingBoat(Player player) {
+        if (player == null || !player.isInsideVehicle()) {
+            return false;
+        }
+        if (!(player.getVehicle() instanceof org.bukkit.entity.Boat)) {
+            return false;
+        }
+        // O piloto é o primeiro passageiro; demais são caronas
+        java.util.List<org.bukkit.entity.Entity> passengers = player.getVehicle().getPassengers();
+        return !passengers.isEmpty() && passengers.get(0).equals(player);
+    }
+
     private boolean isBedrockPlayer(UUID uuid) {
         try {
             if (Bukkit.getPluginManager().isPluginEnabled("Floodgate") || Bukkit.getPluginManager().isPluginEnabled("floodgate")) {
@@ -815,6 +827,11 @@ public class RegionListener implements Listener {
 
     private void startSoloTimer(Player player, String regionTrackDisplayName, String regionTrackWS, String type, long startTime) {
         UUID uuid = player.getUniqueId();
+
+        // Só inicia o timer para quem está pilotando o barco (não passageiro, não a pé)
+        if (!isDrivingBoat(player)) {
+            return;
+        }
 
         if (this.plugin.getDriverLookup().isRacing(uuid)) {
             return;

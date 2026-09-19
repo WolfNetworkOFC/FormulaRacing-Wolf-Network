@@ -6,18 +6,24 @@ import co.aikar.commands.annotation.CommandCompletion;
 import co.aikar.commands.annotation.CommandPermission;
 import co.aikar.commands.annotation.Default;
 import co.aikar.commands.annotation.Description;
-import co.aikar.commands.annotation.Syntax;
+import co.aikar.commands.annotation.Optional;
 import co.aikar.commands.annotation.Subcommand;
+import co.aikar.commands.annotation.Syntax;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.GimmickConfig;
+import dev.EfraGroup.formulaRacing.Heat.GimmickException;
 import dev.EfraGroup.formulaRacing.Heat.GimmickManager;
+import dev.EfraGroup.formulaRacing.Heat.GimmickSchematics;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
+import java.util.List;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.entity.Player;
 
-import java.util.List;
-import java.util.Optional;
-
+/**
+ * Admin command for the gimmicks: an admin copies a build with //copy, runs
+ * {@code /gimmick save <nome> <pista> [-a]} standing where it must be pasted,
+ * and then schedules it in a heat with {@code /heat set gimmick add <nome> <lap>}.
+ */
 @CommandAlias("gimmick|gm")
 @CommandPermission("formularacing.admin")
 public class GimmickCommand extends BaseCommand {
@@ -31,267 +37,259 @@ public class GimmickCommand extends BaseCommand {
     }
 
     @Default
-    @Description("Mostra info e comandos disponíveis de gimmick")
+    @Description("Mostra os comandos do sistema de gimmicks")
     public void onDefault(Player player) {
         player.sendMessage("");
         player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
         player.sendMessage(ChatColor.YELLOW + "  Sistema de Gimmicks");
         player.sendMessage("");
-        player.sendMessage(ChatColor.GRAY + "  Use //schem save <nome> no WorldEdit");
-        player.sendMessage(ChatColor.GRAY + "  para salvar um schematic primeiro.");
+        player.sendMessage(ChatColor.GRAY + "  Faça //copy na área que quer colar e fique");
+        player.sendMessage(ChatColor.GRAY + "  parado onde a gimmick deve aparecer.");
         player.sendMessage("");
-        player.sendMessage(ChatColor.WHITE + "  /gm save <nome> - Salva gimmick na sua posição");
-        player.sendMessage(ChatColor.WHITE + "  /gm setlap <nome> <volta> - Define volta do gatilho");
-        player.sendMessage(ChatColor.WHITE + "  /gm setremove <nome> <voltas|permanent> - Duração");
-        player.sendMessage(ChatColor.WHITE + "  /gm setmessage <nome> <msg> - Mensagem de announce");
-        player.sendMessage(ChatColor.WHITE + "  /gm enable <nome> / disable <nome> - Ativa/desativa");
-        player.sendMessage(ChatColor.WHITE + "  /gm list - Lista gimmicks do heat");
-        player.sendMessage(ChatColor.WHITE + "  /gm remove <nome> - Remove uma gimmick");
-        player.sendMessage(ChatColor.WHITE + "  /gm clear - Remove todas as gimmicks");
-        player.sendMessage(ChatColor.WHITE + "  /gm paste <nome> - Cola gimmick agora (teste)");
+        player.sendMessage(ChatColor.WHITE + "  /gimmick save <nome> <pista> [-a]");
+        player.sendMessage(ChatColor.GRAY + "    Salva o clipboard na sua posição.");
+        player.sendMessage(ChatColor.GRAY + "    -a: cola o ar junto (senão o ar é ignorado).");
+        player.sendMessage(ChatColor.WHITE + "  /gimmick list [pista]");
+        player.sendMessage(ChatColor.WHITE + "  /gimmick gui [pista] - menu de gimmicks");
+        player.sendMessage(ChatColor.WHITE + "  /gimmick paste <nome> [pista] - cola agora (teste)");
+        player.sendMessage(ChatColor.WHITE + "  /gimmick toggle <nome> [pista] - ativa/desativa");
+        player.sendMessage(ChatColor.WHITE + "  /gimmick setmessage <nome> [pista] <mensagem>");
+        player.sendMessage(ChatColor.WHITE + "  /gimmick remove <nome> [pista]");
+        player.sendMessage(ChatColor.WHITE + "  /gimmick restore - desfaz tudo que está colado");
+        player.sendMessage("");
+        player.sendMessage(ChatColor.WHITE + "  /heat set gimmick add <nome> <volta>");
+        player.sendMessage(ChatColor.WHITE + "  /heat set gimmick remove <nome>");
+        player.sendMessage(ChatColor.WHITE + "  /heat set gimmick list");
+        player.sendMessage(ChatColor.WHITE + "  /heat set gimmick clear");
         player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
     }
 
     @Subcommand("save")
-    @Syntax("<nome>")
-    @Description("Salva uma gimmick com o schematic e sua posição atual")
-    public void onSave(Player player, String schematicName) {
-        Heats heat = resolveHeat(player);
-        if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado. Use /heat select <id> primeiro.");
+    @Syntax("<nome> <pista> [-a]")
+    @CommandCompletion("<nome> @tracks -a")
+    @Description("Salva o clipboard do WorldEdit como gimmick da pista, na sua posição")
+    public void onSave(Player player, String[] args) {
+        boolean withAir = false;
+        int end = args.length;
+        if (end > 0 && isAirFlag(args[end - 1])) {
+            withAir = true;
+            end--;
+        }
+
+        if (end != 2) {
+            player.sendMessage(ChatColor.RED + "✗ Uso: /gimmick save <nome> <pista> [-a]");
             return;
         }
 
-        GimmickConfig config = new GimmickConfig(schematicName, player.getLocation().clone());
-        gimmickManager.addGimmick(heat.getId(), config);
+        String name = args[0];
+        String track = args[1];
 
-        player.sendMessage(ChatColor.GREEN + "✓ Gimmick '" + schematicName + "' salva para o heat " + heat.getId() + ".");
-        player.sendMessage(ChatColor.GRAY + "  Posição: " + formatLoc(player.getLocation()));
-        player.sendMessage(ChatColor.GRAY + "  Use /gm setlap " + schematicName + " <volta> para definir quando colar.");
-    }
-
-    @Subcommand("setlap")
-    @Syntax("<nome> <volta>")
-    @Description("Define a volta que dispara a gimmick")
-    public void onSetLap(Player player, String schematicName, int lap) {
-        Heats heat = resolveHeat(player);
-        if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado.");
-            return;
-        }
-
-        GimmickConfig gimmick = findGimmick(heat.getId(), schematicName);
-        if (gimmick == null) {
-            player.sendMessage(ChatColor.RED + "✗ Gimmick '" + schematicName + "' não encontrada no heat " + heat.getId() + ".");
-            return;
-        }
-
-        gimmick.setTriggerLap(lap);
-        player.sendMessage(ChatColor.GREEN + "✓ Gimmick '" + schematicName + "' configurada para colar na volta " + lap + ".");
-    }
-
-    @Subcommand("setremove")
-    @Syntax("<nome> <voltas|permanent>")
-    @Description("Define se a gimmick é permanente ou quantas voltas dura")
-    public void onSetRemove(Player player, String schematicName, String value) {
-        Heats heat = resolveHeat(player);
-        if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado.");
-            return;
-        }
-
-        GimmickConfig gimmick = findGimmick(heat.getId(), schematicName);
-        if (gimmick == null) {
-            player.sendMessage(ChatColor.RED + "✗ Gimmick '" + schematicName + "' não encontrada no heat " + heat.getId() + ".");
-            return;
-        }
-
-        if (value.equalsIgnoreCase("permanent") || value.equalsIgnoreCase("p")) {
-            gimmick.setPermanent(true);
-            player.sendMessage(ChatColor.GREEN + "✓ Gimmick '" + schematicName + "' configurada como permanente.");
-        } else {
-            try {
-                int laps = Integer.parseInt(value);
-                gimmick.setPermanent(false);
-                gimmick.setRemoveAfterLaps(laps);
-                player.sendMessage(ChatColor.GREEN + "✓ Gimmick '" + schematicName + "' será removida após " + laps + " voltas.");
-            } catch (NumberFormatException e) {
-                player.sendMessage(ChatColor.RED + "✗ Valor inválido! Use um número de voltas ou 'permanent'.");
+        try {
+            GimmickConfig gimmick = gimmickManager.saveFromClipboard(player, name, track, withAir);
+            player.sendMessage(ChatColor.GREEN + "✓ Gimmick '" + gimmick.getName() + "' salva na pista '" +
+                gimmick.getTrackNameWS() + "'.");
+            player.sendMessage(ChatColor.GRAY + "  Posição: " + formatLocation(player));
+            player.sendMessage(ChatColor.GRAY + "  Colagem: " +
+                (withAir ? "com o ar do schematic (-a)" : "sem o ar do schematic"));
+            player.sendMessage(ChatColor.GRAY + "  Agende com: /heat set gimmick add " +
+                gimmick.getName() + " <volta>");
+            if (GimmickSchematics.hasPendingTransform(player)) {
+                player.sendMessage(ChatColor.YELLOW +
+                    "⚠ O clipboard estava rotacionado/invertido e isso NÃO é salvo: " +
+                    "faça //copy de novo (já com a seleção como quer colar) e salve de novo.");
             }
+        } catch (GimmickException e) {
+            player.sendMessage(ChatColor.RED + "✗ " + e.getMessage());
         }
-    }
-
-    @Subcommand("setmessage")
-    @Syntax("<nome> <mensagem>")
-    @Description("Define a mensagem estilo announce quando a gimmick for colada")
-    public void onSetMessage(Player player, String schematicName, String message) {
-        Heats heat = resolveHeat(player);
-        if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado.");
-            return;
-        }
-
-        GimmickConfig gimmick = findGimmick(heat.getId(), schematicName);
-        if (gimmick == null) {
-            player.sendMessage(ChatColor.RED + "✗ Gimmick '" + schematicName + "' não encontrada no heat " + heat.getId() + ".");
-            return;
-        }
-
-        gimmick.setAnnounceMessage(message);
-        player.sendMessage(ChatColor.GREEN + "✓ Mensagem configurada para '" + schematicName + "'.");
-        player.sendMessage(ChatColor.GRAY + "  Preview: " + message.replace("&", "§"));
-    }
-
-    @Subcommand("enable")
-    @Syntax("<nome>")
-    @Description("Ativa uma gimmick")
-    public void onEnable(Player player, String schematicName) {
-        Heats heat = resolveHeat(player);
-        if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado.");
-            return;
-        }
-
-        GimmickConfig gimmick = findGimmick(heat.getId(), schematicName);
-        if (gimmick == null) {
-            player.sendMessage(ChatColor.RED + "✗ Gimmick '" + schematicName + "' não encontrada no heat " + heat.getId() + ".");
-            return;
-        }
-
-        gimmick.setEnabled(true);
-        player.sendMessage(ChatColor.GREEN + "✓ Gimmick '" + schematicName + "' ativada.");
-    }
-
-    @Subcommand("disable")
-    @Syntax("<nome>")
-    @Description("Desativa uma gimmick")
-    public void onDisable(Player player, String schematicName) {
-        Heats heat = resolveHeat(player);
-        if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado.");
-            return;
-        }
-
-        GimmickConfig gimmick = findGimmick(heat.getId(), schematicName);
-        if (gimmick == null) {
-            player.sendMessage(ChatColor.RED + "✗ Gimmick '" + schematicName + "' não encontrada no heat " + heat.getId() + ".");
-            return;
-        }
-
-        gimmick.setEnabled(false);
-        player.sendMessage(ChatColor.YELLOW + "⚠ Gimmick '" + schematicName + "' desativada.");
     }
 
     @Subcommand("list")
-    @Description("Lista todas as gimmicks do heat selecionado")
-    public void onList(Player player) {
-        Heats heat = resolveHeat(player);
-        if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado.");
+    @Syntax("[pista]")
+    @CommandCompletion("@tracks")
+    @Description("Lista as gimmicks salvas de uma pista")
+    public void onList(Player player, @Optional String track) {
+        String trackName = resolveTrack(player, track);
+        if (trackName == null) {
+            player.sendMessage(ChatColor.RED + "✗ Informe a pista: /gimmick list <pista>");
             return;
         }
 
-        List<GimmickConfig> gimmicks = gimmickManager.getGimmicksForHeat(heat.getId());
-
+        List<GimmickConfig> gimmicks = gimmickManager.getGimmicksForTrack(trackName);
         player.sendMessage("");
         player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
-        player.sendMessage(ChatColor.YELLOW + "  Gimmicks do Heat " + heat.getId());
+        player.sendMessage(ChatColor.YELLOW + "  Gimmicks de " + trackName);
         player.sendMessage("");
 
         if (gimmicks.isEmpty()) {
-            player.sendMessage(ChatColor.GRAY + "  Nenhuma gimmick configurada.");
+            player.sendMessage(ChatColor.GRAY + "  Nenhuma gimmick salva nessa pista.");
         } else {
-            for (GimmickConfig g : gimmicks) {
-                String status = g.isEnabled() ? ChatColor.GREEN + "●" : ChatColor.RED + "●";
-                String duration = g.isPermanent() ? "Permanente" : "Remove em " + g.getRemoveAfterLaps() + " voltas";
-                player.sendMessage(status + " " + ChatColor.WHITE + g.getSchematicName());
-                player.sendMessage(ChatColor.GRAY + "    Volta: " + g.getTriggerLap() + " | " + duration);
-                if (g.getAnnounceMessage() != null) {
-                    player.sendMessage(ChatColor.GRAY + "    Msg: " + g.getAnnounceMessage().replace("&", "§"));
+            for (GimmickConfig gimmick : gimmicks) {
+                String status = gimmick.isEnabled() ? ChatColor.GREEN + "●" : ChatColor.RED + "●";
+                player.sendMessage(status + " " + ChatColor.WHITE + gimmick.getName() +
+                    ChatColor.GRAY + " | " + (gimmick.isPasteWithAir() ? "com ar" : "sem ar"));
+                player.sendMessage(ChatColor.GRAY + "    " + gimmick.getWorldName() + " " +
+                    (int) gimmick.getX() + ", " + (int) gimmick.getY() + ", " + (int) gimmick.getZ());
+                if (gimmick.getAnnounceMessage() != null) {
+                    player.sendMessage(ChatColor.GRAY + "    Msg: " +
+                        ChatColor.translateAlternateColorCodes('&', gimmick.getAnnounceMessage()));
                 }
-                player.sendMessage("");
             }
         }
 
         player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
     }
 
-    @Subcommand("remove")
-    @Syntax("<nome>")
-    @Description("Remove uma gimmick do heat")
-    public void onRemove(Player player, String schematicName) {
-        Heats heat = resolveHeat(player);
-        if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado.");
+    @Subcommand("gui|menu")
+    @Syntax("[pista]")
+    @CommandCompletion("@tracks")
+    @Description("Abre o menu de gimmicks da pista (e do heat selecionado)")
+    public void onGui(Player player, @Optional String track) {
+        String trackName = resolveTrack(player, track);
+        if (trackName == null) {
+            player.sendMessage(ChatColor.RED + "✗ Informe a pista: /gimmick gui <pista>");
             return;
         }
 
-        if (gimmickManager.removeGimmick(heat.getId(), schematicName)) {
-            player.sendMessage(ChatColor.GREEN + "✓ Gimmick '" + schematicName + "' removida do heat " + heat.getId() + ".");
-        } else {
-            player.sendMessage(ChatColor.RED + "✗ Gimmick '" + schematicName + "' não encontrada no heat " + heat.getId() + ".");
-        }
-    }
-
-    @Subcommand("clear")
-    @Description("Remove todas as gimmicks do heat")
-    public void onClear(Player player) {
-        Heats heat = resolveHeat(player);
-        if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado.");
-            return;
-        }
-
-        gimmickManager.clearGimmicks(heat.getId());
-        player.sendMessage(ChatColor.GREEN + "✓ Todas as gimmicks do heat " + heat.getId() + " foram removidas.");
+        Heats heat = gimmickManager.resolveSelectedHeat(player);
+        new dev.EfraGroup.formulaRacing.Gui.GimmickGui(plugin, player, trackName, heat).show(player);
     }
 
     @Subcommand("paste")
-    @Syntax("<nome>")
-    @Description("Cola uma gimmick imediatamente (para teste)")
-    public void onPaste(Player player, String schematicName) {
-        Heats heat = resolveHeat(player);
-        if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado.");
-            return;
-        }
+    @Syntax("<nome> [pista]")
+    @CommandCompletion("@gimmicks @tracks")
+    @Description("Cola a gimmick agora, para teste")
+    public void onPaste(Player player, String name, @Optional String track) {
+        GimmickConfig gimmick = find(player, name, track);
+        if (gimmick == null) return;
 
-        GimmickConfig gimmick = findGimmick(heat.getId(), schematicName);
-        if (gimmick == null) {
-            player.sendMessage(ChatColor.RED + "✗ Gimmick '" + schematicName + "' não encontrada no heat " + heat.getId() + ".");
-            return;
+        try {
+            gimmickManager.pasteNow(gimmick);
+            player.sendMessage(ChatColor.GREEN + "✓ Gimmick '" + gimmick.getName() + "' colada.");
+            player.sendMessage(ChatColor.GRAY + "  Desfaça com /gimmick restore");
+        } catch (GimmickException e) {
+            player.sendMessage(ChatColor.RED + "✗ " + e.getMessage());
         }
-
-        gimmickManager.pasteGimmick(gimmick);
-        player.sendMessage(ChatColor.GREEN + "✓ Colando gimmick '" + schematicName + "'...");
     }
 
-    private Heats resolveHeat(Player player) {
-        var selectedHeatId = plugin.getDatabaseManager().getPlayerSelectedHeat(player.getUniqueId());
-        if (selectedHeatId.isPresent()) {
-            Optional<Heats> heat = plugin.getRaceEventManager().getHeat(selectedHeatId.get());
-            if (heat.isPresent()) return heat.get();
+    @Subcommand("toggle")
+    @Syntax("<nome> [pista]")
+    @CommandCompletion("@gimmicks @tracks")
+    @Description("Ativa ou desativa uma gimmick")
+    public void onToggle(Player player, String name, @Optional String track) {
+        GimmickConfig gimmick = find(player, name, track);
+        if (gimmick == null) return;
+
+        boolean enabled = gimmickManager.toggleGimmick(gimmick);
+        player.sendMessage(
+            (enabled ? ChatColor.GREEN + "✓ Gimmick '" + gimmick.getName() + "' ativada."
+                     : ChatColor.YELLOW + "⚠ Gimmick '" + gimmick.getName() + "' desativada.")
+        );
+    }
+
+    @Subcommand("setmessage")
+    @Syntax("<nome> [pista] <mensagem>")
+    @Description("Define a mensagem anunciada quando a gimmick é colada no heat")
+    public void onSetMessage(Player player, String[] args) {
+        if (args.length < 2) {
+            player.sendMessage(ChatColor.RED + "✗ Uso: /gimmick setmessage <nome> [pista] <mensagem>");
+            return;
+        }
+
+        String name = args[0];
+        String track = null;
+        int messageStart = 1;
+        if (args.length >= 3) {
+            track = args[1];
+            messageStart = 2;
+        }
+
+        GimmickConfig gimmick = find(player, name, track);
+        if (gimmick == null) return;
+
+        String message = String.join(" ", java.util.Arrays.copyOfRange(args, messageStart, args.length));
+        gimmickManager.setAnnounceMessage(gimmick, message);
+        player.sendMessage(ChatColor.GREEN + "✓ Mensagem de '" + gimmick.getName() + "' definida.");
+        player.sendMessage(ChatColor.GRAY + "  Preview: " +
+            ChatColor.translateAlternateColorCodes('&', message));
+    }
+
+    @Subcommand("remove|delete")
+    @Syntax("<nome> [pista]")
+    @CommandCompletion("@gimmicks @tracks")
+    @Description("Apaga a gimmick (arquivo, definição e agendamentos)")
+    public void onRemove(Player player, String name, @Optional String track) {
+        GimmickConfig gimmick = find(player, name, track);
+        if (gimmick == null) return;
+
+        gimmickManager.deleteGimmick(gimmick);
+        player.sendMessage(ChatColor.GREEN + "✓ Gimmick '" + gimmick.getName() + "' apagada de '" +
+            gimmick.getTrackNameWS() + "'.");
+    }
+
+    @Subcommand("restore")
+    @Description("Desfaz todas as gimmicks coladas (emergência)")
+    public void onRestore(Player player) {
+        int restored = gimmickManager.restoreEverything();
+        if (restored == 0) {
+            player.sendMessage(ChatColor.GRAY + "Nada colado no momento.");
+            return;
+        }
+        player.sendMessage(ChatColor.GREEN + "✓ " + restored + " gimmick(s) desfeita(s).");
+    }
+
+    private boolean isAirFlag(String arg) {
+        return arg.equalsIgnoreCase("-a") || arg.equalsIgnoreCase("--air");
+    }
+
+    /** Uses the given track, or the heat the admin has selected, so [pista] stays optional. */
+    private String resolveTrack(Player player, String track) {
+        if (track != null && !track.isBlank()) return GimmickConfig.normalizeTrack(track);
+
+        var selectedHeat = plugin.getDatabaseManager().getPlayerSelectedHeat(player.getUniqueId());
+        if (selectedHeat.isPresent()) {
+            var heat = plugin.getRaceEventManager().getHeat(selectedHeat.get());
+            if (heat.isPresent() && heat.get().getTrackNameWS() != null) {
+                return GimmickConfig.normalizeTrack(heat.get().getTrackNameWS());
+            }
         }
 
         var event = plugin.getDatabaseManager().getPlayerSelectedEvent(player.getUniqueId()).orElse(null);
         if (event != null) {
             var round = event.getSchedule().getCurrentRound().orElse(null);
-            if (round != null) return round.getCurrentHeat().orElse(null);
+            if (round != null) {
+                var heat = round.getCurrentHeat().orElse(null);
+                if (heat != null && heat.getTrackNameWS() != null) {
+                    return GimmickConfig.normalizeTrack(heat.getTrackNameWS());
+                }
+            }
         }
 
         return null;
     }
 
-    private GimmickConfig findGimmick(int heatId, String schematicName) {
-        return gimmickManager.getGimmicksForHeat(heatId).stream()
-                .filter(g -> g.getSchematicName().equalsIgnoreCase(schematicName))
-                .findFirst()
-                .orElse(null);
+    private GimmickConfig find(Player player, String name, String track) {
+        String trackName = resolveTrack(player, track);
+        if (trackName == null) {
+            player.sendMessage(ChatColor.RED + "✗ Informe a pista: /gimmick " +
+                "<comando> <nome> <pista>");
+            return null;
+        }
+
+        GimmickConfig gimmick = gimmickManager.findGimmick(trackName, name);
+        if (gimmick == null) {
+            player.sendMessage(ChatColor.RED + "✗ Gimmick '" + name + "' não encontrada em '" +
+                trackName + "'.");
+        }
+        return gimmick;
     }
 
-    private String formatLoc(org.bukkit.Location loc) {
-        return String.format("%s %d, %d, %d",
-                loc.getWorld() != null ? loc.getWorld().getName() : "?",
-                loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+    private String formatLocation(Player player) {
+        return String.format(
+            "%s %d, %d, %d",
+            player.getWorld().getName(),
+            player.getLocation().getBlockX(),
+            player.getLocation().getBlockY(),
+            player.getLocation().getBlockZ()
+        );
     }
 }

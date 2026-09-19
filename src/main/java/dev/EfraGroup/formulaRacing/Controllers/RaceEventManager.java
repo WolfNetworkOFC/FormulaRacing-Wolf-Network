@@ -1213,6 +1213,9 @@ public class RaceEventManager {
         if (round == null) {
             return false;
         } else {
+            // A removed heat must not leave its gimmicks pasted in the world.
+            this.plugin.getGimmickManager().cleanupHeat(heat.getId());
+
             if (heat.getId() > 0) {
                 this.dbManager.deleteHeat(heat.getId());
             }

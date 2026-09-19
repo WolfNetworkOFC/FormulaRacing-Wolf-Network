@@ -2073,6 +2073,16 @@ public class Heats {
                 this.plugin.getAILineVisualizer().unregisterHeat(this.id);
             }
         }
+
+        // Gimmicks: a new race (re)arms the scheduled laps, and when the heat ends
+        // everything that was pasted goes back to the state it replaced.
+        if (this.plugin != null) {
+            if (heatState == HeatState.RACING && previous != HeatState.RACING) {
+                this.plugin.getGimmickManager().onHeatRacing(this);
+            } else if (heatState == HeatState.FINISHED) {
+                this.plugin.getGimmickManager().onHeatFinished(this);
+            }
+        }
     }
 
     public void setHeatStateForLoad(HeatState heatState) {

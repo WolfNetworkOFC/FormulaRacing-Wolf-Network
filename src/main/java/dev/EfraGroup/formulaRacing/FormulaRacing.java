@@ -418,6 +418,8 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.apiManager = new ApiManager(this);
             this.apiManager.init();
             this.gimmickManager = new GimmickManager(this);
+            // Puts back anything a crash left pasted (backups are written before pasting).
+            this.gimmickManager.schedulePendingRestore();
             this.leagueManager = new LeagueManager(this);
             this.weatherManager = new WeatherManager(this);
             this.ghostManager = new GhostManager(this);
@@ -769,6 +771,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         );
         this.lightningRodListener = new LightningRodListener(this);
         this.lightningRodListener.start();
+        Bukkit.getPluginManager().registerEvents(
+            new dev.EfraGroup.formulaRacing.Listener.GimmickListener(this),
+            this
+        );
     }
 
     private void registerPlaceholders() {
@@ -1730,6 +1736,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                     .filter(trackName -> this.dm.isTrackOpen(trackName))
                     .map(t -> t.replace(" ", ""))
                     .toList()
+        );
+        this.commandManager.getCommandCompletions().registerCompletion(
+            "gimmicks",
+            c -> this.getGimmickManager().getAllGimmickNames()
         );
         this.commandManager.getCommandCompletions().registerCompletion(
             "partyMembers",

@@ -13,6 +13,10 @@ import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Event.Events;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.CollisionMode;
+import dev.EfraGroup.formulaRacing.Heat.GimmickConfig;
+import dev.EfraGroup.formulaRacing.Heat.GimmickException;
+import dev.EfraGroup.formulaRacing.Heat.GimmickManager;
+import dev.EfraGroup.formulaRacing.Heat.GimmickSchedule;
 import dev.EfraGroup.formulaRacing.Heat.HeatConfig;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
@@ -2140,6 +2144,139 @@ public class HeatCommand extends BaseCommand {
                 }
             }
         }
+    }
+
+    @Subcommand("set gimmick add")
+    @CommandCompletion("@gimmicks <volta>")
+    @CommandPermission("formularacing.event.admin")
+    @Description("Agenda uma gimmick da pista do heat para uma volta que ainda vai acontecer")
+    public void onSetGimmickAdd(Player player, String gimmickName, int lap) {
+        Heats heat = this.resolveHeat(player, null);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+
+        GimmickManager gimmickManager = this.plugin.getGimmickManager();
+        GimmickConfig gimmick = gimmickManager.findGimmick(
+            heat.getTrackNameWS(),
+            gimmickName
+        );
+        if (gimmick == null) {
+            player.sendMessage(
+                ChatColor.RED + "✗ A gimmick '" + gimmickName +
+                    "' não existe na pista '" + heat.getTrackNameWS() +
+                    "'. Crie com /gimmick save."
+            );
+            return;
+        }
+
+        try {
+            GimmickSchedule schedule = gimmickManager.scheduleGimmick(
+                heat,
+                gimmick,
+                lap
+            );
+            player.sendMessage(
+                ChatColor.GREEN + "✓ Gimmick '" + gimmick.getName() +
+                    "' agendada para a volta " + schedule.getTriggerLap() +
+                    " do heat " + heat.getName() + "."
+            );
+        } catch (GimmickException e) {
+            player.sendMessage(ChatColor.RED + "✗ " + e.getMessage());
+        }
+    }
+
+    @Subcommand("set gimmick remove")
+    @CommandCompletion("@gimmicks")
+    @CommandPermission("formularacing.event.admin")
+    @Description("Remove o agendamento de uma gimmick do heat")
+    public void onSetGimmickRemove(Player player, String gimmickName) {
+        Heats heat = this.resolveHeat(player, null);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+
+        GimmickManager gimmickManager = this.plugin.getGimmickManager();
+        GimmickConfig gimmick = gimmickManager.findGimmick(
+            heat.getTrackNameWS(),
+            gimmickName
+        );
+
+        if (gimmick != null && gimmickManager.unscheduleGimmick(heat, gimmick)) {
+            player.sendMessage(
+                ChatColor.GREEN + "✓ Gimmick '" + gimmick.getName() +
+                    "' removida do heat " + heat.getName() + "."
+            );
+        } else {
+            player.sendMessage(
+                ChatColor.RED + "✗ A gimmick '" + gimmickName +
+                    "' não está agendada nesse heat."
+            );
+        }
+    }
+
+    @Subcommand("set gimmick clear")
+    @CommandPermission("formularacing.event.admin")
+    @Description("Remove todas as gimmicks agendadas no heat")
+    public void onSetGimmickClear(Player player) {
+        Heats heat = this.resolveHeat(player, null);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+
+        GimmickManager gimmickManager = this.plugin.getGimmickManager();
+        int removed = gimmickManager.getSchedule(heat).size();
+        gimmickManager.clearSchedule(heat);
+        player.sendMessage(
+            ChatColor.GREEN + "✓ " + removed + " gimmick(s) removida(s) do heat " +
+                heat.getName() + "."
+        );
+    }
+
+    @Subcommand("set gimmick list")
+    @CommandPermission("formularacing.event.admin")
+    @Description("Lista as gimmicks agendadas no heat")
+    public void onSetGimmickList(Player player) {
+        Heats heat = this.resolveHeat(player, null);
+        if (heat == null) {
+            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+
+        List<GimmickSchedule> schedules = this.plugin
+            .getGimmickManager()
+            .getSchedule(heat);
+
+        player.sendMessage("");
+        player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
+        player.sendMessage(
+            ChatColor.YELLOW + "  Gimmicks do heat " + heat.getName() + " (" +
+                heat.getTrackNameWS() + ")"
+        );
+        player.sendMessage("");
+
+        if (schedules.isEmpty()) {
+            player.sendMessage(ChatColor.GRAY + "  Nenhuma gimmick agendada.");
+        } else {
+            for (GimmickSchedule schedule : schedules) {
+                GimmickConfig gimmick = schedule.getGimmick();
+                String status = schedule.isTriggered()
+                    ? ChatColor.GRAY + "● "
+                    : gimmick.isEnabled()
+                        ? ChatColor.GREEN + "● "
+                        : ChatColor.RED + "● ";
+                player.sendMessage(
+                    status + ChatColor.WHITE + gimmick.getName() +
+                        ChatColor.GRAY + " | volta " + schedule.getTriggerLap() +
+                        (schedule.isTriggered() ? " (já colada)" : "")
+                );
+            }
+        }
+
+        player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
     }
 
     @Subcommand("set laps")

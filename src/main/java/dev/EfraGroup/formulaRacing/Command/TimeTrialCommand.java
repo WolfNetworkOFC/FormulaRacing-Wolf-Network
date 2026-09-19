@@ -241,44 +241,110 @@ import dev.EfraGroup.formulaRacing.PacketSender;
         @CommandAlias("timetrialrandom|ttr|timetrialr|ttrandom")
         @Description("Joins a random Time Trial")
         public void onRandom(Player player) {
-            UUID uuid = player.getUniqueId();
-
-            // 1. Safety Checks (Early Returns)
+            // 1. Safety Checks (Early Returns) — only the player's own thread may read this.
             if (isBusy(player)) {
                 return;
             }
 
-            // 2. Get Tracks
-            List<String> availableTracks = this.mysql.getAllTracks();
-            if (availableTracks == null || availableTracks.isEmpty()) {
-                this.plugin.sendMessage(player, "tt_no_tracks_avail");
-                return;
+            final UUID uuid = player.getUniqueId();
+            final String playerName = player.getName();
+            final boolean hasBoatUtils = FormulaRacing.hasOpenBoatUtilsMod(player);
+            final String currentTrackWS = normalizeTrackName(this.plugin.getLastTimeTrialTrack(uuid));
+
+            // 2. Building the pool and picking the track reads the database, so it runs off
+            //    the main thread. The old implementation did one `isTrackOpen` plus one
+            //    `trackHaveBoatUtils` query per track right on the main thread.
+            SchedulerHelper.runAsync(this.plugin, () -> {
+                Set<String> openTracks = this.mysql.getOpenTracks();
+                if (openTracks.isEmpty()) {
+                    SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                        if (player.isOnline()) this.plugin.sendMessage(player, "tt_no_tracks_avail");
+                    });
+                    return;
+                }
+
+                List<String> validTracks = this.collectValidRandomTracks(openTracks, currentTrackWS);
+                if (validTracks.isEmpty() && currentTrackWS != null) {
+                    // The player's current track is the only playable one: repeating it is
+                    // better than telling them there is nothing left to race on.
+                    validTracks = this.collectValidRandomTracks(openTracks, null);
+                }
+
+                // 3. Rerolling instead of pre-filtering keeps the player without the mod from
+                //    paying one query per track: a mod-less pick costs a single extra query.
+                final int poolSize = validTracks.size();
+                String trackName = null;
+                while (trackName == null && !validTracks.isEmpty()) {
+                    int index = this.random.nextInt(validTracks.size());
+                    String candidate = validTracks.get(index);
+                    if (hasBoatUtils || !this.mysql.trackHaveBoatUtils(candidate)) {
+                        trackName = candidate;
+                    } else {
+                        validTracks.remove(index);
+                    }
+                }
+
+                if (trackName == null) {
+                    SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                        if (player.isOnline()) this.plugin.sendMessage(player, "tt_no_tracks_compatible");
+                    });
+                    return;
+                }
+
+                this.plugin.getDebugManager().logTimeTrialSystem(
+                    "[TTR] " + playerName + " rolled '" + trackName + "' out of " + poolSize + " valid tracks"
+                );
+
+                DatabaseManager.TrackData trackData = this.mysql.getTrackData(trackName);
+                String owner = (trackData != null) ? trackData.getOwnerName() : null;
+                final String finalTrackName = trackName;
+
+                // 4. Teleport/hotbar/scoreboard only touch Bukkit state, so they go back to
+                //    the player's own thread.
+                SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                    if (player.isOnline()) this.startTrack(player, finalTrackName, owner);
+                });
+            });
+        }
+
+        /**
+         * Builds the pool of tracks that /ttr (and the hotbar's random item, which runs
+         * the same command) can pick from: only open tracks whose world is loaded, that
+         * have a spawn and at least one checkpoint, skipping the track the player is
+         * already on. Call it off the main thread — it queries the database.
+         */
+        private List<String> collectValidRandomTracks(Set<String> openTracks, String excludedTrackWS) {
+            Set<String> openNormalized = openTracks.stream()
+                    .map(TimeTrialCommand::normalizeTrackName)
+                    .collect(Collectors.toSet());
+
+            // A single query for every track (the database layer already skips tracks whose
+            // world is not loaded) instead of one query per track.
+            Map<String, DatabaseManager.TrackData> tracksData = this.mysql.getAllTracksWithData();
+
+            List<String> validTracks = new ArrayList<>();
+            for (Map.Entry<String, DatabaseManager.TrackData> entry : tracksData.entrySet()) {
+                String trackName = entry.getKey();
+                String trackWS = normalizeTrackName(trackName);
+                if (!openNormalized.contains(trackWS)) continue;
+                if (excludedTrackWS != null && excludedTrackWS.equals(trackWS)) continue;
+
+                DatabaseManager.TrackData data = entry.getValue();
+                Location spawn = data.getSpawnLocation();
+                // Starting on a track without spawn or checkpoints would either fail the
+                // teleport ("tt_track_no_spawn") or leave the player on a track the timer
+                // can never finish, so those are never drawn.
+                if (spawn == null || spawn.getWorld() == null) continue;
+                if (data.getTotalCheckpoints() <= 0) continue;
+
+                validTracks.add(trackName);
             }
+            return validTracks;
+        }
 
-            // 3. Filter Compatible Tracks
-            boolean hasBoatUtils = FormulaRacing.hasOpenBoatUtilsMod(player);
-
-            List<String> validTracks = availableTracks.stream()
-                    .filter(this.mysql::isTrackOpen) // Filter open tracks
-                    .filter(track -> {
-                        boolean trackRequiresBoatUtils = this.mysql.trackHaveBoatUtils(track);
-                        // If the player has the mod, they can race on any track.
-                        // If not, only those that don't require it.
-                        return hasBoatUtils || !trackRequiresBoatUtils;
-                    })
-                    .collect(Collectors.toList());
-
-            if (validTracks.isEmpty()) {
-                this.plugin.sendMessage(player, "tt_no_tracks_compatible");
-                return;
-            }
-
-            // 4. Selection and Start
-            String trackName = validTracks.get(this.random.nextInt(validTracks.size()));
-            DatabaseManager.TrackData trackData = this.mysql.getTrackData(trackName);
-            String owner = (trackData != null) ? trackData.getOwnerName() : null;
-
-            this.startTrack(player, trackName, owner);
+        /** Track names are compared without spaces and case-insensitively, as the database does. */
+        private static String normalizeTrackName(String trackName) {
+            return trackName == null ? null : trackName.replaceAll("\\s+", "").toLowerCase(Locale.ROOT);
         }
 
         /**

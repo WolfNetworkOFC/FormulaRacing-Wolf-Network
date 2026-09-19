@@ -2,6 +2,7 @@ package dev.EfraGroup.formulaRacing.Database;
 
 import dev.EfraGroup.formulaRacing.FileManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Heat.GimmickConfig;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
@@ -930,6 +931,38 @@ public class DatabaseManager {
                     exitMaxX REAL, exitMaxY REAL, exitMaxZ REAL,
                     world TEXT NOT NULL
                 )"""
+            );
+
+            // Gimmicks: definition lives per track, the schedule links it to a heat.
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS fr_gimmicks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    trackNameWS TEXT NOT NULL,
+                    worldName TEXT NOT NULL,
+                    x REAL NOT NULL, y REAL NOT NULL, z REAL NOT NULL,
+                    pasteWithAir BOOLEAN NOT NULL DEFAULT 0,
+                    announceMessage TEXT DEFAULT NULL,
+                    enabled BOOLEAN NOT NULL DEFAULT 1,
+                    createdBy TEXT DEFAULT NULL,
+                    createdAt BIGINT DEFAULT 0
+                )"""
+            );
+            stmt.executeUpdate(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_fr_gimmicks_track_name ON fr_gimmicks (trackNameWS, name)"
+            );
+            stmt.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS fr_heat_gimmicks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    heatId INTEGER NOT NULL,
+                    gimmickId INTEGER NOT NULL,
+                    triggerLap INTEGER NOT NULL
+                )"""
+            );
+            stmt.executeUpdate(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_fr_heat_gimmicks ON fr_heat_gimmicks (heatId, gimmickId)"
             );
 
             // MIGRATION: ensures all new columns exist (in case the table is old)
@@ -9033,6 +9066,262 @@ public class DatabaseManager {
         public boolean isFinished() {
             return finished || checkpointsReached >= totalCheckpoints;
         } // automatic fallback
+    }
+
+    /* ========================================================
+     *  GIMMICKS
+     *  Definition per track (fr_gimmicks) + schedule per heat
+     *  (fr_heat_gimmicks, see HeatGimmickRow).
+     * ======================================================== */
+
+    private GimmickConfig readGimmick(ResultSet rs) throws SQLException {
+        GimmickConfig gimmick = new GimmickConfig();
+        gimmick.setId(rs.getInt("id"));
+        gimmick.setName(rs.getString("name"));
+        gimmick.setTrackNameWS(rs.getString("trackNameWS"));
+        gimmick.setWorldName(rs.getString("worldName"));
+        gimmick.setCoordinates(
+            rs.getDouble("x"),
+            rs.getDouble("y"),
+            rs.getDouble("z")
+        );
+        gimmick.setPasteWithAir(rs.getBoolean("pasteWithAir"));
+        gimmick.setAnnounceMessage(rs.getString("announceMessage"));
+        gimmick.setEnabled(rs.getBoolean("enabled"));
+        gimmick.setCreatedBy(rs.getString("createdBy"));
+        gimmick.setCreatedAt(rs.getLong("createdAt"));
+        return gimmick;
+    }
+
+    public synchronized List<GimmickConfig> getAllGimmicks() {
+        List<GimmickConfig> gimmicks = new ArrayList<>();
+        String sql = "SELECT * FROM fr_gimmicks ORDER BY name";
+        try {
+            Connection conn = getOrConnect();
+            try (
+                PreparedStatement ps = conn.prepareStatement(sql);
+                ResultSet rs = ps.executeQuery()
+            ) {
+                while (rs.next()) gimmicks.add(readGimmick(rs));
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return gimmicks;
+    }
+
+    public synchronized GimmickConfig getGimmick(
+        String trackNameWS,
+        String name
+    ) {
+        if (trackNameWS == null || name == null) return null;
+        String sql =
+            "SELECT * FROM fr_gimmicks WHERE LOWER(trackNameWS) = LOWER(?) " +
+            "AND LOWER(name) = LOWER(?) LIMIT 1";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackNameWS.replaceAll("\\s+", ""));
+                ps.setString(2, name.trim());
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) return readGimmick(rs);
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return null;
+    }
+
+    /** @return the id of the new gimmick, or -1 when the insert failed. */
+    public synchronized int insertGimmick(GimmickConfig gimmick) {
+        String sql =
+            "INSERT INTO fr_gimmicks (name, trackNameWS, worldName, x, y, z, pasteWithAir, " +
+            "announceMessage, enabled, createdBy, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        try {
+            Connection conn = getOrConnect();
+            try (
+                PreparedStatement ps = conn.prepareStatement(
+                    sql,
+                    Statement.RETURN_GENERATED_KEYS
+                )
+            ) {
+                ps.setString(1, gimmick.getName());
+                ps.setString(2, gimmick.getTrackNameWS());
+                ps.setString(3, gimmick.getWorldName());
+                ps.setDouble(4, gimmick.getX());
+                ps.setDouble(5, gimmick.getY());
+                ps.setDouble(6, gimmick.getZ());
+                ps.setBoolean(7, gimmick.isPasteWithAir());
+                ps.setString(8, gimmick.getAnnounceMessage());
+                ps.setBoolean(9, gimmick.isEnabled());
+                ps.setString(10, gimmick.getCreatedBy());
+                ps.setLong(11, gimmick.getCreatedAt());
+                ps.executeUpdate();
+                try (ResultSet keys = ps.getGeneratedKeys()) {
+                    if (keys.next()) return keys.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return -1;
+    }
+
+    public synchronized void updateGimmick(GimmickConfig gimmick) {
+        String sql =
+            "UPDATE fr_gimmicks SET worldName = ?, x = ?, y = ?, z = ?, pasteWithAir = ?, " +
+            "announceMessage = ?, enabled = ? WHERE id = ?";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, gimmick.getWorldName());
+                ps.setDouble(2, gimmick.getX());
+                ps.setDouble(3, gimmick.getY());
+                ps.setDouble(4, gimmick.getZ());
+                ps.setBoolean(5, gimmick.isPasteWithAir());
+                ps.setString(6, gimmick.getAnnounceMessage());
+                ps.setBoolean(7, gimmick.isEnabled());
+                ps.setInt(8, gimmick.getId());
+                ps.executeUpdate();
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+    }
+
+    /** Deletes the definition and every heat schedule pointing at it. */
+    public synchronized void deleteGimmick(int gimmickId) {
+        try {
+            Connection conn = getOrConnect();
+            try (
+                PreparedStatement ps = conn.prepareStatement(
+                    "DELETE FROM fr_heat_gimmicks WHERE gimmickId = ?"
+                )
+            ) {
+                ps.setInt(1, gimmickId);
+                ps.executeUpdate();
+            }
+            try (
+                PreparedStatement ps = conn.prepareStatement(
+                    "DELETE FROM fr_gimmicks WHERE id = ?"
+                )
+            ) {
+                ps.setInt(1, gimmickId);
+                ps.executeUpdate();
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized List<HeatGimmickRow> getHeatGimmicks(int heatId) {
+        List<HeatGimmickRow> rows = new ArrayList<>();
+        String sql =
+            "SELECT hg.id, hg.heatId, hg.gimmickId, hg.triggerLap FROM fr_heat_gimmicks hg " +
+            "WHERE hg.heatId = ? ORDER BY hg.triggerLap, hg.id";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, heatId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        rows.add(
+                            new HeatGimmickRow(
+                                rs.getInt("id"),
+                                rs.getInt("heatId"),
+                                rs.getInt("gimmickId"),
+                                rs.getInt("triggerLap")
+                            )
+                        );
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return rows;
+    }
+
+    /** @return true when a new schedule was created, false when it was updated or failed. */
+    public synchronized boolean addHeatGimmick(
+        int heatId,
+        int gimmickId,
+        int triggerLap
+    ) {
+        String sql =
+            "INSERT INTO fr_heat_gimmicks (heatId, gimmickId, triggerLap) VALUES (?, ?, ?) " +
+            "ON CONFLICT(heatId, gimmickId) DO UPDATE SET triggerLap = excluded.triggerLap";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, heatId);
+                ps.setInt(2, gimmickId);
+                ps.setInt(3, triggerLap);
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return false;
+    }
+
+    public synchronized void removeHeatGimmick(int heatId, int gimmickId) {
+        String sql = "DELETE FROM fr_heat_gimmicks WHERE heatId = ? AND gimmickId = ?";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, heatId);
+                ps.setInt(2, gimmickId);
+                ps.executeUpdate();
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized void removeAllHeatGimmicks(int heatId) {
+        String sql = "DELETE FROM fr_heat_gimmicks WHERE heatId = ?";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, heatId);
+                ps.executeUpdate();
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+    }
+
+    public static class HeatGimmickRow {
+
+        private final int id;
+        private final int heatId;
+        private final int gimmickId;
+        private final int triggerLap;
+
+        public HeatGimmickRow(int id, int heatId, int gimmickId, int triggerLap) {
+            this.id = id;
+            this.heatId = heatId;
+            this.gimmickId = gimmickId;
+            this.triggerLap = triggerLap;
+        }
+
+        public int getId() {
+            return id;
+        }
+
+        public int getHeatId() {
+            return heatId;
+        }
+
+        public int getGimmickId() {
+            return gimmickId;
+        }
+
+        public int getTriggerLap() {
+            return triggerLap;
+        }
     }
 
     public static class TrackData {
