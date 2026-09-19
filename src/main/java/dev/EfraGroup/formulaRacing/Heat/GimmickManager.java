@@ -1,6 +1,5 @@
 package dev.EfraGroup.formulaRacing.Heat;
 
-import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
@@ -50,8 +49,10 @@ public class GimmickManager {
 
     private final FormulaRacing plugin;
     private final File rootFolder;
+    private final GimmickStore store;
 
-    private final Map<Integer, GimmickConfig> gimmicksById = new ConcurrentHashMap<>();
+    /** trackWS:name (lowercase) -> config. */
+    private final Map<String, GimmickConfig> gimmicksByKey = new ConcurrentHashMap<>();
     private volatile boolean definitionsLoaded = false;
 
     private final Map<Integer, List<GimmickSchedule>> scheduleCache = new ConcurrentHashMap<>();
@@ -61,8 +62,8 @@ public class GimmickManager {
      * lap counter would start shifted.
      */
     private final Map<Integer, Integer> lapBaseline = new ConcurrentHashMap<>();
-    /** heatId -> gimmickId -> build already loaded one lap ahead of its trigger. */
-    private final Map<Integer, Map<Integer, PreparedGimmick>> preparedPerHeat = new ConcurrentHashMap<>();
+    /** heatId -> gimmickKey -> build already loaded one lap ahead of its trigger. */
+    private final Map<Integer, Map<String, PreparedGimmick>> preparedPerHeat = new ConcurrentHashMap<>();
     /** heatId -> pastes still applied, newest first (restore walks the stack). */
     private final Map<Integer, Deque<PastedGimmick>> pastedPerHeat = new ConcurrentHashMap<>();
     private volatile boolean recoveryScheduled = false;
@@ -70,30 +71,39 @@ public class GimmickManager {
     public GimmickManager(FormulaRacing plugin) {
         this.plugin = plugin;
         this.rootFolder = new File(plugin.getDataFolder(), "gimmicks");
+        this.store = new GimmickStore(plugin.getDataFolder());
     }
 
     public File getRootFolder() {
         return rootFolder;
     }
 
+    public GimmickStore getStore() {
+        return store;
+    }
+
     /* ========================================================
-     *  DEFINITIONS
+     *  DEFINITIONS (file-only)
      * ======================================================== */
 
-    private DatabaseManager db() {
-        return plugin.getDatabaseManager();
+    private static String keyOf(String trackNameWS, String name) {
+        return GimmickConfig.normalizeTrack(trackNameWS) + ":" + GimmickConfig.normalize(name);
+    }
+
+    private static String keyOf(GimmickConfig gimmick) {
+        return keyOf(gimmick.getTrackNameWS(), gimmick.getName());
     }
 
     private void ensureDefinitionsLoaded() {
         if (definitionsLoaded) return;
-        gimmicksById.clear();
-        for (GimmickConfig gimmick : db().getAllGimmicks()) {
-            gimmicksById.put(gimmick.getId(), gimmick);
+        gimmicksByKey.clear();
+        for (GimmickConfig gimmick : store.loadAll()) {
+            gimmicksByKey.put(keyOf(gimmick), gimmick);
         }
         definitionsLoaded = true;
     }
 
-    /** Reloads the definitions from the database. */
+    /** Reloads the definitions from disk. */
     public void reload() {
         definitionsLoaded = false;
         ensureDefinitionsLoaded();
@@ -106,7 +116,7 @@ public class GimmickManager {
         List<GimmickConfig> result = new ArrayList<>();
         if (trackWS == null) return result;
 
-        for (GimmickConfig gimmick : gimmicksById.values()) {
+        for (GimmickConfig gimmick : gimmicksByKey.values()) {
             if (trackWS.equals(GimmickConfig.normalizeTrack(gimmick.getTrackNameWS()))) {
                 result.add(gimmick);
             }
@@ -125,15 +135,20 @@ public class GimmickManager {
     }
 
     public GimmickConfig findGimmickById(int id) {
+        return null;
+    }
+
+    /** Lookup by track + name key (replaces the old numeric id). */
+    public GimmickConfig findGimmickByKey(String trackNameWS, String name) {
         ensureDefinitionsLoaded();
-        return gimmicksById.get(id);
+        return gimmicksByKey.get(keyOf(trackNameWS, name));
     }
 
     /** Every gimmick name, used by the command tab completion. */
     public List<String> getAllGimmickNames() {
         ensureDefinitionsLoaded();
         List<String> names = new ArrayList<>();
-        for (GimmickConfig gimmick : gimmicksById.values()) {
+        for (GimmickConfig gimmick : gimmicksByKey.values()) {
             names.add(gimmick.getName());
         }
         names.sort(String.CASE_INSENSITIVE_ORDER);
@@ -159,11 +174,11 @@ public class GimmickManager {
         if (trackWS == null || trackWS.isBlank()) {
             throw new GimmickException("Informe a pista da gimmick.");
         }
-        if (!db().isTrackExists(trackWS)) {
+        if (!plugin.getDatabaseManager().isTrackExists(trackWS)) {
             throw new GimmickException("Pista não encontrada: " + trackName);
         }
 
-        // Reads the clipboard and writes the file first: a failure here must not touch the database.
+        // Reads the clipboard and writes the build file first.
         List<GimmickFile.Entry> entries = GimmickSchematics.readClipboard(player);
         if (entries.isEmpty()) {
             throw new GimmickException("O clipboard está vazio.");
@@ -180,8 +195,8 @@ public class GimmickManager {
         if (existing != null) {
             existing.setPasteLocation(anchor);
             existing.setPasteWithAir(pasteWithAir);
-            db().updateGimmick(existing);
-            dropPrepared(existing.getId());
+            store.save(existing);
+            dropPrepared(keyOf(existing));
             return existing;
         }
 
@@ -191,12 +206,8 @@ public class GimmickManager {
         gimmick.setCreatedAt(System.currentTimeMillis());
         gimmick.setEnabled(true);
 
-        int id = db().insertGimmick(gimmick);
-        if (id <= 0) {
-            throw new GimmickException("Não foi possível salvar a gimmick no banco de dados.");
-        }
-        gimmick.setId(id);
-        gimmicksById.put(id, gimmick);
+        store.save(gimmick);
+        gimmicksByKey.put(keyOf(gimmick), gimmick);
         return gimmick;
     }
 
@@ -211,8 +222,9 @@ public class GimmickManager {
 
     /** Whether the build of a gimmick is currently loaded in memory (one lap ahead). */
     public boolean isLoaded(GimmickConfig gimmick) {
-        for (Map<Integer, PreparedGimmick> prepared : preparedPerHeat.values()) {
-            PreparedGimmick entry = prepared.get(gimmick.getId());
+        String key = keyOf(gimmick);
+        for (Map<String, PreparedGimmick> prepared : preparedPerHeat.values()) {
+            PreparedGimmick entry = prepared.get(key);
             if (entry != null && entry.isReady()) return true;
         }
         return false;
@@ -220,28 +232,28 @@ public class GimmickManager {
 
     public void setAnnounceMessage(GimmickConfig gimmick, String message) {
         gimmick.setAnnounceMessage(message);
-        db().updateGimmick(gimmick);
+        store.save(gimmick);
     }
 
     public boolean toggleGimmick(GimmickConfig gimmick) {
         gimmick.setEnabled(!gimmick.isEnabled());
-        db().updateGimmick(gimmick);
+        store.save(gimmick);
         return gimmick.isEnabled();
     }
 
     /** Removes the definition, its files and every heat schedule pointing at it. */
     public void deleteGimmick(GimmickConfig gimmick) {
-        db().deleteGimmick(gimmick.getId());
-        gimmicksById.remove(gimmick.getId());
+        store.removeGimmickEverywhere(gimmick);
+        gimmicksByKey.remove(keyOf(gimmick));
 
         File file = fileOf(gimmick);
         if (file.exists() && !file.delete()) {
             logWarn("Não foi possível apagar o arquivo " + file.getName());
         }
 
-        // The rows are gone from the database, so cached schedules must be rebuilt.
+        // Schedules lived in the JSON file, so cached schedules must be rebuilt.
         scheduleCache.clear();
-        dropPrepared(gimmick.getId());
+        dropPrepared(keyOf(gimmick));
     }
 
     /* ========================================================
@@ -290,24 +302,25 @@ public class GimmickManager {
 
     private List<GimmickSchedule> loadSchedule(int heatId) {
         List<GimmickSchedule> schedules = new ArrayList<>();
-        for (DatabaseManager.HeatGimmickRow row : db().getHeatGimmicks(heatId)) {
-            GimmickConfig gimmick = gimmicksById.get(row.getGimmickId());
-            if (gimmick == null) continue; // definition was deleted
-            schedules.add(new GimmickSchedule(row.getHeatId(), gimmick, row.getTriggerLap()));
+        ensureDefinitionsLoaded();
+        for (GimmickConfig gimmick : gimmicksByKey.values()) {
+            Integer lap = store.loadSchedules(gimmick).get(heatId);
+            if (lap != null) schedules.add(new GimmickSchedule(heatId, gimmick, lap));
         }
+        schedules.sort(java.util.Comparator.comparingInt(GimmickSchedule::getTriggerLap));
         return schedules;
     }
 
     /** Heat the player has selected: /heat select, or the current heat of the selected event. */
     public Heats resolveSelectedHeat(Player player) {
         if (player == null) return null;
-        var selectedHeat = db().getPlayerSelectedHeat(player.getUniqueId());
+        var selectedHeat = plugin.getDatabaseManager().getPlayerSelectedHeat(player.getUniqueId());
         if (selectedHeat.isPresent()) {
             var heat = plugin.getRaceEventManager().getHeat(selectedHeat.get());
             if (heat.isPresent()) return heat.get();
         }
 
-        var event = db().getPlayerSelectedEvent(player.getUniqueId()).orElse(null);
+        var event = plugin.getDatabaseManager().getPlayerSelectedEvent(player.getUniqueId()).orElse(null);
         if (event != null) {
             var round = event.getSchedule().getCurrentRound().orElse(null);
             if (round != null) return round.getCurrentHeat().orElse(null);
@@ -318,8 +331,9 @@ public class GimmickManager {
     /** Finds the schedule of a gimmick in a heat, or null. */
     public GimmickSchedule findSchedule(Heats heat, GimmickConfig gimmick) {
         if (heat == null || gimmick == null) return null;
+        String wanted = keyOf(gimmick);
         for (GimmickSchedule schedule : getSchedule(heat)) {
-            if (schedule.getGimmick().getId() == gimmick.getId()) return schedule;
+            if (wanted.equals(keyOf(schedule.getGimmick()))) return schedule;
         }
         return null;
     }
@@ -368,17 +382,12 @@ public class GimmickManager {
             throw new GimmickException("O arquivo da gimmick '" + gimmick.getName() + "' não existe mais.");
         }
 
-        db().addHeatGimmick(heat.getId(), gimmick.getId(), lap);
+        store.saveSchedule(gimmick, heat.getId(), lap);
 
-        // Read back instead of trusting the update count: the upsert returns different
-        // values depending on the driver, and a silent failure would only show up after
-        // a restart.
-        boolean persisted = db()
-            .getHeatGimmicks(heat.getId())
-            .stream()
-            .anyMatch(row -> row.getGimmickId() == gimmick.getId());
+        // Read back: a silent failure would only show up after a restart.
+        boolean persisted = store.loadSchedules(gimmick).containsKey(heat.getId());
         if (!persisted) {
-            throw new GimmickException("Não foi possível salvar o agendamento no banco de dados.");
+            throw new GimmickException("Não foi possível salvar o agendamento no arquivo.");
         }
 
         GimmickSchedule schedule = new GimmickSchedule(heat.getId(), gimmick, lap);
@@ -393,22 +402,25 @@ public class GimmickManager {
 
     public boolean unscheduleGimmick(Heats heat, GimmickConfig gimmick) {
         if (heat == null || gimmick == null) return false;
+        String wanted = keyOf(gimmick);
         boolean removed = getSchedule(heat).removeIf(
-            schedule -> schedule.getGimmick().getId() == gimmick.getId()
+            schedule -> wanted.equals(keyOf(schedule.getGimmick()))
         );
         if (removed) {
-            db().removeHeatGimmick(heat.getId(), gimmick.getId());
-            dropPrepared(gimmick.getId());
+            store.removeSchedule(gimmick, heat.getId());
+            dropPrepared(wanted);
         }
         return removed;
     }
 
-    /** Keeps the heat rows in the database (they are the heat config). */
+    /** Clears the heat schedules (kept in the JSON files). */
     public void clearSchedule(Heats heat) {
         if (heat == null) return;
-        db().removeAllHeatGimmicks(heat.getId());
+        store.removeAllSchedules(heat.getId());
+        // Rebuild this heat's cache from disk.
+        scheduleCache.remove(heat.getId());
         getSchedule(heat).clear();
-        Map<Integer, PreparedGimmick> prepared = preparedPerHeat.remove(heat.getId());
+        Map<String, PreparedGimmick> prepared = preparedPerHeat.remove(heat.getId());
         if (prepared != null) prepared.clear();
     }
 
@@ -418,7 +430,7 @@ public class GimmickManager {
         scheduleCache.remove(heatId);
         lapBaseline.remove(heatId);
         if (heatId > 0) {
-            db().removeAllHeatGimmicks(heatId);
+            store.removeAllSchedules(heatId);
         }
     }
 
@@ -466,7 +478,7 @@ public class GimmickManager {
             if (schedule.isTriggered() || schedule.getTriggerLap() != lap) continue;
             GimmickConfig gimmick = schedule.getGimmick();
             if (gimmick == null || !gimmick.isEnabled()) continue;
-            if (isPrepared(heat.getId(), gimmick.getId())) continue;
+            if (isPrepared(heat.getId(), keyOf(gimmick))) continue;
             prepare(heat.getId(), gimmick, lap, false);
         }
     }
@@ -480,7 +492,7 @@ public class GimmickManager {
             if (gimmick == null || !gimmick.isEnabled()) continue;
             if (schedule.getTriggerLap() > heatLap) continue;
 
-            PreparedGimmick prepared = prepared(heat.getId()).get(gimmick.getId());
+            PreparedGimmick prepared = prepared(heat.getId()).get(keyOf(gimmick));
             if (prepared == null || !prepared.isReady()) {
                 // Still loading (or never prepared): the next lap event retries.
                 logWarn(
@@ -504,17 +516,17 @@ public class GimmickManager {
         prepare(MANUAL_HEAT_ID, gimmick, 1, true);
     }
 
-    private boolean isPrepared(int heatId, int gimmickId) {
-        return prepared(heatId).containsKey(gimmickId);
+    private boolean isPrepared(int heatId, String gimmickKey) {
+        return prepared(heatId).containsKey(gimmickKey);
     }
 
-    private Map<Integer, PreparedGimmick> prepared(int heatId) {
+    private Map<String, PreparedGimmick> prepared(int heatId) {
         return preparedPerHeat.computeIfAbsent(heatId, key -> new ConcurrentHashMap<>());
     }
 
-    private void dropPrepared(int gimmickId) {
-        for (Map<Integer, PreparedGimmick> prepared : preparedPerHeat.values()) {
-            prepared.remove(gimmickId);
+    private void dropPrepared(String gimmickKey) {
+        for (Map<String, PreparedGimmick> prepared : preparedPerHeat.values()) {
+            prepared.remove(gimmickKey);
         }
     }
 
@@ -540,7 +552,8 @@ public class GimmickManager {
             heatId
         );
         PreparedGimmick preparedGimmick = new PreparedGimmick(gimmick, backupFile);
-        prepared(heatId).put(gimmick.getId(), preparedGimmick); // marks it as in progress
+        String gimmickKey = keyOf(gimmick);
+        prepared(heatId).put(gimmickKey, preparedGimmick); // marks it as in progress
 
         SchedulerHelper.runAsync(plugin, () -> {
             List<GimmickBlocks.Placement> placements;
@@ -552,13 +565,13 @@ public class GimmickManager {
                 );
             } catch (Exception e) {
                 logWarn("[Gimmick] Falha ao carregar '" + gimmick.getName() + "': " + e.getMessage());
-                prepared(heatId).remove(gimmick.getId());
+                prepared(heatId).remove(gimmickKey);
                 return;
             }
 
             if (placements.isEmpty()) {
                 logWarn("[Gimmick] '" + gimmick.getName() + "' não tem blocos para colar.");
-                prepared(heatId).remove(gimmick.getId());
+                prepared(heatId).remove(gimmickKey);
                 return;
             }
 
@@ -592,7 +605,7 @@ public class GimmickManager {
             return;
         }
 
-        prepared(heatId).remove(gimmick.getId());
+        prepared(heatId).remove(keyOf(gimmick));
         pasted(heatId).push(
             new PastedGimmick(
                 gimmick.getName(),
@@ -617,7 +630,7 @@ public class GimmickManager {
     /** Undoes every paste of a heat. */
     public void restoreHeat(int heatId) {
         Deque<PastedGimmick> pasted = pastedPerHeat.remove(heatId);
-        Map<Integer, PreparedGimmick> prepared = preparedPerHeat.remove(heatId);
+        Map<String, PreparedGimmick> prepared = preparedPerHeat.remove(heatId);
         if (prepared != null) prepared.clear();
         if (pasted == null || pasted.isEmpty()) return;
 

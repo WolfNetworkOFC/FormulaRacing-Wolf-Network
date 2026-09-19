@@ -9074,6 +9074,12 @@ public class DatabaseManager {
      *  (fr_heat_gimmicks, see HeatGimmickRow).
      * ======================================================== */
 
+    /* ========================================================
+     *  GIMMICKS (legado, file-only agora — ver GimmickStore)
+     *  As tabelas continuam sendo criadas para compatibilidade,
+     *  mas o GimmickManager não usa mais o banco.
+     * ======================================================== */
+
     private GimmickConfig readGimmick(ResultSet rs) throws SQLException {
         GimmickConfig gimmick = new GimmickConfig();
         gimmick.setId(rs.getInt("id"));
@@ -9094,153 +9100,30 @@ public class DatabaseManager {
     }
 
     public synchronized List<GimmickConfig> getAllGimmicks() {
-        List<GimmickConfig> gimmicks = new ArrayList<>();
-        String sql = "SELECT * FROM fr_gimmicks ORDER BY name";
-        try {
-            Connection conn = getOrConnect();
-            try (
-                PreparedStatement ps = conn.prepareStatement(sql);
-                ResultSet rs = ps.executeQuery()
-            ) {
-                while (rs.next()) gimmicks.add(readGimmick(rs));
-            }
-        } catch (SQLException e) {
-            handleSqlError(e);
-        }
-        return gimmicks;
+        return new ArrayList<>();
     }
 
     public synchronized GimmickConfig getGimmick(
         String trackNameWS,
         String name
     ) {
-        if (trackNameWS == null || name == null) return null;
-        String sql =
-            "SELECT * FROM fr_gimmicks WHERE LOWER(trackNameWS) = LOWER(?) " +
-            "AND LOWER(name) = LOWER(?) LIMIT 1";
-        try {
-            Connection conn = getOrConnect();
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setString(1, trackNameWS.replaceAll("\\s+", ""));
-                ps.setString(2, name.trim());
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) return readGimmick(rs);
-                }
-            }
-        } catch (SQLException e) {
-            handleSqlError(e);
-        }
         return null;
     }
 
     /** @return the id of the new gimmick, or -1 when the insert failed. */
     public synchronized int insertGimmick(GimmickConfig gimmick) {
-        String sql =
-            "INSERT INTO fr_gimmicks (name, trackNameWS, worldName, x, y, z, pasteWithAir, " +
-            "announceMessage, enabled, createdBy, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try {
-            Connection conn = getOrConnect();
-            try (
-                PreparedStatement ps = conn.prepareStatement(
-                    sql,
-                    Statement.RETURN_GENERATED_KEYS
-                )
-            ) {
-                ps.setString(1, gimmick.getName());
-                ps.setString(2, gimmick.getTrackNameWS());
-                ps.setString(3, gimmick.getWorldName());
-                ps.setDouble(4, gimmick.getX());
-                ps.setDouble(5, gimmick.getY());
-                ps.setDouble(6, gimmick.getZ());
-                ps.setBoolean(7, gimmick.isPasteWithAir());
-                ps.setString(8, gimmick.getAnnounceMessage());
-                ps.setBoolean(9, gimmick.isEnabled());
-                ps.setString(10, gimmick.getCreatedBy());
-                ps.setLong(11, gimmick.getCreatedAt());
-                ps.executeUpdate();
-                try (ResultSet keys = ps.getGeneratedKeys()) {
-                    if (keys.next()) return keys.getInt(1);
-                }
-            }
-        } catch (SQLException e) {
-            handleSqlError(e);
-        }
         return -1;
     }
 
     public synchronized void updateGimmick(GimmickConfig gimmick) {
-        String sql =
-            "UPDATE fr_gimmicks SET worldName = ?, x = ?, y = ?, z = ?, pasteWithAir = ?, " +
-            "announceMessage = ?, enabled = ? WHERE id = ?";
-        try {
-            Connection conn = getOrConnect();
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setString(1, gimmick.getWorldName());
-                ps.setDouble(2, gimmick.getX());
-                ps.setDouble(3, gimmick.getY());
-                ps.setDouble(4, gimmick.getZ());
-                ps.setBoolean(5, gimmick.isPasteWithAir());
-                ps.setString(6, gimmick.getAnnounceMessage());
-                ps.setBoolean(7, gimmick.isEnabled());
-                ps.setInt(8, gimmick.getId());
-                ps.executeUpdate();
-            }
-        } catch (SQLException e) {
-            handleSqlError(e);
-        }
     }
 
     /** Deletes the definition and every heat schedule pointing at it. */
     public synchronized void deleteGimmick(int gimmickId) {
-        try {
-            Connection conn = getOrConnect();
-            try (
-                PreparedStatement ps = conn.prepareStatement(
-                    "DELETE FROM fr_heat_gimmicks WHERE gimmickId = ?"
-                )
-            ) {
-                ps.setInt(1, gimmickId);
-                ps.executeUpdate();
-            }
-            try (
-                PreparedStatement ps = conn.prepareStatement(
-                    "DELETE FROM fr_gimmicks WHERE id = ?"
-                )
-            ) {
-                ps.setInt(1, gimmickId);
-                ps.executeUpdate();
-            }
-        } catch (SQLException e) {
-            handleSqlError(e);
-        }
     }
 
     public synchronized List<HeatGimmickRow> getHeatGimmicks(int heatId) {
-        List<HeatGimmickRow> rows = new ArrayList<>();
-        String sql =
-            "SELECT hg.id, hg.heatId, hg.gimmickId, hg.triggerLap FROM fr_heat_gimmicks hg " +
-            "WHERE hg.heatId = ? ORDER BY hg.triggerLap, hg.id";
-        try {
-            Connection conn = getOrConnect();
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, heatId);
-                try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        rows.add(
-                            new HeatGimmickRow(
-                                rs.getInt("id"),
-                                rs.getInt("heatId"),
-                                rs.getInt("gimmickId"),
-                                rs.getInt("triggerLap")
-                            )
-                        );
-                    }
-                }
-            }
-        } catch (SQLException e) {
-            handleSqlError(e);
-        }
-        return rows;
+        return new ArrayList<>();
     }
 
     /** @return true when a new schedule was created, false when it was updated or failed. */
@@ -9249,48 +9132,13 @@ public class DatabaseManager {
         int gimmickId,
         int triggerLap
     ) {
-        String sql =
-            "INSERT INTO fr_heat_gimmicks (heatId, gimmickId, triggerLap) VALUES (?, ?, ?) " +
-            "ON CONFLICT(heatId, gimmickId) DO UPDATE SET triggerLap = excluded.triggerLap";
-        try {
-            Connection conn = getOrConnect();
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, heatId);
-                ps.setInt(2, gimmickId);
-                ps.setInt(3, triggerLap);
-                return ps.executeUpdate() > 0;
-            }
-        } catch (SQLException e) {
-            handleSqlError(e);
-        }
         return false;
     }
 
     public synchronized void removeHeatGimmick(int heatId, int gimmickId) {
-        String sql = "DELETE FROM fr_heat_gimmicks WHERE heatId = ? AND gimmickId = ?";
-        try {
-            Connection conn = getOrConnect();
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, heatId);
-                ps.setInt(2, gimmickId);
-                ps.executeUpdate();
-            }
-        } catch (SQLException e) {
-            handleSqlError(e);
-        }
     }
 
     public synchronized void removeAllHeatGimmicks(int heatId) {
-        String sql = "DELETE FROM fr_heat_gimmicks WHERE heatId = ?";
-        try {
-            Connection conn = getOrConnect();
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, heatId);
-                ps.executeUpdate();
-            }
-        } catch (SQLException e) {
-            handleSqlError(e);
-        }
     }
 
     public static class HeatGimmickRow {
