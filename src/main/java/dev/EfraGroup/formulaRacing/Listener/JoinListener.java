@@ -107,7 +107,7 @@ public class JoinListener implements Listener {
                             onlinePlayer.sendMessage(welcomeMsg);
                         }
                     } else {
-                        msg = this.plugin.applyPapi(player, this.plugin.getConfig().getString("message-settings.join.message", "[+] {rank} {player}").replace("{player}", playerName).replace("{rank}", rank));
+                        msg = this.buildJoinMessage(player, playerName);
                     }
 
                     String finalMsg = msg;
@@ -140,6 +140,44 @@ public class JoinListener implements Listener {
             int version = FormulaRacing.getInstance().getOpenBoatUtilsVersion(uuid);
             OpenBoatUtilsVersion.setPlayerVersion(uuid, version);
         }
+    }
+
+    /**
+     * Monta a mensagem de entrada com retry: no momento do join o LuckPerms
+     * pode ainda não ter carregado o usuário e o PAPI pode não ter os
+     * placeholders prontos, deixando códigos crus visíveis. Tenta até
+     * MAX_ATTEMPTS vezes e só então usa o melhor resultado disponível.
+     */
+    private String buildJoinMessage(Player player, String playerName) {
+        String template = this.plugin.getConfig().getString("message-settings.join.message", "[+] {rank} {player}");
+        String rank = this.getPlayerRank(player.getUniqueId());
+        String msg = this.plugin.applyPapi(player, template.replace("{player}", playerName).replace("{rank}", rank));
+        if (!containsUnresolvedCode(msg)) {
+            return msg;
+        }
+        // Retry com pequenas pausas: dá tempo do LuckPerms/PAPI carregarem
+        for (int i = 0; i < 4; i++) {
+            try {
+                Thread.sleep(500L);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+            if (!player.isOnline()) break;
+            rank = this.getPlayerRank(player.getUniqueId());
+            msg = this.plugin.applyPapi(player, template.replace("{player}", playerName).replace("{rank}", rank));
+            if (!containsUnresolvedCode(msg)) {
+                return msg;
+            }
+        }
+        // Último recurso: sem o rank, para nunca exibir código cru
+        return this.plugin.applyPapi(player, template.replace("{player}", playerName).replace("{rank}", "").replace("  ", " ").trim());
+    }
+
+    private boolean containsUnresolvedCode(String msg) {
+        if (msg == null) return false;
+        // Placeholders PAPI/LuckPerms não resolvidos ou tags de ícone cruas
+        return msg.contains("%") || msg.matches(".*:[a-zA-Z_]+:.*");
     }
 
     public boolean isFloodgatePlayer(UUID uuid) {
