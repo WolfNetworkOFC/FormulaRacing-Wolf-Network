@@ -64,6 +64,8 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     }
 
     public void open(Player player) {
+        // Detecta Bedrock na thread principal (Floodgate exige thread segura).
+        final boolean bedrock = plugin.isBedrockPlayer(player);
         SchedulerHelper.runAsync(plugin, () -> {
             try {
                 // Fixed: Defining types for the Map returned by MySQL
@@ -86,6 +88,10 @@ public class TimeTrialMenuUtilsV2 implements Listener {
 
                     // Skip tracks that are not open (flag já vem na query principal, sem query extra)
                     if (!data.isOpen()) continue;
+
+                    // Bedrock: mostra só pistas sem boatutils (OBU não funciona no Bedrock)
+                    String trackWS = trackName.replaceAll("\\s+", "");
+                    if (bedrock && this.mysql.trackHaveBoatUtils(trackWS)) continue;
 
                     String icon = data.getIconName();
                     String trackNameWS = trackName.replaceAll("\\s+", "").toLowerCase();
