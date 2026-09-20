@@ -110,6 +110,18 @@ message-settings:
     enabled: true
     message: §8[§c-§8] §c{player} {rank}
 
+# =========================================================
+#                     PREFIX SETTINGS
+# Ícones de cargo aplicados SOMENTE no servidor boatracing.
+# No LuckPerms, use o contexto server=boatracing nos prefixos,
+# ex: /lp group gerente meta addprefix 100 "%img_manager% " server=boatracing
+# =========================================================
+prefix-settings:
+  # Nome do servidor onde os prefixos de cargo com ícone valem.
+  boat-server-name: boatracing
+  # Fallback caso o nome não seja detectado automaticamente.
+  server-name: ""
+
 # =========================================================#
 #                         BSTATS                           #
 # =========================================================#

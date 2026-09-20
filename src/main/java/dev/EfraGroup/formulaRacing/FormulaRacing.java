@@ -1016,6 +1016,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             } catch (Exception ignored) {}
         }
         message = message.replace("%img_java%", "\uE000").replace("%img_bedrock%", "\uE001");
+        message = message.replace("%img_builder%", "\uE002").replace("%img_manager%", "\uE003");
+        message = message.replace("%img_helper%", "\uE004").replace("%img_admin%", "\uE005");
+        message = message.replace("%img_dev%", "\uE006").replace("%img_mod%", "\uE007");
         return message;
     }
 

@@ -7,6 +7,7 @@ import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.BoatUtils.OpenBoatUtilsVersion;
 import me.clip.placeholderapi.PlaceholderAPI;
+import java.io.File;
 import java.sql.SQLException;
 import java.util.UUID;
 
@@ -180,20 +181,66 @@ public class JoinListener implements Listener {
 
         String primaryGroup = user.getPrimaryGroup();
 
+        String boatServer = this.plugin.getConfig().getString("prefix-settings.boat-server-name", "boatracing");
+        String currentServer = getCurrentServerName();
+        boolean onBoatServer = boatServer != null && boatServer.equalsIgnoreCase(currentServer);
+
+        String iconPrefix = null;
         if (primaryGroup.equalsIgnoreCase("default")) {
-            String prefix;
             if (isFloodgatePlayer(player.getUniqueId())){
-                prefix = "%img_bedrock% ";
+                iconPrefix = "%img_bedrock% ";
                 TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, "%img_bedrock% §r");
 
             } else{
-                prefix = "%img_java% ";
+                iconPrefix = "%img_java% ";
                 TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, "%img_java% §r");
             }
+        } else if (onBoatServer) {
+            String imgTag = groupIconTag(primaryGroup);
+            if (imgTag != null) {
+                iconPrefix = imgTag + " ";
+                TabAPI.getInstance().getTabListFormatManager().setPrefix(tabPlayer, imgTag + " §r");
+            }
+        }
 
+        if (iconPrefix != null) {
+            String prefix = iconPrefix;
             user.data().clear(node -> node instanceof PrefixNode);
             user.data().add(PrefixNode.builder(prefix, 100).build());
             luckPerms.getUserManager().saveUser(user);
+        }
+    }
+
+    private String getCurrentServerName() {
+        try {
+            File velocityConfig = new File("velocity.toml");
+            if (velocityConfig.exists()) {
+                return System.getProperty("velocity.server.name", "");
+            }
+            String serverName = this.plugin.getConfig().getString("prefix-settings.server-name", "");
+            if (serverName != null && !serverName.isBlank()) return serverName;
+        } catch (Exception ignored) {
+        }
+        return Bukkit.getServer().getName();
+    }
+
+    private String groupIconTag(String group) {
+        if (group == null) return null;
+        switch (group.toLowerCase(java.util.Locale.ROOT)) {
+            case "builder": return "%img_builder%";
+            case "gerente":
+            case "manager": return "%img_manager%";
+            case "helper":
+            case "ajudante": return "%img_helper%";
+            case "administrador":
+            case "admin": return "%img_admin%";
+            case "dev":
+            case "developer":
+            case "desenvolvedor": return "%img_dev%";
+            case "moderador":
+            case "mod":
+            case "moderator": return "%img_mod%";
+            default: return null;
         }
     }
 
