@@ -778,15 +778,43 @@ public class RegionListener implements Listener {
     }
 
     private boolean isDrivingBoat(Player player) {
-        if (player == null || !player.isInsideVehicle()) {
-            return false;
+        if (player == null) return false;
+        try {
+            // No Folia, o estado da entidade só pode ser lido na thread da região dela.
+            // Fora dela, usa só isInsideVehicle (estado do player) em vez de tocar
+            // no barco, e assume pilotando — o checkPlayerRegions já validou
+            // na thread correta antes de chegar aqui.
+            if (!Bukkit.isOwnedByCurrentRegion(player)) {
+                return player.isInsideVehicle();
+            }
+            if (!player.isInsideVehicle()) {
+                return false;
+            }
+            if (!(player.getVehicle() instanceof org.bukkit.entity.Boat)) {
+                return false;
+            }
+            // O piloto é o primeiro passageiro; demais são caronas
+            java.util.List<org.bukkit.entity.Entity> passengers = player.getVehicle().getPassengers();
+            return !passengers.isEmpty() && passengers.get(0).equals(player);
+        } catch (IllegalStateException e) {
+            return safeInsideVehicle(player);
         }
-        if (!(player.getVehicle() instanceof org.bukkit.entity.Boat)) {
-            return false;
+    }
+
+    private boolean safeInsideVehicle(Player player) {
+        try {
+            return player.isInsideVehicle();
+        } catch (IllegalStateException e) {
+            return true;
         }
-        // O piloto é o primeiro passageiro; demais são caronas
-        java.util.List<org.bukkit.entity.Entity> passengers = player.getVehicle().getPassengers();
-        return !passengers.isEmpty() && passengers.get(0).equals(player);
+    }
+
+    private boolean isBoatVehicle(Player player) {
+        try {
+            return player.getVehicle() instanceof org.bukkit.entity.Boat;
+        } catch (IllegalStateException e) {
+            return true;
+        }
     }
 
     private boolean isBedrockPlayer(UUID uuid) {
