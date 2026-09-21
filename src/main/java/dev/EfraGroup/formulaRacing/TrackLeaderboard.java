@@ -43,10 +43,15 @@ public class TrackLeaderboard {
         this.plugin = plugin;
         this.trackName = trackName;
         this.mySQLManager = mySQLManager;
+        // Each type uses ONLY its own saved location. Never fall back to
+        // `defaultLocation` for a type that has no location saved: on
+        // loadLeaderboards() the default is the OTHER type's location, which made
+        // an unset Bedrock board render on top of the Java one after a restart.
+        // A type without its own location is simply not drawn.
         Location savedJava = mySQLManager.getHologramLocation(trackName, "java");
         Location savedBedrock = mySQLManager.getHologramLocation(trackName, "bedrock");
-        this.javaLocation = savedJava != null ? savedJava : defaultLocation.clone();
-        this.bedrockLocation = savedBedrock != null ? savedBedrock : defaultLocation.clone();
+        this.javaLocation = savedJava;
+        this.bedrockLocation = savedBedrock;
         this.javaEnabled = mySQLManager.isHologramEnabled(trackName, "java");
         this.bedrockEnabled = mySQLManager.isHologramEnabled(trackName, "bedrock");
     }
@@ -256,6 +261,12 @@ public class TrackLeaderboard {
 
         String safeTrackName = this.trackName.toLowerCase().replaceAll("[^a-z0-9]", "");
         Location holoLoc = this.locationForType(type);
+
+        // No location set for this type -> nothing to draw (prevents an unset
+        // Bedrock board from being created at the Java board's location).
+        if (holoLoc == null || holoLoc.getWorld() == null) {
+            return;
+        }
 
         if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
             Runnable updateDecentHologram = () -> {

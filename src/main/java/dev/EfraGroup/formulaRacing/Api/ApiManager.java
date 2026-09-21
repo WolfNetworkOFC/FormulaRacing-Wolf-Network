@@ -1927,15 +1927,6 @@ public class ApiManager {
             authToken = "";
             authProtectLogs = false;
         }
-        } catch (Exception e) {
-            plugin.getLogger().warning("Failed to load API config, using defaults: " + e.getMessage());
-            port = 8080;
-            corsEnabled = true;
-            rateLimitEnabled = true;
-            requestsPerMinute = 60;
-            logRequests = true;
-            logErrors = true;
-        }
     }
 
     public void reloadConfig() {
