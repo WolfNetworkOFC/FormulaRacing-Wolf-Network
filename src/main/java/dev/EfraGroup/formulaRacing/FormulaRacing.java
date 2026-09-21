@@ -848,6 +848,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.commandManager.registerCommand(new GimmickCommand(this));
             this.commandManager.registerCommand(new OpenBoatUtilsCommand(this));
             this.commandManager.registerCommand(new WeatherCommand(this));
+            this.commandManager.registerCommand(new FormulaRacingCommand(this));
         } catch (Exception e) {
             if (this.debugManager != null) {
                 this.debugManager.logRaceSystem(
