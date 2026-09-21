@@ -20,11 +20,14 @@ import dev.EfraGroup.formulaRacing.League.TeamConfig;
 import dev.EfraGroup.formulaRacing.League.TeamMode;
 import dev.EfraGroup.formulaRacing.Pontuation.PointsConfig;
 import dev.EfraGroup.formulaRacing.League.scoring.ScoringRegistry;
+import dev.EfraGroup.formulaRacing.Utils.SenderUtils;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.Location;
 
@@ -40,38 +43,41 @@ public class LeagueCommand extends BaseCommand {
     }
 
     @Default
-    public void onDefault(Player player) {
-        League league = leagueManager.getSelectedLeague(player.getUniqueId()).orElse(null);
+    public void onDefault(CommandSender sender) {
+        League league = this.selectedLeague(sender).orElse(null);
         if (league == null) {
-            plugin.sendMessage(player, "league_none_selected");
+            plugin.sendMessage(sender, "league_none_selected");
             return;
         }
-        showInfo(player, league);
+        showInfo(sender, league);
     }
 
     @Subcommand("create")
     @CommandPermission("formularacing.event.admin")
     @Description("Cria uma liga")
-    public void onCreate(Player player, String name) {
+    public void onCreate(CommandSender sender, String name) {
         try {
-            League league = leagueManager.createLeague(player.getUniqueId(), name);
+            League league = leagueManager.createLeague(this.ownerUuid(sender), name);
             if (league == null) {
-                plugin.sendMessage(player, "league_create_error");
+                plugin.sendMessage(sender, "league_create_error");
                 return;
             }
-            leagueManager.selectLeague(player.getUniqueId(), league);
-            plugin.sendMessage(player, "league_created", "{league}", league.getName());
+            Player owner = SenderUtils.player(sender);
+            if (owner != null) {
+                leagueManager.selectLeague(owner.getUniqueId(), league);
+            }
+            plugin.sendMessage(sender, "league_created", "{league}", league.getName());
         } catch (SQLException e) {
-            plugin.sendMessage(player, "league_create_error");
+            plugin.sendMessage(sender, "league_create_error");
         }
     }
 
     @Subcommand("list")
-    public void onList(Player player) {
-        plugin.sendMessage(player, "league_list_header");
+    public void onList(CommandSender sender) {
+        plugin.sendMessage(sender, "league_list_header");
         for (League league : leagueManager.getAllLeagues()) {
             plugin.sendMessage(
-                player,
+                sender,
                 "league_list_row",
                 "{league}",
                 league.getName(),
@@ -83,45 +89,50 @@ public class LeagueCommand extends BaseCommand {
 
     @Subcommand("select")
     @CommandCompletion("@leagues")
-    public void onSelect(Player player, String leagueName) {
+    public void onSelect(CommandSender sender, String leagueName) {
         League league = leagueManager.getLeagueByName(leagueName).orElse(null);
         if (league == null) {
-            plugin.sendMessage(player, "league_not_found", "{league}", leagueName);
+            plugin.sendMessage(sender, "league_not_found", "{league}", leagueName);
             return;
         }
-        leagueManager.selectLeague(player.getUniqueId(), league);
-        plugin.sendMessage(player, "league_selected", "{league}", league.getName());
-        showInfo(player, league);
+        Player selector = SenderUtils.player(sender);
+        if (selector == null) {
+            sender.sendMessage("§cApenas jogadores podem selecionar uma liga.");
+            return;
+        }
+        leagueManager.selectLeague(selector.getUniqueId(), league);
+        plugin.sendMessage(sender, "league_selected", "{league}", league.getName());
+        showInfo(sender, league);
     }
 
     @Subcommand("info")
     @CommandCompletion("@leagues")
-    public void onInfo(Player player, @Optional String leagueName) {
+    public void onInfo(CommandSender sender, @Optional String leagueName) {
         League league = leagueName == null
-            ? leagueManager.getSelectedLeague(player.getUniqueId()).orElse(null)
+            ? this.selectedLeague(sender).orElse(null)
             : leagueManager.getLeagueByName(leagueName).orElse(null);
         if (league == null) {
-            plugin.sendMessage(player, "league_none_selected");
+            plugin.sendMessage(sender, "league_none_selected");
             return;
         }
-        showInfo(player, league);
+        showInfo(sender, league);
     }
 
     @Subcommand("addteam")
     @CommandPermission("formularacing.event.admin")
-    public void onAddTeam(Player player, String teamName) {
-        League league = leagueManager.getSelectedLeague(player.getUniqueId()).orElse(null);
+    public void onAddTeam(CommandSender sender, String teamName) {
+        League league = this.selectedLeague(sender).orElse(null);
         if (league == null) {
-            plugin.sendMessage(player, "league_none_selected");
+            plugin.sendMessage(sender, "league_none_selected");
             return;
         }
         try {
             if (leagueManager.addTeam(league, teamName) == null) {
-                plugin.sendMessage(player, "league_team_add_error", "{team}", teamName);
+                plugin.sendMessage(sender, "league_team_add_error", "{team}", teamName);
                 return;
             }
             plugin.sendMessage(
-                player,
+                sender,
                 "league_team_added",
                 "{team}",
                 teamName,
@@ -129,31 +140,31 @@ public class LeagueCommand extends BaseCommand {
                 league.getName()
             );
         } catch (SQLException e) {
-            plugin.sendMessage(player, "league_team_add_error", "{team}", teamName);
+            plugin.sendMessage(sender, "league_team_add_error", "{team}", teamName);
         }
     }
 
     @Subcommand("adddriver")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@players @nothing")
-    public void onAddDriver(Player player, String playerName, @Optional String teamName) {
-        League league = leagueManager.getSelectedLeague(player.getUniqueId()).orElse(null);
+    public void onAddDriver(CommandSender sender, String playerName, @Optional String teamName) {
+        League league = this.selectedLeague(sender).orElse(null);
         if (league == null) {
-            plugin.sendMessage(player, "league_none_selected");
+            plugin.sendMessage(sender, "league_none_selected");
             return;
         }
         OfflinePlayer target = Bukkit.getOfflinePlayer(playerName);
         if (target == null || target.getUniqueId() == null) {
-            plugin.sendMessage(player, "player_not_found");
+            plugin.sendMessage(sender, "player_not_found");
             return;
         }
         try {
             if (leagueManager.addDriver(league, target.getUniqueId(), teamName) == null) {
-                plugin.sendMessage(player, "league_driver_add_error", "{player}", playerName);
+                plugin.sendMessage(sender, "league_driver_add_error", "{player}", playerName);
                 return;
             }
             plugin.sendMessage(
-                player,
+                sender,
                 "league_driver_added",
                 "{player}",
                 playerName,
@@ -161,22 +172,22 @@ public class LeagueCommand extends BaseCommand {
                 league.getName()
             );
         } catch (SQLException e) {
-            plugin.sendMessage(player, "league_driver_add_error", "{player}", playerName);
+            plugin.sendMessage(sender, "league_driver_add_error", "{player}", playerName);
         }
     }
 
     @Subcommand("linkevent")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@event")
-    public void onLinkEvent(Player player, String eventName, @Optional String roundNumberText) {
-        League league = leagueManager.getSelectedLeague(player.getUniqueId()).orElse(null);
+    public void onLinkEvent(CommandSender sender, String eventName, @Optional String roundNumberText) {
+        League league = this.selectedLeague(sender).orElse(null);
         if (league == null) {
-            plugin.sendMessage(player, "league_none_selected");
+            plugin.sendMessage(sender, "league_none_selected");
             return;
         }
         Events event = plugin.getRaceEventManager().getEventByName(eventName).orElse(null);
         if (event == null) {
-            plugin.sendMessage(player, "event_not_found");
+            plugin.sendMessage(sender, "event_not_found");
             return;
         }
         int roundNumber = 1;
@@ -184,16 +195,16 @@ public class LeagueCommand extends BaseCommand {
             try {
                 roundNumber = Integer.parseInt(roundNumberText);
             } catch (NumberFormatException e) {
-                plugin.sendMessage(player, "invalid_number");
+                plugin.sendMessage(sender, "invalid_number");
                 return;
             }
         }
         if (!leagueManager.linkEvent(league, event, roundNumber)) {
-            plugin.sendMessage(player, "league_link_error");
+            plugin.sendMessage(sender, "league_link_error");
             return;
         }
         plugin.sendMessage(
-            player,
+            sender,
             "league_event_linked",
             "{league}",
             league.getName(),
@@ -204,22 +215,22 @@ public class LeagueCommand extends BaseCommand {
 
     @Subcommand("standings")
     @CommandCompletion("drivers|teams @leagues")
-    public void onStandings(Player player, @Optional String type, @Optional String leagueName) {
+    public void onStandings(CommandSender sender, @Optional String type, @Optional String leagueName) {
         League league = leagueName == null
-            ? leagueManager.getSelectedLeague(player.getUniqueId()).orElse(null)
+            ? this.selectedLeague(sender).orElse(null)
             : leagueManager.getLeagueByName(leagueName).orElse(null);
         if (league == null) {
-            plugin.sendMessage(player, "league_none_selected");
+            plugin.sendMessage(sender, "league_none_selected");
             return;
         }
 
         if ("teams".equalsIgnoreCase(type)) {
-            plugin.sendMessage(player, "league_standings_teams_header", "{league}", league.getName());
+            plugin.sendMessage(sender, "league_standings_teams_header", "{league}", league.getName());
             List<LeagueTeamStanding> standings = leagueManager.getTeamStandings(league);
             for (int i = 0; i < standings.size(); i++) {
                 LeagueTeamStanding row = standings.get(i);
                 plugin.sendMessage(
-                    player,
+                    sender,
                     "league_standings_team_row",
                     "{position}",
                     String.valueOf(i + 1),
@@ -232,7 +243,7 @@ public class LeagueCommand extends BaseCommand {
             return;
         }
 
-        plugin.sendMessage(player, "league_standings_drivers_header", "{league}", league.getName());
+        plugin.sendMessage(sender, "league_standings_drivers_header", "{league}", league.getName());
         List<LeagueStanding> standings = leagueManager.getDriverStandings(league);
         for (int i = 0; i < standings.size(); i++) {
             LeagueStanding row = standings.get(i);
@@ -241,7 +252,7 @@ public class LeagueCommand extends BaseCommand {
                 name = row.getPlayerUUID().toString();
             }
             plugin.sendMessage(
-                player,
+                sender,
                 "league_standings_driver_row",
                 "{position}",
                 String.valueOf(i + 1),
@@ -256,116 +267,116 @@ public class LeagueCommand extends BaseCommand {
     @Subcommand("delete")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues")
-    public void onDelete(Player player, String leagueName) {
+    public void onDelete(CommandSender sender, String leagueName) {
         League league = leagueManager.getLeagueByName(leagueName).orElse(null);
         if (league == null) {
-            plugin.sendMessage(player, "league_not_found", "{league}", leagueName);
+            plugin.sendMessage(sender, "league_not_found", "{league}", leagueName);
             return;
         }
         plugin.getLeagueHologramService().removeHolograms(league);
         leagueManager.getAllLeagues().remove(league);
-        plugin.sendMessage(player, "league_deleted", "{league}", league.getName());
+        plugin.sendMessage(sender, "league_deleted", "{league}", league.getName());
     }
 
     @Subcommand("addevent")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues @event")
-    public void onAddEvent(Player player, String leagueName, String eventName) {
+    public void onAddEvent(CommandSender sender, String leagueName, String eventName) {
         League league = leagueManager.getLeagueByName(leagueName).orElse(null);
         if (league == null) {
-            plugin.sendMessage(player, "league_not_found", "{league}", leagueName);
+            plugin.sendMessage(sender, "league_not_found", "{league}", leagueName);
             return;
         }
         Events event = plugin.getRaceEventManager().getEventByName(eventName).orElse(null);
         if (event == null) {
-            plugin.sendMessage(player, "event_not_found");
+            plugin.sendMessage(sender, "event_not_found");
             return;
         }
         try {
             leagueManager.linkEvent(league, event, 1);
             league.getCalendar().putIfAbsent(event.getId(), new LeagueCalendarEntry(event.getId()));
-            plugin.sendMessage(player, "league_event_linked",
+            plugin.sendMessage(sender, "league_event_linked",
                 "{league}", league.getName(), "{event}", event.getDisplayName());
         } catch (Exception e) {
-            plugin.sendMessage(player, "league_link_error");
+            plugin.sendMessage(sender, "league_link_error");
         }
     }
 
     @Subcommand("removeevent")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues @event")
-    public void onRemoveEvent(Player player, String leagueName, String eventName) {
+    public void onRemoveEvent(CommandSender sender, String leagueName, String eventName) {
         League league = leagueManager.getLeagueByName(leagueName).orElse(null);
         if (league == null) {
-            plugin.sendMessage(player, "league_not_found", "{league}", leagueName);
+            plugin.sendMessage(sender, "league_not_found", "{league}", leagueName);
             return;
         }
         Events event = plugin.getRaceEventManager().getEventByName(eventName).orElse(null);
         if (event == null) {
-            plugin.sendMessage(player, "event_not_found");
+            plugin.sendMessage(sender, "event_not_found");
             return;
         }
         league.getCalendar().remove(event.getId());
-        plugin.sendMessage(player, "league_event_unlinked",
+        plugin.sendMessage(sender, "league_event_unlinked",
             "{league}", league.getName(), "{event}", event.getDisplayName());
     }
 
     @Subcommand("seteventcategory")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues @event @nothing")
-    public void onSetEventCategory(Player player, String leagueName, String eventName, String categoryName) {
-        League league = requireLeague(player, leagueName);
+    public void onSetEventCategory(CommandSender sender, String leagueName, String eventName, String categoryName) {
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
         Events event = plugin.getRaceEventManager().getEventByName(eventName).orElse(null);
         if (event == null) {
-            plugin.sendMessage(player, "event_not_found");
+            plugin.sendMessage(sender, "event_not_found");
             return;
         }
         try {
             leagueManager.setEventMeta(league, event.getId(),
                 categoryName.isBlank() ? null : categoryName, null);
-            plugin.sendMessage(player, "league_event_category_set",
+            plugin.sendMessage(sender, "league_event_category_set",
                 "{event}", event.getDisplayName(), "{category}", categoryName);
         } catch (SQLException e) {
-            plugin.sendMessage(player, "league_link_error");
+            plugin.sendMessage(sender, "league_link_error");
         }
     }
 
     @Subcommand("seteventheat")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues @event @nothing")
-    public void onSetEventHeat(Player player, String leagueName, String eventName, Integer heatId) {
-        League league = requireLeague(player, leagueName);
+    public void onSetEventHeat(CommandSender sender, String leagueName, String eventName, Integer heatId) {
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
         Events event = plugin.getRaceEventManager().getEventByName(eventName).orElse(null);
         if (event == null) {
-            plugin.sendMessage(player, "event_not_found");
+            plugin.sendMessage(sender, "event_not_found");
             return;
         }
         try {
             leagueManager.setEventMeta(league, event.getId(), null, heatId);
-            plugin.sendMessage(player, "league_event_heat_set",
+            plugin.sendMessage(sender, "league_event_heat_set",
                 "{event}", event.getDisplayName(), "{heat}", String.valueOf(heatId));
         } catch (SQLException e) {
-            plugin.sendMessage(player, "league_link_error");
+            plugin.sendMessage(sender, "league_link_error");
         }
     }
 
     @Subcommand("scoring")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues @nothing @nothing")
-    public void onScoring(Player player, String leagueName, String systemId, @Optional String categoryName) {
-        League league = requireLeague(player, leagueName);
+    public void onScoring(CommandSender sender, String leagueName, String systemId, @Optional String categoryName) {
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
         if (!ScoringRegistry.exists(systemId)) {
-            plugin.sendMessage(player, "league_scoring_invalid", "{system}", systemId);
+            plugin.sendMessage(sender, "league_scoring_invalid", "{system}", systemId);
             return;
         }
         try {
             if (categoryName != null && !categoryName.isBlank()) {
                 LeagueCategory cat = league.getCategory(categoryName);
                 if (cat == null) {
-                    plugin.sendMessage(player, "league_category_not_found", "{category}", categoryName);
+                    plugin.sendMessage(sender, "league_category_not_found", "{category}", categoryName);
                     return;
                 }
                 cat.setScoringSystem(systemId.toUpperCase());
@@ -376,35 +387,35 @@ public class LeagueCommand extends BaseCommand {
                 leagueManager.saveLeagueConfig(league);
                 leagueManager.recalculate(league);
             }
-            plugin.sendMessage(player, "league_scoring_set", "{system}", systemId);
+            plugin.sendMessage(sender, "league_scoring_set", "{system}", systemId);
         } catch (SQLException e) {
-            plugin.sendMessage(player, "league_link_error");
+            plugin.sendMessage(sender, "league_link_error");
         }
     }
 
     @Subcommand("teammode")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues @nothing")
-    public void onTeamMode(Player player, String leagueName, String mode) {
-        League league = requireLeague(player, leagueName);
+    public void onTeamMode(CommandSender sender, String leagueName, String mode) {
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
         try {
             league.setTeamMode(TeamMode.valueOf(mode.toUpperCase()));
             leagueManager.saveLeagueConfig(league);
-            plugin.sendMessage(player, "league_teammode_set", "{mode}", mode);
+            plugin.sendMessage(sender, "league_teammode_set", "{mode}", mode);
         } catch (IllegalArgumentException e) {
-            plugin.sendMessage(player, "league_teammode_invalid", "{mode}", mode);
+            plugin.sendMessage(sender, "league_teammode_invalid", "{mode}", mode);
         } catch (SQLException e) {
-            plugin.sendMessage(player, "league_link_error");
+            plugin.sendMessage(sender, "league_link_error");
         }
     }
 
     @Subcommand("teamconfig")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues @nothing @nothing @nothing")
-    public void onTeamConfig(Player player, String leagueName, Integer maxMains,
+    public void onTeamConfig(CommandSender sender, String leagueName, Integer maxMains,
                              Integer maxReserves, Integer countedScorers) {
-        League league = requireLeague(player, leagueName);
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
         TeamConfig cfg = league.getTeamConfig();
         if (maxMains != null) cfg.setMaxMains(maxMains);
@@ -412,17 +423,17 @@ public class LeagueCommand extends BaseCommand {
         if (countedScorers != null) cfg.setCountedScorers(countedScorers);
         try {
             leagueManager.saveLeagueConfig(league);
-            plugin.sendMessage(player, "league_teamconfig_set");
+            plugin.sendMessage(sender, "league_teamconfig_set");
         } catch (SQLException e) {
-            plugin.sendMessage(player, "league_link_error");
+            plugin.sendMessage(sender, "league_link_error");
         }
     }
 
     @Subcommand("customscale")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues @nothing @nothing")
-    public void onCustomScale(Player player, String leagueName, Integer position, Integer points) {
-        League league = requireLeague(player, leagueName);
+    public void onCustomScale(CommandSender sender, String leagueName, Integer position, Integer points) {
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
         if (league.getCustomScale() == null) {
             league.setCustomScale(new PointsConfig("custom"));
@@ -431,25 +442,25 @@ public class LeagueCommand extends BaseCommand {
         try {
             leagueManager.saveLeagueConfig(league);
             leagueManager.recalculate(league);
-            plugin.sendMessage(player, "league_customscale_set",
+            plugin.sendMessage(sender, "league_customscale_set",
                 "{position}", String.valueOf(position), "{points}", String.valueOf(points));
         } catch (SQLException e) {
-            plugin.sendMessage(player, "league_link_error");
+            plugin.sendMessage(sender, "league_link_error");
         }
     }
 
     @Subcommand("mulligans")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues @nothing @nothing")
-    public void onMulligans(Player player, String leagueName, Integer count,
+    public void onMulligans(CommandSender sender, String leagueName, Integer count,
                             @Optional String categoryName) {
-        League league = requireLeague(player, leagueName);
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
         try {
             if (categoryName != null && !categoryName.isBlank()) {
                 LeagueCategory cat = league.getCategory(categoryName);
                 if (cat == null) {
-                    plugin.sendMessage(player, "league_category_not_found", "{category}", categoryName);
+                    plugin.sendMessage(sender, "league_category_not_found", "{category}", categoryName);
                     return;
                 }
                 cat.setMulliganCount(count);
@@ -458,43 +469,43 @@ public class LeagueCommand extends BaseCommand {
             }
             leagueManager.saveLeagueConfig(league);
             leagueManager.recalculate(league);
-            plugin.sendMessage(player, "league_mulligans_set", "{count}", String.valueOf(count));
+            plugin.sendMessage(sender, "league_mulligans_set", "{count}", String.valueOf(count));
         } catch (SQLException e) {
-            plugin.sendMessage(player, "league_link_error");
+            plugin.sendMessage(sender, "league_link_error");
         }
     }
 
     @Subcommand("category")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues @nothing")
-    public void onCategory(Player player, String leagueName, String action, String categoryName) {
-        League league = requireLeague(player, leagueName);
+    public void onCategory(CommandSender sender, String leagueName, String action, String categoryName) {
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
         try {
             if ("add".equalsIgnoreCase(action)) {
                 leagueManager.addCategory(league, categoryName);
-                plugin.sendMessage(player, "league_category_added", "{category}", categoryName);
+                plugin.sendMessage(sender, "league_category_added", "{category}", categoryName);
             } else if ("remove".equalsIgnoreCase(action)) {
                 leagueManager.removeCategory(league, categoryName);
-                plugin.sendMessage(player, "league_category_removed", "{category}", categoryName);
+                plugin.sendMessage(sender, "league_category_removed", "{category}", categoryName);
             } else {
-                plugin.sendMessage(player, "league_category_usage");
+                plugin.sendMessage(sender, "league_category_usage");
             }
         } catch (SQLException e) {
-            plugin.sendMessage(player, "league_link_error");
+            plugin.sendMessage(sender, "league_link_error");
         }
     }
 
     @Subcommand("calendar")
     @CommandCompletion("@leagues")
-    public void onCalendar(Player player, String leagueName) {
-        League league = requireLeague(player, leagueName);
+    public void onCalendar(CommandSender sender, String leagueName) {
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
-        plugin.sendMessage(player, "league_calendar_header", "{league}", league.getName());
+        plugin.sendMessage(sender, "league_calendar_header", "{league}", league.getName());
         for (LeagueCalendarEntry entry : league.getCalendar().values()) {
             Events event = plugin.getRaceEventManager().getEventById(entry.getEventId()).orElse(null);
             String name = event != null ? event.getDisplayName() : String.valueOf(entry.getEventId());
-            plugin.sendMessage(player, "league_calendar_row",
+            plugin.sendMessage(sender, "league_calendar_row",
                 "{event}", name,
                 "{category}", entry.hasCategory() ? entry.getCategoryName() : "-",
                 "{heat}", entry.hasPinnedHeat() ? String.valueOf(entry.getPinnedHeatId()) : "-");
@@ -504,48 +515,53 @@ public class LeagueCommand extends BaseCommand {
     @Subcommand("recalculate")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues")
-    public void onRecalculate(Player player, String leagueName) {
-        League league = requireLeague(player, leagueName);
+    public void onRecalculate(CommandSender sender, String leagueName) {
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
         leagueManager.recalculate(league);
-        plugin.sendMessage(player, "league_recalculated", "{league}", league.getName());
+        plugin.sendMessage(sender, "league_recalculated", "{league}", league.getName());
     }
 
     @Subcommand("holo")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues drivers|teams create|remove")
-    public void onHolo(Player player, String leagueName, String scope, String action) {
-        League league = requireLeague(player, leagueName);
+    public void onHolo(CommandSender sender, String leagueName, String scope, String action) {
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
-        Location loc = player.getLocation();
         if ("create".equalsIgnoreCase(action)) {
+            Player player = SenderUtils.player(sender);
+            if (player == null) {
+                sender.sendMessage("§cCriar holograma exige um jogador (usa a sua posição).");
+                return;
+            }
+            Location loc = player.getLocation();
             if ("teams".equalsIgnoreCase(scope)) {
                 plugin.getLeagueHologramService().createTeamHologram(league, loc);
             } else {
                 plugin.getLeagueHologramService().createDriverHologram(league, loc);
             }
-            plugin.sendMessage(player, "league_holo_created",
+            plugin.sendMessage(sender, "league_holo_created",
                 "{scope}", scope, "{league}", league.getName());
         } else if ("remove".equalsIgnoreCase(action)) {
             plugin.getLeagueHologramService().removeHolograms(league);
-            plugin.sendMessage(player, "league_holo_removed", "{league}", league.getName());
+            plugin.sendMessage(sender, "league_holo_removed", "{league}", league.getName());
         } else {
             plugin.getLeagueHologramService().updateHolograms(league);
-            plugin.sendMessage(player, "league_holo_updated", "{league}", league.getName());
+            plugin.sendMessage(sender, "league_holo_updated", "{league}", league.getName());
         }
     }
 
     @Subcommand("breakdown")
     @CommandCompletion("@leagues")
-    public void onBreakdown(Player player, String leagueName) {
-        League league = requireLeague(player, leagueName);
+    public void onBreakdown(CommandSender sender, String leagueName) {
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
-        plugin.sendMessage(player, "league_breakdown_header", "{league}", league.getName());
+        plugin.sendMessage(sender, "league_breakdown_header", "{league}", league.getName());
         List<LeagueStanding> standings = leagueManager.getDriverStandings(league);
         for (LeagueStanding row : standings) {
             String name = Bukkit.getOfflinePlayer(row.getPlayerUUID()).getName();
             if (name == null) name = row.getPlayerUUID().toString();
-            plugin.sendMessage(player, "league_breakdown_row",
+            plugin.sendMessage(sender, "league_breakdown_row",
                 "{player}", name, "{points}", String.valueOf(row.getPoints()));
         }
     }
@@ -553,78 +569,92 @@ public class LeagueCommand extends BaseCommand {
     @Subcommand("givepoints")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues @players @nothing")
-    public void onGivePoints(Player player, String leagueName, String targetName, Integer amount) {
-        League league = requireLeague(player, leagueName);
+    public void onGivePoints(CommandSender sender, String leagueName, String targetName, Integer amount) {
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
         OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
         if (target.getUniqueId() == null) {
-            plugin.sendMessage(player, "player_not_found");
+            plugin.sendMessage(sender, "player_not_found");
             return;
         }
         leagueManager.adjustPoints(league, target.getUniqueId(), amount);
-        plugin.sendMessage(player, "league_points_given",
+        plugin.sendMessage(sender, "league_points_given",
             "{player}", targetName, "{amount}", String.valueOf(amount), "{league}", league.getName());
     }
 
     @Subcommand("takepoints")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues @players @nothing")
-    public void onTakePoints(Player player, String leagueName, String targetName, Integer amount) {
-        League league = requireLeague(player, leagueName);
+    public void onTakePoints(CommandSender sender, String leagueName, String targetName, Integer amount) {
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
         OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
         if (target.getUniqueId() == null) {
-            plugin.sendMessage(player, "player_not_found");
+            plugin.sendMessage(sender, "player_not_found");
             return;
         }
         leagueManager.adjustPoints(league, target.getUniqueId(), -Math.abs(amount));
-        plugin.sendMessage(player, "league_points_taken",
+        plugin.sendMessage(sender, "league_points_taken",
             "{player}", targetName, "{amount}", String.valueOf(amount), "{league}", league.getName());
     }
 
     @Subcommand("transferpoints")
     @CommandPermission("formularacing.event.admin")
     @CommandCompletion("@leagues @players @players @nothing")
-    public void onTransferPoints(Player player, String leagueName, String fromName, String toName,
+    public void onTransferPoints(CommandSender sender, String leagueName, String fromName, String toName,
                                  Integer amount) {
-        League league = requireLeague(player, leagueName);
+        League league = requireLeague(sender, leagueName);
         if (league == null) return;
         OfflinePlayer from = Bukkit.getOfflinePlayer(fromName);
         OfflinePlayer to = Bukkit.getOfflinePlayer(toName);
         if (from.getUniqueId() == null || to.getUniqueId() == null) {
-            plugin.sendMessage(player, "player_not_found");
+            plugin.sendMessage(sender, "player_not_found");
             return;
         }
         leagueManager.transferPoints(league, from.getUniqueId(), to.getUniqueId(), Math.abs(amount));
-        plugin.sendMessage(player, "league_points_transferred",
+        plugin.sendMessage(sender, "league_points_transferred",
             "{from}", fromName, "{to}", toName, "{amount}", String.valueOf(amount),
             "{league}", league.getName());
     }
 
-    private League requireLeague(Player player, String leagueName) {
+    /** Player's selected league, or empty for the console. */
+    private java.util.Optional<League> selectedLeague(CommandSender sender) {
+        Player player = SenderUtils.player(sender);
+        return player != null
+            ? leagueManager.getSelectedLeague(player.getUniqueId())
+            : java.util.Optional.empty();
+    }
+
+    /** Owner UUID for a league created from the console (no player available). */
+    private UUID ownerUuid(CommandSender sender) {
+        Player player = SenderUtils.player(sender);
+        return player != null ? player.getUniqueId() : new UUID(0L, 0L);
+    }
+
+    private League requireLeague(CommandSender sender, String leagueName) {
         League league = leagueManager.getLeagueByName(leagueName).orElse(null);
         if (league == null) {
-            plugin.sendMessage(player, "league_not_found", "{league}", leagueName);
+            plugin.sendMessage(sender, "league_not_found", "{league}", leagueName);
         }
         return league;
     }
 
-    private void showInfo(Player player, League league) {
-        plugin.sendMessage(player, "league_info_header", "{league}", league.getName());
+    private void showInfo(CommandSender sender, League league) {
+        plugin.sendMessage(sender, "league_info_header", "{league}", league.getName());
         plugin.sendMessage(
-            player,
+            sender,
             "league_info_status",
             "{status}",
             league.getStatus().name()
         );
         plugin.sendMessage(
-            player,
+            sender,
             "league_info_teams",
             "{teams}",
             String.valueOf(league.getTeams().size())
         );
         plugin.sendMessage(
-            player,
+            sender,
             "league_info_drivers",
             "{drivers}",
             String.valueOf(league.getDrivers().size())

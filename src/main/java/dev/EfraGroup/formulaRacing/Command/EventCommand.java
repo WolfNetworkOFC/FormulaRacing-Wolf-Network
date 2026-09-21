@@ -14,6 +14,7 @@ import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.ApiUtilities;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
+import dev.EfraGroup.formulaRacing.Utils.SenderUtils;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import java.util.Comparator;
 import java.util.List;
@@ -46,15 +47,13 @@ public class EventCommand extends BaseCommand {
 
     @Default
     @Description(("Mostra info do evento atual"))
-    public void onDefault(Player player) {
-        Optional<Events> eventOpt = this.database.getPlayerSelectedEvent(
-            player.getUniqueId()
-        );
+    public void onDefault(CommandSender sender) {
+        Optional<Events> eventOpt = this.selectedEvent(sender);
         if (eventOpt.isPresent()) {
-            this.onInfo(player, (Events) eventOpt.get());
+            this.onInfo(sender, (Events) eventOpt.get());
         } else {
             this.plugin.sendMessage(
-                player,
+                sender,
                 "event_none_selected_hint",
                 new String[0]
             );
@@ -147,24 +146,22 @@ public class EventCommand extends BaseCommand {
     @CommandCompletion("@event")
     @Description("Mostra informações do evento")
     public void onInfo(
-        Player player,
+        CommandSender sender,
         @co.aikar.commands.annotation.Optional Events event
     ) {
         if (event == null) {
-            event = database
-                .getPlayerSelectedEvent(player.getUniqueId())
-                .orElse(null);
+            event = this.selectedEvent(sender).orElse(null);
         }
 
         if (event == null) {
             this.plugin.sendMessage(
-                player,
+                sender,
                 "event_none_selected",
                 new String[0]
             );
         } else {
-            this.selectEventForPlayer(player, event, false);
-            this.showEventInfo(player, event);
+            this.selectEventForPlayer(sender, event, false);
+            this.showEventInfo(sender, event);
         }
     }
 
@@ -172,23 +169,23 @@ public class EventCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Cria um novo evento vazio")
     @CommandCompletion("@nothing @tracks")
-    public void onCreate(Player player, String name, String trackNameWS) {
+    public void onCreate(CommandSender sender, String name, String trackNameWS) {
         this.eventManager.createEvent(
-            player.getUniqueId(),
+            this.ownerUuid(sender),
             name,
             trackNameWS
         ).thenAccept(event -> {
             SchedulerHelper.runTask(this.plugin, () -> {
                     if (event != null) {
                         this.plugin.sendMessage(
-                            player,
+                            sender,
                             "event_created",
                             new String[] { "{event}", name }
                         );
-                        this.selectEventForPlayer(player, event, false);
+                        this.selectEventForPlayer(sender, event, false);
                     } else {
                         this.plugin.sendMessage(
-                            player,
+                            sender,
                             "event_create_error",
                             new String[0]
                         );
@@ -202,7 +199,7 @@ public class EventCommand extends BaseCommand {
     @CommandCompletion("@nothing @tracks 15 0 10 5 0")
     @Description("Cria um evento completo (Treino + Qualy + Final)")
     public void onCreateFull(
-        Player player,
+        CommandSender sender,
         String name,
         String track,
         @Default("15") int practiceTime,
@@ -229,19 +226,19 @@ public class EventCommand extends BaseCommand {
             }
 
             if (changed) {
-                player.sendMessage(
+                sender.sendMessage(
                     "§e⚠️ A pista '" +
                         track +
                         "' não é um circuito fechado (Sprint/Parkour)."
                 );
-                player.sendMessage(
+                sender.sendMessage(
                     "§e⚠️ Voltas ajustadas para 1 e Pit Stops desativados."
                 );
             }
         }
 
         this.eventManager.createFullEvent(
-            player.getUniqueId(),
+            this.ownerUuid(sender),
             name,
             track,
             practiceTime,
@@ -253,14 +250,14 @@ public class EventCommand extends BaseCommand {
             SchedulerHelper.runTask(this.plugin, () -> {
                     if (event != null) {
                         this.plugin.sendMessage(
-                            player,
+                            sender,
                             "event_full_created",
                             new String[] { "{event}", name }
                         );
-                        this.selectEventForPlayer(player, event, false);
+                        this.selectEventForPlayer(sender, event, false);
                     } else {
                         this.plugin.sendMessage(
-                            player,
+                            sender,
                             "event_full_error",
                             new String[0]
                         );
@@ -274,12 +271,12 @@ public class EventCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Remove um evento")
     public void onDelete(
-        Player player,
+        CommandSender sender,
         @co.aikar.commands.annotation.Optional Events event
     ) {
         if (event == null) {
             this.plugin.sendMessage(
-                player,
+                sender,
                 "event_none_selected",
                 new String[0]
             );
@@ -288,7 +285,7 @@ public class EventCommand extends BaseCommand {
 
         if (this.eventManager.removeEvent(event.getId())) {
             String var10001 = String.valueOf(ChatColor.GREEN);
-            player.sendMessage(
+            sender.sendMessage(
                 var10001 +
                     "✓ Evento removido com sucesso: " +
                     String.valueOf(ChatColor.GOLD) +
@@ -296,7 +293,7 @@ public class EventCommand extends BaseCommand {
             );
         } else {
             this.plugin.sendMessage(
-                player,
+                sender,
                 "event_delete_error",
                 new String[0]
             );
@@ -308,31 +305,29 @@ public class EventCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Finaliza um evento")
     public void onFinish(
-        Player player,
+        CommandSender sender,
         @co.aikar.commands.annotation.Optional Events event
     ) {
         if (event == null) {
-            event = database
-                .getPlayerSelectedEvent(player.getUniqueId())
-                .orElse(null);
+            event = this.selectedEvent(sender).orElse(null);
         }
 
         if (event == null) {
             this.plugin.sendMessage(
-                player,
+                sender,
                 "event_none_selected",
                 new String[0]
             );
         } else {
             if (event.finish()) {
                 this.plugin.sendMessage(
-                    player,
+                    sender,
                     "event_finished",
                     new String[0]
                 );
             } else {
                 this.plugin.sendMessage(
-                    player,
+                    sender,
                     "event_finish_error",
                     new String[0]
                 );
@@ -348,9 +343,7 @@ public class EventCommand extends BaseCommand {
         @co.aikar.commands.annotation.Optional Events event
     ) {
         if (event == null) {
-            event = database
-                .getPlayerSelectedEvent(player.getUniqueId())
-                .orElse(null);
+            event = this.selectedEvent(player).orElse(null);
         }
 
         if (event == null) {
@@ -503,9 +496,7 @@ public class EventCommand extends BaseCommand {
         @co.aikar.commands.annotation.Optional Events event
     ) {
         if (event == null) {
-            event = database
-                .getPlayerSelectedEvent(player.getUniqueId())
-                .orElse(null);
+            event = this.selectedEvent(player).orElse(null);
         }
 
         if (event == null) {
@@ -559,9 +550,7 @@ public class EventCommand extends BaseCommand {
         @co.aikar.commands.annotation.Optional Events event
     ) {
         if (event == null) {
-            event = database
-                .getPlayerSelectedEvent(player.getUniqueId())
-                .orElse(null);
+            event = this.selectedEvent(player).orElse(null);
         }
 
         if (event == null) {
@@ -636,23 +625,21 @@ public class EventCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Envia mensagem clicável para inscrição")
     public void onBroadcast(
-        Player player,
+        CommandSender sender,
         @co.aikar.commands.annotation.Optional Events event
     ) {
         if (event == null) {
-            event = database
-                .getPlayerSelectedEvent(player.getUniqueId())
-                .orElse(null);
+            event = this.selectedEvent(sender).orElse(null);
         }
 
         if (event == null) {
             this.plugin.sendMessage(
-                player,
+                sender,
                 "event_none_selected",
                 new String[0]
             );
         } else if (event.getState() == EventState.FINISHED) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Este evento já foi finalizado!"
             );
@@ -688,9 +675,9 @@ public class EventCommand extends BaseCommand {
                 }
             }
 
-            String lang = this.database.getPlayerLanguage(player.getUniqueId());
+            String lang = this.lang(sender);
             this.plugin.sendMessage(
-                player,
+                sender,
                 "event_broadcast_sent",
                 new String[] { "{count}", String.valueOf(sentCount) }
             );
@@ -713,9 +700,7 @@ public class EventCommand extends BaseCommand {
         @co.aikar.commands.annotation.Optional Events event
     ) {
         if (event == null) {
-            event = database
-                .getPlayerSelectedEvent(player.getUniqueId())
-                .orElse(null);
+            event = this.selectedEvent(player).orElse(null);
         }
 
         if (event == null) {
@@ -824,25 +809,23 @@ public class EventCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Define a pista do evento")
     public void onSetTrack(
-        Player player,
+        CommandSender sender,
         @co.aikar.commands.annotation.Optional Events event,
         String[] trackArgs
     ) {
         if (event == null) {
-            event = database
-                .getPlayerSelectedEvent(player.getUniqueId())
-                .orElse(null);
+            event = this.selectedEvent(sender).orElse(null);
         }
 
         if (event == null) {
             this.plugin.sendMessage(
-                player,
+                sender,
                 "event_none_selected",
                 new String[0]
             );
         } else if (trackArgs.length == 0) {
             this.plugin.sendMessage(
-                player,
+                sender,
                 "event_usage_settrack",
                 new String[0]
             );
@@ -850,13 +833,13 @@ public class EventCommand extends BaseCommand {
             String trackName = String.join(" ", trackArgs);
             if (event.setTrack(trackName)) {
                 this.plugin.sendMessage(
-                    player,
+                    sender,
                     "event_track_set",
                     new String[] { "{track}", trackName }
                 );
             } else {
                 this.plugin.sendMessage(
-                    player,
+                    sender,
                     "event_create_error",
                     new String[0]
                 );
@@ -867,13 +850,11 @@ public class EventCommand extends BaseCommand {
     @Subcommand("set signs")
     @CommandCompletion("open|closed")
     @CommandPermission("formularacing.event.admin")
-    public void onSetSigns(Player player, String state) {
-        Optional<Events> eventOpt = this.database.getPlayerSelectedEvent(
-            player.getUniqueId()
-        );
+    public void onSetSigns(CommandSender sender, String state) {
+        Optional<Events> eventOpt = this.selectedEvent(sender);
         if (eventOpt.isEmpty()) {
             this.plugin.sendMessage(
-                player,
+                sender,
                 "event_none_selected",
                 new String[0]
             );
@@ -883,27 +864,48 @@ public class EventCommand extends BaseCommand {
             event.setOpenSign(open);
             if (open) {
                 this.plugin.sendMessage(
-                    player,
+                    sender,
                     "event_signs_open",
                     new String[] { "{event}", event.getDisplayName() }
                 );
             } else {
                 this.plugin.sendMessage(
-                    player,
+                    sender,
                     "event_signs_closed",
                     new String[] { "{event}", event.getDisplayName() }
                 );
             }
 
-            this.showEventInfo(player, event);
+            this.showEventInfo(sender, event);
         }
     }
 
+    /** Event selected by the player, or empty for the console. */
+    private Optional<Events> selectedEvent(CommandSender sender) {
+        Player player = SenderUtils.player(sender);
+        return player != null
+            ? this.database.getPlayerSelectedEvent(player.getUniqueId())
+            : Optional.empty();
+    }
+
+    /** Owner UUID for an event created from the console. */
+    private UUID ownerUuid(CommandSender sender) {
+        Player player = SenderUtils.player(sender);
+        return player != null ? player.getUniqueId() : new UUID(0L, 0L);
+    }
+
+    /** Player's language when available, default language for the console. */
+    private String lang(CommandSender sender) {
+        Player player = SenderUtils.player(sender);
+        return player != null ? this.database.getPlayerLanguage(player.getUniqueId()) : "en_US";
+    }
+
     private void selectEventForPlayer(
-        Player player,
+        CommandSender sender,
         Events event,
         boolean announceSelectedMessage
     ) {
+        Player player = SenderUtils.player(sender);
         if (player == null || event == null) {
             return;
         }
@@ -925,7 +927,7 @@ public class EventCommand extends BaseCommand {
         if (selected) {
             if (announceSelectedMessage) {
                 this.plugin.sendMessage(
-                    player,
+                    sender,
                     "event_selected",
                     new String[] { "{event}", event.getDisplayName() }
                 );
@@ -933,23 +935,23 @@ public class EventCommand extends BaseCommand {
         } else {
             this.plugin.getDebugManager().logDatabaseOperation(
                 "[EventCommand] Falha ao persistir selected_event_id para player " +
-                    player.getName() +
+                    sender.getName() +
                     " (eventId=" +
                     event.getId() +
                     ", event=" +
                     event.getDisplayName() +
                     ")"
             );
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.YELLOW) +
                     "⚠ Evento exibido, mas não foi possível confirmar a seleção automática."
             );
         }
     }
 
-    private void showEventInfo(Player player, Events event) {
-        boolean isAdmin = player.hasPermission("formularacing.event.admin");
-        player.sendMessage("");
+    private void showEventInfo(CommandSender sender, Events event) {
+        boolean isAdmin = sender.hasPermission("formularacing.event.admin");
+        sender.sendMessage("");
         TextComponent header = new TextComponent("");
         header.addExtra(
             ClickableMessageUtil.getRefreshButton(
@@ -972,7 +974,7 @@ public class EventCommand extends BaseCommand {
         header.addExtra(
             new TextComponent(var10003 + " (#" + event.getId() + ")")
         );
-        player.spigot().sendMessage(header);
+        sender.spigot().sendMessage(header);
         TextComponent trackRow = new TextComponent(
             String.valueOf(ChatColor.YELLOW) + "  Pista: "
         );
@@ -1006,7 +1008,7 @@ public class EventCommand extends BaseCommand {
             );
         }
 
-        player.spigot().sendMessage(trackRow);
+        sender.spigot().sendMessage(trackRow);
         TextComponent signsRow = new TextComponent(
             String.valueOf(ChatColor.YELLOW) + "  Inscrições: "
         );
@@ -1040,7 +1042,7 @@ public class EventCommand extends BaseCommand {
             );
         }
 
-        player.spigot().sendMessage(signsRow);
+        sender.spigot().sendMessage(signsRow);
         TextComponent driversRow = new TextComponent(
             String.valueOf(ChatColor.YELLOW) + "  Pilotos: "
         );
@@ -1068,8 +1070,8 @@ public class EventCommand extends BaseCommand {
                 Action.RUN_COMMAND
             )
         );
-        player.spigot().sendMessage(driversRow);
-        player.sendMessage("");
+        sender.spigot().sendMessage(driversRow);
+        sender.sendMessage("");
         String var10002 = String.valueOf(ChatColor.GOLD);
         TextComponent roundsHeader = new TextComponent(
             var10002 + String.valueOf(ChatColor.BOLD) + "  ROUNDS:"
@@ -1087,10 +1089,10 @@ public class EventCommand extends BaseCommand {
             );
         }
 
-        player.spigot().sendMessage(roundsHeader);
+        sender.spigot().sendMessage(roundsHeader);
         List<Rounds> rounds = event.getSchedule().getRoundsOrdered();
         if (rounds.isEmpty()) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.GRAY) + "   (Nenhum round configurado)"
             );
         } else {
@@ -1130,7 +1132,7 @@ public class EventCommand extends BaseCommand {
                         Action.RUN_COMMAND
                     )
                 );
-                player.spigot().sendMessage(line);
+                sender.spigot().sendMessage(line);
                 if (isAdmin) {
                     for (Heats heat : round.getHeats().values()) {
                         var10002 = String.valueOf(ChatColor.GRAY);
@@ -1216,14 +1218,14 @@ public class EventCommand extends BaseCommand {
                             )
                         );
                         heatLine.addExtra(removeHeatBtn);
-                        player.spigot().sendMessage(heatLine);
+                        sender.spigot().sendMessage(heatLine);
                     }
                 }
             }
         }
 
         if (isAdmin) {
-            player.sendMessage("");
+            sender.sendMessage("");
             TextComponent actions = new TextComponent("  AÇÕES: ");
             actions.setColor(ChatColor.GOLD);
             actions.setBold(true);
@@ -1273,11 +1275,11 @@ public class EventCommand extends BaseCommand {
                 )
             );
             actions.addExtra(deleteBtn);
-            player.spigot().sendMessage(actions);
+            sender.spigot().sendMessage(actions);
         }
 
         String var10001 = String.valueOf(ChatColor.GOLD);
-        player.sendMessage(
+        sender.sendMessage(
             var10001 +
                 String.valueOf(ChatColor.BOLD) +
                 "═══════════════════════════════"

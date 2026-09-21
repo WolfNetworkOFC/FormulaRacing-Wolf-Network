@@ -7,6 +7,7 @@ import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent.Action;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
  public class ClickableMessageUtil {
@@ -42,7 +43,7 @@ import org.bukkit.entity.Player;
          }
      }
 
-     public static void sendClickableLine(Player player, String prefix, String clickable, String suffix, String command, String hover, boolean suggest) {
+     public static void sendClickableLine(CommandSender sender, String prefix, String clickable, String suffix, String command, String hover, boolean suggest) {
          TextComponent message = new TextComponent("");
          if (prefix != null && !prefix.isEmpty()) {
              for (BaseComponent bc : TextComponent.fromLegacyText(prefix)) {
@@ -56,7 +57,7 @@ import org.bukkit.entity.Player;
                  message.addExtra(bc);
              }
          }
-         player.spigot().sendMessage(message);
+         sender.spigot().sendMessage(message);
      }
 
      public static void sendEventSignBroadcast(Player player, String text, String hoverText, String eventName) {

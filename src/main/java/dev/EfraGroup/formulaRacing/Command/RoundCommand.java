@@ -21,6 +21,7 @@ import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.ApiUtilities;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.SenderUtils;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -40,6 +41,7 @@ import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.ClickEvent.Action;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 @CommandAlias("round")
@@ -57,14 +59,20 @@ public class RoundCommand extends BaseCommand {
         this.heatDriverService = new HeatDriverCommandService(plugin);
     }
 
+    /** Event selected by the player, or empty for the console. */
+    private Optional<Events> selectedEvent(CommandSender sender) {
+        Player player = SenderUtils.player(sender);
+        return player != null
+            ? this.database.getPlayerSelectedEvent(player.getUniqueId())
+            : Optional.empty();
+    }
+
     @Default
     @Description("Mostra info do round atual")
-    public void onDefault(Player player) {
-        Optional<Events> eventOpt = this.database.getPlayerSelectedEvent(
-            player.getUniqueId()
-        );
+    public void onDefault(CommandSender sender) {
+        Optional<Events> eventOpt = this.selectedEvent(sender);
         if (eventOpt.isEmpty()) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum evento selecionado! Use /event info <evento> primeiro."
             );
@@ -72,16 +80,16 @@ public class RoundCommand extends BaseCommand {
             Events event = (Events) eventOpt.get();
             Optional<Rounds> roundOpt = event.getSchedule().getCurrentRound();
             if (roundOpt.isPresent()) {
-                this.onInfo(player, (Rounds) roundOpt.get());
+                this.onInfo(sender, (Rounds) roundOpt.get());
             } else {
                 String var10001 = String.valueOf(ChatColor.YELLOW);
-                player.sendMessage(
+                sender.sendMessage(
                     var10001 +
                         "Nenhuma rodada ativa no evento " +
                         event.getDisplayName()
                 );
                 ClickableMessageUtil.sendClickableLine(
-                    player,
+                    sender,
                     String.valueOf(ChatColor.GRAY) + "Use ",
                     "/round create <tipo>",
                     " para criar uma.",
@@ -98,18 +106,16 @@ public class RoundCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Cria um novo round no evento")
     public void onCreate(
-        Player player,
+        CommandSender sender,
         RoundType type,
         @co.aikar.commands.annotation.Optional Events event
     ) {
         if (event == null) {
-            event = this.database.getPlayerSelectedEvent(
-                player.getUniqueId()
-            ).orElse(null);
+            event = this.selectedEvent(sender).orElse(null);
         }
 
         if (event == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) + "✗ Nenhum evento selecionado!"
             );
         } else {
@@ -117,7 +123,7 @@ public class RoundCommand extends BaseCommand {
             this.eventManager.createRound(event, type, nextIndex).thenAccept(
                 r -> {
                     if (r != null) {
-                        player.sendMessage(
+                        sender.sendMessage(
                             String.valueOf(ChatColor.GREEN) +
                                 "✓ Round " +
                                 nextIndex +
@@ -126,7 +132,7 @@ public class RoundCommand extends BaseCommand {
                                 ") criado com sucesso!"
                         );
                     } else {
-                        player.sendMessage(
+                        sender.sendMessage(
                             String.valueOf(ChatColor.RED) +
                                 "✗ Erro ao criar round (Falha no Banco de Dados)."
                         );
@@ -140,28 +146,26 @@ public class RoundCommand extends BaseCommand {
     @CommandCompletion("@round")
     @Description("Mostra informações detalhadas de um round")
     public void onInfo(
-        Player player,
+        CommandSender sender,
         @co.aikar.commands.annotation.Optional Rounds round
     ) {
         if (round == null) {
-            Events event = this.database.getPlayerSelectedEvent(
-                player.getUniqueId()
-            ).orElse(null);
+            Events event = this.selectedEvent(sender).orElse(null);
             if (event != null) {
                 round = event.getSchedule().getCurrentRound().orElse(null);
             }
         }
 
         if (round == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum round selecionado ou ativo!"
             );
             return;
         }
 
-        boolean isAdmin = player.hasPermission("formularacing.event.admin");
-        player.sendMessage("");
+        boolean isAdmin = sender.hasPermission("formularacing.event.admin");
+        sender.sendMessage("");
         TextComponent header = new TextComponent("");
         header.addExtra(
             ClickableMessageUtil.getRefreshButton(
@@ -190,15 +194,15 @@ public class RoundCommand extends BaseCommand {
                 Action.RUN_COMMAND
             )
         );
-        player.spigot().sendMessage(header);
+        sender.spigot().sendMessage(header);
         String var10001 = String.valueOf(ChatColor.YELLOW);
-        player.sendMessage(
+        sender.sendMessage(
             var10001 +
                 "  Estado: " +
                 String.valueOf(ChatColor.WHITE) +
                 String.valueOf(round.getState())
         );
-        player.sendMessage("");
+        sender.sendMessage("");
         String var10002 = String.valueOf(ChatColor.GOLD);
         TextComponent heatsHeader = new TextComponent(
             var10002 + String.valueOf(ChatColor.BOLD) + "  HEATS:"
@@ -219,9 +223,9 @@ public class RoundCommand extends BaseCommand {
             );
         }
 
-        player.spigot().sendMessage(heatsHeader);
+        sender.spigot().sendMessage(heatsHeader);
         if (round.getHeats().isEmpty()) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.GRAY) + "   (Nenhum heat criado)"
             );
         } else {
@@ -264,7 +268,7 @@ public class RoundCommand extends BaseCommand {
                     );
                 }
 
-                player.spigot().sendMessage(line);
+                sender.spigot().sendMessage(line);
             }
         }
 
@@ -273,9 +277,9 @@ public class RoundCommand extends BaseCommand {
             round.getType() == RoundType.SPRINT_QUALIFICATION ||
             round.getType() == RoundType.PRACTICE
         ) {
-            player.sendMessage("");
+            sender.sendMessage("");
             ClickableMessageUtil.sendClickableLine(
-                player,
+                sender,
                 "  ",
                 String.valueOf(ChatColor.GOLD) + "[VER RESULTADOS GERAIS]",
                 "",
@@ -285,7 +289,7 @@ public class RoundCommand extends BaseCommand {
             );
         }
 
-        player.sendMessage("");
+        sender.sendMessage("");
     }
 
     @Subcommand("results")
@@ -293,12 +297,11 @@ public class RoundCommand extends BaseCommand {
     @CommandPermission("formularacing.event.results")
     @Description("Mostra os resultados de um round")
     public void onResults(
-        Player player,
+        CommandSender sender,
         @co.aikar.commands.annotation.Optional Rounds round
     ) {
         if (round == null) {
-            Events event = database
-                .getPlayerSelectedEvent(player.getUniqueId())
+            Events event = this.selectedEvent(sender)
                 .orElse(null);
             if (event != null) {
                 round = event.getSchedule().getCurrentRound().orElse(null);
@@ -306,32 +309,32 @@ public class RoundCommand extends BaseCommand {
         }
 
         if (round == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum round selecionado ou ativo!"
             );
         } else {
-            this.displayRoundRanking(player, round);
+            this.displayRoundRanking(sender, round);
         }
     }
 
-    private void displayRoundRanking(Player player, Rounds round) {
-        player.sendMessage("");
+    private void displayRoundRanking(CommandSender sender, Rounds round) {
+        sender.sendMessage("");
         String var10001 = String.valueOf(ChatColor.GOLD);
-        player.sendMessage(
+        sender.sendMessage(
             var10001 +
                 String.valueOf(ChatColor.BOLD) +
                 "═══════════════════════════════"
         );
         var10001 = String.valueOf(ChatColor.GOLD);
-        player.sendMessage(
+        sender.sendMessage(
             var10001 +
                 "    RESULTADOS: " +
                 String.valueOf(ChatColor.WHITE) +
                 round.getDisplayName()
         );
         var10001 = String.valueOf(ChatColor.GOLD);
-        player.sendMessage(
+        sender.sendMessage(
             var10001 +
                 String.valueOf(ChatColor.BOLD) +
                 "═══════════════════════════════"
@@ -353,7 +356,7 @@ public class RoundCommand extends BaseCommand {
         }
 
         if (bestLaps.isEmpty()) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.GRAY) +
                     "  Ainda não há tempos registrados."
             );
@@ -376,7 +379,7 @@ public class RoundCommand extends BaseCommand {
                     color = ChatColor.GOLD.toString();
                 }
 
-                player.sendMessage(
+                sender.sendMessage(
                     String.format(
                         "  " +
                             color +
@@ -396,7 +399,7 @@ public class RoundCommand extends BaseCommand {
                 }
             }
 
-            player.sendMessage("");
+            sender.sendMessage("");
         }
     }
 
@@ -405,34 +408,32 @@ public class RoundCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Inicia um round")
     public void onStart(
-        Player player,
+        CommandSender sender,
         @co.aikar.commands.annotation.Optional Rounds round
     ) {
         if (round == null) {
-            Events event = this.database.getPlayerSelectedEvent(
-                player.getUniqueId()
-            ).orElse(null);
+            Events event = this.selectedEvent(sender).orElse(null);
             if (event != null) {
                 round = event.getSchedule().getCurrentRound().orElse(null);
             }
         }
 
         if (round == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum round selecionado ou ativo!"
             );
         } else {
             if (round.start()) {
                 String var10001 = String.valueOf(ChatColor.GREEN);
-                player.sendMessage(
+                sender.sendMessage(
                     var10001 +
                         "✓ Round " +
                         round.getDisplayName() +
                         " iniciado!"
                 );
             } else {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.RED) + "✗ Falha ao iniciar round."
                 );
             }
@@ -444,27 +445,25 @@ public class RoundCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Finaliza um round")
     public void onFinish(
-        Player player,
+        CommandSender sender,
         @co.aikar.commands.annotation.Optional Rounds round
     ) {
         if (round == null) {
-            Events event = this.database.getPlayerSelectedEvent(
-                player.getUniqueId()
-            ).orElse(null);
+            Events event = this.selectedEvent(sender).orElse(null);
             if (event != null) {
                 round = event.getSchedule().getCurrentRound().orElse(null);
             }
         }
 
         if (round == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum round selecionado ou ativo!"
             );
         } else {
             round.finish();
             String var10001 = String.valueOf(ChatColor.GREEN);
-            player.sendMessage(
+            sender.sendMessage(
                 var10001 + "✓ Round " + round.getDisplayName() + " finalizado!"
             );
         }
@@ -475,30 +474,28 @@ public class RoundCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Remove um round")
     public void onDelete(
-        Player player,
+        CommandSender sender,
         @co.aikar.commands.annotation.Optional Rounds round
     ) {
         if (round == null) {
-            Events event = this.database.getPlayerSelectedEvent(
-                player.getUniqueId()
-            ).orElse(null);
+            Events event = this.selectedEvent(sender).orElse(null);
             if (event != null) {
                 round = event.getSchedule().getCurrentRound().orElse(null);
             }
         }
 
         if (round == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum round selecionado ou ativo!"
             );
         } else if (this.plugin.getRaceEventManager().removeRound(round)) {
             String var10001 = String.valueOf(ChatColor.GREEN);
-            player.sendMessage(
+            sender.sendMessage(
                 var10001 + "✓ Round " + round.getDisplayName() + " removido."
             );
         } else {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) + "✗ Falha ao remover round."
             );
         }
@@ -509,20 +506,18 @@ public class RoundCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Remove todos os pilotos de todos os heats do round")
     public void onClear(
-        Player player,
+        CommandSender sender,
         @co.aikar.commands.annotation.Optional Rounds round
     ) {
         if (round == null) {
-            Events event = this.database.getPlayerSelectedEvent(
-                player.getUniqueId()
-            ).orElse(null);
+            Events event = this.selectedEvent(sender).orElse(null);
             if (event != null) {
                 round = event.getSchedule().getCurrentRound().orElse(null);
             }
         }
 
         if (round == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum round selecionado ou ativo!"
             );
@@ -530,7 +525,7 @@ public class RoundCommand extends BaseCommand {
             for (Heats heat : round.getHeats().values()) {
                 if (heat.getHeatState() != HeatState.SETUP) {
                     String var10001 = String.valueOf(ChatColor.RED);
-                    player.sendMessage(
+                    sender.sendMessage(
                         var10001 +
                             "✗ Não é possível remover pilotos do " +
                             heat.getName() +
@@ -547,7 +542,7 @@ public class RoundCommand extends BaseCommand {
                         .clearHeatDriversSync(heat.getId())
                 ) {
                     String var10002 = String.valueOf(ChatColor.RED);
-                    player.sendMessage(
+                    sender.sendMessage(
                         var10002 +
                             "✗ Falha ao limpar pilotos do heat " +
                             heat.getName() +
@@ -561,7 +556,7 @@ public class RoundCommand extends BaseCommand {
             }
 
             String var8 = String.valueOf(ChatColor.GREEN);
-            player.sendMessage(
+            sender.sendMessage(
                 var8 +
                     "✓ Todos os pilotos foram removidos do round " +
                     round.getDisplayName()
@@ -574,34 +569,32 @@ public class RoundCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Preenche heats do round automaticamente")
     public void onFill(
-        Player player,
+        CommandSender sender,
         @co.aikar.commands.annotation.Optional Rounds round,
         String sortMode,
         String groupMode
     ) {
         if (round == null) {
-            Events event = this.database.getPlayerSelectedEvent(
-                player.getUniqueId()
-            ).orElse(null);
+            Events event = this.selectedEvent(sender).orElse(null);
             if (event != null) {
                 round = event.getSchedule().getCurrentRound().orElse(null);
             }
         }
 
         if (round == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum round selecionado ou ativo!"
             );
         } else {
             Events event = round.getEvent();
             if (event == null) {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.RED) +
                         "✗ Evento associado ao round não encontrado!"
                 );
             } else if (event.getState() != EventState.SETUP) {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.RED) +
                         "✗ Evento já começou! Não é possível preencher heats."
                 );
@@ -609,14 +602,14 @@ public class RoundCommand extends BaseCommand {
                 List<Heats> heats = new ArrayList(round.getHeats().values());
                 if (heats.isEmpty()) {
                     String var46 = String.valueOf(ChatColor.RED);
-                    player.sendMessage(
+                    sender.sendMessage(
                         var46 +
                             "✗ Nenhum heat criado na rodada R" +
                             round.getRoundNumber() +
                             "!"
                     );
                     var46 = String.valueOf(ChatColor.GRAY);
-                    player.sendMessage(
+                    sender.sendMessage(
                         var46 +
                             "Use /heat create R" +
                             round.getRoundNumber() +
@@ -630,7 +623,7 @@ public class RoundCommand extends BaseCommand {
                             heat.getHeatState() != HeatState.IDLE
                         ) {
                             String var47 = String.valueOf(ChatColor.RED);
-                            player.sendMessage(
+                            sender.sendMessage(
                                 var47 +
                                     "✗ Não é possível preencher o heat " +
                                     heat.getName() +
@@ -718,7 +711,7 @@ public class RoundCommand extends BaseCommand {
                         int currentDrivers = heat.getDriverCount();
                         int slotsAvailable = heatCapacity - currentDrivers;
                         String var10001 = String.valueOf(ChatColor.YELLOW);
-                        player.sendMessage(
+                        sender.sendMessage(
                             var10001 + "⚙ Preenchendo " + heat.getName() + "..."
                         );
 
@@ -755,7 +748,7 @@ public class RoundCommand extends BaseCommand {
                                     heat.handleLateJoin(targetPlayer);
                                 }
 
-                                player.sendMessage(
+                                sender.sendMessage(
                                     String.valueOf(ChatColor.GREEN) +
                                         "  ✓ " +
                                         playerName +
@@ -764,7 +757,7 @@ public class RoundCommand extends BaseCommand {
                                 );
                             } else {
                                 var10001 = String.valueOf(ChatColor.RED);
-                                player.sendMessage(
+                                sender.sendMessage(
                                     var10001 +
                                         "  ✗ Falha ao adicionar " +
                                         playerName +
@@ -779,8 +772,8 @@ public class RoundCommand extends BaseCommand {
                     }
 
                     if (!playerQueue.isEmpty() || !excludedPlayers.isEmpty()) {
-                        player.sendMessage("");
-                        player.sendMessage(
+                        sender.sendMessage("");
+                        sender.sendMessage(
                             String.valueOf(ChatColor.YELLOW) +
                                 "⚠ Jogadores que ficaram de fora:"
                         );
@@ -795,7 +788,7 @@ public class RoundCommand extends BaseCommand {
                                           .getOfflinePlayer(uuid)
                                           .getName();
                             String var40 = String.valueOf(ChatColor.GRAY);
-                            player.sendMessage(
+                            sender.sendMessage(
                                 var40 + "  - " + name + " (sem vaga)"
                             );
                         }
@@ -809,19 +802,19 @@ public class RoundCommand extends BaseCommand {
                                           .getOfflinePlayer(uuid)
                                           .getName();
                             String var41 = String.valueOf(ChatColor.GRAY);
-                            player.sendMessage(
+                            sender.sendMessage(
                                 var41 + "  - " + name + " (reserva)"
                             );
                         }
                     }
 
-                    player.sendMessage("");
+                    sender.sendMessage("");
                     String var42 = String.valueOf(ChatColor.GREEN);
-                    player.sendMessage(
+                    sender.sendMessage(
                         var42 + "✓ Heats preenchidos com sucesso!"
                     );
                     var42 = String.valueOf(ChatColor.GRAY);
-                    player.sendMessage(
+                    sender.sendMessage(
                         var42 +
                             "Modo: " +
                             String.valueOf(ChatColor.WHITE) +
@@ -830,14 +823,14 @@ public class RoundCommand extends BaseCommand {
                                 : "Aleatório")
                     );
                     var42 = String.valueOf(ChatColor.GRAY);
-                    player.sendMessage(
+                    sender.sendMessage(
                         var42 +
                             "Pilotos adicionados: " +
                             String.valueOf(ChatColor.WHITE) +
                             addedCount
                     );
                     var42 = String.valueOf(ChatColor.GRAY);
-                    player.sendMessage(
+                    sender.sendMessage(
                         var42 +
                             "Capacidade total: " +
                             String.valueOf(ChatColor.WHITE) +

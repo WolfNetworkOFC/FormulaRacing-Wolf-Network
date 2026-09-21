@@ -3,6 +3,7 @@ package dev.EfraGroup.formulaRacing.Command;
 import dev.EfraGroup.formulaRacing.Command.Help.CommandHelpService;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Utils.SenderUtils;
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.CatchUnknown;
 import co.aikar.commands.annotation.CommandAlias;
@@ -14,6 +15,7 @@ import co.aikar.commands.annotation.Subcommand;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 @CommandAlias("track|t")
@@ -34,29 +36,35 @@ public class TrackCommand extends BaseCommand {
         return String.format("%d:%02d.%03d", minutes, seconds, millis);
     }
 
+    /** Player's language when available, default language for the console. */
+    private String lang(CommandSender sender) {
+        Player player = SenderUtils.player(sender);
+        return player != null ? this.dbManager.getPlayerLanguage(player.getUniqueId()) : "en_US";
+    }
+
     @Default
-    public void onDefault(Player player) {
-        CommandHelpService.sendHelp(player, this, "/track");
+    public void onDefault(CommandSender sender) {
+        CommandHelpService.sendHelp(sender, this, "/track");
     }
 
     @CatchUnknown
-    public void onUnknown(Player player) {
-        this.onDefault(player);
+    public void onUnknown(CommandSender sender) {
+        this.onDefault(sender);
     }
 
     @Subcommand("help|ajuda|?")
     @Description("Mostra a ajuda do comando track")
-    public void onHelp(Player player) {
-        this.onDefault(player);
+    public void onHelp(CommandSender sender) {
+        this.onDefault(sender);
     }
 
     @Subcommand("times")
     @CommandCompletion("@tracks @nothing")
     @Description("Mostra os tempos de uma pista")
-    public void onTimes(Player player, String[] args) {
+    public void onTimes(CommandSender sender, String[] args) {
         if (args.length == 0) {
-            String langCode = this.dbManager.getPlayerLanguage(player.getUniqueId());
-            player.sendMessage(this.plugin.getDirectTranslation("track_usage", langCode));
+            String langCode = this.lang(sender);
+            sender.sendMessage(this.plugin.getDirectTranslation("track_usage", langCode));
         } else {
             int page = 1;
 
@@ -72,12 +80,12 @@ public class TrackCommand extends BaseCommand {
                 trackName = String.join(" ", args);
             }
 
-            String langCode = this.dbManager.getPlayerLanguage(player.getUniqueId());
+            String langCode = this.lang(sender);
             List<Map<String, Object>> times = this.dbManager.getAllTimesOnTrack(trackName, page);
             if (times.isEmpty()) {
-                player.sendMessage(this.plugin.getTranslation("track_no_times", langCode, new String[]{"{track}", trackName}));
+                sender.sendMessage(this.plugin.getTranslation("track_no_times", langCode, new String[]{"{track}", trackName}));
             } else {
-                player.sendMessage(this.plugin.getTranslation("track_times_title", langCode, new String[]{"{track}", trackName, "{page}", String.valueOf(page)}));
+                sender.sendMessage(this.plugin.getTranslation("track_times_title", langCode, new String[]{"{track}", trackName, "{page}", String.valueOf(page)}));
 
                 for(Map<String, Object> entry : times) {
                     int pos = (Integer)entry.get("pos");
@@ -87,7 +95,7 @@ public class TrackCommand extends BaseCommand {
                     boolean finished = (Boolean)entry.get("finished");
                     String timeStr = formatTime(time);
                     String formatted = finished ? String.format("§e#%d §7» §a%s §8— §f%s §8(✓)", pos, pname, timeStr) : String.format("§e#%d §7» §a%s §8— §f%s §7(%dCP)", pos, pname, timeStr, cp);
-                    player.sendMessage(formatted);
+                    sender.sendMessage(formatted);
                 }
 
             }
@@ -99,7 +107,7 @@ public class TrackCommand extends BaseCommand {
     @Description("Mostra seus tempos em uma pista")
     public void onMyTimes(Player player, String[] args) {
         if (args.length == 0) {
-            String langCode = this.dbManager.getPlayerLanguage(player.getUniqueId());
+            String langCode = this.lang(player);
             player.sendMessage(this.plugin.getDirectTranslation("track_usage", langCode));
         } else {
             int page = 1;
@@ -116,7 +124,7 @@ public class TrackCommand extends BaseCommand {
                 trackName = String.join(" ", args);
             }
 
-            String langCode = this.dbManager.getPlayerLanguage(player.getUniqueId());
+            String langCode = this.lang(player);
             List<Map<String, Object>> times = this.dbManager.getAllTimesOnTrackByPlayer(trackName, player.getName(), page);
             if (times.isEmpty()) {
                 player.sendMessage(this.plugin.getTranslation("track_no_personal_times", langCode, new String[]{"{track}", trackName}));
@@ -142,18 +150,18 @@ public class TrackCommand extends BaseCommand {
     @CommandPermission("formularacing.admin")
     @CommandCompletion("@tracks @players")
     @Description("Deleta o melhor tempo de um jogador em uma pista")
-    public void onDeleteBestTime(Player player, String[] args) {
+    public void onDeleteBestTime(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            player.sendMessage("§cUse: /track deletebesttime <pista> <jogador>");
+            sender.sendMessage("§cUse: /track deletebesttime <pista> <jogador>");
         } else {
             String targetPlayer = args[args.length - 1];
             String trackName = String.join(" ", (CharSequence[])Arrays.copyOfRange(args, 0, args.length - 1));
-            String langCode = this.dbManager.getPlayerLanguage(player.getUniqueId());
+            String langCode = this.lang(sender);
             boolean success = this.dbManager.deletePlayerBestTimeOnTrack(trackName, targetPlayer);
             if (success) {
-                player.sendMessage(this.plugin.getTranslation("track_besttime_deleted", langCode, new String[]{"{player}", targetPlayer, "{track}", trackName}));
+                sender.sendMessage(this.plugin.getTranslation("track_besttime_deleted", langCode, new String[]{"{player}", targetPlayer, "{track}", trackName}));
             } else {
-                player.sendMessage(this.plugin.getTranslation("track_besttime_not_found", langCode, new String[]{"{player}", targetPlayer, "{track}", trackName}));
+                sender.sendMessage(this.plugin.getTranslation("track_besttime_not_found", langCode, new String[]{"{player}", targetPlayer, "{track}", trackName}));
             }
 
         }
@@ -163,9 +171,9 @@ public class TrackCommand extends BaseCommand {
     @CommandPermission("formularacing.admin")
     @CommandCompletion("@tracks @players")
     @Description("Deleta todos os tempos de uma pista (opcionalmente de um jogador)")
-    public void onDeleteAllTimes(Player player, String[] args) {
+    public void onDeleteAllTimes(CommandSender sender, String[] args) {
         if (args.length == 0) {
-            player.sendMessage("§cUse: /track deletealltimes <pista> [jogador]");
+            sender.sendMessage("§cUse: /track deletealltimes <pista> [jogador]");
         } else {
             String targetPlayer = null;
             String fullPath = String.join(" ", args);
@@ -179,16 +187,16 @@ public class TrackCommand extends BaseCommand {
                 trackName = args[0];
             }
 
-            String langCode = this.dbManager.getPlayerLanguage(player.getUniqueId());
+            String langCode = this.lang(sender);
             boolean success = this.dbManager.deleteAllTimes(trackName, targetPlayer);
             if (success) {
                 if (targetPlayer != null) {
-                    player.sendMessage(this.plugin.getTranslation("track_alltimes_deleted_player", langCode, new String[]{"{player}", targetPlayer, "{track}", trackName}));
+                    sender.sendMessage(this.plugin.getTranslation("track_alltimes_deleted_player", langCode, new String[]{"{player}", targetPlayer, "{track}", trackName}));
                 } else {
-                    player.sendMessage(this.plugin.getTranslation("track_alltimes_deleted", langCode, new String[]{"{track}", trackName}));
+                    sender.sendMessage(this.plugin.getTranslation("track_alltimes_deleted", langCode, new String[]{"{track}", trackName}));
                 }
             } else {
-                player.sendMessage(this.plugin.getTranslation("track_no_times", langCode, new String[]{"{track}", trackName}));
+                sender.sendMessage(this.plugin.getTranslation("track_no_times", langCode, new String[]{"{track}", trackName}));
             }
 
         }
@@ -198,13 +206,13 @@ public class TrackCommand extends BaseCommand {
     @CommandPermission("formularacing.admin")
     @CommandCompletion("@players")
     @Description("Deleta todos os tempos de um jogador em todas as pistas")
-    public void onDeleteAllPlayerTimes(Player player, String targetPlayer) {
-        String langCode = this.dbManager.getPlayerLanguage(player.getUniqueId());
+    public void onDeleteAllPlayerTimes(CommandSender sender, String targetPlayer) {
+        String langCode = this.lang(sender);
         boolean success = this.dbManager.deletePlayerAllTimes(targetPlayer);
         if (success) {
-            player.sendMessage(this.plugin.getTranslation("track_allplayertimes_deleted", langCode, new String[]{"{player}", targetPlayer}));
+            sender.sendMessage(this.plugin.getTranslation("track_allplayertimes_deleted", langCode, new String[]{"{player}", targetPlayer}));
         } else {
-            player.sendMessage(this.plugin.getTranslation("track_player_no_times", langCode, new String[]{"{player}", targetPlayer}));
+            sender.sendMessage(this.plugin.getTranslation("track_player_no_times", langCode, new String[]{"{player}", targetPlayer}));
         }
 
     }

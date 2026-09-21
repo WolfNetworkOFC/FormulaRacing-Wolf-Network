@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 public class TranslationUtil {
@@ -43,6 +44,15 @@ public class TranslationUtil {
 
     public String getTranslated(Player player, String key, String ... placeholders) {
         String lang = this.getPlayerLanguage(player.getUniqueId());
+        return this.plugin.getTranslation(key, lang, placeholders);
+    }
+
+    /**
+     * Sender-aware overload: uses the player's language when available, otherwise
+     * falls back to the default language so console invocations still get text.
+     */
+    public String getTranslated(CommandSender sender, String key, String ... placeholders) {
+        String lang = sender instanceof Player player ? this.getPlayerLanguage(player.getUniqueId()) : "en_US";
         return this.plugin.getTranslation(key, lang, placeholders);
     }
 

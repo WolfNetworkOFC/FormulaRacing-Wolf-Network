@@ -26,6 +26,7 @@ import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.ApiUtilities;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import dev.EfraGroup.formulaRacing.Utils.SenderUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -40,6 +41,7 @@ import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.Sound;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 @CommandAlias("heat")
@@ -59,14 +61,12 @@ public class HeatCommand extends BaseCommand {
 
     @Default
     @Description("Shows current heat info")
-    public void onDefault(Player player) {
-        Heats heat = this.resolveHeat(player, (Heats) null);
+    public void onDefault(CommandSender sender) {
+        Heats heat = this.resolveHeat(sender, (Heats) null);
         if (heat != null) {
-            this.onInfo(player, heat);
+            this.onInfo(sender, heat);
         } else {
-            Events event = database
-                .getPlayerSelectedEvent(player.getUniqueId())
-                .orElse(null);
+            Events event = this.selectedEvent(sender).orElse(null);
             if (event != null) {
                 Rounds round = event
                     .getSchedule()
@@ -74,21 +74,21 @@ public class HeatCommand extends BaseCommand {
                     .orElse(null);
                 if (round != null) {
                     String var10001 = String.valueOf(ChatColor.YELLOW);
-                    player.sendMessage(
+                    sender.sendMessage(
                         var10001 +
                             "No active heat in round " +
                             round.getDisplayName()
                     );
                 } else {
                     String var5 = String.valueOf(ChatColor.RED);
-                    player.sendMessage(
+                    sender.sendMessage(
                         var5 +
                             "✗ No active round in event " +
                             event.getDisplayName()
                     );
                 }
             } else {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.RED) +
                         "✗ No event selected!"
                 );
@@ -96,10 +96,14 @@ public class HeatCommand extends BaseCommand {
         }
     }
 
-    private Heats resolveHeat(Player player, Heats argumentHeat) {
+    private Heats resolveHeat(CommandSender sender, Heats argumentHeat) {
         if (argumentHeat != null) {
             return argumentHeat;
         } else {
+            Player player = SenderUtils.player(sender);
+            if (player == null) {
+                return null;
+            }
             Optional<Integer> selectedId = this.database.getPlayerSelectedHeat(
                 player.getUniqueId()
             );
@@ -127,6 +131,14 @@ public class HeatCommand extends BaseCommand {
 
             return null;
         }
+    }
+
+    /** Event selected by the player, or empty for the console. */
+    private Optional<Events> selectedEvent(CommandSender sender) {
+        Player player = SenderUtils.player(sender);
+        return player != null
+            ? this.database.getPlayerSelectedEvent(player.getUniqueId())
+            : Optional.empty();
     }
 
     private Integer resolveHeatIdFromCode(String code, Events event) {
@@ -173,7 +185,11 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.event.admin")
     @Description("Selects a specific heat to focus commands on")
-    public void onSelect(Player player, String heatCodeOrId) {
+    public void onSelect(CommandSender sender, String heatCodeOrId) {
+        if (!SenderUtils.requirePlayer(sender)) {
+            return;
+        }
+        Player player = SenderUtils.player(sender);
         if (
             !heatCodeOrId.equalsIgnoreCase("off") &&
             !heatCodeOrId.equalsIgnoreCase("none")
@@ -186,7 +202,7 @@ public class HeatCommand extends BaseCommand {
                     .getPlayerSelectedEvent(player.getUniqueId())
                     .orElse(null);
                 if (event == null) {
-                    player.sendMessage(
+                    sender.sendMessage(
                         String.valueOf(ChatColor.RED) +
                             "✗ Select an event first to use heat codes (ex: R1F1)."
                     );
@@ -197,7 +213,7 @@ public class HeatCommand extends BaseCommand {
             }
 
             if (heatId == null) {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.RED) +
                         "✗ Heat not found or invalid code."
                 );
@@ -205,13 +221,13 @@ public class HeatCommand extends BaseCommand {
                 Optional<Heats> heat = this.eventManager.getHeat(heatId);
                 if (heat.isEmpty()) {
                     String var7 = String.valueOf(ChatColor.RED);
-                    player.sendMessage(
+                    sender.sendMessage(
                         var7 + "✗ Heat with ID " + heatId + " not found."
                     );
                 } else {
                     this.database.setSelectedHeat(player.getUniqueId(), heatId);
                     String var10001 = String.valueOf(ChatColor.GREEN);
-                    player.sendMessage(
+                    sender.sendMessage(
                         var10001 +
                             "✓ Heat selected: " +
                             String.valueOf(ChatColor.WHITE) +
@@ -225,7 +241,7 @@ public class HeatCommand extends BaseCommand {
             }
         } else {
             this.database.setSelectedHeat(player.getUniqueId(), (Integer) null);
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.YELLOW) +
                     "Heat selection disabled. Commands will use the active heat."
             );
@@ -237,17 +253,17 @@ public class HeatCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Creates a new heat in the round")
     public void onCreate(
-        Player player,
+        CommandSender sender,
         @co.aikar.commands.annotation.Optional String roundOrHeatRef
     ) {
-        Rounds round = this.resolveRoundReference(player, roundOrHeatRef);
+        Rounds round = this.resolveRoundReference(sender, roundOrHeatRef);
 
         if (round == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum round selecionado ou ativo!"
             );
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.GRAY) +
                     "Use /heat create R1 ou /heat create R1Q1 (ou selecione um evento com round atual)."
             );
@@ -258,7 +274,7 @@ public class HeatCommand extends BaseCommand {
         this.eventManager.createHeat(round, nextNumber).thenAccept(heat -> {
             if (heat != null) {
                 String var10001 = String.valueOf(ChatColor.GREEN);
-                player.sendMessage(
+                sender.sendMessage(
                     var10001 +
                         "✓ Heat " +
                         nextNumber +
@@ -267,7 +283,7 @@ public class HeatCommand extends BaseCommand {
                         "!"
                 );
             } else {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.RED) +
                         "✗ Erro ao criar heat no banco de dados."
                 );
@@ -275,10 +291,11 @@ public class HeatCommand extends BaseCommand {
         });
     }
 
-    private Rounds resolveRoundReference(Player player, String roundOrHeatRef) {
-        Events selectedEvent = this.database.getPlayerSelectedEvent(
-            player.getUniqueId()
-        ).orElse(null);
+    private Rounds resolveRoundReference(CommandSender sender, String roundOrHeatRef) {
+        Player player = SenderUtils.player(sender);
+        Events selectedEvent = player != null
+            ? this.database.getPlayerSelectedEvent(player.getUniqueId()).orElse(null)
+            : null;
 
         if (roundOrHeatRef == null || roundOrHeatRef.isBlank()) {
             if (selectedEvent != null) {
@@ -327,16 +344,16 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("info|view")
     @CommandCompletion("@heat")
     @Description("Mostra informações detalhadas de um heat")
-    public void onInfo(Player player, Heats heat) {
-        heat = this.resolveHeat(player, heat);
+    public void onInfo(CommandSender sender, Heats heat) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo! Use /heat select <id|code>"
             );
         } else {
-            boolean isAdmin = player.hasPermission("formularacing.event.admin");
-            player.sendMessage("");
+            boolean isAdmin = sender.hasPermission("formularacing.event.admin");
+            sender.sendMessage("");
             TextComponent header = new TextComponent("");
             header.addExtra(
                 ClickableMessageUtil.getRefreshButton(
@@ -367,7 +384,7 @@ public class HeatCommand extends BaseCommand {
                     Action.RUN_COMMAND
                 )
             );
-            player.spigot().sendMessage(header);
+            sender.spigot().sendMessage(header);
             if (isAdmin) {
                 TextComponent controls = new TextComponent("  ");
                 controls.addExtra(
@@ -409,8 +426,8 @@ public class HeatCommand extends BaseCommand {
                         Action.RUN_COMMAND
                     )
                 );
-                player.spigot().sendMessage(controls);
-                player.sendMessage("");
+                sender.spigot().sendMessage(controls);
+                sender.sendMessage("");
             }
 
             TextComponent trackRow = new TextComponent(
@@ -429,7 +446,7 @@ public class HeatCommand extends BaseCommand {
                 );
             }
 
-            player.spigot().sendMessage(trackRow);
+            sender.spigot().sendMessage(trackRow);
             TextComponent configRow = new TextComponent("  ");
             var10003 = String.valueOf(heat.getTotalLaps());
             String var10004 = heat.getName();
@@ -479,7 +496,7 @@ public class HeatCommand extends BaseCommand {
                     isAdmin
                 )
             );
-            player.spigot().sendMessage(configRow);
+            sender.spigot().sendMessage(configRow);
             TextComponent configRow2 = new TextComponent("  ");
             var34 = heat.getCollisionMode().name();
             var10004 = heat.getName();
@@ -666,10 +683,10 @@ public class HeatCommand extends BaseCommand {
                     isAdmin
                 )
             );
-            player.spigot().sendMessage(configRow2);
-            player.spigot().sendMessage(configRow3);
-            player.spigot().sendMessage(configRow4);
-            player.spigot().sendMessage(configRow5);
+            sender.spigot().sendMessage(configRow2);
+            sender.spigot().sendMessage(configRow3);
+            sender.spigot().sendMessage(configRow4);
+            sender.spigot().sendMessage(configRow5);
             if (heat.getRound() != null && heat.getRound().getType() == RoundType.ELIMINATION) {
                 TextComponent elimRow = new TextComponent("  ");
                 String elimIntervalStr = heat.getEliminationIntervalSeconds() + "s";
@@ -691,9 +708,9 @@ public class HeatCommand extends BaseCommand {
                         isAdmin
                     )
                 );
-                player.spigot().sendMessage(elimRow);
+                sender.spigot().sendMessage(elimRow);
             }
-            player.sendMessage("");
+            sender.sendMessage("");
             List<Driver> displayDrivers;
             String tableTitle;
             if (heat.getHeatState() == HeatState.FINISHED) {
@@ -726,9 +743,9 @@ public class HeatCommand extends BaseCommand {
                 );
             }
 
-            player.sendMessage(tableTitle);
+            sender.sendMessage(tableTitle);
             if (displayDrivers.isEmpty()) {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.GRAY) + "    (Nenhum piloto)"
                 );
             } else {
@@ -832,12 +849,12 @@ public class HeatCommand extends BaseCommand {
                         );
                     }
 
-                    player.spigot().sendMessage(line);
+                    sender.spigot().sendMessage(line);
                 }
             }
 
             if (isAdmin && heat.getHeatState() == HeatState.SETUP) {
-                player.sendMessage("");
+                sender.sendMessage("");
                 TextComponent addBtns = new TextComponent("  Adicionar: ");
                 addBtns.addExtra(
                     ClickableMessageUtil.getButton(
@@ -858,12 +875,12 @@ public class HeatCommand extends BaseCommand {
                         Action.SUGGEST_COMMAND
                     )
                 );
-                player.spigot().sendMessage(addBtns);
+                sender.spigot().sendMessage(addBtns);
             }
 
-            player.sendMessage("");
+            sender.sendMessage("");
             String var10001 = String.valueOf(ChatColor.GOLD);
-            player.sendMessage(
+            sender.sendMessage(
                 var10001 +
                     String.valueOf(ChatColor.BOLD) +
                     "═══════════════════════════════"
@@ -898,17 +915,17 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("set realistic")
     @CommandCompletion("@heat true|false")
     @CommandPermission("formularacing.admin")
-    public void onSetRealistic(Player player, Heats heat, boolean val) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetRealistic(CommandSender sender, Heats heat, boolean val) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
         }
 
         heat.setrealistc(val);
-        player.sendMessage(
+        sender.sendMessage(
             "§a[Config] Modo Realista " +
                 (val ? "§2ATIVADO" : "§cDESATIVADO") +
                 " §apara o heat §f" +
@@ -919,23 +936,23 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("set reversegrid")
     @CommandCompletion("@heat full|50%|75%|100%")
     @CommandPermission("formularacing.admin")
-    public void onSetReverseGrid(Player player, Heats heat, String mode) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetReverseGrid(CommandSender sender, Heats heat, String mode) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
         }
 
         if (heat.getHeatState() != HeatState.SETUP && heat.getHeatState() != HeatState.LOADED) {
-            player.sendMessage(ChatColor.RED + "O heat deve estar em SETUP ou LOADED para inverter o grid!");
+            sender.sendMessage(ChatColor.RED + "O heat deve estar em SETUP ou LOADED para inverter o grid!");
             return;
         }
 
         if (mode == null || mode.isBlank()) {
-            player.sendMessage(ChatColor.RED + "Uso: /heat set reversegrid <full|porcentagem>");
-            player.sendMessage(ChatColor.GRAY + "Exemplos: full, 50%, 75%, 100%");
+            sender.sendMessage(ChatColor.RED + "Uso: /heat set reversegrid <full|porcentagem>");
+            sender.sendMessage(ChatColor.GRAY + "Exemplos: full, 50%, 75%, 100%");
             return;
         }
 
@@ -943,12 +960,12 @@ public class HeatCommand extends BaseCommand {
 
         if (lower.equals("full") || lower.equals("100%")) {
             heat.reverseFullGrid();
-            player.sendMessage(
+            sender.sendMessage(
                 "§a[Config] Grid 100% invertido para o heat §f" + heat.getName()
             );
         } else if (lower.equals("restore") || lower.equals("off") || lower.equals("0%")) {
             heat.restoreOriginalGrid();
-            player.sendMessage(
+            sender.sendMessage(
                 "§a[Config] Grid restaurado para ordem original no heat §f" + heat.getName()
             );
         } else {
@@ -957,16 +974,16 @@ public class HeatCommand extends BaseCommand {
             try {
                 int percentage = Integer.parseInt(numStr);
                 if (percentage < 1 || percentage > 100) {
-                    player.sendMessage(ChatColor.RED + "A porcentagem deve estar entre 1 e 100!");
+                    sender.sendMessage(ChatColor.RED + "A porcentagem deve estar entre 1 e 100!");
                     return;
                 }
                 heat.reverseGrid(percentage);
-                player.sendMessage(
+                sender.sendMessage(
                     "§a[Config] Grid invertido em " + percentage + "% para o heat §f" + heat.getName()
                 );
             } catch (NumberFormatException e) {
-                player.sendMessage(ChatColor.RED + "Valor inválido: " + mode);
-                player.sendMessage(ChatColor.GRAY + "Use: full, 50%, 75%, 100%, restore");
+                sender.sendMessage(ChatColor.RED + "Valor inválido: " + mode);
+                sender.sendMessage(ChatColor.GRAY + "Use: full, 50%, 75%, 100%, restore");
             }
         }
     }
@@ -974,17 +991,17 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("set swap")
     @CommandCompletion("@heat true|false")
     @CommandPermission("formularacing.admin")
-    public void onSetDriverSwap(Player player, Heats heat, boolean val) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetDriverSwap(CommandSender sender, Heats heat, boolean val) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
         }
 
         heat.setDriverSwap(val);
-        player.sendMessage(
+        sender.sendMessage(
             "§a[Config] Driver Swap " +
                 (val ? "§2ATIVADO" : "§cDESATIVADO") +
                 " §apara o heat §f" +
@@ -995,17 +1012,17 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("set p2ppower")
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
-    public void onSetP2PPower(Player player, Heats heat, double power) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetP2PPower(CommandSender sender, Heats heat, double power) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
         }
 
         heat.setpushtopasspower(power);
-        player.sendMessage(
+        sender.sendMessage(
             "§a[Config] Poder do P2P definido para: §f" +
                 power +
                 "x §ano heat §f" +
@@ -1016,17 +1033,17 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("set drspower")
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
-    public void onSetDRSPower(Player player, Heats heat, double power) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetDRSPower(CommandSender sender, Heats heat, double power) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
         }
 
         heat.setDrsdownpower(power);
-        player.sendMessage(
+        sender.sendMessage(
             "§a[Config] Poder do DRS definido para: §f" +
                 power +
                 "x §ano heat §f" +
@@ -1037,17 +1054,17 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("set drsdowntime")
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
-    public void onSetDRSTime(Player player, Heats heat, double seconds) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetDRSTime(CommandSender sender, Heats heat, double seconds) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
         }
 
         heat.setDrsdowntime(seconds);
-        player.sendMessage(
+        sender.sendMessage(
             "§a[Config] Tempo de DRS definido para: §f" +
                 seconds +
                 "s §ano heat §f" +
@@ -1058,17 +1075,17 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("set ers")
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
-    public void onSetErs(Player player, Heats heat, boolean seconds) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetErs(CommandSender sender, Heats heat, boolean seconds) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                     ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
         }
 
         heat.setErsEnabled(seconds);
-        player.sendMessage(
+        sender.sendMessage(
                 "§a[Config] Ers definido como §f" +
                         seconds +
                         "s §ano heat §f" +
@@ -1079,59 +1096,59 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("set ersrecharge")
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
-    public void onSetErsRecharge(Player player, Heats heat, double speed) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetErsRecharge(CommandSender sender, Heats heat, double speed) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
 
         heat.getHeatConfig().setErsRechargeSpeed(speed);
-        player.sendMessage("§a[Config] Velocidade de recarga ERS definida para: §f" + speed + " §ano heat §f" + heat.getId());
+        sender.sendMessage("§a[Config] Velocidade de recarga ERS definida para: §f" + speed + " §ano heat §f" + heat.getId());
     }
 
     @Subcommand("set ersdrain")
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
-    public void onSetErsDrain(Player player, Heats heat, double speed) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetErsDrain(CommandSender sender, Heats heat, double speed) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
 
         heat.getHeatConfig().setErsDrainSpeed(speed);
-        player.sendMessage("§a[Config] Velocidade de gasto ERS definida para: §f" + speed + " §ano heat §f" + heat.getId());
+        sender.sendMessage("§a[Config] Velocidade de gasto ERS definida para: §f" + speed + " §ano heat §f" + heat.getId());
     }
 
     @Subcommand("set erspower")
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
-    public void onSetErsPower(Player player, Heats heat, double power) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetErsPower(CommandSender sender, Heats heat, double power) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
 
         heat.getHeatConfig().setErsDeployPower(power);
-        player.sendMessage("§a[Config] Potência do ERS definida para: §f" + power + " §ano heat §f" + heat.getId());
+        sender.sendMessage("§a[Config] Potência do ERS definida para: §f" + power + " §ano heat §f" + heat.getId());
     }
 
     @Subcommand("set deltaghosting")
     @CommandCompletion("@heat <seconds>")
     @CommandPermission("formularacing.admin")
-    public void onSetGhosting(Player player, Heats heat, int seconds) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetGhosting(CommandSender sender, Heats heat, int seconds) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
         }
 
         heat.setDeltaghosting(seconds);
-        player.sendMessage(
+        sender.sendMessage(
             "§a[Config] Delta Ghosting definido para: §f" +
                 seconds +
                 "s §ano heat §f" +
@@ -1143,10 +1160,10 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat true|false")
     @CommandPermission("formularacing.admin")
     @Description("Configura corrida endurance por tempo (usa o /heat set timelimit; volta final quando o tempo acaba)")
-    public void onSetTimed(Player player, Heats heat, boolean enabled) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetTimed(CommandSender sender, Heats heat, boolean enabled) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
 
@@ -1155,23 +1172,23 @@ public class HeatCommand extends BaseCommand {
         if (enabled) {
             Integer timeLimit = heat.getTimeLimit();
             if (timeLimit == null || timeLimit <= 0) {
-                player.sendMessage(
+                sender.sendMessage(
                     "§a[Config] Endurance §fATIVADO §ano heat §f" + heat.getId() +
                     "§c, mas o heat não tem timelimit!"
                 );
-                player.sendMessage(
+                sender.sendMessage(
                     ChatColor.GRAY + "Defina com: " + ChatColor.WHITE + "/heat set timelimit " + heat.getName() + " <segundos>"
                 );
-                player.sendMessage(ChatColor.GRAY + "Sem timelimit, a corrida cai no modo normal de voltas.");
+                sender.sendMessage(ChatColor.GRAY + "Sem timelimit, a corrida cai no modo normal de voltas.");
             } else {
-                player.sendMessage(
+                sender.sendMessage(
                     "§a[Config] Endurance §fATIVADO §ano heat §f" + heat.getId() +
                     "§a — limite de §f" + timeLimit + "s" +
                     " §7(o tempo acaba → todos fazem a volta final)"
                 );
             }
         } else {
-            player.sendMessage("§a[Config] Endurance §fDESATIVADO §ano heat §f" + heat.getId());
+            sender.sendMessage("§a[Config] Endurance §fDESATIVADO §ano heat §f" + heat.getId());
         }
     }
 
@@ -1179,12 +1196,12 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat true|false 100 0.45")
     @CommandPermission("formularacing.admin")
     @Description("Configura sistema de combustível do heat")
-    public void onSetFuel(Player player, Heats heat, boolean enabled,
+    public void onSetFuel(CommandSender sender, Heats heat, boolean enabled,
                           @Default("100") Double startingFuel,
                           @Default("0.45") Double consumption) {
-        heat = this.resolveHeat(player, heat);
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
 
@@ -1193,9 +1210,9 @@ public class HeatCommand extends BaseCommand {
         if (startingFuel != null) config.setStartingFuel(startingFuel);
         if (consumption != null) config.setFuelConsumptionPerSecond(consumption);
 
-        player.sendMessage("§a[Config] Combustível " + (enabled ? "§fATIVADO" : "§fDESATIVADO") + " §ano heat §f" + heat.getId());
+        sender.sendMessage("§a[Config] Combustível " + (enabled ? "§fATIVADO" : "§fDESATIVADO") + " §ano heat §f" + heat.getId());
         if (enabled) {
-            player.sendMessage("§7  Carga inicial: §f" + config.getStartingFuel() + "% §8| §7Consumo/s: §f" + config.getFuelConsumptionPerSecond());
+            sender.sendMessage("§7  Carga inicial: §f" + config.getStartingFuel() + "% §8| §7Consumo/s: §f" + config.getFuelConsumptionPerSecond());
         }
     }
 
@@ -1203,25 +1220,25 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat true|false")
     @CommandPermission("formularacing.admin")
     @Description("Configura fluxo de bandeira quadriculada")
-    public void onSetCheckeredFlag(Player player, Heats heat, boolean enabled) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetCheckeredFlag(CommandSender sender, Heats heat, boolean enabled) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
 
         heat.getHeatConfig().setEnableCheckeredFlagFlow(enabled);
-        player.sendMessage("§a[Config] Checkered Flag Flow " + (enabled ? "§fATIVADO" : "§fDESATIVADO") + " §ano heat §f" + heat.getId());
+        sender.sendMessage("§a[Config] Checkered Flag Flow " + (enabled ? "§fATIVADO" : "§fDESATIVADO") + " §ano heat §f" + heat.getId());
     }
 
     @Subcommand("set reactstart")
     @CommandCompletion("@heat true|false 3")
     @CommandPermission("formularacing.admin")
     @Description("Configura largada por reação (hold aleatório + punição de largada antecipada)")
-    public void onSetReactStart(Player player, Heats heat, boolean enabled, @Default("3") Integer penaltySeconds) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetReactStart(CommandSender sender, Heats heat, boolean enabled, @Default("3") Integer penaltySeconds) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
 
@@ -1231,9 +1248,9 @@ public class HeatCommand extends BaseCommand {
             config.setF1StartPenaltySeconds(penaltySeconds);
         }
 
-        player.sendMessage("§a[Config] React Start " + (enabled ? "§fATIVADA" : "§fDESATIVADA") + " §ano heat §f" + heat.getId());
+        sender.sendMessage("§a[Config] React Start " + (enabled ? "§fATIVADA" : "§fDESATIVADA") + " §ano heat §f" + heat.getId());
         if (enabled) {
-            player.sendMessage("§7  Punição por largada antecipada: §f" + config.getF1StartPenaltySeconds() + "s");
+            sender.sendMessage("§7  Punição por largada antecipada: §f" + config.getF1StartPenaltySeconds() + "s");
         }
     }
 
@@ -1255,38 +1272,38 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")
     @Description("Reseta a configuração avançada do heat (endurance, fuel, checkered flag, largada F1)")
-    public void onSetReset(Player player, Heats heat) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetReset(CommandSender sender, Heats heat) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
 
         heat.getHeatConfig().reset();
-        player.sendMessage("§a[Config] Configuração avançada do heat §f" + heat.getId() + " §aresetada!");
-        player.sendMessage(ChatColor.GRAY + "Visualize tudo com: " + ChatColor.WHITE + "/heat info " + heat.getName());
+        sender.sendMessage("§a[Config] Configuração avançada do heat §f" + heat.getId() + " §aresetada!");
+        sender.sendMessage(ChatColor.GRAY + "Visualize tudo com: " + ChatColor.WHITE + "/heat info " + heat.getName());
     }
 
     @Subcommand("load")
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.event.admin")
     @Description("Carrega um heat (prepara para largada)")
-    public void onLoad(Player player, Heats heat) {
-        heat = this.resolveHeat(player, heat);
+    public void onLoad(CommandSender sender, Heats heat) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo!"
             );
         } else {
-            if (heat.loadHeat(player)) {
+            if (heat.loadHeat(sender)) {
                 String var10001 = String.valueOf(ChatColor.GREEN);
-                player.sendMessage(
+                sender.sendMessage(
                     var10001 + "✓ Heat " + heat.getName() + " carregado!"
                 );
-                this.displaySortedDrivers(player, heat);
+                this.displaySortedDrivers(sender, heat);
             } else {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.RED) +
                         "✗ Falha ao carregar o heat (veja o motivo acima)."
                 );
@@ -1294,7 +1311,7 @@ public class HeatCommand extends BaseCommand {
         }
     }
 
-    private void displaySortedDrivers(Player player, Heats heat) {
+    private void displaySortedDrivers(CommandSender sender, Heats heat) {
         Rounds currentRound = heat.getRound();
         if (currentRound != null) {
             Events event = currentRound.getEvent();
@@ -1355,9 +1372,9 @@ public class HeatCommand extends BaseCommand {
                             );
                             return Long.compare(t1, t2);
                         });
-                        player.sendMessage("");
+                        sender.sendMessage("");
                         String var10001 = String.valueOf(ChatColor.GOLD);
-                        player.sendMessage(
+                        sender.sendMessage(
                             var10001 + "═══════════════════════════════"
                         );
                         String sessionName =
@@ -1365,13 +1382,13 @@ public class HeatCommand extends BaseCommand {
                                 ? "TREINO LIVRE"
                                 : "QUALIFICATÓRIA";
                         var10001 = String.valueOf(ChatColor.YELLOW);
-                        player.sendMessage(
+                        sender.sendMessage(
                             var10001 +
                                 "  ORDEM DE LARGADA (BASEADO EM " +
                                 sessionName +
                                 "):"
                         );
-                        player.sendMessage("");
+                        sender.sendMessage("");
                         int pos = 1;
 
                         for (UUID uuid : sortedDrivers) {
@@ -1384,7 +1401,7 @@ public class HeatCommand extends BaseCommand {
                                     ? ApiUtilities.formatRaceTime(time)
                                     : "---";
                             var10001 = String.valueOf(ChatColor.GRAY);
-                            player.sendMessage(
+                            sender.sendMessage(
                                 var10001 +
                                     "  " +
                                     pos +
@@ -1398,7 +1415,7 @@ public class HeatCommand extends BaseCommand {
                             ++pos;
                         }
 
-                        player.sendMessage(
+                        sender.sendMessage(
                             String.valueOf(ChatColor.GOLD) +
                                 "═══════════════════════════════"
                         );
@@ -1413,14 +1430,14 @@ public class HeatCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Inicia a contagem regressiva do heat (lights = largada F1, normal = padrão)")
     public void onStart(
-        Player player,
+        CommandSender sender,
         Heats heat,
         @Default("5") Integer seconds,
         @co.aikar.commands.annotation.Optional String mode
     ) {
-        heat = this.resolveHeat(player, heat);
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo!"
             );
@@ -1428,7 +1445,7 @@ public class HeatCommand extends BaseCommand {
         }
         Optional<Rounds> blockingRound = heat.getPreviousUnfinishedRound();
         if (blockingRound.isPresent()) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Não é possível iniciar o heat " +
                     heat.getName() +
@@ -1445,14 +1462,14 @@ public class HeatCommand extends BaseCommand {
                 this.plugin.getReadyCheckManager().stopReadyCheck(
                     heat.getId()
                 );
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.GREEN) +
                         "✓ Contagem regressiva do heat " +
                         heat.getName() +
                         " iniciada (FORÇADO)!"
                 );
             } else {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.RED) +
                         "✗ Falha ao iniciar contagem do heat."
                 );
@@ -1462,27 +1479,27 @@ public class HeatCommand extends BaseCommand {
             !mode.equalsIgnoreCase("lights") &&
             !mode.equalsIgnoreCase("normal")
         ) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Modo de largada inválido: " + mode
             );
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.GRAY) +
                     "Uso: /heat start [heat] [segundos] [lights|normal]"
             );
         } else if (
             this.plugin.getReadyCheckManager().isReadyCheckActive(heat.getId())
         ) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.YELLOW) +
                     "⚠ Há um Ready Check ativo para este heat!"
             );
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.GRAY) +
                     "Use /heat readycheck para ver quem ainda não confirmou."
             );
             ClickableMessageUtil.sendClickableLine(
-                player,
+                sender,
                 String.valueOf(ChatColor.GRAY) + "Deseja forçar o início? ",
                 String.valueOf(ChatColor.RED) + "[FORÇAR INÍCIO]",
                 "",
@@ -1495,7 +1512,7 @@ public class HeatCommand extends BaseCommand {
             boolean f1Start = mode != null && mode.equalsIgnoreCase("lights");
             heat.getHeatConfig().setF1StartEnabled(f1Start);
             if (heat.startCountdown(seconds)) {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.GREEN) +
                         "✓ Contagem regressiva de " +
                         seconds +
@@ -1507,7 +1524,7 @@ public class HeatCommand extends BaseCommand {
                             : "")
                 );
             } else {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.RED) +
                         "✗ Falha ao iniciar contagem do heat."
                 );
@@ -1520,22 +1537,22 @@ public class HeatCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Inicia a contagem regressiva do heat (forçando)")
     public void onStartForce(
-        Player player,
+        CommandSender sender,
         Heats heat,
         Integer seconds,
         String force
     ) {
         if (force.equalsIgnoreCase("force")) {
-            heat = this.resolveHeat(player, heat);
+            heat = this.resolveHeat(sender, heat);
             if (heat == null) {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.RED) +
                         "✗ Nenhum heat selecionado ou ativo!"
                 );
             } else {
                 Optional<Rounds> blockingRound = heat.getPreviousUnfinishedRound();
                 if (blockingRound.isPresent()) {
-                    player.sendMessage(
+                    sender.sendMessage(
                         String.valueOf(ChatColor.RED) +
                             "✗ Não é possível iniciar o heat " +
                             heat.getName() +
@@ -1548,14 +1565,14 @@ public class HeatCommand extends BaseCommand {
                         heat.getId()
                     );
                     String var10001 = String.valueOf(ChatColor.GREEN);
-                    player.sendMessage(
+                    sender.sendMessage(
                         var10001 +
                             "✓ Contagem regressiva do heat " +
                             heat.getName() +
                             " iniciada (FORÇADO)!"
                     );
                 } else {
-                    player.sendMessage(
+                    sender.sendMessage(
                         String.valueOf(ChatColor.RED) +
                             "✗ Falha ao iniciar contagem do heat."
                     );
@@ -1568,17 +1585,17 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.event.admin")
     @Description("Finaliza o Ready Check do heat")
-    public void onReadyCheckEnd(Player player, Heats heat) {
-        heat = this.resolveHeat(player, heat);
+    public void onReadyCheckEnd(CommandSender sender, Heats heat) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo!"
             );
         } else {
             this.plugin.getReadyCheckManager().stopReadyCheck(heat.getId());
             String var10001 = String.valueOf(ChatColor.YELLOW);
-            player.sendMessage(
+            sender.sendMessage(
                 var10001 +
                     "✓ Ready Check do heat " +
                     heat.getName() +
@@ -1591,17 +1608,17 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat <h/m/s>")
     @CommandPermission("formularacing.event.admin")
     @Description("Define o limite de tempo do heat")
-    public void onSetTimeLimit(Player player, Heats heat, String time) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetTimeLimit(CommandSender sender, Heats heat, String time) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo!"
             );
         } else {
             Integer timeMillis = ApiUtilities.parseDurationToMillis(time);
             if (timeMillis == null) {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.RED) +
                         "✗ Formato de tempo inválido! Use algo como 5m, 10m..."
                 );
@@ -1614,7 +1631,7 @@ public class HeatCommand extends BaseCommand {
                     String.valueOf(timeSeconds)
                 );
                 String var10001 = String.valueOf(ChatColor.GREEN);
-                player.sendMessage(
+                sender.sendMessage(
                     var10001 +
                         "✓ Limite de tempo do " +
                         String.valueOf(ChatColor.WHITE) +
@@ -1633,10 +1650,10 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat high|low|disabled")
     @CommandPermission("formularacing.event.admin")
     @Description("Define o modo de colisão do heat")
-    public void onSetCollision(Player player, Heats heat, String mode) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetCollision(CommandSender sender, Heats heat, String mode) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo!"
             );
@@ -1652,7 +1669,7 @@ public class HeatCommand extends BaseCommand {
                     collisionMode.name()
                 );
                 String var10001 = String.valueOf(ChatColor.GREEN);
-                player.sendMessage(
+                sender.sendMessage(
                     var10001 +
                         "✓ Modo de colisão do " +
                         String.valueOf(ChatColor.WHITE) +
@@ -1663,7 +1680,7 @@ public class HeatCommand extends BaseCommand {
                         collisionMode.name()
                 );
             } catch (IllegalArgumentException var5) {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.RED) +
                         "✗ Modo de colisão inválido! Use: high, low, disabled"
                 );
@@ -1675,10 +1692,10 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat <h/m/s>")
     @CommandPermission("formularacing.event.admin")
     @Description("Define o delay antes do início da corrida")
-    public void onSetStartDelay(Player player, Heats heat, String startDelay) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetStartDelay(CommandSender sender, Heats heat, String startDelay) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo!"
             );
@@ -1687,7 +1704,7 @@ public class HeatCommand extends BaseCommand {
                 startDelay
             );
             if (delayMillis == null) {
-                player.sendMessage(
+                sender.sendMessage(
                     String.valueOf(ChatColor.RED) +
                         "✗ Formato de tempo inválido! Use algo como 5s, 10s..."
                 );
@@ -1700,7 +1717,7 @@ public class HeatCommand extends BaseCommand {
                     String.valueOf(delaySeconds)
                 );
                 String var10001 = String.valueOf(ChatColor.GREEN);
-                player.sendMessage(
+                sender.sendMessage(
                     var10001 +
                         "✓ Delay de início do " +
                         String.valueOf(ChatColor.WHITE) +
@@ -1721,10 +1738,10 @@ public class HeatCommand extends BaseCommand {
     @Description(
         "Ordena as posições do grid com base em um heat anterior ou aleatoriamente"
     )
-    public void onSort(Player player, Heats targetHeat, String source) {
+    public void onSort(CommandSender sender, Heats targetHeat, String source) {
         // Usa o método utilitário que criamos antes para resolver o heat atual se for nulo
         if (targetHeat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat de destino selecionado ou ativo!"
             );
             return;
@@ -1742,10 +1759,10 @@ public class HeatCommand extends BaseCommand {
         }
         // 2. Lógica para Ordenação baseada em outro Heat (Fonte)
         else {
-            Heats sourceHeat = findSourceHeat(player, targetHeat, source);
+            Heats sourceHeat = findSourceHeat(sender, targetHeat, source);
 
             if (sourceHeat == null) {
-                player.sendMessage(
+                sender.sendMessage(
                     ChatColor.RED +
                         "✗ Heat de origem '" +
                         source +
@@ -1801,20 +1818,20 @@ public class HeatCommand extends BaseCommand {
             newPositions
         );
 
-        player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
-        player.sendMessage(
+        sender.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
+        sender.sendMessage(
             ChatColor.YELLOW +
                 "  GRID ORDENADO POR: " +
                 ChatColor.WHITE +
                 criteriaName
         );
-        player.sendMessage("");
+        sender.sendMessage("");
 
         for (UUID uuid : sortedDrivers) {
             String name = Bukkit.getOfflinePlayer(uuid).getName();
             Driver d = targetHeat.getDriver(uuid);
             if (d != null) {
-                player.sendMessage(
+                sender.sendMessage(
                     ChatColor.GRAY +
                         "  " +
                         d.getStartPosition() +
@@ -1825,7 +1842,7 @@ public class HeatCommand extends BaseCommand {
             }
         }
 
-        player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
+        sender.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
 
         // 4. Se o Heat já estiver carregado, reordena fisicamente os barcos/jogadores
         if (
@@ -1833,7 +1850,7 @@ public class HeatCommand extends BaseCommand {
             targetHeat.getHeatState() == HeatState.STARTING
         ) {
             targetHeat.reorderGrid();
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.GREEN + "✓ Pilotos re-posicionados no grid!"
             );
         }
@@ -1843,7 +1860,7 @@ public class HeatCommand extends BaseCommand {
      * Método auxiliar para encontrar o Heat de origem baseado na String (ID ou Formato R1Q1)
      */
     private Heats findSourceHeat(
-        Player player,
+        CommandSender sender,
         Heats targetHeat,
         String source
     ) {
@@ -1896,14 +1913,19 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.event.admin")
     @Description("Inicia um check de prontidão para os pilotos")
-    public void onReadyCheck(Player player, Heats heat) {
-        heat = this.resolveHeat(player, heat);
+    public void onReadyCheck(CommandSender sender, Heats heat) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo!"
             );
         } else {
+            Player player = SenderUtils.player(sender);
+            if (player == null) {
+                sender.sendMessage(ChatColor.RED + "✗ Ready Check exige um jogador administrador.");
+                return;
+            }
             this.plugin.getReadyCheckManager().startReadyCheck(heat, player);
         }
     }
@@ -1912,24 +1934,24 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.event.admin")
     @Description("Cancela o check de prontidão atual")
-    public void onReadyCheckCancel(Player player, Heats heat) {
-        heat = this.resolveHeat(player, heat);
+    public void onReadyCheckCancel(CommandSender sender, Heats heat) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo!"
             );
         } else if (
             !this.plugin.getReadyCheckManager().isReadyCheckActive(heat.getId())
         ) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Não há um Ready Check ativo para este heat."
             );
         } else {
             this.plugin.getReadyCheckManager().stopReadyCheck(heat.getId());
             String var10001 = String.valueOf(ChatColor.YELLOW);
-            player.sendMessage(
+            sender.sendMessage(
                 var10001 +
                     "⚠ Ready Check cancelado para o heat " +
                     heat.getName()
@@ -1940,14 +1962,15 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("set drs")
     @CommandCompletion("@heat true|false")
     @CommandPermission("formularacing.event.admin")
-    public void onSetDrs(Player player, Heats heat, Boolean drs) {
-        String lang = this.database.getPlayerLanguage(player.getUniqueId());
+    public void onSetDrs(CommandSender sender, Heats heat, Boolean drs) {
+        Player player = SenderUtils.player(sender);
+        String lang = player != null
+            ? this.database.getPlayerLanguage(player.getUniqueId())
+            : "en_US";
         if (heat == null) {
-            Events selected = database
-                .getPlayerSelectedEvent(player.getUniqueId())
-                .orElse(null);
+            Events selected = this.selectedEvent(sender).orElse(null);
             if (selected == null) {
-                player.sendMessage(
+                sender.sendMessage(
                     "§c[!] Você precisa especificar um Heat ou selecionar um Evento primeiro."
                 );
                 return;
@@ -1963,7 +1986,7 @@ public class HeatCommand extends BaseCommand {
                         .forEach(h -> h.setDrsEnabled(drs))
                 );
             String var10001 = drs ? "§2LIGADO" : "§cDESLIGADO";
-            player.sendMessage(
+            sender.sendMessage(
                 "§a[DRS] Status definido como " +
                     var10001 +
                     " §apara TODO o evento: §f" +
@@ -1972,7 +1995,7 @@ public class HeatCommand extends BaseCommand {
         } else {
             heat.setDrsEnabled(drs);
             String var6 = drs ? "§2LIGADO" : "§cDESLIGADO";
-            player.sendMessage(
+            sender.sendMessage(
                 "§a[DRS] Status definido como " +
                     var6 +
                     " §apara o Heat: §f" +
@@ -1980,24 +2003,25 @@ public class HeatCommand extends BaseCommand {
             );
         }
 
-        player.playSound(
-            player.getLocation(),
-            Sound.BLOCK_NOTE_BLOCK_CHIME,
-            1.0F,
-            1.2F
-        );
+        if (player != null) {
+            player.playSound(
+                player.getLocation(),
+                Sound.BLOCK_NOTE_BLOCK_CHIME,
+                1.0F,
+                1.2F
+            );
+        }
     }
 
     @Subcommand("set pushtopass|set p2p")
     @CommandCompletion("@heat true|false")
     @CommandPermission("formularacing.event.admin")
-    public void onSetPushToPass(Player player, Heats heat, @co.aikar.commands.annotation.Optional Boolean enabled) {
+    public void onSetPushToPass(CommandSender sender, Heats heat, @co.aikar.commands.annotation.Optional Boolean enabled) {
+        Player player = SenderUtils.player(sender);
         if (heat == null) {
-            Events selected = this.database.getPlayerSelectedEvent(
-                player.getUniqueId()
-            ).orElse(null);
+            Events selected = this.selectedEvent(sender).orElse(null);
             if (selected == null) {
-                player.sendMessage(
+                sender.sendMessage(
                     "§c[!] Você precisa especificar um Heat ou selecionar um Evento primeiro."
                 );
                 return;
@@ -2028,7 +2052,7 @@ public class HeatCommand extends BaseCommand {
                         .forEach(h -> h.setPushtopass(finalEnabled))
                 );
             String status = finalEnabled ? "§2LIGADO" : "§cDESLIGADO";
-            player.sendMessage(
+            sender.sendMessage(
                 "§a[P2P] Status definido como " +
                     status +
                     " §apara TODO o evento: §f" +
@@ -2038,7 +2062,7 @@ public class HeatCommand extends BaseCommand {
             boolean value = enabled != null ? enabled : !heat.isPushtopass();
             heat.setPushtopass(value);
             String status = value ? "§2LIGADO" : "§cDESLIGADO";
-            player.sendMessage(
+            sender.sendMessage(
                 "§a[P2P] Status definido como " +
                     status +
                     " §apara o Heat: §f" +
@@ -2046,12 +2070,14 @@ public class HeatCommand extends BaseCommand {
             );
         }
 
-        player.playSound(
-            player.getLocation(),
-            Sound.BLOCK_NOTE_BLOCK_CHIME,
-            1.0F,
-            1.2F
-        );
+        if (player != null) {
+            player.playSound(
+                player.getLocation(),
+                Sound.BLOCK_NOTE_BLOCK_CHIME,
+                1.0F,
+                1.2F
+            );
+        }
     }
 
     @Subcommand("set driverposition")
@@ -2059,14 +2085,14 @@ public class HeatCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Define a posição de largada de um piloto")
     public void onSetDriverPosition(
-        Player player,
+        CommandSender sender,
         Heats heat,
         String targetPlayerName,
         String positionStr
     ) {
-        heat = this.resolveHeat(player, heat);
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo!"
             );
@@ -2074,14 +2100,14 @@ public class HeatCommand extends BaseCommand {
             Player target = Bukkit.getPlayer(targetPlayerName);
             if (target == null) {
                 String var14 = String.valueOf(ChatColor.RED);
-                player.sendMessage(
+                sender.sendMessage(
                     var14 + "✗ Jogador não encontrado: " + targetPlayerName
                 );
             } else {
                 Driver driver = heat.getDriver(target.getUniqueId());
                 if (driver == null) {
                     String var13 = String.valueOf(ChatColor.RED);
-                    player.sendMessage(
+                    sender.sendMessage(
                         var13 +
                             "✗ O jogador " +
                             target.getName() +
@@ -2107,7 +2133,7 @@ public class HeatCommand extends BaseCommand {
                         }
                     } catch (NumberFormatException var9) {
                         String var10001 = String.valueOf(ChatColor.RED);
-                        player.sendMessage(
+                        sender.sendMessage(
                             var10001 + "✗ Posição inválida: " + positionStr
                         );
                         return;
@@ -2115,7 +2141,7 @@ public class HeatCommand extends BaseCommand {
 
                     if (heat.setDriverPosition(driver, newPos)) {
                         String var11 = String.valueOf(ChatColor.GREEN);
-                        player.sendMessage(
+                        sender.sendMessage(
                             var11 +
                                 "✓ Posição de " +
                                 target.getName() +
@@ -2123,21 +2149,21 @@ public class HeatCommand extends BaseCommand {
                                 newPos
                         );
                         if (heat.getHeatState() == HeatState.LOADED) {
-                            player.sendMessage(
+                            sender.sendMessage(
                                 String.valueOf(ChatColor.YELLOW) +
                                     "⚠ O grid foi atualizado. Pilotos re-teleportados."
                             );
                         }
                     } else {
                         String var12 = String.valueOf(ChatColor.RED);
-                        player.sendMessage(
+                        sender.sendMessage(
                             var12 +
                                 "✗ Falha ao definir posição. Verifique se o valor está entre 1 e " +
                                 heat.getDrivers().size()
                         );
                     }
                 } else {
-                    player.sendMessage(
+                    sender.sendMessage(
                         String.valueOf(ChatColor.RED) +
                             "✗ Não é possível alterar a posição com o heat em andamento!"
                     );
@@ -2150,10 +2176,10 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@gimmicks <volta>")
     @CommandPermission("formularacing.event.admin")
     @Description("Agenda uma gimmick da pista do heat para uma volta que ainda vai acontecer")
-    public void onSetGimmickAdd(Player player, String gimmickName, int lap) {
-        Heats heat = this.resolveHeat(player, null);
+    public void onSetGimmickAdd(CommandSender sender, String gimmickName, int lap) {
+        Heats heat = this.resolveHeat(sender, null);
         if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
 
@@ -2163,7 +2189,7 @@ public class HeatCommand extends BaseCommand {
             gimmickName
         );
         if (gimmick == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ A gimmick '" + gimmickName +
                     "' não existe na pista '" + heat.getTrackNameWS() +
                     "'. Crie com /gimmick save."
@@ -2177,13 +2203,13 @@ public class HeatCommand extends BaseCommand {
                 gimmick,
                 lap
             );
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.GREEN + "✓ Gimmick '" + gimmick.getName() +
                     "' agendada para a volta " + schedule.getTriggerLap() +
                     " do heat " + heat.getName() + "."
             );
         } catch (GimmickException e) {
-            player.sendMessage(ChatColor.RED + "✗ " + e.getMessage());
+            sender.sendMessage(ChatColor.RED + "✗ " + e.getMessage());
         }
     }
 
@@ -2191,10 +2217,10 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@gimmicks")
     @CommandPermission("formularacing.event.admin")
     @Description("Remove o agendamento de uma gimmick do heat")
-    public void onSetGimmickRemove(Player player, String gimmickName) {
-        Heats heat = this.resolveHeat(player, null);
+    public void onSetGimmickRemove(CommandSender sender, String gimmickName) {
+        Heats heat = this.resolveHeat(sender, null);
         if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
 
@@ -2205,12 +2231,12 @@ public class HeatCommand extends BaseCommand {
         );
 
         if (gimmick != null && gimmickManager.unscheduleGimmick(heat, gimmick)) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.GREEN + "✓ Gimmick '" + gimmick.getName() +
                     "' removida do heat " + heat.getName() + "."
             );
         } else {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ A gimmick '" + gimmickName +
                     "' não está agendada nesse heat."
             );
@@ -2220,17 +2246,17 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("set gimmick clear")
     @CommandPermission("formularacing.event.admin")
     @Description("Remove todas as gimmicks agendadas no heat")
-    public void onSetGimmickClear(Player player) {
-        Heats heat = this.resolveHeat(player, null);
+    public void onSetGimmickClear(CommandSender sender) {
+        Heats heat = this.resolveHeat(sender, null);
         if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
 
         GimmickManager gimmickManager = this.plugin.getGimmickManager();
         int removed = gimmickManager.getSchedule(heat).size();
         gimmickManager.clearSchedule(heat);
-        player.sendMessage(
+        sender.sendMessage(
             ChatColor.GREEN + "✓ " + removed + " gimmick(s) removida(s) do heat " +
                 heat.getName() + "."
         );
@@ -2239,10 +2265,10 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("set gimmick list")
     @CommandPermission("formularacing.event.admin")
     @Description("Lista as gimmicks agendadas no heat")
-    public void onSetGimmickList(Player player) {
-        Heats heat = this.resolveHeat(player, null);
+    public void onSetGimmickList(CommandSender sender) {
+        Heats heat = this.resolveHeat(sender, null);
         if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
 
@@ -2250,16 +2276,16 @@ public class HeatCommand extends BaseCommand {
             .getGimmickManager()
             .getSchedule(heat);
 
-        player.sendMessage("");
-        player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
-        player.sendMessage(
+        sender.sendMessage("");
+        sender.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
+        sender.sendMessage(
             ChatColor.YELLOW + "  Gimmicks do heat " + heat.getName() + " (" +
                 heat.getTrackNameWS() + ")"
         );
-        player.sendMessage("");
+        sender.sendMessage("");
 
         if (schedules.isEmpty()) {
-            player.sendMessage(ChatColor.GRAY + "  Nenhuma gimmick agendada.");
+            sender.sendMessage(ChatColor.GRAY + "  Nenhuma gimmick agendada.");
         } else {
             for (GimmickSchedule schedule : schedules) {
                 GimmickConfig gimmick = schedule.getGimmick();
@@ -2268,7 +2294,7 @@ public class HeatCommand extends BaseCommand {
                     : gimmick.isEnabled()
                         ? ChatColor.GREEN + "● "
                         : ChatColor.RED + "● ";
-                player.sendMessage(
+                sender.sendMessage(
                     status + ChatColor.WHITE + gimmick.getName() +
                         ChatColor.GRAY + " | volta " + schedule.getTriggerLap() +
                         (schedule.isTriggered() ? " (já colada)" : "")
@@ -2276,22 +2302,22 @@ public class HeatCommand extends BaseCommand {
             }
         }
 
-        player.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
+        sender.sendMessage(ChatColor.GOLD + "═══════════════════════════════");
     }
 
     @Subcommand("set laps")
     @CommandCompletion("@heat <laps>")
     @CommandPermission("formularacing.event.admin")
     @Description("Define o número de voltas do heat")
-    public void onSetLaps(Player player, Heats heat, int laps) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetLaps(CommandSender sender, Heats heat, int laps) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo!"
             );
         } else if (laps < 1) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ O número de voltas deve ser pelo menos 1."
             );
@@ -2302,18 +2328,18 @@ public class HeatCommand extends BaseCommand {
                 !this.database.isCircuit(trackName) &&
                 laps > 1
             ) {
-                player.sendMessage(
+                sender.sendMessage(
                     "§e⚠️ A pista '" +
                         trackName +
                         "' não é um circuito fechado (Sprint/Parkour)."
                 );
-                player.sendMessage("§e⚠️ Forçando 1 volta.");
+                sender.sendMessage("§e⚠️ Forçando 1 volta.");
                 laps = 1;
             }
 
             heat.setTotalLaps(laps);
             String var10001 = String.valueOf(ChatColor.GREEN);
-            player.sendMessage(
+            sender.sendMessage(
                 var10001 +
                     "✓ Voltas do heat " +
                     heat.getName() +
@@ -2327,15 +2353,15 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat <pits>")
     @CommandPermission("formularacing.event.admin")
     @Description("Define o número de pit stops obrigatórios")
-    public void onSetPits(Player player, Heats heat, int pits) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetPits(CommandSender sender, Heats heat, int pits) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo!"
             );
         } else if (pits < 0) {
-            player.sendMessage(
+            sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ O número de pits não pode ser negativo."
             );
@@ -2346,18 +2372,18 @@ public class HeatCommand extends BaseCommand {
                 !this.database.isCircuit(trackName) &&
                 pits > 0
             ) {
-                player.sendMessage(
+                sender.sendMessage(
                     "§e⚠️ A pista '" +
                         trackName +
                         "' não é um circuito fechado (Sprint/Parkour)."
                 );
-                player.sendMessage("§e⚠️ Forçando 0 pits.");
+                sender.sendMessage("§e⚠️ Forçando 0 pits.");
                 pits = 0;
             }
 
             heat.setTotalPits(pits);
             String var10001 = String.valueOf(ChatColor.GREEN);
-            player.sendMessage(
+            sender.sendMessage(
                 var10001 +
                     "✓ Pit stops obrigatórios do heat " +
                     heat.getName() +
@@ -2371,24 +2397,24 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat <max>")
     @CommandPermission("formularacing.event.admin")
     @Description("Define o número máximo de pilotos no heat")
-    public void onSetMaxDrivers(Player player, Heats heat, int max) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetMaxDrivers(CommandSender sender, Heats heat, int max) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
         }
 
         if (max < 1) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ O máximo de pilotos deve ser pelo menos 1."
             );
             return;
         }
 
         heat.setMaxDrivers(max);
-        player.sendMessage(
+        sender.sendMessage(
             ChatColor.GREEN +
                 "✓ Máximo de pilotos do heat " +
                 heat.getName() +
@@ -2401,63 +2427,63 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat <seconds>")
     @CommandPermission("formularacing.event.admin")
     @Description("Define o intervalo de eliminação em segundos (apenas heats de eliminação)")
-    public void onSetElimInterval(Player player, Heats heat, int seconds) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetElimInterval(CommandSender sender, Heats heat, int seconds) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
         if (heat.getRound() == null || heat.getRound().getType() != RoundType.ELIMINATION) {
-            player.sendMessage(ChatColor.RED + "✗ Esta configuração só é válida para heats de eliminação!");
+            sender.sendMessage(ChatColor.RED + "✗ Esta configuração só é válida para heats de eliminação!");
             return;
         }
         if (seconds < 5) {
-            player.sendMessage(ChatColor.RED + "✗ O intervalo mínimo é de 5 segundos.");
+            sender.sendMessage(ChatColor.RED + "✗ O intervalo mínimo é de 5 segundos.");
             return;
         }
         heat.setEliminationIntervalSeconds(seconds);
         this.eventManager.getDatabaseManager().heatSet(heat.getId(), "eliminationInterval", String.valueOf(seconds));
-        player.sendMessage(ChatColor.GREEN + "✓ Intervalo de eliminação do " + ChatColor.WHITE + heat.getName() + ChatColor.GREEN + " definido para " + ChatColor.WHITE + seconds + "s");
+        sender.sendMessage(ChatColor.GREEN + "✓ Intervalo de eliminação do " + ChatColor.WHITE + heat.getName() + ChatColor.GREEN + " definido para " + ChatColor.WHITE + seconds + "s");
     }
 
     @Subcommand("set mindrivers")
     @CommandCompletion("@heat <minimum>")
     @CommandPermission("formularacing.event.admin")
     @Description("Define o número mínimo de pilotos antes de encerrar a eliminação")
-    public void onSetMinDrivers(Player player, Heats heat, int minimum) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetMinDrivers(CommandSender sender, Heats heat, int minimum) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
             return;
         }
         if (heat.getRound() == null || heat.getRound().getType() != RoundType.ELIMINATION) {
-            player.sendMessage(ChatColor.RED + "✗ Esta configuração só é válida para heats de eliminação!");
+            sender.sendMessage(ChatColor.RED + "✗ Esta configuração só é válida para heats de eliminação!");
             return;
         }
         if (minimum < 1) {
-            player.sendMessage(ChatColor.RED + "✗ O mínimo de pilotos deve ser pelo menos 1.");
+            sender.sendMessage(ChatColor.RED + "✗ O mínimo de pilotos deve ser pelo menos 1.");
             return;
         }
         heat.setMinimumDrivers(minimum);
         this.eventManager.getDatabaseManager().heatSet(heat.getId(), "minimumDrivers", String.valueOf(minimum));
-        player.sendMessage(ChatColor.GREEN + "✓ Mínimo de pilotos do " + ChatColor.WHITE + heat.getName() + ChatColor.GREEN + " definido para " + ChatColor.WHITE + minimum);
+        sender.sendMessage(ChatColor.GREEN + "✓ Mínimo de pilotos do " + ChatColor.WHITE + heat.getName() + ChatColor.GREEN + " definido para " + ChatColor.WHITE + minimum);
     }
 
     @Subcommand("set lonely")
     @CommandCompletion("@heat true|false")
     @CommandPermission("formularacing.event.admin")
     @Description("Ativa ou desativa o modo solitário (ghost) no heat")
-    public void onSetLonely(Player player, Heats heat, boolean lonely) {
-        heat = this.resolveHeat(player, heat);
+    public void onSetLonely(CommandSender sender, Heats heat, boolean lonely) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
         }
 
         heat.setLonely(lonely);
-        player.sendMessage(
+        sender.sendMessage(
             ChatColor.GREEN +
                 "✓ Modo solitário do heat " +
                 heat.getName() +
@@ -2471,20 +2497,20 @@ public class HeatCommand extends BaseCommand {
     @CommandPermission("formularacing.event.admin")
     @Description("Inverte o grid de largada do heat")
     public void onReverseGrid(
-        Player player,
+        CommandSender sender,
         Heats heat,
         @Default("100") Integer percentage
     ) {
-        heat = this.resolveHeat(player, heat);
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
         }
 
         heat.reverseGrid(percentage);
-        player.sendMessage(
+        sender.sendMessage(
             ChatColor.GREEN +
                 "✓ Grid do heat " +
                 heat.getName() +
@@ -2494,7 +2520,7 @@ public class HeatCommand extends BaseCommand {
         );
 
         if (heat.getHeatState() == HeatState.LOADED) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.YELLOW +
                     "⚠ O grid foi atualizado. Pilotos re-teleportados."
             );
@@ -2505,17 +2531,17 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.event.admin")
     @Description("Finaliza um heat")
-    public void onFinish(Player player, Heats heat) {
-        heat = this.resolveHeat(player, heat);
+    public void onFinish(CommandSender sender, Heats heat) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
         }
 
         heat.finishHeat();
-        player.sendMessage(
+        sender.sendMessage(
             ChatColor.GREEN + "✓ Heat " + heat.getName() + " finalizado!"
         );
     }
@@ -2524,17 +2550,17 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.event.admin")
     @Description("Reseta um heat IMEDIATAMENTE")
-    public void onReset(Player player, Heats heat) {
-        heat = this.resolveHeat(player, heat);
+    public void onReset(CommandSender sender, Heats heat) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
         }
 
         heat.resetHeat();
-        player.sendMessage(
+        sender.sendMessage(
             ChatColor.YELLOW +
                 "⚠ Heat " +
                 heat.getName() +
@@ -2545,31 +2571,31 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("delete|remove")
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.event.admin")
-    public void onDelete(Player player, Heats heat) {
-        heat = this.resolveHeat(player, heat);
+    public void onDelete(CommandSender sender, Heats heat) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
         }
 
         if (this.eventManager.removeHeat(heat)) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.GREEN + "✓ Heat " + heat.getName() + " removido."
             );
         } else {
-            player.sendMessage(ChatColor.RED + "✗ Falha ao remover heat.");
+            sender.sendMessage(ChatColor.RED + "✗ Falha ao remover heat.");
         }
     }
 
     @Subcommand("adddriver|join")
     @CommandCompletion("@heat @players")
     @CommandPermission("formularacing.event.admin")
-    public void onAddDriver(Player player, Heats heat, String targetName) {
-        heat = this.resolveHeat(player, heat);
+    public void onAddDriver(CommandSender sender, Heats heat, String targetName) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
@@ -2603,7 +2629,7 @@ public class HeatCommand extends BaseCommand {
                                 resolvedHeat.handleLateJoin(onlineTarget);
                             }
 
-                            player.sendMessage(
+                            sender.sendMessage(
                                 ChatColor.GREEN +
                                     "✓ Piloto " +
                                     resolvedTargetName +
@@ -2615,7 +2641,7 @@ public class HeatCommand extends BaseCommand {
                             return;
                         }
 
-                        player.sendMessage(
+                        sender.sendMessage(
                             this.translateDriverMutationFailure(
                                 result.getStatus(),
                                 resolvedHeat,
@@ -2626,7 +2652,7 @@ public class HeatCommand extends BaseCommand {
             })
             .exceptionally(exception -> {
                 SchedulerHelper.runTask(this.plugin, () ->
-                        player.sendMessage(
+                        sender.sendMessage(
                             ChatColor.RED +
                                 "✗ Falha inesperada ao adicionar piloto."
                         )
@@ -2639,14 +2665,14 @@ public class HeatCommand extends BaseCommand {
     @CommandCompletion("@heat @players @range:1-100")
     @CommandPermission("formularacing.event.admin")
     public void onAddDriverAtPosition(
-        Player player,
+        CommandSender sender,
         Heats heat,
         String targetName,
         Integer position
     ) {
-        heat = this.resolveHeat(player, heat);
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
@@ -2681,7 +2707,7 @@ public class HeatCommand extends BaseCommand {
                                 resolvedHeat.handleLateJoin(onlineTarget);
                             }
 
-                            player.sendMessage(
+                            sender.sendMessage(
                                 ChatColor.GREEN +
                                     "✓ Piloto " +
                                     resolvedTargetName +
@@ -2693,7 +2719,7 @@ public class HeatCommand extends BaseCommand {
                             return;
                         }
 
-                        player.sendMessage(
+                        sender.sendMessage(
                             this.translateDriverMutationFailure(
                                 result.getStatus(),
                                 resolvedHeat,
@@ -2704,7 +2730,7 @@ public class HeatCommand extends BaseCommand {
             })
             .exceptionally(exception -> {
                 SchedulerHelper.runTask(this.plugin, () ->
-                        player.sendMessage(
+                        sender.sendMessage(
                             ChatColor.RED +
                                 "✗ Falha inesperada ao adicionar piloto."
                         )
@@ -2716,10 +2742,10 @@ public class HeatCommand extends BaseCommand {
     @Subcommand("removedriver|leave")
     @CommandCompletion("@heat @players")
     @CommandPermission("formularacing.event.admin")
-    public void onRemoveDriver(Player player, Heats heat, String targetName) {
-        heat = this.resolveHeat(player, heat);
+    public void onRemoveDriver(CommandSender sender, Heats heat, String targetName) {
+        heat = this.resolveHeat(sender, heat);
         if (heat == null) {
-            player.sendMessage(
+            sender.sendMessage(
                 ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
             );
             return;
@@ -2752,7 +2778,7 @@ public class HeatCommand extends BaseCommand {
                                 resolvedHeat.handleLateLeave(onlineTarget);
                             }
 
-                            player.sendMessage(
+                            sender.sendMessage(
                                 ChatColor.GREEN +
                                     "✓ Piloto " +
                                     resolvedTargetName +
@@ -2762,7 +2788,7 @@ public class HeatCommand extends BaseCommand {
                             return;
                         }
 
-                        player.sendMessage(
+                        sender.sendMessage(
                             this.translateDriverMutationFailure(
                                 result.getStatus(),
                                 resolvedHeat,
@@ -2773,7 +2799,7 @@ public class HeatCommand extends BaseCommand {
             })
             .exceptionally(exception -> {
                 SchedulerHelper.runTask(this.plugin, () ->
-                        player.sendMessage(
+                        sender.sendMessage(
                             ChatColor.RED +
                                 "✗ Falha inesperada ao remover piloto."
                         )
