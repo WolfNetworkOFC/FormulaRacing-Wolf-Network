@@ -64,6 +64,8 @@ public class DatabaseManager {
 
     private DatabaseType databaseType;
     private boolean isDatabaseInitialized = false; // Flag to ensure single initialization
+    private boolean trackSchemaReady = false;
+    private boolean playerTimeSchemaReady = false;
 
     public DatabaseManager(FormulaRacing plugin, FileManager fileManager) {
         this.plugin = plugin;
@@ -110,6 +112,8 @@ public class DatabaseManager {
             try (Statement stmt = connection.createStatement()) {
                 stmt.setQueryTimeout(1); // Quick timeout for the test
                 stmt.execute("SELECT 1;");
+                this.ensureTrackSchema(connection);
+                this.ensurePlayerTimeSchema(connection);
                 return connection; // Connection is alive, return it
             } catch (SQLException e) {
                 // If SELECT 1 fails, the connection died. Close and create a new one.
@@ -143,9 +147,10 @@ public class DatabaseManager {
 
                 if (!isDatabaseInitialized) {
                     initDatabase(connection);
-
-                    isDatabaseInitialized = true;
+                    this.isDatabaseInitialized = true;
                 }
+                this.ensureTrackSchema(connection);
+                this.ensurePlayerTimeSchema(connection);
 
                 return connection;
             } catch (SQLException e) {
@@ -952,6 +957,25 @@ public class DatabaseManager {
             } catch (SQLException ignored) {}
         }
     }
+
+   private synchronized void ensureTrackSchema(Connection conn) throws SQLException {
+       if (this.trackSchemaReady) {
+           return;
+       }
+       ensureTrackMinVersionColumn(conn);
+       this.trackSchemaReady = true;
+   }
+
+   private synchronized void ensurePlayerTimeSchema(Connection conn) throws SQLException {
+       if (this.playerTimeSchemaReady) {
+           return;
+       }
+       try (Statement stmt = conn.createStatement()) {
+           ensurePlayerTimeColumns(stmt);
+           migratePlayerTimes(stmt);
+       }
+       this.playerTimeSchemaReady = true;
+   }
 
    /** Idempotently adds the official-time columns to fr_player_times. */
    private void ensurePlayerTimeColumns(Statement stmt) {
@@ -4366,6 +4390,7 @@ public class DatabaseManager {
             "spawnPoint_yaw, spawnPoint_pitch, creatorName, icon_name, game_time, open, minVersion FROM fr_tracks";
         try {
             Connection conn = getOrConnect();
+            ensureTrackMinVersionColumn(conn);
             try (
                 PreparedStatement ps = conn.prepareStatement(sql);
                 ResultSet rs = ps.executeQuery()
@@ -5517,7 +5542,8 @@ public class DatabaseManager {
                 WHERE pt.player_name = ?
                   AND LOWER(pt.trackNameWS) = LOWER(?)
                   AND pt.finished = TRUE
-                ORDER BY """ + officialOrderBy("pt.") + """
+                ORDER BY
+""" + officialOrderBy("pt.") + """
                 LIMIT 1
             """;
         try {
@@ -5556,7 +5582,8 @@ public class DatabaseManager {
             WHERE player_name = ?
               AND LOWER(trackNameWS) = LOWER(?)
               AND finished = TRUE
-            ORDER BY """ + officialOrderBy("") + """
+            ORDER BY
+""" + officialOrderBy("") + """
             LIMIT 1
             """;
         try {
@@ -5594,7 +5621,8 @@ public class DatabaseManager {
             WHERE player_uuid = ?
               AND LOWER(trackNameWS) = LOWER(?)
               AND finished = TRUE
-            ORDER BY """ + officialOrderBy("") + """
+            ORDER BY
+""" + officialOrderBy("") + """
             LIMIT 1
             """;
         try {
@@ -5802,7 +5830,8 @@ public class DatabaseManager {
                 SELECT p.trackNameWS, p.bestTime, p.display_millis,
                        ROW_NUMBER() OVER (
                            PARTITION BY p.trackNameWS
-                           ORDER BY """ + officialOrderBy("p.") + """
+                           ORDER BY
+""" + officialOrderBy("p.") + """
                        ) AS rn
                 FROM fr_player_times p
                 WHERE p.finished = TRUE
@@ -5842,7 +5871,8 @@ public class DatabaseManager {
                 SELECT p.trackNameWS, p.bestTime, p.display_millis,
                        ROW_NUMBER() OVER (
                            PARTITION BY p.trackNameWS
-                           ORDER BY """ + officialOrderBy("p.") + """
+                           ORDER BY
+""" + officialOrderBy("p.") + """
                        ) AS rn
                 FROM fr_player_times p
                 WHERE p.player_name = ? AND p.finished = TRUE
@@ -5877,6 +5907,7 @@ public class DatabaseManager {
             "FROM fr_tracks WHERE LOWER(trackNameWS) = LOWER(?)";
         try {
             Connection conn = getOrConnect();
+            ensureTrackMinVersionColumn(conn);
 
             // 1. Try to fetch by exact name (display name) first - Resolves conflicts like "Floor is Lava" vs "floorislava"
             String sqlExact =
