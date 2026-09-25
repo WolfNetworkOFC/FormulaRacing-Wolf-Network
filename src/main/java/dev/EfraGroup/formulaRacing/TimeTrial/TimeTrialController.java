@@ -19,8 +19,27 @@ public class TimeTrialController {
         this.activeSessions.put(player.getUniqueId(), new TimeTrialSession(player.getUniqueId(), trackName));
     }
 
+    public void startSession(TimeTrialSession session) {
+        if (session != null) {
+            this.activeSessions.put(session.getPlayerUUID(), session);
+        }
+    }
+
     public void startSession(Player player, String trackName, Instant startTime) {
         this.activeSessions.put(player.getUniqueId(), new TimeTrialSession(player.getUniqueId(), trackName, startTime));
+    }
+
+    public void startSession(
+        Player player,
+        String trackName,
+        Instant startTime,
+        long startNanos,
+        UUID runId
+    ) {
+        this.activeSessions.put(
+            player.getUniqueId(),
+            new TimeTrialSession(player.getUniqueId(), trackName, startTime, startNanos, runId)
+        );
     }
 
     public TimeTrialSession getSession(Player player) {

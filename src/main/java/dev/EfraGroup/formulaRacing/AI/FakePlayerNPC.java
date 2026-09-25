@@ -308,30 +308,14 @@ public class FakePlayerNPC {
 
         // Variant A (1.21.5+): ClientboundAddEntityPacket — players no longer have
         // a dedicated AddPlayerPacket and spawn through the generic AddEntity packet.
-        // Canonical Mojang-mappings constructor, called explicitly IN ORDER:
-        // (int id, UUID uuid, double x, double y, double z, float xRot, float yRot,
-        //  EntityType<?> type, int data, Vec3 deltaMovement, double yHeadRot)
-        // NOTE: xRot = PITCH and yRot = YAW (vanilla convention); the trailing
-        // double is the head yaw.
+        Exception variantAError = null;
         try {
-            Class<?> packetClass = Class.forName("net.minecraft.network.protocol.game.ClientboundAddEntityPacket");
-            Class<?> entityTypeClass = Class.forName("net.minecraft.world.entity.EntityType");
-            Field playerField = entityTypeClass.getField("PLAYER");
-            playerField.setAccessible(true);
-            Object playerType = playerField.get(null);
-            Class<?> vec3Class = Class.forName("net.minecraft.world.phys.Vec3");
-            Constructor<?> vecCtor = vec3Class.getConstructor(double.class, double.class, double.class);
-            vecCtor.setAccessible(true);
-            Object zeroVec = vecCtor.newInstance(0.0, 0.0, 0.0);
-            Constructor<?> ctor = packetClass.getConstructor(
-                    int.class, UUID.class, double.class, double.class, double.class,
-                    float.class, float.class, entityTypeClass, int.class, vec3Class, double.class);
-            ctor.setAccessible(true);
-            return ctor.newInstance(entityId, profileUuid, x, y, z, yaw, pitch, playerType, 0, zeroVec, (double) yaw);
-        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | InstantiationException ignored) {
-            // Variant B (1.21.4): ClientboundAddPlayerPacket(int, UUID, Vector3d, float, float)
+            return buildViaAddEntityPacket(x, y, z, yaw, pitch);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            variantAError = e;
         }
         try {
+            // Variant B (1.21.4): ClientboundAddPlayerPacket(int, UUID, Vector3d, float, float)
             Class<?> packetClass = Class.forName("net.minecraft.network.protocol.game.ClientboundAddPlayerPacket");
             Class<?> vecClass = Class.forName("org.joml.Vector3d");
             Constructor<?> vecCtor = vecClass.getConstructor(double.class, double.class, double.class);
@@ -340,7 +324,7 @@ public class FakePlayerNPC {
             Constructor<?> ctor = packetClass.getConstructor(int.class, UUID.class, vecClass, float.class, float.class);
             ctor.setAccessible(true);
             return ctor.newInstance(entityId, profileUuid, vec, yaw, pitch);
-        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException | InstantiationException ignored) {
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
             // Variant C (≤1.21.3): ClientboundAddPlayerPacket(int, UUID, double, double, double, float, float)
         }
         try {
@@ -349,11 +333,162 @@ public class FakePlayerNPC {
                     int.class, UUID.class, double.class, double.class, double.class, float.class, float.class);
             ctor.setAccessible(true);
             return ctor.newInstance(entityId, profileUuid, x, y, z, yaw, pitch);
-        } catch (NoSuchMethodException e) {
-            throw new IllegalStateException("Player spawn packet constructor not found", e);
-        } catch (InvocationTargetException | IllegalAccessException | InstantiationException e) {
-            throw new IllegalStateException("Player spawn packet constructor failed: " + e.getCause().getMessage(), e);
+        } catch (NoSuchMethodException | ClassNotFoundException e) {
+            IllegalStateException ex = new IllegalStateException(
+                    "Player spawn packet constructor not found", e);
+            if (variantAError != null) {
+                ex.addSuppressed(variantAError);
+            }
+            throw ex;
+        } catch (ReflectiveOperationException e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            IllegalStateException ex = new IllegalStateException(
+                    "Player spawn packet constructor failed: " + cause.getMessage(), e);
+            if (variantAError != null) {
+                ex.addSuppressed(variantAError);
+            }
+            throw ex;
         }
+    }
+
+    /**
+     * Builds the 1.21.5+ {@code ClientboundAddEntityPacket} for the NPC player.
+     *
+     * <p>First tries the canonical 11-arg constructor; if the signature drifted on
+     * the running server version, adapts by filling any declared constructor
+     * parameter-by-parameter. On failure the thrown exception carries a diagnostic
+     * listing every available constructor.
+     */
+    private Object buildViaAddEntityPacket(double x, double y, double z, float yaw, float pitch)
+            throws ReflectiveOperationException {
+        Class<?> packetClass;
+        try {
+            packetClass = Class.forName("net.minecraft.network.protocol.game.ClientboundAddEntityPacket");
+        } catch (ClassNotFoundException e) {
+            throw new NoSuchMethodException("ClientboundAddEntityPacket ausente no servidor: " + e.getMessage());
+        }
+        Class<?> entityTypeClass = Class.forName("net.minecraft.world.entity.EntityType");
+        Object playerType = resolveEntityType(entityTypeClass, "PLAYER", "player");
+        Class<?> vec3Class = Class.forName("net.minecraft.world.phys.Vec3");
+        Constructor<?> vecCtor = vec3Class.getConstructor(double.class, double.class, double.class);
+        vecCtor.setAccessible(true);
+        Object zeroVec = vecCtor.newInstance(0.0, 0.0, 0.0);
+
+        // 1) Canonical Mojang-mappings constructor (1.21.5+):
+        // (int id, UUID uuid, double x, double y, double z, float xRot, float yRot,
+        //  EntityType<?> type, int data, Vec3 deltaMovement, double yHeadRot)
+        try {
+            Constructor<?> ctor = packetClass.getConstructor(
+                    int.class, UUID.class, double.class, double.class, double.class,
+                    float.class, float.class, entityTypeClass, int.class, vec3Class, double.class);
+            ctor.setAccessible(true);
+            return ctor.newInstance(entityId, profileUuid, x, y, z, yaw, pitch, playerType, 0, zeroVec, (double) yaw);
+        } catch (NoSuchMethodException ignored) {
+        }
+
+        // 2) Adaptive: fill whatever constructor exists, param by param.
+        NoSuchMethodException failure = new NoSuchMethodException(
+                "ClientboundAddEntityPacket sem construtor compativel; playerType=" + playerType
+                        + "; disponiveis: " + describeConstructors(packetClass));
+        for (Constructor<?> ctor : packetClass.getDeclaredConstructors()) {
+            Object[] args = fillPacketArgs(ctor.getParameterTypes(), entityTypeClass, playerType,
+                    vec3Class, zeroVec, x, y, z, yaw, pitch);
+            if (args == null) {
+                continue;
+            }
+            try {
+                ctor.setAccessible(true);
+                return ctor.newInstance(args);
+            } catch (ReflectiveOperationException | IllegalArgumentException e) {
+                failure.addSuppressed(e);
+            }
+        }
+        throw failure;
+    }
+
+    /**
+     * Fills constructor arguments by parameter type; returns {@code null} when a
+     * parameter type is not recognized (caller skips that constructor).
+     */
+    private Object[] fillPacketArgs(Class<?>[] params, Class<?> entityTypeClass, Object playerType,
+                                    Class<?> vec3Class, Object zeroVec,
+                                    double x, double y, double z, float yaw, float pitch) {
+        Object[] args = new Object[params.length];
+        int ints = 0;
+        int doubles = 0;
+        int floats = 0;
+        for (int i = 0; i < params.length; i++) {
+            Class<?> p = params[i];
+            if (p == int.class) {
+                args[i] = (ints++ == 0) ? entityId : 0;
+            } else if (p == UUID.class) {
+                args[i] = profileUuid;
+            } else if (p == double.class) {
+                doubles++;
+                args[i] = switch (doubles) {
+                    case 1 -> x;
+                    case 2 -> y;
+                    case 3 -> z;
+                    default -> (double) yaw; // yHeadRot
+                };
+            } else if (p == float.class) {
+                floats++;
+                args[i] = (floats == 1) ? yaw : pitch;
+            } else if (p == boolean.class) {
+                args[i] = false;
+            } else if (playerType != null && p.isInstance(playerType)) {
+                args[i] = playerType;
+            } else if (zeroVec != null && p.isInstance(zeroVec)) {
+                args[i] = zeroVec;
+            } else if (p == vec3Class) {
+                args[i] = zeroVec;
+            } else {
+                return null;
+            }
+        }
+        return args;
+    }
+
+    private static String describeConstructors(Class<?> packetClass) {
+        StringBuilder sb = new StringBuilder();
+        for (Constructor<?> c : packetClass.getDeclaredConstructors()) {
+            if (sb.length() > 0) {
+                sb.append(" | ");
+            }
+            sb.append(c);
+        }
+        return sb.length() == 0 ? "NENHUM" : sb.toString();
+    }
+
+    /**
+     * Resolves the NMS {@code EntityType} for players with several fallbacks.
+     *
+     * <p>{@code getField("PLAYER")} can fail on remapped/rewritten servers even
+     * when the field exists in the jar (Paper's plugin reflection rewriter),
+     * so we also try the declared field and the registry lookup
+     * {@code EntityType.byString("player")}.
+     */
+    private static Object resolveEntityType(Class<?> entityTypeClass, String fieldName, String registryName)
+            throws ReflectiveOperationException {
+        try {
+            Field field = entityTypeClass.getField(fieldName);
+            field.setAccessible(true);
+            return field.get(null);
+        } catch (NoSuchFieldException ignored) {
+        }
+        try {
+            Field field = entityTypeClass.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return field.get(null);
+        } catch (NoSuchFieldException ignored) {
+        }
+        Method byString = entityTypeClass.getMethod("byString", String.class);
+        Object optional = byString.invoke(null, registryName);
+        Method isPresent = optional.getClass().getMethod("isPresent");
+        if (Boolean.TRUE.equals(isPresent.invoke(optional))) {
+            return optional.getClass().getMethod("get").invoke(optional);
+        }
+        throw new NoSuchFieldException(fieldName + " (field and registry lookup '" + registryName + "' failed)");
     }
 
     /**
@@ -489,6 +624,8 @@ public class FakePlayerNPC {
                     + e.getClass().getSimpleName() + ": " + e.getMessage()
                     + " (npcName=" + name + ", len=" + name.length() + ")");
             plugin.getLogger().warning("[FormulaRacing] O barco da IA continua funcionando sem o NPC visível.");
+            plugin.getLogger().log(java.util.logging.Level.WARNING,
+                    "[FormulaRacing] Stack trace do erro do NPC:", e);
         }
     }
 }

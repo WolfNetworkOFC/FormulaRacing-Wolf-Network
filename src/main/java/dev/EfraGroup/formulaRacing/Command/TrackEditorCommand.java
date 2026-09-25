@@ -106,6 +106,18 @@ public class TrackEditorCommand extends BaseCommand {
         }
     }
 
+    private String getExistingTargetTrack(Player player, String trackNameArg) {
+        String trackName = this.getTargetTrack(player, trackNameArg);
+        if (trackName == null) {
+            return null;
+        }
+        if (!this.mysql.isTrackExists(trackName)) {
+            player.sendMessage("§cTrack '" + trackName + "' does not exist.");
+            return null;
+        }
+        return trackName;
+    }
+
     private String formatLocation(Location loc) {
         return String.format("%.1f, %.1f, %.1f (yaw: %.0f°)", loc.getX(), loc.getY(), loc.getZ(), loc.getYaw());
     }
@@ -277,6 +289,150 @@ public class TrackEditorCommand extends BaseCommand {
             DiscordUtils.sendNewTrackEmbed(this.plugin, trackName, this.mysql.getTrackOwner(trackName), collaborators, boatMode != null ? boatMode : "", tagsList,
                 imageUrl != null && !imageUrl.isEmpty() ? java.util.List.of(imageUrl) : java.util.List.of());
             player.sendMessage("§a✅ Broadcast sent to Discord!");
+        }
+    }
+
+    @Subcommand("tags add")
+    @Description("Adds a tag to a track")
+    @CommandCompletion("@nothing @tracks")
+    public void onTagsAdd(Player player, String tag, @Optional String trackNameArg) {
+        String trackName = this.getExistingTargetTrack(player, trackNameArg);
+        if (trackName == null) {
+            return;
+        }
+
+        String normalizedTag = tag.trim();
+        if (normalizedTag.isEmpty()) {
+            player.sendMessage("§cThe tag cannot be empty.");
+            return;
+        }
+
+        boolean alreadyExists = this.mysql.getTrackTags(trackName).stream()
+                .anyMatch(existingTag -> existingTag.equalsIgnoreCase(normalizedTag));
+        if (alreadyExists) {
+            player.sendMessage("§eTag '" + normalizedTag + "' is already assigned to track '" + trackName + "'.");
+            return;
+        }
+
+        if (this.mysql.addTrackTag(trackName, normalizedTag)) {
+            player.sendMessage("§aTag '" + normalizedTag + "' added to track '" + trackName + "'.");
+        } else {
+            player.sendMessage("§cCould not add the tag to track '" + trackName + "'.");
+        }
+    }
+
+    @Subcommand("tags remove")
+    @Description("Removes a tag from a track")
+    @CommandCompletion("@nothing @tracks")
+    public void onTagsRemove(Player player, String tag, @Optional String trackNameArg) {
+        String trackName = this.getExistingTargetTrack(player, trackNameArg);
+        if (trackName == null) {
+            return;
+        }
+
+        String normalizedTag = tag.trim();
+        if (normalizedTag.isEmpty()) {
+            player.sendMessage("§cThe tag cannot be empty.");
+            return;
+        }
+
+        if (!this.mysql.getTrackTags(trackName).stream()
+                .anyMatch(existingTag -> existingTag.equalsIgnoreCase(normalizedTag))) {
+            player.sendMessage("§eTag '" + normalizedTag + "' is not assigned to track '" + trackName + "'.");
+            return;
+        }
+
+        if (this.mysql.removeTrackTag(trackName, normalizedTag)) {
+            player.sendMessage("§aTag '" + normalizedTag + "' removed from track '" + trackName + "'.");
+        } else {
+            player.sendMessage("§cCould not remove the tag from track '" + trackName + "'.");
+        }
+    }
+
+    @Subcommand("tags reset")
+    @Description("Removes all tags from a track")
+    @CommandCompletion("@tracks")
+    public void onTagsReset(Player player, @Optional String trackNameArg) {
+        String trackName = this.getExistingTargetTrack(player, trackNameArg);
+        if (trackName == null) {
+            return;
+        }
+
+        if (this.mysql.resetTrackTags(trackName)) {
+            player.sendMessage("§aAll tags removed from track '" + trackName + "'.");
+        } else {
+            player.sendMessage("§cCould not reset the tags for track '" + trackName + "'.");
+        }
+    }
+
+    @Subcommand("tags list")
+    @Description("Lists the tags of a track")
+    @CommandCompletion("@tracks")
+    public void onTagsList(Player player, @Optional String trackNameArg) {
+        String trackName = this.getExistingTargetTrack(player, trackNameArg);
+        if (trackName == null) {
+            return;
+        }
+
+        List<String> tags = this.mysql.getTrackTags(trackName);
+        if (tags.isEmpty()) {
+            player.sendMessage("§eTrack '" + trackName + "' has no tags.");
+            return;
+        }
+
+        player.sendMessage("§eTags for track '" + trackName + "': §f" + String.join("§e, §f", tags));
+    }
+
+    @Subcommand("difficulty")
+    @Description("Sets the difficulty of a track")
+    @CommandCompletion("@nothing @tracks")
+    public void onTrackDifficulty(Player player, String difficulty, @Optional String trackNameArg) {
+        String trackName = this.getExistingTargetTrack(player, trackNameArg);
+        if (trackName == null) {
+            return;
+        }
+
+        String normalizedDifficulty = difficulty.trim();
+        if (normalizedDifficulty.isEmpty()) {
+            player.sendMessage("§cThe difficulty cannot be empty.");
+            return;
+        }
+
+        if (this.mysql.setTrackDifficulty(trackName, normalizedDifficulty)) {
+            player.sendMessage("§aDifficulty '" + normalizedDifficulty + "' set for track '" + trackName + "'.");
+        } else {
+            player.sendMessage("§cCould not set the difficulty for track '" + trackName + "'.");
+        }
+    }
+
+    @Subcommand("minversion")
+    @Description("Sets the minimum compatible version of a track")
+    @CommandCompletion("clear|reset @nothing @tracks")
+    public void onTrackMinVersion(Player player, String version, @Optional String trackNameArg) {
+        String trackName = this.getExistingTargetTrack(player, trackNameArg);
+        if (trackName == null) {
+            return;
+        }
+
+        String minVersion = version.trim();
+        if (minVersion.isEmpty()) {
+            player.sendMessage("§cThe minimum version cannot be empty.");
+            return;
+        }
+
+        if (minVersion.equalsIgnoreCase("clear") || minVersion.equalsIgnoreCase("reset")) {
+            if (this.mysql.setTrackMinVersion(trackName, null)) {
+                player.sendMessage("§aMinimum version cleared for track '" + trackName + "'.");
+            } else {
+                player.sendMessage("§cCould not clear the minimum version for track '" + trackName + "'.");
+            }
+            return;
+        }
+
+        if (this.mysql.setTrackMinVersion(trackName, minVersion)) {
+            player.sendMessage("§aMinimum version '" + minVersion + "' set for track '" + trackName + "'.");
+        } else {
+            player.sendMessage("§cCould not set the minimum version for track '" + trackName + "'.");
         }
     }
 

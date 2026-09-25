@@ -15,6 +15,9 @@ import dev.EfraGroup.formulaRacing.TimeTrial.Events.TimeTrialFinishEvent;
 import dev.EfraGroup.formulaRacing.TimeTrial.Events.TimeTrialStartEvent;
 import dev.EfraGroup.formulaRacing.TimeTrial.TimeTrialController;
 import dev.EfraGroup.formulaRacing.TimeTrial.TimeTrialSession;
+import dev.EfraGroup.formulaRacing.TimeTrial.Timing.OfficialTime;
+import dev.EfraGroup.formulaRacing.TimeTrial.Timing.SoloTimingAttempt;
+import dev.EfraGroup.formulaRacing.TimeTrial.Timing.WolfTimingService;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.RegionMathUtils;
@@ -33,6 +36,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -56,10 +60,12 @@ public class RegionListener implements Listener {
     private final TimeTrialDuelsAction DuelsTimer;
     private final TimeTrialDuels timeTrialDuels;
     private final TimeTrialController timeTrialController;
+    private final WolfTimingService timingService;
     private final Map<UUID, String> playerRegion = new ConcurrentHashMap<>();
     private final Map<String, List<DatabaseManager.RegionData>> regions = new ConcurrentHashMap<>();
     private final Set<String> warnedWorlds = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<UUID, Location> lastLocation = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastLocationNanos = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastStartEndCross = new ConcurrentHashMap<>();
     private static final long START_END_DEBOUNCE_MS = 1000L;
     private final Map<UUID, Long> lastDuelRegionCross = new ConcurrentHashMap<>();
@@ -74,6 +80,7 @@ public class RegionListener implements Listener {
     public void cleanupPlayer(UUID uuid) {
         this.playerRegion.remove(uuid);
         this.lastLocation.remove(uuid);
+        this.lastLocationNanos.remove(uuid);
         this.lastStartEndCross.remove(uuid);
         this.lastDuelRegionCross.remove(uuid);
         this.lastTimeLimitLog.remove(uuid);
@@ -84,6 +91,7 @@ public class RegionListener implements Listener {
     public void cleanupHeatPlayers(java.util.Collection<UUID> uuids) {
         for (UUID uuid : uuids) {
             this.lastLocation.remove(uuid);
+        this.lastLocationNanos.remove(uuid);
             this.lastStartEndCross.remove(uuid);
             this.lastDuelRegionCross.remove(uuid);
             this.lastTimeLimitLog.remove(uuid);
@@ -93,6 +101,20 @@ public class RegionListener implements Listener {
     }
 
     public RegionListener(FormulaRacing plugin, DatabaseManager database, TimerUtils timerUtils, PacketSender packetSender, ScoreboardTimeTrialUtils stt, TimeTrialDuelsAction DuelsTimer, TimeTrialDuels timeTrialDuels, TimeTrialController timeTrialController) {
+        this(plugin, database, timerUtils, packetSender, stt, DuelsTimer, timeTrialDuels, timeTrialController, plugin.getWolfTimingService());
+    }
+
+    public RegionListener(
+        FormulaRacing plugin,
+        DatabaseManager database,
+        TimerUtils timerUtils,
+        PacketSender packetSender,
+        ScoreboardTimeTrialUtils stt,
+        TimeTrialDuelsAction DuelsTimer,
+        TimeTrialDuels timeTrialDuels,
+        TimeTrialController timeTrialController,
+        WolfTimingService timingService
+    ) {
         this.plugin = plugin;
         this.database = database;
         this.timerUtils = timerUtils;
@@ -101,6 +123,7 @@ public class RegionListener implements Listener {
         this.DuelsTimer = DuelsTimer;
         this.timeTrialDuels = timeTrialDuels;
         this.timeTrialController = timeTrialController;
+        this.timingService = timingService;
         startRegionLoader();
         startRegionChecker();
     }
@@ -198,7 +221,9 @@ public class RegionListener implements Listener {
             if (currentRaw == null) {
                 return;
             }
+            long currentNanos = System.nanoTime();
             Location previousRaw = this.lastLocation.get(uuid);
+            long previousNanos = this.lastLocationNanos.getOrDefault(uuid, currentNanos);
             Location current = currentRaw;
             Location previous = previousRaw;
 
@@ -212,6 +237,7 @@ public class RegionListener implements Listener {
             }
 
             this.lastLocation.put(uuid, currentRaw);
+            this.lastLocationNanos.put(uuid, currentNanos);
             if (previous == null || previous.getWorld() == null || current.getWorld() == null || previous.getWorld() != current.getWorld()) {
                 previous = current;
             }
@@ -265,7 +291,27 @@ public class RegionListener implements Listener {
                                 if (startEndRegion != null) {
                                     Location finalFrom = previous.clone();
                                     Location finalTo = current.clone();
-                                    SchedulerHelper.runTaskFor(this.plugin, player, () -> this.handleRegion(player, startEndRegion, finalFrom, finalTo));
+                                    double crossingFraction = RegionMathUtils.calculateRegionEntryProportion(
+                                        previous,
+                                        current,
+                                        startEndRegion
+                                    );
+                                    long crossingNanos = interpolateNanos(
+                                        previousNanos,
+                                        currentNanos,
+                                        crossingFraction
+                                    );
+                                    SchedulerHelper.runTaskFor(
+                                        this.plugin,
+                                        player,
+                                        () -> this.handleRegion(
+                                            player,
+                                            startEndRegion,
+                                            finalFrom,
+                                            finalTo,
+                                            crossingNanos
+                                        )
+                                    );
                                 }
 
                             // Checkpoints and duels logic
@@ -364,7 +410,23 @@ public class RegionListener implements Listener {
         }
     }
 
-    private void handleRegion(Player player, DatabaseManager.RegionData region, Location from, Location to) {
+    private static long interpolateNanos(long beforeNanos, long afterNanos, double fraction) {
+        long span = afterNanos - beforeNanos;
+        if (span <= 0L) {
+            return afterNanos;
+        }
+        double clamped = Math.max(0.0, Math.min(1.0, fraction));
+        long value = Math.round(beforeNanos + span * clamped);
+        return Math.max(beforeNanos, Math.min(afterNanos, value));
+    }
+
+    private void handleRegion(
+        Player player,
+        DatabaseManager.RegionData region,
+        Location from,
+        Location to,
+        long crossingNanos
+    ) {
         UUID uuid = player.getUniqueId();
         String regionTrackDisplayName = region.getTrackName();
         String regionTrackWS = region.getTrackNameWS();
@@ -417,6 +479,9 @@ public class RegionListener implements Listener {
                                     // linha START/END novamente.
                                     this.timerUtils.stopTimer(player);
                                     this.timeTrialController.endSession(player);
+                                    if (this.timingService != null) {
+                                        this.timingService.abort(uuid, true);
+                                    }
                                     // Cancelar a gravação de ghost para não acumular frames
                                     // da volta abortada (memory leak no buffer de gravação).
                                     if (this.plugin.getGhostManager() != null) {
@@ -612,11 +677,11 @@ public class RegionListener implements Listener {
                         if (type.equals("START") || type.equals("END")) {
                             this.plugin.getDebugManager().logTimeTrialSystem("[AUTO TT] " + player.getName() + " - Auto-iniciando TT após duelo");
                             this.plugin.clearLastDuelTrack(uuid);
-                            this.handleSoloTimeTrial(player, regionTrackDisplayName, regionTrackWS, type, from, to, region, shouldLoop);
+                            this.handleSoloTimeTrial(player, regionTrackDisplayName, regionTrackWS, type, from, to, region, shouldLoop, crossingNanos);
                         }
                     } else if (!isRunningDuel && ttEnabled) {
                         if (type.equals("START") || type.equals("END")) {
-                            this.handleSoloTimeTrial(player, regionTrackDisplayName, regionTrackWS, type, from, to, region, shouldLoop);
+                            this.handleSoloTimeTrial(player, regionTrackDisplayName, regionTrackWS, type, from, to, region, shouldLoop, crossingNanos);
                         }
                     } else if (isRunningDuel) {
                         DebugManager var66 = this.plugin.getDebugManager();
@@ -644,7 +709,17 @@ public class RegionListener implements Listener {
         }
     }
 
-    private void handleSoloTimeTrial(Player player, String regionTrackDisplayName, String regionTrackWS, String type, Location from, Location to, DatabaseManager.RegionData region, boolean shouldLoop) {
+    private void handleSoloTimeTrial(
+        Player player,
+        String regionTrackDisplayName,
+        String regionTrackWS,
+        String type,
+        Location from,
+        Location to,
+        DatabaseManager.RegionData region,
+        boolean shouldLoop,
+        long crossingNanos
+    ) {
         UUID uuid = player.getUniqueId();
 
         if (this.plugin.getDriverLookup().isRacing(uuid)) {
@@ -668,110 +743,49 @@ public class RegionListener implements Listener {
             this.plugin.getDebugManager().logTimeTrialSystem(String.format("[SOLO TT] %s - handleSoloTimeTrial: isRunning=%b, shouldLoop=%b", player.getName(), isRunningSolo, shouldLoop));
             if (!isRunningSolo) {
                 if (shouldLoop) {
-                    double proportion = RegionMathUtils.calculateRegionEntryProportion(from, to, region);
-                    long tickDurationMs = 50L;
-                    long adjustmentMs = (long)(((double)1.0F - proportion) * (double)tickDurationMs);
-                    long preciseTime = System.currentTimeMillis() - adjustmentMs;
-                    this.startSoloTimer(player, regionTrackDisplayName, regionTrackWS, type, preciseTime);
+                    this.startSoloTimer(
+                        player,
+                        regionTrackDisplayName,
+                        regionTrackWS,
+                        type,
+                        System.currentTimeMillis(),
+                        crossingNanos
+                    );
                 }
             } else {
                 TimerUtils.PlayerTimerData data = this.timerUtils.getTimerData(player, regionTrackWS);
                 if (data != null) {
-                    double rawElapsed = this.timerUtils.getPlayerElapsedTime(player, regionTrackWS);
                     int checkpoints = data.getCheckpointsReached();
                     int totalCheckpoints = this.database.getCheckpointCount(regionTrackWS);
                     if (checkpoints >= totalCheckpoints) {
-                        double proportion = RegionMathUtils.calculateRegionEntryProportion(from, to, region);
-                        long tickDurationMs = 50L;
-                        long adjustmentMs = (long)(((double)1.0F - proportion) * (double)tickDurationMs);
-                        long preciseFinishTime = System.currentTimeMillis() - adjustmentMs;
-                        TimeTrialSession session = this.timeTrialController.getSession(player);
-                        long totalTimeMillis = session != null ? preciseFinishTime - session.getStartTime().toEpochMilli() : (long)(rawElapsed * (double)1000.0F);
-                        double preciseElapsedSeconds = (double)totalTimeMillis / (double)1000.0F;
-
-                        // --- Ghost System: stop recording and capture frames ---
-                        final List<dev.EfraGroup.formulaRacing.Ghost.GhostFrame> ghostFrames =
-                                this.plugin.getGhostManager() != null
-                                        ? this.plugin.getGhostManager().stopRecording(player)
-                                        : null;
-
-                        // --- Medal record: capture lap for /te medals record ---
-                        if (this.plugin.getMedalManager() != null) {
-                            this.plugin.getMedalManager().handleLapFinish(
-                                    player, regionTrackWS, preciseElapsedSeconds, ghostFrames);
-                            // Announce when the lap achieves a diamond/netherite/saphira medal
-                            this.plugin.getMedalManager().checkMedalAchievement(
-                                    player, regionTrackWS, preciseElapsedSeconds);
-                        }
-
-                        SchedulerHelper.runAsync(this.plugin, () -> {
-                            Object[] pb = this.database.getPlayerBestTime(player.getName(), regionTrackWS);
-                            double bestTime = pb != null && pb[0] != null ? (Double)pb[0] : Double.MAX_VALUE;
-                            boolean isPB = preciseElapsedSeconds < bestTime;
-
-                            // If new PB, save ghost frames
-                            if (isPB && ghostFrames != null && !ghostFrames.isEmpty()
-                                    && this.plugin.getGhostManager() != null) {
-                                this.plugin.getGhostManager().saveGhostAsync(
-                                        uuid, regionTrackWS, ghostFrames);
-                            }
-
-                            SchedulerHelper.runTask(this.plugin, () -> {
-                                TimeTrialFinishEvent event = new TimeTrialFinishEvent(player, session, totalTimeMillis, isPB);
-                                Bukkit.getPluginManager().callEvent(event);
-                            });
-                            int oldRank = this.database.getPlayerRank(uuid, regionTrackWS);
-                            this.database.saveFullTime(uuid, player.getName(), regionTrackWS, preciseElapsedSeconds, checkpoints);
-                            int newRank = this.database.getPlayerRank(uuid, regionTrackWS);
-                            SchedulerHelper.runTask(this.plugin, () -> {
-                                if (player.isOnline()) {
-                                    String msg = this.plugin.getTranslation("timetrial_completed", lang_code, new String[]{"{time}", this.formatTime(preciseElapsedSeconds)});
-                                    player.sendMessage(msg);
-                                    if (isPB) {
-                                        player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0F, 1.2F);
-                                        String rankMessage;
-                                        if (oldRank == 0) {
-                                            rankMessage = this.plugin.getTranslation("timetrial_new_pb_new_rank", lang_code, new String[]{"{rank}", String.valueOf(newRank)});
-                                        } else if (newRank < oldRank) {
-                                            rankMessage = this.plugin.getTranslation("timetrial_new_pb_improved_rank", lang_code, new String[]{"{old}", String.valueOf(oldRank), "{new}", String.valueOf(newRank)});
-                                        } else {
-                                            rankMessage = this.plugin.getTranslation("timetrial_new_pb_same_rank", lang_code, new String[]{"{rank}", String.valueOf(newRank)});
-                                        }
-
-                                        player.sendMessage(rankMessage);
-                                    }
-
-                                    this.plugin.getDebugManager().logTimeTrialSystem(String.format("[SOLO TT] %s completou volta na pista %s (%s) em %s", player.getName(), regionTrackDisplayName, regionTrackWS, this.formatTime(preciseElapsedSeconds)));
-                                    this.timerUtils.stopTimer(player, regionTrackWS);
-                                    if (shouldLoop) {
-                                        SchedulerHelper.runAsync(this.plugin, () -> {
-                                            this.timerUtils.reloadCacheAsync(player, regionTrackWS);
-                                            SchedulerHelper.runTask(this.plugin, () -> this.startSoloTimer(player, regionTrackDisplayName, regionTrackWS, "START", System.currentTimeMillis()));
-                                        });
-                                    } else {
-                                        this.plugin.getDebugManager().logTimeTrialSystem("[SOLO TT] Sprint finished. Timer stopped.");
-                                    }
-
-                                }
-                            });
-                        });
+                        this.finishSoloTimeTrial(
+                            player,
+                            regionTrackDisplayName,
+                            regionTrackWS,
+                            checkpoints,
+                            shouldLoop,
+                            crossingNanos
+                        );
                     } else {
-                        if (totalCheckpoints <= 0) {
-                            return;
-                        }
-
-                        this.plugin.sendMessage(player, "timetrial_incomplete_lap", new String[]{"{count}", String.valueOf(checkpoints), "{total}", String.valueOf(totalCheckpoints)});
-                        player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5F, 1.0F);
-                        this.timerUtils.stopTimer(player, regionTrackWS);
-                        if (shouldLoop) {
-                            double proportion = RegionMathUtils.calculateRegionEntryProportion(from, to, region);
-                            long tickDurationMs = 50L;
-                            long adjustmentMs = (long)(((double)1.0F - proportion) * (double)tickDurationMs);
-                            long preciseTime = System.currentTimeMillis() - adjustmentMs;
-                            this.startSoloTimer(player, regionTrackDisplayName, regionTrackWS, type, preciseTime);
+                        if (totalCheckpoints > 0) {
+                            this.plugin.sendMessage(player, "timetrial_incomplete_lap", new String[]{"{count}", String.valueOf(checkpoints), "{total}", String.valueOf(totalCheckpoints)});
+                            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5F, 1.0F);
+                            this.timerUtils.stopTimer(player, regionTrackWS);
+                            if (this.timingService != null) {
+                                this.timingService.abort(uuid, true);
+                            }
+                            if (shouldLoop) {
+                                this.startSoloTimer(
+                                    player,
+                                    regionTrackDisplayName,
+                                    regionTrackWS,
+                                    type,
+                                    System.currentTimeMillis(),
+                                    crossingNanos
+                                );
+                            }
                         }
                     }
-
                 }
             }
         }
@@ -853,77 +867,213 @@ public class RegionListener implements Listener {
         return player.getLocation();
     }
 
-    private void startSoloTimer(Player player, String regionTrackDisplayName, String regionTrackWS, String type, long startTime) {
+    private void startSoloTimer(
+        Player player,
+        String regionTrackDisplayName,
+        String regionTrackWS,
+        String type,
+        long startTime,
+        long startNanos
+    ) {
         UUID uuid = player.getUniqueId();
-
-        // Só inicia o timer para quem está pilotando o barco (não passageiro, não a pé)
-        if (!isDrivingBoat(player)) {
+        if (!isDrivingBoat(player)
+            || this.plugin.getDriverLookup().isRacing(uuid)
+            || (this.plugin.getQuickRaceManager() != null && this.plugin.getQuickRaceManager().isPlayerInActiveRace(uuid))
+            || this.timeTrialDuels.isPlayerInDuel(uuid)) {
             return;
         }
 
-        if (this.plugin.getDriverLookup().isRacing(uuid)) {
-            return;
+        SoloTimingAttempt timingAttempt = this.timingService != null
+            ? this.timingService.getAttempt(uuid)
+            : null;
+        if (this.timingService != null && (timingAttempt == null || !timingAttempt.getTrackName().equalsIgnoreCase(regionTrackWS))) {
+            timingAttempt = this.timingService.armForTrack(player, regionTrackWS);
         }
-        if (this.plugin.getQuickRaceManager() != null && this.plugin.getQuickRaceManager().isPlayerInActiveRace(uuid)) {
-            return;
+        if (this.timingService != null) {
+            timingAttempt = this.timingService.onServerStart(uuid, startNanos);
         }
-        if (this.timeTrialDuels.isPlayerInDuel(uuid)) {
-            return;
-        }
-        String ownerName = null;
-        DatabaseManager.TrackData td = this.database.getTrackData(regionTrackWS);
-        if (td != null) {
-            ownerName = td.getOwnerName();
-        }
+        UUID runId = timingAttempt != null ? timingAttempt.getRunId() : null;
+        long wallStartTime = startTime > 0L
+            ? startTime
+            : System.currentTimeMillis() - Math.max(0L, System.nanoTime() - startNanos) / 1_000_000L;
 
+        DatabaseManager.TrackData trackData = this.database.getTrackData(regionTrackWS);
+        String ownerName = trackData == null ? null : trackData.getOwnerName();
         this.plugin.setLastTimeTrialTrack(uuid, regionTrackDisplayName);
         this.stt.setPlayerTrack(player, regionTrackDisplayName, ownerName);
-        this.plugin.getDebugManager().logTimeTrialSystem(String.format("[SOLO TT] %s - startSoloTimer: track=%s (%s), type=%s", player.getName(), regionTrackDisplayName, regionTrackWS, type));
-        TimeTrialSession session = new TimeTrialSession(uuid, regionTrackWS, Instant.ofEpochMilli(startTime));
+
+        TimeTrialSession session = new TimeTrialSession(
+            uuid,
+            regionTrackWS,
+            Instant.ofEpochMilli(wallStartTime),
+            startNanos,
+            runId == null ? UUID.randomUUID() : runId
+        );
         TimeTrialStartEvent event = new TimeTrialStartEvent(player, session);
         Bukkit.getPluginManager().callEvent(event);
-        if (!event.isCancelled()) {
-            this.timerUtils.startTimer(player, regionTrackWS, startTime);
-            this.timeTrialController.startSession(player, regionTrackWS, session.getStartTime());
-            // Apply track game time (day/night cycle)
-            this.plugin.applyTrackGameTime(player, regionTrackDisplayName);
-            // Update hotbar to time trial mode when time trial starts
-            if (this.plugin.getHotbarController() != null) {
-                this.plugin.getHotbarController().giveTimeTrialHotbar(player);
+        if (event.isCancelled()) {
+            if (this.timingService != null && timingAttempt != null) {
+                this.timingService.markAttemptFailed(player, timingAttempt);
             }
-            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0F, 1.2F);
-            if (this.plugin.getLonelyController() != null) {
-                this.plugin.getLonelyController().updatePlayersVisibility(player);
-                this.plugin.getLonelyController().updatePlayerVisibility(player);
-            }
+            return;
+        }
 
-            // --- Ghost System: start recording ---
-            if (this.plugin.getGhostManager() != null) {
-                this.plugin.getGhostManager().startRecording(player);
-            }
-
-            // --- Ghost System: load and start replay if ghost exists ---
-            // Não mostra ghost/PB para jogadores Bedrock
-            if (this.plugin.getGhostManager() != null && !this.plugin.isBedrockPlayer(player)) {
+        this.timerUtils.startTimerAtNanos(
+            player,
+            regionTrackWS,
+            wallStartTime,
+            startNanos,
+            runId
+        );
+        this.timeTrialController.startSession(session);
+        this.plugin.applyTrackGameTime(player, regionTrackDisplayName);
+        if (this.plugin.getHotbarController() != null) {
+            this.plugin.getHotbarController().giveTimeTrialHotbar(player);
+        }
+        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0F, 1.2F);
+        if (this.plugin.getLonelyController() != null) {
+            this.plugin.getLonelyController().updatePlayersVisibility(player);
+            this.plugin.getLonelyController().updatePlayerVisibility(player);
+        }
+        if (this.plugin.getGhostManager() != null) {
+            this.plugin.getGhostManager().startRecording(player);
+            if (!this.plugin.isBedrockPlayer(player)) {
                 this.plugin.getGhostManager().loadGhostAsync(uuid, regionTrackWS, frames -> {
                     if (frames != null && !frames.isEmpty() && player.isOnline()) {
                         this.plugin.getGhostManager().startReplay(player, frames);
-                        this.plugin.getDebugManager().logTimeTrialSystem(
-                                "[GHOST] Replay started for " + player.getName()
-                                        + " — " + frames.size() + " frames");
                     }
                 });
             }
+        }
+        if (this.plugin.getMedalManager() != null && !this.plugin.isBedrockPlayer(player)) {
+            this.plugin.getMedalManager().startMedalReplayIfBetter(player, regionTrackWS);
+        }
+    }
 
-            // --- Medal System: start colored medal line replay if faster than PB ---
-            // Não mostra linhas de medalha para jogadores Bedrock
-            if (this.plugin.getMedalManager() != null && !this.plugin.isBedrockPlayer(player)) {
-                this.plugin.getMedalManager().startMedalReplayIfBetter(player, regionTrackWS);
+    private void finishSoloTimeTrial(
+        Player player,
+        String regionTrackDisplayName,
+        String regionTrackWS,
+        int checkpoints,
+        boolean shouldLoop,
+        long finishNanos
+    ) {
+        UUID uuid = player.getUniqueId();
+        TimerUtils.PlayerTimerData timerData = this.timerUtils.getTimerData(player, regionTrackWS);
+        if (timerData == null) {
+            return;
+        }
+        TimeTrialSession session = this.timeTrialController.getSession(player);
+        long startNanos = timerData.getStartNanoTime();
+        List<dev.EfraGroup.formulaRacing.Ghost.GhostFrame> ghostFrames =
+            this.plugin.getGhostManager() != null
+                ? this.plugin.getGhostManager().stopRecording(player)
+                : null;
+
+        CompletableFuture<OfficialTime> resolution;
+        if (this.timingService != null) {
+            resolution = this.timingService.onServerFinish(player, startNanos, finishNanos);
+        } else {
+            long elapsedMillis = Math.max(0L, finishNanos - startNanos) / 1_000_000L;
+            resolution = CompletableFuture.completedFuture(
+                OfficialTime.fromServerMillis(elapsedMillis, null)
+            );
+        }
+
+        resolution.thenAccept(officialTime -> SchedulerHelper.runAsync(
+            this.plugin,
+            () -> this.persistSoloTime(
+                player,
+                regionTrackDisplayName,
+                regionTrackWS,
+                session,
+                checkpoints,
+                shouldLoop,
+                officialTime,
+                ghostFrames
+            )
+        ));
+    }
+
+    private void persistSoloTime(
+        Player player,
+        String regionTrackDisplayName,
+        String regionTrackWS,
+        TimeTrialSession session,
+        int checkpoints,
+        boolean shouldLoop,
+        OfficialTime officialTime,
+        List<dev.EfraGroup.formulaRacing.Ghost.GhostFrame> ghostFrames
+    ) {
+        UUID uuid = player.getUniqueId();
+        OfficialTime previousBest = this.database.getPlayerBestOfficialTime(uuid, regionTrackWS);
+        boolean isPersonalBest = officialTime.isBetterThan(previousBest);
+        int oldRank = this.database.getPlayerRank(uuid, regionTrackWS);
+        this.database.saveSoloFullTime(
+            uuid,
+            player.getName(),
+            regionTrackWS,
+            officialTime,
+            checkpoints
+        );
+        int newRank = this.database.getPlayerRank(uuid, regionTrackWS);
+
+        if (isPersonalBest && ghostFrames != null && !ghostFrames.isEmpty() && this.plugin.getGhostManager() != null) {
+            this.plugin.getGhostManager().saveGhostAsync(uuid, regionTrackWS, ghostFrames);
+        }
+        if (this.plugin.getMedalManager() != null) {
+            double displaySeconds = officialTime.getDisplaySeconds();
+            this.plugin.getMedalManager().handleLapFinish(player, regionTrackWS, displaySeconds, ghostFrames);
+            this.plugin.getMedalManager().checkMedalAchievement(player, regionTrackWS, displaySeconds);
+        }
+
+        String langCode = this.database.getPlayerLanguage(uuid);
+        SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            TimeTrialFinishEvent event = new TimeTrialFinishEvent(
+                player,
+                session,
+                officialTime.getOfficialMillis(),
+                officialTime.displayMillis(),
+                officialTime.officialTicks(),
+                officialTime.runId(),
+                officialTime.source(),
+                isPersonalBest
+            );
+            Bukkit.getPluginManager().callEvent(event);
+            player.sendMessage(this.plugin.getTranslation(
+                "timetrial_completed",
+                langCode,
+                new String[]{"{time}", this.formatTime(officialTime.getDisplaySeconds())}
+            ));
+            if (isPersonalBest) {
+                player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0F, 1.2F);
+                String rankMessage;
+                if (oldRank == 0) {
+                    rankMessage = this.plugin.getTranslation("timetrial_new_pb_new_rank", langCode, new String[]{"{rank}", String.valueOf(newRank)});
+                } else if (newRank < oldRank) {
+                    rankMessage = this.plugin.getTranslation("timetrial_new_pb_improved_rank", langCode, new String[]{"{old}", String.valueOf(oldRank), "{new}", String.valueOf(newRank)});
+                } else {
+                    rankMessage = this.plugin.getTranslation("timetrial_new_pb_same_rank", langCode, new String[]{"{rank}", String.valueOf(newRank)});
+                }
+                player.sendMessage(rankMessage);
             }
 
-            int totalCheckpoints = this.database.getCheckpointCount(regionTrackWS);
-            this.plugin.getDebugManager().logTimeTrialSystem(String.format("[SOLO TT] %s iniciou/resetou timer na pista %s (%s) (via %s, CPs: %d)", player.getName(), regionTrackDisplayName, regionTrackWS, type, totalCheckpoints));
-        }
+            this.timerUtils.stopTimer(player, regionTrackWS);
+            this.timeTrialController.endSession(player);
+            if (shouldLoop) {
+                this.startSoloTimer(
+                    player,
+                    regionTrackDisplayName,
+                    regionTrackWS,
+                    "START",
+                    System.currentTimeMillis(),
+                    System.nanoTime()
+                );
+            }
+        });
     }
 
     public double roundTime(double sec) {

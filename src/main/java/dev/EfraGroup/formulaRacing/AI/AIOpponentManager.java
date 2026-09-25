@@ -65,15 +65,31 @@ public class AIOpponentManager {
     private static final double WATER_MAX_SPEED = 8.0D / 20.0D;       // 0.4 b/t
     private static final double LAND_MAX_SPEED = 2.0D / 20.0D;        // 0.1 b/t
 
+    /** Yaw error (deg) inside which the AI releases the turn keys. */
+    private static final double STEER_DEADZONE_DEG = 5.0D;
+    /** Horiz speed / desired above which the AI simply lifts the throttle (coast). */
+    private static final double COAST_OVERSPEED_RATIO = 1.12D;
+    /** Horiz speed / desired above which the AI starts the ice-boat turnaround brake. */
+    private static final double BRAKE_OVERSPEED_RATIO = 1.45D;
+    /** Yaw error to the reverse of velocity that ends the 180° turnaround. */
+    private static final double TURNAROUND_DONE_DEG = 40.0D;
+    /** Yaw error to the racing line that ends recovery after a brake. */
+    private static final double RECOVERY_DONE_DEG = 45.0D;
+    private static final int MAX_TURNAROUND_TICKS = 35;
+    private static final int MAX_BRAKING_TICKS = 50;
+    private static final int MAX_RECOVERY_TICKS = 60;
+
     /**
-     * Velocity lerp per update while accelerating. Tuned so a boat's ramp-up
-     * from standstill to terminal speed matches vanilla (~3-4.7 s): combined
-     * with the speed lerp in {@link #calculateSpeed} this yields roughly a
-     * 4-second build-up to top speed, instead of the old ~1 s.
+     * Ice-boat brake phases. Real ice racing does not use S (barely any grip);
+     * drivers spin ~180° against the velocity vector and hold W so thrust
+     * scrubs speed, then realign with the racing line.
      */
-    private static final double ACCEL_STEER = 0.10D;
-    /** Velocity lerp per update while braking (decisive corner entry). */
-    private static final double BRAKE_STEER = 0.60D;
+    public enum BrakePhase {
+        NONE,
+        TURN_AROUND,
+        BRAKING,
+        RECOVERY
+    }
 
     /**
      * Returns how fast (blocks/tick) a boat can realistically travel on the
@@ -238,7 +254,9 @@ public class AIOpponentManager {
         // No automatic racing-line generation here: tracks without a recorded
         // line simply have no line (no .bin file is ever created silently).
         // A basic line can still be generated manually (/ai) if wanted.
-        heatTasks.put(heat.getId(), SchedulerHelper.runTaskTimer(plugin, () -> updateAI(heat), 0L, 2L));
+        // 1-tick period: input injection must run every tick like a real client,
+        // otherwise deltaRotation/thrust are applied at half vanilla rate.
+        heatTasks.put(heat.getId(), SchedulerHelper.runTaskTimer(plugin, () -> updateAI(heat), 0L, 1L));
     }
 
     public void stopAI() {
@@ -412,6 +430,19 @@ public class AIOpponentManager {
         private volatile int spawnGeneration;
         /** Client-side fake player (NPC) riding the boat, if it was created successfully. */
         private FakePlayerNPC fakePlayer;
+        /** Current ice-brake phase (see {@link BrakePhase}). */
+        private BrakePhase brakePhase = BrakePhase.NONE;
+        /** Ticks spent in the current brake phase. */
+        private int brakeTicks;
+        /** Reverse-of-velocity yaw captured when a brake starts (stable scrub target). */
+        private double brakeAnchorYaw;
+        /**
+         * Held steering corruption (deg). Unlike the old per-call white noise,
+         * this stays constant between refreshes so inputs read as a human
+         * misjudging a corner, not as per-tick jitter.
+         */
+        private double steeringBiasDeg;
+        private long lastBiasUpdateMs;
 
         public AIOpponent(Driver driver, String displayName, AIDifficulty difficulty, FormulaRacing plugin) {
             this.driver = driver;
@@ -431,6 +462,8 @@ public class AIOpponentManager {
             this.boatUuid = null;
             this.lastKnownLocation = null;
             this.lastStartEndCrossTime = 0L;
+            this.steeringBiasDeg = 0.0D;
+            this.lastBiasUpdateMs = 0L;
             resetLearnedValues();
         }
 
@@ -443,7 +476,7 @@ public class AIOpponentManager {
                 return;
             }
             // The spawn task only executes on the region thread next tick; without
-            // this guard, the 2-tick update loop schedules another boat before the
+            // this guard, the 1-tick update loop schedules another boat before the
             // first one exists, leaking orphan boats that are never tracked.
             if (spawnPending) {
                 return;
@@ -631,24 +664,30 @@ public class AIOpponentManager {
         private void checkForMistake() {
             long currentTime = System.currentTimeMillis();
 
+            boolean wasMistake = isMakingMistake;
             if (isMakingMistake) {
                 long duration = currentTime - mistakeStartTime;
                 long maxDuration = (long) (2800 - (learnedLineAccuracy * 1600));
                 if (duration > maxDuration) {
                     isMakingMistake = false;
                 }
-                return;
-            }
-
-            if (currentTime - lastMistakeTime < 10000L) {
-                return;
-            }
-
-            if (ThreadLocalRandom.current().nextDouble() < learnedErrorRate) {
+            } else if (currentTime - lastMistakeTime >= 10000L
+                    && ThreadLocalRandom.current().nextDouble() < learnedErrorRate) {
                 isMakingMistake = true;
                 mistakeStartTime = currentTime;
                 lastMistakeTime = currentTime;
                 mistakesMade++;
+            }
+
+            // Refresh the held steering bias: immediately when the mistake state
+            // flips, otherwise rarely enough that it reads as a stable error.
+            long biasInterval = isMakingMistake ? 250L : 1200L;
+            if (wasMistake != isMakingMistake || currentTime - lastBiasUpdateMs >= biasInterval) {
+                lastBiasUpdateMs = currentTime;
+                steeringBiasDeg = isMakingMistake
+                        ? ThreadLocalRandom.current().nextDouble(-35.0, 35.0)
+                        : ThreadLocalRandom.current().nextDouble(-1.0, 1.0)
+                                * (1.0 - learnedLineAccuracy) * 18.0;
             }
         }
 
@@ -738,15 +777,22 @@ public class AIOpponentManager {
         }
 
         private void moveBoat(Heats heat, AIRacingLine line, Entity controlledEntity, Location currentLoc, int resolvedIndex) {
+            if (!(controlledEntity instanceof Boat boat)) {
+                return;
+            }
+
+            Vector velocity = controlledEntity.getVelocity();
+            double horizSpeed = Math.sqrt((velocity.getX() * velocity.getX()) + (velocity.getZ() * velocity.getZ()));
+            Vector velDir = boatVelocityDir(controlledEntity, currentLoc);
+            double velYaw = Math.toDegrees(Math.atan2(-velDir.getX(), velDir.getZ()));
+
+            double yawErr;
+            double desiredBt;
             if (line != null && line.isUsable()) {
                 int index = resolvedIndex;
-                // Distance-based lookahead scaled by the boat's actual speed: at
-                // vanilla ice speeds (~3.6 blocks/tick) the boat covers ~7 blocks
-                // per 2-tick update, so a fixed 2-3 point (~4-6 blocks) lookahead
-                // aimed BEHIND the boat and every corner was cut. Look ~0.3s of
-                // travel ahead (clamped) so the AI starts turning before the apex.
-                Vector vel = controlledEntity.getVelocity();
-                double horizSpeed = Math.sqrt((vel.getX() * vel.getX()) + (vel.getZ() * vel.getZ()));
+                // Look ~0.3s of travel ahead (clamped) so the AI starts turning
+                // before the apex — same distance-based lookahead as before, but
+                // it now only feeds the yaw error (velocity is never lerped).
                 double lookAheadBlocks = Math.max(MIN_LOOKAHEAD_BLOCKS,
                         Math.min(MAX_LOOKAHEAD_BLOCKS, horizSpeed * 6.0D));
                 Location target = getSteerTarget(line, index, lookAheadBlocks);
@@ -759,24 +805,10 @@ public class AIOpponentManager {
                 if (offset.lengthSquared() < 0.0001) {
                     return;
                 }
-
                 Vector idealDirection = offset.normalize();
-                Vector correctedDirection = applySteeringVariance(idealDirection);
-                // Corner-aware speed: like a player, the AI eases off on tighter
-                // turns. Without this, the lerp keeps the velocity magnitude while
-                // only rotating the direction, so on ice the AI would blow through
-                // corners at full speed. The factor is 1.0 below 25° of turn and
-                // eases toward 0.35 for a full 180°.
-                // Two signals are combined:
-                //  - bendAhead: how much the racing line bends between the current
-                //    lookahead target and one lookahead further — anticipates a
-                //    corner BEFORE the boat reaches it (real drivers brake into
-                //    the apex, not at it);
-                //  - headingChange: angle between the travel direction (velocity,
-                //    drift-aware) and the target — catches the moment the boat is
-                //    already turning.
-                Vector heading = boatVelocityDir(controlledEntity, currentLoc);
-                double headingChange = Math.toDegrees(Math.acos(clampDot(heading.dot(correctedDirection))));
+
+                Vector heading = velDir;
+                double headingChange = Math.toDegrees(Math.acos(clampDot(heading.dot(idealDirection))));
                 double bendAhead = 0.0D;
                 Location furtherTarget = getSteerTarget(line, index, lookAheadBlocks * 2.0D);
                 if (furtherTarget != null && furtherTarget.getWorld() != null
@@ -792,18 +824,11 @@ public class AIOpponentManager {
                     cornerFactor = Math.max(0.35, 1.0D - ((effectiveTurn - 25.0D) / 155.0D) * 0.65D);
                 }
 
-                // Corner steering: a long straight-line target across a bend aims at
-                // the CHORD and cuts the inside of the corner. Keep the long lookahead
-                // for speed planning (braking early) but steer toward a SHORTER point
-                // so the boat follows the arc through the apex — like a driver who
-                // brakes early (long vision) and turns in late (short lookahead).
+                // Shorter arc target through the apex so the boat does not cut
+                // the chord of a tight corner (pure-pursuit refinement).
                 if (effectiveTurn > 35.0D) {
                     double shrink = Math.max(0.35D, 1.0D - ((effectiveTurn - 35.0D) / 145.0D));
                     double shortDistance = Math.max(6.0D, lookAheadBlocks * shrink);
-                    // Hairpins (>90°): even the shrunken target can sit past the apex
-                    // at speed (e.g. 30 * 0.5 = 15 blocks across a hairpin), which cuts
-                    // the chord. Clamp to a near-apex distance so the arc is followed
-                    // immediately instead of only after the corner braking slows the boat.
                     if (effectiveTurn > 90.0D) {
                         shortDistance = Math.min(shortDistance, 8.0D);
                     }
@@ -812,23 +837,135 @@ public class AIOpponentManager {
                             && shortTarget.getWorld().equals(currentLoc.getWorld())) {
                         Vector shortOffset = shortTarget.toVector().subtract(currentLoc.toVector()).setY(0.0);
                         if (shortOffset.lengthSquared() > 0.0001) {
-                            correctedDirection = applySteeringVariance(shortOffset.normalize());
+                            idealDirection = shortOffset.normalize();
                         }
                     }
                 }
 
-                applyThrottle(controlledEntity, correctedDirection, currentSpeed * cornerFactor);
+                double targetYaw = Math.toDegrees(Math.atan2(-idealDirection.getX(), idealDirection.getZ()));
+                yawErr = wrapDegrees(targetYaw + steeringBiasDeg - currentLoc.getYaw());
 
-                float yaw = (float) Math.toDegrees(Math.atan2(-correctedDirection.getX(), correctedDirection.getZ()));
-                controlledEntity.setRotation(yaw, currentLoc.getPitch());
+                double surfaceMax = getSurfaceMaxSpeed(currentLoc);
+                desiredBt = currentSpeed * surfaceMax * cornerFactor;
+
+                if (line.isNearBrakingPoint(currentLoc, 6.0D)
+                        && horizSpeed > desiredBt * BRAKE_OVERSPEED_RATIO) {
+                    maybeBeginBrake(velYaw, horizSpeed, desiredBt);
+                }
                 currentLineIndex = index;
             } else {
-                Vector forward = currentLoc.getDirection().setY(0.0);
-                if (forward.lengthSquared() < 0.0001) {
-                    return;
-                }
-                applyThrottle(controlledEntity, applySteeringVariance(forward.normalize()), currentSpeed);
+                // No line: hold heading, still obey throttle/brake logic.
+                yawErr = 0.0D;
+                desiredBt = currentSpeed * getSurfaceMaxSpeed(currentLoc);
             }
+
+            updateBrakePhase(currentLoc, velYaw, horizSpeed, desiredBt, yawErr);
+
+            boolean left = false;
+            boolean right = false;
+            boolean up = false;
+            boolean down = false;
+
+            double steerErr;
+            if (brakePhase == BrakePhase.NONE || brakePhase == BrakePhase.RECOVERY) {
+                // Normal line following (RECOVERY re-aims at the racing line).
+                steerErr = yawErr;
+            } else {
+                // TURN_AROUND / BRAKING: point against the velocity vector.
+                steerErr = wrapDegrees(brakeAnchorYaw + steeringBiasDeg * 0.5D - currentLoc.getYaw());
+            }
+
+            double lead = Math.abs(AIBoatController.getDeltaRotation(controlledEntity));
+            if (steerErr > STEER_DEADZONE_DEG + lead) {
+                right = true;
+            } else if (steerErr < -(STEER_DEADZONE_DEG + lead)) {
+                left = true;
+            }
+
+            if (brakePhase != BrakePhase.NONE) {
+                // Ice brake: hold W so yaw-aligned thrust scrubs speed. Never S —
+                // backward input barely slows a boat on ice.
+                up = true;
+            } else if (horizSpeed < desiredBt * 0.98D || horizSpeed < 0.05D) {
+                up = true;
+            } else if (horizSpeed > desiredBt * COAST_OVERSPEED_RATIO) {
+                // Lift throttle first (natural ice coast); hard overspeed
+                // already triggered the brake state machine above.
+                up = false;
+            } else {
+                up = true;
+            }
+
+            AIBoatController.drive(boat, left, right, up, down);
+        }
+
+        private void maybeBeginBrake(double velYaw, double horizSpeed, double desiredBt) {
+            if (brakePhase != BrakePhase.NONE) {
+                return;
+            }
+            if (horizSpeed > desiredBt * BRAKE_OVERSPEED_RATIO) {
+                beginBrake(velYaw);
+            }
+        }
+
+        private void beginBrake(double velYaw) {
+            brakePhase = BrakePhase.TURN_AROUND;
+            brakeTicks = 0;
+            brakeAnchorYaw = velYaw + 180.0D;
+        }
+
+        private void updateBrakePhase(Location currentLoc, double velYaw, double horizSpeed,
+                                      double desiredBt, double lineYawErr) {
+            if (brakePhase == BrakePhase.NONE) {
+                // Opportunistic brake when massively overspeed for a slow target.
+                if (horizSpeed > desiredBt * BRAKE_OVERSPEED_RATIO
+                        && desiredBt < getSurfaceMaxSpeed(currentLoc) * 0.55D) {
+                    beginBrake(velYaw);
+                }
+                return;
+            }
+
+            brakeTicks++;
+            switch (brakePhase) {
+                case TURN_AROUND -> {
+                    double reverseYaw = velYaw + 180.0D;
+                    double errToReverse = Math.abs(wrapDegrees(reverseYaw - currentLoc.getYaw()));
+                    if (errToReverse <= TURNAROUND_DONE_DEG || brakeTicks >= MAX_TURNAROUND_TICKS) {
+                        brakeAnchorYaw = reverseYaw;
+                        brakePhase = BrakePhase.BRAKING;
+                        brakeTicks = 0;
+                    }
+                }
+                case BRAKING -> {
+                    // Keep scrubbing against travel; refresh anchor so a
+                    // deflected velocity vector is still opposed.
+                    brakeAnchorYaw = velYaw + 180.0D;
+                    boolean slowEnough = horizSpeed <= Math.max(desiredBt * 1.08D, desiredBt + 0.05D);
+                    if (slowEnough || brakeTicks >= MAX_BRAKING_TICKS) {
+                        brakePhase = BrakePhase.RECOVERY;
+                        brakeTicks = 0;
+                    }
+                }
+                case RECOVERY -> {
+                    if (Math.abs(lineYawErr) <= RECOVERY_DONE_DEG || brakeTicks >= MAX_RECOVERY_TICKS) {
+                        brakePhase = BrakePhase.NONE;
+                        brakeTicks = 0;
+                    }
+                }
+                case NONE -> {
+                }
+            }
+        }
+
+        private static double wrapDegrees(double deg) {
+            deg %= 360.0D;
+            if (deg >= 180.0D) {
+                deg -= 360.0D;
+            }
+            if (deg < -180.0D) {
+                deg += 360.0D;
+            }
+            return deg;
         }
 
         private static double clampDot(double dot) {
@@ -849,29 +986,6 @@ public class AIOpponentManager {
                 }
             }
             return currentLoc.getDirection().setY(0.0).normalize();
-        }
-
-        /**
-         * Accelerates/brakes the boat toward its target speed on the current
-         * surface, mimicking a player's boat: on ice the low friction lets the
-         * velocity build up to ice-boat speeds, while on water drag keeps it
-         * slow. The current horizontal velocity is lerped toward
-         * {@code direction * speed * surfaceMaxSpeed} so straights reach full
-         * ice speed and corners/braking actively pull the velocity down.
-         * The lerp is asymmetric — smooth on the throttle (the AI doesn't snap
-         * from 0 to the ~73 blocks/s vanilla ice top speed in a couple of ticks)
-         * and decisive on the brakes (corner entry) — just like a real driver.
-         */
-        private void applyThrottle(Entity boat, Vector direction, double speed) {
-            double surfaceMax = getSurfaceMaxSpeed(boat.getLocation());
-            double targetSpeed = speed * surfaceMax;
-            Vector current = boat.getVelocity();
-            double currentHorizSpeed = Math.sqrt((current.getX() * current.getX()) + (current.getZ() * current.getZ()));
-            double steer = currentHorizSpeed < targetSpeed ? ACCEL_STEER : BRAKE_STEER;
-            double newX = current.getX() + ((direction.getX() * targetSpeed) - current.getX()) * steer;
-            double newZ = current.getZ() + ((direction.getZ() * targetSpeed) - current.getZ()) * steer;
-            double newY = Math.max(-0.08, Math.min(0.08, current.getY()));
-            boat.setVelocity(new Vector(newX, newY, newZ));
         }
 
         private void processTrackProgress(Heats heat, Location from, Location to) {
@@ -991,20 +1105,6 @@ public class AIOpponentManager {
             Location min = new Location(world, regionData.getMinX(), regionData.getMinY(), regionData.getMinZ());
             Location max = new Location(world, regionData.getMaxX(), regionData.getMaxY(), regionData.getMaxZ());
             return new RegionBox(min, max);
-        }
-
-        private Vector applySteeringVariance(Vector baseDirection) {
-            double varianceDegrees = isMakingMistake
-                    ? ThreadLocalRandom.current().nextDouble(-35.0, 35.0)
-                    : ThreadLocalRandom.current().nextDouble(-1.0, 1.0) * (1.0 - learnedLineAccuracy) * 18.0;
-
-            double radians = Math.toRadians(varianceDegrees);
-            double cos = Math.cos(radians);
-            double sin = Math.sin(radians);
-
-            double x = (baseDirection.getX() * cos) - (baseDirection.getZ() * sin);
-            double z = (baseDirection.getX() * sin) + (baseDirection.getZ() * cos);
-            return new Vector(x, 0.0, z).normalize();
         }
 
         private int resolveLineIndex(AIRacingLine line, Location currentLoc) {

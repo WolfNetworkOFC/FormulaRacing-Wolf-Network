@@ -33,7 +33,7 @@ commands:
     usage: /track
     aliases: [t]
   trackedit:
-    usage: /trackedit <create|select|delete|boatutils|region|checkpoint|time|icon|open|close|grid|pitlane|location>
+    usage: /trackedit <create|select|delete|boatutils|region|checkpoint|time|icon|minversion|open|close|grid|pitlane|location>
     description: Editor completo de pistas (inclui configuração de grid e pit lanes)
     aliases: [te, trackeditor]
   debug:

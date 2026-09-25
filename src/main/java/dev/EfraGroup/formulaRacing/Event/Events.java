@@ -33,7 +33,6 @@ public class Events {
     private long creationTime;
     private EventState state;
     private boolean openSign;
-    private String league;
     private final EventSchedule eventSchedule;
     private final EventCountdown eventCountdown;
     private final EventAnnouncements announcements;
@@ -128,11 +127,7 @@ public class Events {
                         this.plugin.getPodiumManager().startCeremony(this, results);
                     }
 
-                    if (this.getLeague() != null && !this.getLeague().isBlank()) {
-                        this.plugin.getLeagueManager()
-                            .getLeagueByName(this.getLeague())
-                            .ifPresent(lg -> this.plugin.getLeagueManager().onEventFinished(this, results));
-                    }
+                    this.plugin.getLeagueManager().onEventFinished(this, results);
                 }
             }
 
@@ -355,14 +350,6 @@ public class Events {
             this.raceEventManager.getDatabaseManager().updateEventOpenSign(this.id, openSign);
         }
 
-    }
-
-    public String getLeague() {
-        return this.league;
-    }
-
-    public void setLeague(String league) {
-        this.league = league;
     }
 
     public EventSchedule getEventSchedule() {

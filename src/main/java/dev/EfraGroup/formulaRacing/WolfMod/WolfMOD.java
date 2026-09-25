@@ -5,14 +5,20 @@ import com.google.common.io.ByteStreams;
 import dev.EfraGroup.formulaRacing.AI.AIRacingLine;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
+import dev.EfraGroup.formulaRacing.TimeTrial.Timing.WolfTimingService;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.messaging.PluginMessageListener;
 
-public class WolfMOD {
+public class WolfMOD implements PluginMessageListener {
 
     private final FormulaRacing plugin;
+    private WolfTimingService timingService;
 
     public static final String GHOST_DATA_CHANNEL = "wolfnetwork:ghost_data";
     public static final String CONFIG_CHANNEL = "wolfnetwork:settings";
@@ -22,9 +28,18 @@ public class WolfMOD {
         registerChannels();
     }
 
+    public void setTimingService(WolfTimingService timingService) {
+        this.timingService = timingService;
+    }
+
+    public boolean hasChannel(Player player) {
+        return player != null && player.isOnline();
+    }
+
     private void registerChannels() {
-        plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, GHOST_DATA_CHANNEL);
-        plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CONFIG_CHANNEL);
+        this.plugin.getServer().getMessenger().registerOutgoingPluginChannel(this.plugin, GHOST_DATA_CHANNEL);
+        this.plugin.getServer().getMessenger().registerOutgoingPluginChannel(this.plugin, CONFIG_CHANNEL);
+        this.plugin.getServer().getMessenger().registerIncomingPluginChannel(this.plugin, CONFIG_CHANNEL, this);
     }
 
     /**
@@ -94,6 +109,45 @@ public class WolfMOD {
         writeString(out, key);
         writeString(out, value);
         player.sendPluginMessage(plugin, CONFIG_CHANNEL, out.toByteArray());
+    }
+
+    @Override
+    public void onPluginMessageReceived(
+        String channel,
+        Player player,
+        byte[] message
+    ) {
+        if (!CONFIG_CHANNEL.equals(channel) || this.timingService == null || message == null) {
+            return;
+        }
+        try {
+            DataInputStream input = new DataInputStream(new ByteArrayInputStream(message));
+            String key = readString(input);
+            String value = readString(input);
+            if (key != null && value != null) {
+                this.timingService.handleIncoming(player, key, value);
+            }
+        } catch (IOException | RuntimeException ignored) {
+        }
+    }
+
+    private static String readString(DataInputStream input) throws IOException {
+        int length = 0;
+        int shift = 0;
+        for (int i = 0; i < 5; i++) {
+            int current = input.readUnsignedByte();
+            length |= (current & 0x7F) << shift;
+            if ((current & 0x80) == 0) {
+                if (length < 0 || length > 32767 || length > input.available()) {
+                    return null;
+                }
+                byte[] bytes = new byte[length];
+                input.readFully(bytes);
+                return new String(bytes, StandardCharsets.UTF_8);
+            }
+            shift += 7;
+        }
+        return null;
     }
 
     public void sendGhostStart(Player player) {

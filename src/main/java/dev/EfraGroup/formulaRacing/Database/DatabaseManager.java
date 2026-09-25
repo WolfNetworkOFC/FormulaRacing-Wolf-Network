@@ -6,6 +6,7 @@ import dev.EfraGroup.formulaRacing.Heat.GimmickConfig;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
+import dev.EfraGroup.formulaRacing.TimeTrial.Timing.OfficialTime;
 import java.io.File;
 import java.sql.*;
 import java.util.*;
@@ -339,9 +340,13 @@ public class DatabaseManager {
                     spawnPoint_yaw REAL, spawnPoint_pitch REAL,
                     finishAll_x REAL, finishAll_y REAL, finishAll_z REAL,
                     finishAll_yaw REAL, finishAll_pitch REAL,
-                    worldName TEXT, icon_name TEXT, open INTEGER DEFAULT 0
+                    worldName TEXT, icon_name TEXT, open INTEGER DEFAULT 0,
+                    TAGS TEXT DEFAULT '',
+                    DIFFICULTY TEXT DEFAULT '',
+                    minVersion TEXT DEFAULT NULL
                 )"""
             );
+            ensureTrackMinVersionColumn(connection);
 
             stmt.executeUpdate(
                 """
@@ -400,7 +405,7 @@ public class DatabaseManager {
 
             // 2. Official Race System (Events, Rounds, Heats, Drivers, Laps)
             stmt.executeUpdate(
-                "CREATE TABLE IF NOT EXISTS fr_events (id INTEGER PRIMARY KEY AUTOINCREMENT, creatorUUID TEXT NOT NULL, name TEXT NOT NULL, league TEXT, trackNameWS TEXT DEFAULT NULL, creationTime INTEGER DEFAULT NULL, state TEXT NOT NULL, openSign INTEGER NOT NULL DEFAULT 1)"
+                "CREATE TABLE IF NOT EXISTS fr_events (id INTEGER PRIMARY KEY AUTOINCREMENT, creatorUUID TEXT NOT NULL, name TEXT NOT NULL, trackNameWS TEXT DEFAULT NULL, creationTime INTEGER DEFAULT NULL, state TEXT NOT NULL, openSign INTEGER NOT NULL DEFAULT 1)"
             );
             stmt.executeUpdate(
                 "CREATE TABLE IF NOT EXISTS fr_rounds (id INTEGER PRIMARY KEY AUTOINCREMENT, eventId INTEGER NOT NULL, roundIndex INTEGER NOT NULL DEFAULT 1, type TEXT DEFAULT NULL, state TEXT NOT NULL)"
@@ -448,153 +453,6 @@ public class DatabaseManager {
                     "ALTER TABLE fr_event_signups ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0"
                 );
             } catch (SQLException ignored) {}
-
-            // League tables (TimingLeague port)
-            stmt.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS fr_leagues (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    creatorUUID TEXT NOT NULL,
-                    name TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'SETUP',
-                    createdAt INTEGER DEFAULT NULL,
-                    scoringSystem TEXT DEFAULT 'BASIC',
-                    customScaleJson TEXT DEFAULT NULL,
-                    teamMode TEXT DEFAULT 'MAIN_RESERVE',
-                    teamConfigJson TEXT DEFAULT NULL,
-                    mulliganCount INTEGER DEFAULT 0,
-                    calendarJson TEXT DEFAULT NULL
-                )"""
-            );
-            stmt.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS fr_league_teams (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    leagueId INTEGER NOT NULL,
-                    name TEXT NOT NULL,
-                    colorHex TEXT DEFAULT NULL
-                )"""
-            );
-            stmt.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS fr_league_drivers (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    leagueId INTEGER NOT NULL,
-                    playerUUID TEXT NOT NULL,
-                    teamId INTEGER DEFAULT NULL,
-                    joinedAt INTEGER DEFAULT NULL
-                )"""
-            );
-            stmt.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS fr_league_events (
-                    leagueId INTEGER NOT NULL,
-                    eventId INTEGER NOT NULL,
-                    roundNumber INTEGER DEFAULT NULL,
-                    pointsApplied INTEGER NOT NULL DEFAULT 0,
-                    PRIMARY KEY (leagueId, eventId)
-                )"""
-            );
-            stmt.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS fr_league_driver_standings (
-                    leagueId INTEGER NOT NULL,
-                    playerUUID TEXT NOT NULL,
-                    points INTEGER NOT NULL DEFAULT 0,
-                    wins INTEGER NOT NULL DEFAULT 0,
-                    podiums INTEGER NOT NULL DEFAULT 0,
-                    eventsCount INTEGER NOT NULL DEFAULT 0,
-                    PRIMARY KEY (leagueId, playerUUID)
-                )"""
-            );
-            stmt.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS fr_league_team_standings (
-                    leagueId INTEGER NOT NULL,
-                    teamId INTEGER NOT NULL,
-                    points INTEGER NOT NULL DEFAULT 0,
-                    wins INTEGER NOT NULL DEFAULT 0,
-                    podiums INTEGER NOT NULL DEFAULT 0,
-                    eventsCount INTEGER NOT NULL DEFAULT 0,
-                    PRIMARY KEY (leagueId, teamId)
-                )"""
-            );
-            stmt.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS fr_league_categories (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    leagueId INTEGER NOT NULL,
-                    name TEXT NOT NULL,
-                    displayName TEXT DEFAULT NULL,
-                    scoringSystem TEXT DEFAULT 'BASIC',
-                    mulliganCount INTEGER DEFAULT 0,
-                    customScaleJson TEXT DEFAULT NULL
-                )"""
-            );
-            stmt.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS fr_league_event_meta (
-                    leagueId INTEGER NOT NULL,
-                    eventId INTEGER NOT NULL,
-                    categoryName TEXT DEFAULT NULL,
-                    pinnedHeatId INTEGER DEFAULT NULL,
-                    roundNumber INTEGER DEFAULT NULL
-                )"""
-            );
-            stmt.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS fr_league_event_results (
-                    leagueId INTEGER NOT NULL,
-                    eventId INTEGER NOT NULL,
-                    position INTEGER NOT NULL,
-                    playerUUID TEXT NOT NULL,
-                    teamId INTEGER DEFAULT NULL,
-                    heatId INTEGER DEFAULT NULL,
-                    points INTEGER NOT NULL DEFAULT 0,
-                    fastestLap BOOLEAN NOT NULL DEFAULT FALSE,
-                    isDNF BOOLEAN NOT NULL DEFAULT FALSE,
-                    isDSQ BOOLEAN NOT NULL DEFAULT FALSE,
-                    PRIMARY KEY (leagueId, eventId, playerUUID)
-                )"""
-            );
-            stmt.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS fr_league_point_history (
-                    leagueId INTEGER NOT NULL,
-                    eventId INTEGER NOT NULL,
-                    playerUUID TEXT NOT NULL,
-                    points INTEGER NOT NULL DEFAULT 0,
-                    position INTEGER NOT NULL DEFAULT 0,
-                    categoryName TEXT DEFAULT NULL,
-                    heatId INTEGER DEFAULT NULL
-                )"""
-            );
-            stmt.executeUpdate(
-                """
-                CREATE TABLE IF NOT EXISTS fr_league_breakdown (
-                    leagueId INTEGER NOT NULL,
-                    playerUUID TEXT NOT NULL,
-                    eventId INTEGER NOT NULL,
-                    categoryName TEXT DEFAULT NULL,
-                    basePoints INTEGER NOT NULL DEFAULT 0,
-                    mulliganDropped INTEGER NOT NULL DEFAULT 0,
-                    finalPoints INTEGER NOT NULL DEFAULT 0
-                )"""
-            );
-            String[] leagueAlterColumns = {
-                "ALTER TABLE fr_leagues ADD COLUMN scoringSystem TEXT DEFAULT 'BASIC'",
-                "ALTER TABLE fr_leagues ADD COLUMN customScaleJson TEXT DEFAULT NULL",
-                "ALTER TABLE fr_leagues ADD COLUMN teamMode TEXT DEFAULT 'MAIN_RESERVE'",
-                "ALTER TABLE fr_leagues ADD COLUMN teamConfigJson TEXT DEFAULT NULL",
-                "ALTER TABLE fr_leagues ADD COLUMN mulliganCount INTEGER DEFAULT 0",
-                "ALTER TABLE fr_leagues ADD COLUMN calendarJson TEXT DEFAULT NULL",
-                "ALTER TABLE fr_league_teams ADD COLUMN colorHex TEXT DEFAULT NULL"
-            };
-            for (String alterSql : leagueAlterColumns) {
-                try {
-                    stmt.executeUpdate(alterSql);
-                } catch (SQLException ignored) {}
-            }
 
             // Soft-delete columns
             try {
@@ -825,10 +683,16 @@ public class DatabaseManager {
                      bestTime REAL DEFAULT 0,
                      checkpointsReached INTEGER DEFAULT 0,
                      finished BOOLEAN DEFAULT FALSE,
-                     plataforma TEXT DEFAULT 'JAVA',
-                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    plataforma TEXT DEFAULT 'JAVA',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    official_ticks INTEGER DEFAULT NULL,
+                    display_millis INTEGER DEFAULT NULL,
+                    timing_source TEXT DEFAULT 'LEGACY',
+                    run_id TEXT
                 )"""
             );
+            ensurePlayerTimeColumns(stmt);
+            migratePlayerTimes(stmt);
 
             stmt.executeUpdate(
                     "CREATE TABLE IF NOT EXISTS fr_drs (" +
@@ -1014,6 +878,9 @@ public class DatabaseManager {
                 stmt.executeUpdate("ALTER TABLE fr_tracks ADD COLUMN game_time INTEGER DEFAULT NULL");
             } catch (SQLException ignored) {}
 
+            ensureTrackTagsColumn(conn);
+            ensureTrackDifficultyColumn(conn);
+
             // Adds icon_amount and icon_meta columns to fr_tracks
             try {
                 stmt.executeUpdate("ALTER TABLE fr_tracks ADD COLUMN icon_amount INTEGER DEFAULT 1");
@@ -1086,7 +953,125 @@ public class DatabaseManager {
         }
     }
 
-    /* =======================================================
+   /** Idempotently adds the official-time columns to fr_player_times. */
+   private void ensurePlayerTimeColumns(Statement stmt) {
+       String[] columns = {
+           "ALTER TABLE fr_player_times ADD COLUMN official_ticks INTEGER DEFAULT NULL",
+           "ALTER TABLE fr_player_times ADD COLUMN display_millis INTEGER DEFAULT NULL",
+           "ALTER TABLE fr_player_times ADD COLUMN timing_source TEXT DEFAULT 'LEGACY'",
+           "ALTER TABLE fr_player_times ADD COLUMN run_id TEXT"
+       };
+       for (String sql : columns) {
+           try {
+               stmt.executeUpdate(sql);
+           } catch (SQLException ignored) {
+               // The column already exists.
+           }
+       }
+
+       try {
+           stmt.executeUpdate(
+               "CREATE INDEX IF NOT EXISTS idx_fr_player_times_official " +
+               "ON fr_player_times(trackNameWS, finished, official_ticks, display_millis, bestTime)"
+           );
+       } catch (SQLException ignored) {
+           // Some MySQL installations do not support IF NOT EXISTS for indexes.
+           try {
+               stmt.executeUpdate(
+                   "CREATE INDEX idx_fr_player_times_official " +
+                   "ON fr_player_times(trackNameWS, finished, official_ticks, display_millis, bestTime)"
+               );
+           } catch (SQLException ignoredAgain) {
+               // An equivalent index may already exist.
+           }
+       }
+
+       try {
+           stmt.executeUpdate(
+               "CREATE UNIQUE INDEX IF NOT EXISTS idx_fr_player_times_run_id " +
+               "ON fr_player_times(run_id)"
+           );
+       } catch (SQLException ignored) {
+           // MySQL and SQLite both allow multiple NULL values in a UNIQUE index.
+           try {
+               stmt.executeUpdate(
+                   "CREATE UNIQUE INDEX idx_fr_player_times_run_id " +
+                   "ON fr_player_times(run_id)"
+               );
+           } catch (SQLException ignoredAgain) {
+               // An equivalent index may already exist.
+           }
+       }
+   }
+
+   /** Backfills derived values for pre-official-time rows without changing bestTime. */
+   private void migratePlayerTimes(Statement stmt) {
+       try {
+           stmt.executeUpdate(
+               "UPDATE fr_player_times SET " +
+                   "official_ticks = COALESCE(official_ticks, ROUND(bestTime * 20)), " +
+                   "display_millis = COALESCE(display_millis, ROUND(bestTime * 1000)), " +
+                   "timing_source = COALESCE(timing_source, 'LEGACY') " +
+               "WHERE bestTime > 0 AND " +
+                   "(official_ticks IS NULL OR display_millis IS NULL OR timing_source IS NULL) AND " +
+                   "(timing_source IS NULL OR timing_source = 'LEGACY')"
+           );
+       } catch (SQLException ignored) {
+           // A missing/unsupported cast or older schema must not block startup.
+       }
+   }
+
+   /** SQL expressions that provide the official tick/display values or their legacy fallback. */
+   private static String officialTicksExpression(String prefix) {
+       return "COALESCE(" + prefix + "official_ticks, ROUND(" + prefix + "bestTime * 20))";
+   }
+
+   private static String displayMillisExpression(String prefix) {
+       return "COALESCE(" + prefix + "display_millis, ROUND(" + prefix + "bestTime * 1000))";
+   }
+
+   /** SQL ordering that keeps official ticks first and legacy bestTime as fallback. */
+   private static String officialOrderBy(String prefix) {
+       return officialTicksExpression(prefix) + " ASC, " +
+           displayMillisExpression(prefix) + " ASC, " +
+           prefix + "bestTime ASC, " +
+           prefix + "id ASC";
+   }
+
+   private static OfficialTime officialTimeFromResultSet(
+       ResultSet rs,
+       String ticksColumn,
+       String displayColumn,
+       String sourceColumn,
+       String runIdColumn
+   ) throws SQLException {
+       double bestTime = rs.getDouble("bestTime");
+       if (rs.wasNull()) bestTime = 0.0;
+
+       Integer officialTicks = rs.getInt(ticksColumn);
+       if (rs.wasNull()) {
+           officialTicks = (int) Math.max(0L, Math.round(bestTime * 20.0));
+       }
+       Integer displayMillis = rs.getInt(displayColumn);
+       if (rs.wasNull()) {
+           displayMillis = (int) Math.max(0L, Math.round(bestTime * 1000.0));
+       }
+       String source = rs.getString(sourceColumn);
+       if (source == null || source.isBlank()) source = "LEGACY";
+
+       UUID runId = null;
+       String runIdValue = rs.getString(runIdColumn);
+       if (runIdValue != null && !runIdValue.isBlank()) {
+           try {
+               runId = UUID.fromString(runIdValue);
+           } catch (IllegalArgumentException ignored) {
+               // Keep a malformed legacy run id from breaking a best-time query.
+           }
+       }
+       return new OfficialTime(officialTicks, displayMillis, source, runId);
+   }
+
+   /* =======================================================
       DRS REGIONS
 ======================================================= */
     public synchronized boolean deleteDRSRegionByID(int id) {
@@ -3373,6 +3358,286 @@ public class DatabaseManager {
         return tracks;
     }
 
+    private void ensureTrackTagsColumn(Connection conn) throws SQLException {
+        try (
+            PreparedStatement ps = conn.prepareStatement("PRAGMA table_info(fr_tracks)");
+            ResultSet rs = ps.executeQuery()
+        ) {
+            while (rs.next()) {
+                if ("TAGS".equalsIgnoreCase(rs.getString("name"))) {
+                    return;
+                }
+            }
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE fr_tracks ADD COLUMN TAGS TEXT DEFAULT ''");
+        }
+    }
+
+    public synchronized boolean setTrackTags(String trackName, List<String> tags) {
+        String sql = "UPDATE fr_tracks SET TAGS = ? WHERE LOWER(trackNameWS) = LOWER(?)";
+        try {
+            Connection conn = getOrConnect();
+            ensureTrackTagsColumn(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, String.join("\n", tags));
+                ps.setString(2, trackName.replaceAll("\\s+", ""));
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
+    }
+
+    public synchronized List<String> getTrackTags(String trackName) {
+        String sql = "SELECT TAGS FROM fr_tracks WHERE LOWER(trackNameWS) = LOWER(?) LIMIT 1";
+        try {
+            Connection conn = getOrConnect();
+            ensureTrackTagsColumn(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackName.replaceAll("\\s+", ""));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        return new ArrayList<>();
+                    }
+
+                    String storedTags = rs.getString("TAGS");
+                    if (storedTags == null || storedTags.isBlank()) {
+                        return new ArrayList<>();
+                    }
+
+                    return new ArrayList<>(Arrays.stream(storedTags.split("\\R"))
+                            .map(String::trim)
+                            .filter(tag -> !tag.isEmpty())
+                            .toList());
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return new ArrayList<>();
+        }
+    }
+
+    public synchronized Map<String, List<String>> getAllTrackTags() {
+        Map<String, List<String>> trackTags = new LinkedHashMap<>();
+        String sql = "SELECT trackNameWS, TAGS FROM fr_tracks";
+        try {
+            Connection conn = getOrConnect();
+            ensureTrackTagsColumn(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String storedTags = rs.getString("TAGS");
+                    List<String> tags = new ArrayList<>();
+                    if (storedTags != null && !storedTags.isBlank()) {
+                        tags.addAll(Arrays.stream(storedTags.split("\\R"))
+                            .map(String::trim)
+                            .filter(tag -> !tag.isEmpty())
+                            .toList());
+                    }
+                    trackTags.put(rs.getString("trackNameWS").toLowerCase(), tags);
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return trackTags;
+    }
+
+    public synchronized boolean addTrackTag(String trackName, String tag) {
+        List<String> tags = getTrackTags(trackName);
+        String normalizedTag = tag.trim();
+        if (normalizedTag.isEmpty()) {
+            return false;
+        }
+        for (String existingTag : tags) {
+            if (existingTag.equalsIgnoreCase(normalizedTag)) {
+                return false;
+            }
+        }
+        tags.add(normalizedTag);
+        return setTrackTags(trackName, tags);
+    }
+
+    public synchronized boolean removeTrackTag(String trackName, String tag) {
+        List<String> tags = getTrackTags(trackName);
+        String normalizedTag = tag.trim();
+        boolean removed = tags.removeIf(existingTag -> existingTag.equalsIgnoreCase(normalizedTag));
+        return removed && setTrackTags(trackName, tags);
+    }
+
+    public synchronized boolean resetTrackTags(String trackName) {
+        return setTrackTags(trackName, Collections.emptyList());
+    }
+
+    private void ensureTrackMinVersionColumn(Connection conn) throws SQLException {
+        try (
+            PreparedStatement ps = conn.prepareStatement("PRAGMA table_info(fr_tracks)");
+            ResultSet rs = ps.executeQuery()
+        ) {
+            while (rs.next()) {
+                if ("minVersion".equalsIgnoreCase(rs.getString("name"))) {
+                    return;
+                }
+            }
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE fr_tracks ADD COLUMN minVersion TEXT DEFAULT NULL");
+        }
+    }
+
+    public synchronized boolean setTrackMinVersion(String trackName, String minVersion) {
+        String sql = "UPDATE fr_tracks SET minVersion = ? WHERE LOWER(trackNameWS) = LOWER(?)";
+        try {
+            Connection conn = getOrConnect();
+            ensureTrackMinVersionColumn(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                if (minVersion == null) {
+                    ps.setNull(1, java.sql.Types.VARCHAR);
+                } else {
+                    ps.setString(1, minVersion);
+                }
+                ps.setString(2, trackName.replaceAll("\\s+", ""));
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
+    }
+
+    public synchronized String getTrackMinVersion(String trackName) {
+        String sql = "SELECT minVersion FROM fr_tracks WHERE LOWER(trackNameWS) = LOWER(?) LIMIT 1";
+        try {
+            Connection conn = getOrConnect();
+            ensureTrackMinVersionColumn(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackName.replaceAll("\\s+", ""));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getString("minVersion");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return null;
+    }
+
+    private void ensureTrackDifficultyColumn(Connection conn) throws SQLException {
+        try (
+            PreparedStatement ps = conn.prepareStatement("PRAGMA table_info(fr_tracks)");
+            ResultSet rs = ps.executeQuery()
+        ) {
+            while (rs.next()) {
+                if ("DIFFICULTY".equalsIgnoreCase(rs.getString("name"))) {
+                    return;
+                }
+            }
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE fr_tracks ADD COLUMN DIFFICULTY TEXT DEFAULT ''");
+        }
+    }
+
+    public synchronized boolean setTrackDifficulty(String trackName, String difficulty) {
+        String sql = "UPDATE fr_tracks SET DIFFICULTY = ? WHERE LOWER(trackNameWS) = LOWER(?)";
+        try {
+            Connection conn = getOrConnect();
+            ensureTrackDifficultyColumn(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, difficulty.trim());
+                ps.setString(2, trackName.replaceAll("\\s+", ""));
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
+    }
+
+    public synchronized String getTrackDifficulty(String trackName) {
+        String sql = "SELECT DIFFICULTY FROM fr_tracks WHERE LOWER(trackNameWS) = LOWER(?) LIMIT 1";
+        try {
+            Connection conn = getOrConnect();
+            ensureTrackDifficultyColumn(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackName.replaceAll("\\s+", ""));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        String difficulty = rs.getString("DIFFICULTY");
+                        return difficulty == null ? "" : difficulty;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return "";
+    }
+
+    public synchronized Map<String, String> getAllTrackDifficulties() {
+        Map<String, String> difficulties = new LinkedHashMap<>();
+        String sql = "SELECT trackNameWS, DIFFICULTY FROM fr_tracks";
+        try {
+            Connection conn = getOrConnect();
+            ensureTrackDifficultyColumn(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    difficulties.put(
+                        rs.getString("trackNameWS").toLowerCase(),
+                        rs.getString("DIFFICULTY")
+                    );
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return difficulties;
+    }
+
+    public synchronized Map<String, TrackIconData> getAllTrackIconData() {
+        Map<String, TrackIconData> iconData = new LinkedHashMap<>();
+        String sql = "SELECT trackNameWS, icon_name, icon_amount, icon_meta FROM fr_tracks";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String trackKey = rs.getString("trackNameWS");
+                    String iconName = rs.getString("icon_name");
+                    int amount = rs.getInt("icon_amount");
+                    String meta = rs.getString("icon_meta");
+                    iconData.put(
+                        trackKey.toLowerCase(),
+                        new TrackIconData(iconName != null ? iconName : "PAPER", amount < 1 ? 1 : amount, meta)
+                    );
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return iconData;
+    }
+
+    public synchronized Map<String, Integer> getAllTrackTimeCounts() {
+        Map<String, Integer> timeCounts = new LinkedHashMap<>();
+        String sql =
+            "SELECT LOWER(trackNameWS) AS trackKey, COUNT(*) AS totalTimes " +
+            "FROM fr_player_times GROUP BY LOWER(trackNameWS)";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    timeCounts.put(rs.getString("trackKey"), rs.getInt("totalTimes"));
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return timeCounts;
+    }
+
     /**
      * Verifica se uma pista existe no banco de dados (normalizado).
      * @param trackName Nome da pista (com ou sem espaços)
@@ -4098,7 +4363,7 @@ public class DatabaseManager {
         Map<String, TrackData> trackDataMap = new HashMap<>();
         String sql =
             "SELECT trackName, trackNameWS, worldName, spawnPoint_x, spawnPoint_y, spawnPoint_z, " +
-            "spawnPoint_yaw, spawnPoint_pitch, creatorName, icon_name, game_time, open FROM fr_tracks";
+            "spawnPoint_yaw, spawnPoint_pitch, creatorName, icon_name, game_time, open, minVersion FROM fr_tracks";
         try {
             Connection conn = getOrConnect();
             try (
@@ -4147,7 +4412,8 @@ public class DatabaseManager {
                                 trackNameWS.replaceAll("\\s+", "").toLowerCase()
                             ),
                             getGameTimeFromResultSet(rs),
-                            getOpenFromResultSet(rs)
+                            getOpenFromResultSet(rs),
+                            rs.getString("minVersion")
                         )
                     );
                 }
@@ -4667,14 +4933,53 @@ public class DatabaseManager {
         double time,
         int checkpointsReached
     ) {
-        String trackNameWS = trackName.replaceAll("\\s+", "");
-        // Round to nearest tick (50ms) for clean display on Folia
-        long roundedMs = Math.round(time * 1000.0);
+        saveSoloFullTime(
+            playerUUID,
+            playerName,
+            trackName,
+            legacyOfficialTime(time),
+            checkpointsReached
+        );
+    }
+
+    private OfficialTime legacyOfficialTime(double seconds) {
+        long roundedMs = Math.round(seconds * 1000.0);
         roundedMs = (roundedMs + 25L) / 50L * 50L;
-        double roundedTime = roundedMs / 1000.0;
+        long safeMs = Math.max(0L, roundedMs);
+        int officialTicks = (int) Math.min(Integer.MAX_VALUE, safeMs / 50L);
+        int displayMillis = (int) Math.min(Integer.MAX_VALUE, safeMs);
+        return new OfficialTime(officialTicks, displayMillis, "LEGACY", null);
+    }
+
+    /**
+     * Persists a solo result using the official tick time and a separate display time.
+     * The legacy bestTime column remains the official time expressed in seconds.
+     */
+    public synchronized void saveSoloFullTime(
+        UUID playerUUID,
+        String playerName,
+        String trackName,
+        OfficialTime officialTime,
+        int checkpointsReached
+    ) {
+        if (officialTime == null || playerUUID == null || trackName == null) return;
+
+        String trackNameWS = trackName.replaceAll("\\s+", "");
+        double officialSeconds = officialTime.officialTicks() / 20.0;
 
         try {
             Connection conn = getOrConnect();
+
+            if (officialTime.runId() != null) {
+                String existingRunSql =
+                    "SELECT 1 FROM fr_player_times WHERE run_id = ? LIMIT 1";
+                try (PreparedStatement psExisting = conn.prepareStatement(existingRunSql)) {
+                    psExisting.setString(1, officialTime.runId().toString());
+                    try (ResultSet rsExisting = psExisting.executeQuery()) {
+                        if (rsExisting.next()) return;
+                    }
+                }
+            }
 
             // --- RECORD LOGIC (DISCORD) ---
             String prevBestPlayer = null;
@@ -4691,12 +4996,14 @@ public class DatabaseManager {
                         " na pista " +
                         trackName +
                         " com tempo " +
-                        roundedTime
+                        officialSeconds
                 );
 
             // FIRST: Fetch the player's OWN best time (ONLY COMPLETE laps)
             String ownBestSql =
-                "SELECT bestTime FROM fr_player_times WHERE LOWER(trackNameWS) = LOWER(?) AND player_uuid = ? AND finished = TRUE ORDER BY bestTime ASC LIMIT 1";
+                "SELECT bestTime FROM fr_player_times WHERE LOWER(trackNameWS) = LOWER(?) AND player_uuid = ? AND finished = TRUE ORDER BY " +
+                officialOrderBy("") +
+                " LIMIT 1";
             try (PreparedStatement psOwn = conn.prepareStatement(ownBestSql)) {
                 psOwn.setString(1, trackNameWS);
                 psOwn.setString(2, playerUUID.toString());
@@ -4720,7 +5027,9 @@ public class DatabaseManager {
                 "INNER JOIN fr_checkpoint_times ct ON ct.timetrial_id = pt.id " +
                 "WHERE pt.player_uuid = ? AND pt.trackNameWS = ? AND pt.finished = TRUE " +
                 "GROUP BY pt.id " +
-                "ORDER BY pt.bestTime ASC LIMIT 1";
+                "ORDER BY " +
+                officialOrderBy("pt.") +
+                " LIMIT 1";
             try (
                 PreparedStatement psCheckpoints = conn.prepareStatement(
                     ownBestWithCheckpointsSql
@@ -4745,9 +5054,12 @@ public class DatabaseManager {
 
             // IF THE TIME IS NOT BETTER THAN THE PLAYER'S OWN TIME, DO NOT SAVE THE TIME
             // BUT CAN STILL SAVE CHECKPOINTS IF IT IS BETTER THAN THE CHECKPOINT TIME
-            boolean shouldSaveTime = roundedTime < playerOwnBestTime;
-            boolean shouldSaveCheckpoints =
-                roundedTime < playerBestTimeWithCheckpoints;
+            OfficialTime previousOfficialTime = this.getPlayerBestOfficialTime(
+                playerUUID,
+                trackNameWS
+            );
+            boolean shouldSaveTime = officialTime.isBetterThan(previousOfficialTime);
+            boolean shouldSaveCheckpoints = officialSeconds < playerBestTimeWithCheckpoints;
 
             if (!shouldSaveTime && !shouldSaveCheckpoints) {
                 plugin
@@ -4773,7 +5085,9 @@ public class DatabaseManager {
             // SECOND: Fetch the GLOBAL best time (from any player, ONLY COMPLETE laps) - ONLY IF SAVING TIME
             if (shouldSaveTime) {
                 String globalRecordSql =
-                    "SELECT player_name, bestTime FROM fr_player_times WHERE LOWER(trackNameWS) = LOWER(?) AND finished = TRUE ORDER BY bestTime ASC LIMIT 1";
+                    "SELECT player_name, bestTime FROM fr_player_times WHERE LOWER(trackNameWS) = LOWER(?) AND finished = TRUE ORDER BY " +
+                    officialOrderBy("") +
+                    " LIMIT 1";
                 try (
                     PreparedStatement psCheck = conn.prepareStatement(
                         globalRecordSql
@@ -4796,7 +5110,7 @@ public class DatabaseManager {
                             // It's a record ONLY if:
                             // 1. New time < current global record time
                             // 2. And the global record is NOT by the player themselves (or it is, but improved)
-                            if (roundedTime < (prevBestTime - 0.001)) {
+                            if (officialSeconds < (prevBestTime - 0.001)) {
                                 // Beat the global record
                                 if (prevBestPlayer.equals(playerName)) {
                                     // It's the player themselves, improving their own record
@@ -4822,7 +5136,7 @@ public class DatabaseManager {
                                     .getDebugManager()
                                     .logTimeTrialSystem(
                                         "[saveFullTime] ❌ Não é recorde global. Tempo atual: " +
-                                            roundedTime +
+                                            officialSeconds +
                                             " vs melhor: " +
                                             prevBestTime
                                     );
@@ -4868,7 +5182,7 @@ public class DatabaseManager {
                     DiscordUtils.sendRecordMessage(
                         plugin,
                         playerName,
-                        roundedTime,
+                        officialSeconds,
                         prevBestPlayer,
                         (prevBestTime == Double.MAX_VALUE ? 0 : prevBestTime),
                         displayTrackName
@@ -4895,52 +5209,20 @@ public class DatabaseManager {
                 // Determines the platform via Floodgate (falls back to name prefix)
                 String platform = resolvePlatform(playerUUID, playerName);
 
-                if (shouldSaveTime) {
-                    // Saves the time normally (it's a new personal record)
-                    String insertSql =
-                            "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, plataforma) VALUES (?, ?, ?, ?, ?, ?, ?)";
-                    try (
-                            PreparedStatement ps = conn.prepareStatement(
-                                    insertSql,
-                                    Statement.RETURN_GENERATED_KEYS
-                            )
-                    ) {
-                        ps.setString(1, trackNameWS);
-                        ps.setString(2, playerUUID.toString());
-                        ps.setString(3, playerName);
-                        ps.setDouble(4, roundedTime);
-                        ps.setInt(5, checkpointsReached);
-                        ps.setBoolean(6, true);
-                        ps.setString(7, platform); // salva a plataforma
-                        ps.executeUpdate();
+                if (shouldSaveTime || shouldSaveCheckpoints) {
+                    generatedId = insertSoloTime(
+                        conn,
+                        trackNameWS,
+                        playerUUID,
+                        playerName,
+                        officialSeconds,
+                        checkpointsReached,
+                        platform,
+                        officialTime
+                    );
+                }
 
-                        try (ResultSet rs = ps.getGeneratedKeys()) {
-                            if (rs.next()) generatedId = rs.getInt(1);
-                        }
-                    }
-                } else if (shouldSaveCheckpoints) {
-                    // Not a personal record, but it's better than the checkpoint time
-                    String insertSql =
-                            "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, plataforma) VALUES (?, ?, ?, ?, ?, ?, ?)";
-                    try (
-                            PreparedStatement ps = conn.prepareStatement(
-                                    insertSql,
-                                    Statement.RETURN_GENERATED_KEYS
-                            )
-                    ) {
-                        ps.setString(1, trackNameWS);
-                        ps.setString(2, playerUUID.toString());
-                        ps.setString(3, playerName);
-                        ps.setDouble(4, roundedTime);
-                        ps.setInt(5, checkpointsReached);
-                        ps.setBoolean(6, true);
-                        ps.setString(7, platform); // salva a plataforma
-                        ps.executeUpdate();
-
-                        try (ResultSet rs = ps.getGeneratedKeys()) {
-                            if (rs.next()) generatedId = rs.getInt(1);
-                        }
-                    }
+                if (!shouldSaveTime && shouldSaveCheckpoints) {
                     plugin.getDebugManager().logTimeTrialSystem(
                             "[saveFullTime] ✅ Registro criado para checkpoints (não é PB, mas tem checkpoints melhores)"
                     );
@@ -4952,7 +5234,7 @@ public class DatabaseManager {
                         playerUUID,
                         trackNameWS,
                         generatedId,
-                        roundedTime,
+                        officialSeconds,
                         checkpointsReached,
                         true
                     );
@@ -4972,6 +5254,44 @@ public class DatabaseManager {
         } catch (SQLException e) {
             handleSqlError(e);
         }
+    }
+
+    private Integer insertSoloTime(
+        Connection conn,
+        String trackNameWS,
+        UUID playerUUID,
+        String playerName,
+        double officialSeconds,
+        int checkpointsReached,
+        String platform,
+        OfficialTime officialTime
+    ) throws SQLException {
+        String insertSql =
+            "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, plataforma, official_ticks, display_millis, timing_source, run_id) " +
+            "VALUES (?, ?, ?, ?, ?, TRUE, ?, ?, ?, ?, ?)";
+        try (
+            PreparedStatement ps = conn.prepareStatement(
+                insertSql,
+                Statement.RETURN_GENERATED_KEYS
+            )
+        ) {
+            ps.setString(1, trackNameWS);
+            ps.setString(2, playerUUID.toString());
+            ps.setString(3, playerName);
+            ps.setDouble(4, officialSeconds);
+            ps.setInt(5, checkpointsReached);
+            ps.setString(6, platform);
+            ps.setInt(7, officialTime.officialTicks());
+            ps.setInt(8, officialTime.displayMillis());
+            ps.setString(9, officialTime.source());
+            ps.setString(10, officialTime.runId() == null ? null : officialTime.runId().toString());
+            ps.executeUpdate();
+
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        }
+        return null;
     }
 
     public synchronized void savePartialTime(
@@ -5197,7 +5517,7 @@ public class DatabaseManager {
                 WHERE pt.player_name = ?
                   AND LOWER(pt.trackNameWS) = LOWER(?)
                   AND pt.finished = TRUE
-                ORDER BY pt.bestTime ASC
+                ORDER BY """ + officialOrderBy("pt.") + """
                 LIMIT 1
             """;
         try {
@@ -5220,6 +5540,94 @@ public class DatabaseManager {
             handleSqlError(e);
         }
         return null;
+    }
+
+    /**
+     * Returns the official/display time for a player's best completed run.
+     * The legacy getPlayerBestTime() array shape is intentionally unchanged.
+     */
+    public synchronized OfficialTime getPlayerBestOfficialTime(
+        String playerName,
+        String trackName
+    ) {
+        String sql = """
+            SELECT bestTime, official_ticks, display_millis, timing_source, run_id
+            FROM fr_player_times
+            WHERE player_name = ?
+              AND LOWER(trackNameWS) = LOWER(?)
+              AND finished = TRUE
+            ORDER BY """ + officialOrderBy("") + """
+            LIMIT 1
+            """;
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, playerName);
+                ps.setString(2, trackName.replaceAll("\\s+", ""));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return officialTimeFromResultSet(
+                            rs,
+                            "official_ticks",
+                            "display_millis",
+                            "timing_source",
+                            "run_id"
+                        );
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return null;
+    }
+
+    /** UUID variant for callers that do not want to resolve the current player name. */
+    public synchronized OfficialTime getPlayerBestOfficialTime(
+        UUID playerUUID,
+        String trackName
+    ) {
+        if (playerUUID == null) return null;
+        String sql = """
+            SELECT bestTime, official_ticks, display_millis, timing_source, run_id
+            FROM fr_player_times
+            WHERE player_uuid = ?
+              AND LOWER(trackNameWS) = LOWER(?)
+              AND finished = TRUE
+            ORDER BY """ + officialOrderBy("") + """
+            LIMIT 1
+            """;
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, playerUUID.toString());
+                ps.setString(2, trackName.replaceAll("\\s+", ""));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return officialTimeFromResultSet(
+                            rs,
+                            "official_ticks",
+                            "display_millis",
+                            "timing_source",
+                            "run_id"
+                        );
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return null;
+    }
+
+    /** Compares official ticks first, then display milliseconds, with null-last semantics. */
+    public static int compareOfficialTimes(OfficialTime left, OfficialTime right) {
+        if (left == right) return 0;
+        if (left == null) return -1;
+        if (right == null) return 1;
+        int ticks = Integer.compare(left.officialTicks(), right.officialTicks());
+        if (ticks != 0) return ticks;
+        return Integer.compare(left.displayMillis(), right.displayMillis());
     }
 
     public synchronized Double getPlayerBestFinishedTime(UUID uuid, String trackName) {
@@ -5249,46 +5657,33 @@ public class DatabaseManager {
     }
 
     public synchronized int getPlayerRank(UUID playerUUID, String trackNameWS) {
-        // 1. Check if the player has a time
-        String checkTimeSql =
-            "SELECT 1 FROM fr_player_times WHERE player_uuid = ? AND LOWER(trackNameWS) = LOWER(?) AND finished = TRUE LIMIT 1";
+        if (playerUUID == null) return 0;
+        String cleanTrack = trackNameWS.replaceAll("\\s+", "");
 
+        // Select each player's best run using the official ordering, then rank the
+        // resulting rows. DENSE_RANK preserves the legacy tie semantics.
+        String sql =
+            "WITH player_bests AS (" +
+            " SELECT t.*, ROW_NUMBER() OVER (PARTITION BY t.player_uuid ORDER BY " +
+            officialOrderBy("t.") +
+            ") AS player_rn" +
+            " FROM fr_player_times t" +
+            " WHERE LOWER(t.trackNameWS) = LOWER(?) AND t.finished = TRUE" +
+            "), ranked_bests AS (" +
+            " SELECT player_uuid, DENSE_RANK() OVER (ORDER BY " +
+            officialOrderBy("") +
+            ") AS rank" +
+            " FROM player_bests WHERE player_rn = 1" +
+            ") SELECT rank FROM ranked_bests WHERE player_uuid = ? LIMIT 1";
         try {
             Connection conn = getOrConnect();
-            try (
-                PreparedStatement psCheck = conn.prepareStatement(checkTimeSql)
-            ) {
-                psCheck.setString(1, playerUUID.toString());
-                psCheck.setString(2, trackNameWS.replaceAll("\\s+", "")); // Garantir WS
-                try (ResultSet rsCheck = psCheck.executeQuery()) {
-                    if (!rsCheck.next()) return 0; // Sem tempo = Sem Rank
-                }
-            }
-
-            // 2. Calculate Rank: Count how many UNIQUE players have a better time
-            String sql = """
-                    SELECT COUNT(DISTINCT player_uuid) + 1 AS rank
-                    FROM fr_player_times
-                    WHERE LOWER(trackNameWS) = LOWER(?)
-                      AND finished = TRUE
-                      AND bestTime < (
-                          SELECT MIN(bestTime)
-                          FROM fr_player_times
-                          WHERE player_uuid = ?
-                            AND LOWER(trackNameWS) = LOWER(?)
-                            AND finished = TRUE
-                      )
-                """;
-
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                String cleanTrack = trackNameWS.replaceAll("\\s+", "");
                 ps.setString(1, cleanTrack);
                 ps.setString(2, playerUUID.toString());
-                ps.setString(3, cleanTrack);
-
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
-                        return rs.getInt("rank");
+                        int rank = rs.getInt("rank");
+                        return rs.wasNull() ? 0 : rank;
                     }
                 }
             }
@@ -5302,18 +5697,24 @@ public class DatabaseManager {
         List<TrackRecord> topTimes = new ArrayList<>();
         String trackWS = trackName.replaceAll("\\s+", "");
         String sql = """
-            SELECT player_name, bestTime, checkpointsReached, finished, created_at
+            SELECT player_name, bestTime, checkpointsReached, finished, created_at,
+                   official_ticks, display_millis, timing_source, run_id
             FROM (
                 SELECT
                     t.player_name, t.bestTime, t.checkpointsReached, t.finished, t.created_at,
+                    t.official_ticks, t.display_millis, t.timing_source, t.run_id,
                     ROW_NUMBER() OVER (
                         PARTITION BY t.player_uuid
                         ORDER BY
                             t.finished DESC,
-                            CASE WHEN t.finished = 1 THEN t.bestTime END ASC,
                             CASE WHEN t.finished = 0 THEN t.checkpointsReached END DESC,
+                            CASE WHEN t.finished = 1 THEN
+                                COALESCE(t.official_ticks, ROUND(t.bestTime * 20)) END ASC,
+                            CASE WHEN t.finished = 1 THEN
+                                COALESCE(t.display_millis, ROUND(t.bestTime * 1000)) END ASC,
                             t.bestTime ASC,
-                            t.created_at ASC
+                            t.created_at ASC,
+                            t.id ASC
                     ) AS rn
                 FROM fr_player_times t
                 WHERE LOWER(t.trackNameWS) = LOWER(?)
@@ -5321,9 +5722,13 @@ public class DatabaseManager {
             WHERE rn = 1
             ORDER BY
                 finished DESC,
-                CASE WHEN finished = 1 THEN bestTime END ASC,
                 CASE WHEN finished = 0 THEN checkpointsReached END DESC,
-                bestTime ASC
+                CASE WHEN finished = 1 THEN
+                    COALESCE(official_ticks, ROUND(bestTime * 20)) END ASC,
+                CASE WHEN finished = 1 THEN
+                    COALESCE(display_millis, ROUND(bestTime * 1000)) END ASC,
+                bestTime ASC,
+                created_at ASC
             """;
         try {
             Connection conn = getOrConnect();
@@ -5331,15 +5736,23 @@ public class DatabaseManager {
                 ps.setString(1, trackWS);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
+                        OfficialTime officialTime = officialTimeFromResultSet(
+                            rs,
+                            "official_ticks",
+                            "display_millis",
+                            "timing_source",
+                            "run_id"
+                        );
                         topTimes.add(
                             new TrackRecord(
                                 rs.getString("player_name"),
-                                rs.getDouble("bestTime"),
+                                officialTime.getDisplaySeconds(),
                                 rs.getInt("checkpointsReached"),
                                 rs.getBoolean("finished"),
                                 rs.getTimestamp("created_at") != null
                                     ? rs.getTimestamp("created_at").getTime()
-                                    : 0L
+                                    : 0L,
+                                officialTime
                             )
                         );
                     }
@@ -5358,7 +5771,9 @@ public class DatabaseManager {
 
     public synchronized Double getBestTime(String trackName) {
         String sql =
-            "SELECT bestTime FROM fr_player_times WHERE LOWER(trackNameWS) = LOWER(?) AND finished = TRUE ORDER BY bestTime ASC LIMIT 1";
+            "SELECT bestTime FROM fr_player_times " +
+            "WHERE LOWER(trackNameWS) = LOWER(?) AND finished = TRUE ORDER BY " +
+            officialOrderBy("") + " LIMIT 1";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -5375,15 +5790,26 @@ public class DatabaseManager {
 
     /**
      * Returns a map of trackNameWS -> bestTime (WR) for ALL tracks in a single query.
-     * Much faster than calling getBestTime() in a loop for hundreds of tracks.
+     * The selected bestTime remains the legacy official time in seconds.
      */
     public synchronized Map<String, Double> getAllBestTimes() {
         Map<String, Double> bestTimes = new HashMap<>();
-        String sql =
-            "SELECT t.trackNameWS, MIN(pt.bestTime) as wr " +
-            "FROM fr_tracks t LEFT JOIN fr_player_times pt " +
-            "ON LOWER(t.trackNameWS) = LOWER(pt.trackNameWS) AND pt.finished = TRUE " +
-            "GROUP BY t.trackNameWS";
+        String sql = """
+            SELECT t.trackNameWS,
+                   COALESCE(ranked.display_millis / 1000.0, ranked.bestTime) AS wr
+            FROM fr_tracks t
+            LEFT JOIN (
+                SELECT p.trackNameWS, p.bestTime, p.display_millis,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY p.trackNameWS
+                           ORDER BY """ + officialOrderBy("p.") + """
+                       ) AS rn
+                FROM fr_player_times p
+                WHERE p.finished = TRUE
+            ) ranked
+              ON LOWER(t.trackNameWS) = LOWER(ranked.trackNameWS)
+             AND ranked.rn = 1
+            """;
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -5405,15 +5831,24 @@ public class DatabaseManager {
 
     /**
      * Returns a map of trackNameWS -> PB for a single player across ALL tracks in one query.
-     * Much faster than calling getPlayerBestTime() in a loop.
+     * The selected PB remains the legacy official time in seconds.
      */
     public synchronized Map<String, Double> getPlayerAllBestTimes(String playerName) {
         Map<String, Double> pbTimes = new HashMap<>();
-        String sql =
-            "SELECT pt.trackNameWS, MIN(pt.bestTime) as pb " +
-            "FROM fr_player_times pt " +
-            "WHERE pt.player_name = ? AND pt.finished = TRUE " +
-            "GROUP BY pt.trackNameWS";
+        String sql = """
+            SELECT ranked.trackNameWS,
+                   COALESCE(ranked.display_millis / 1000.0, ranked.bestTime) AS pb
+            FROM (
+                SELECT p.trackNameWS, p.bestTime, p.display_millis,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY p.trackNameWS
+                           ORDER BY """ + officialOrderBy("p.") + """
+                       ) AS rn
+                FROM fr_player_times p
+                WHERE p.player_name = ? AND p.finished = TRUE
+            ) ranked
+            WHERE ranked.rn = 1
+            """;
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -5438,7 +5873,7 @@ public class DatabaseManager {
         // ✅ Uses LOWER() in the query
         String sql =
             "SELECT trackName, worldName, spawnPoint_x, spawnPoint_y, spawnPoint_z, " +
-            "spawnPoint_pitch, spawnPoint_yaw, creatorName, creatorUUID, icon_name, game_time " +
+            "spawnPoint_pitch, spawnPoint_yaw, creatorName, creatorUUID, icon_name, game_time, minVersion " +
             "FROM fr_tracks WHERE LOWER(trackNameWS) = LOWER(?)";
         try {
             Connection conn = getOrConnect();
@@ -5446,7 +5881,7 @@ public class DatabaseManager {
             // 1. Try to fetch by exact name (display name) first - Resolves conflicts like "Floor is Lava" vs "floorislava"
             String sqlExact =
                 "SELECT trackName, worldName, spawnPoint_x, spawnPoint_y, spawnPoint_z, " +
-                "spawnPoint_pitch, spawnPoint_yaw, creatorName, creatorUUID, icon_name, trackNameWS, game_time " +
+                "spawnPoint_pitch, spawnPoint_yaw, creatorName, creatorUUID, icon_name, trackNameWS, game_time, minVersion " +
                 "FROM fr_tracks WHERE LOWER(trackName) = LOWER(?)";
 
             try (PreparedStatement ps = conn.prepareStatement(sqlExact)) {
@@ -5490,7 +5925,8 @@ public class DatabaseManager {
                             rs.getString("icon_name"),
                             getCheckpointCount(trackNameWS),
                             getGameTimeFromResultSet(rs),
-                            getOpenFromResultSet(rs)
+                            getOpenFromResultSet(rs),
+                            rs.getString("minVersion")
                         );
                     }
                 }
@@ -5994,10 +6430,9 @@ public class DatabaseManager {
                         case "level" -> {
                             if (item.getType() == Material.LIGHT && itemMeta instanceof BlockStateMeta blockMeta) {
                                 org.bukkit.block.BlockState blockState = blockMeta.getBlockState();
-                                org.bukkit.block.data.BlockData blockData = blockState.getBlockData();
-                                if (blockData instanceof org.bukkit.block.data.type.Light light) {
+                                if (blockState.getBlockData() instanceof org.bukkit.block.data.type.Light light) {
                                     light.setLevel(Math.max(0, Math.min(15, Integer.parseInt(value))));
-                                    blockState.setBlockData(blockData);
+                                    blockState.setBlockData(light);
                                     blockMeta.setBlockState(blockState);
                                 }
                             }
@@ -9052,7 +9487,7 @@ public class DatabaseManager {
         }
 
         public double getTime() {
-            return time;
+            return this.time;
         }
 
         public int getCheckpointsReached() {
@@ -9183,6 +9618,7 @@ public class DatabaseManager {
         private final int totalCheckpoints; // Total number of track checkpoints
         private final Long gameTime; // Fixed day time (ticks), null = use server default
         private final boolean open; // Whether the track is open for racing
+        private final String minVersion;
 
         // --- Constructor ---
         public TrackData(
@@ -9193,7 +9629,8 @@ public class DatabaseManager {
             String iconName,
             int totalCheckpoints,
             Long gameTime,
-            boolean open
+            boolean open,
+            String minVersion
         ) {
             this.trackName = trackName;
             this.spawnLocation = spawnLocation;
@@ -9203,6 +9640,30 @@ public class DatabaseManager {
             this.totalCheckpoints = totalCheckpoints;
             this.gameTime = gameTime;
             this.open = open;
+            this.minVersion = minVersion;
+        }
+
+        public TrackData(
+            String trackName,
+            Location spawnLocation,
+            String worldName,
+            String ownerName,
+            String iconName,
+            int totalCheckpoints,
+            Long gameTime,
+            boolean open
+        ) {
+            this(
+                trackName,
+                spawnLocation,
+                worldName,
+                ownerName,
+                iconName,
+                totalCheckpoints,
+                gameTime,
+                open,
+                null
+            );
         }
 
         // --- Getters ---
@@ -9236,6 +9697,10 @@ public class DatabaseManager {
 
         public boolean isOpen() {
             return open;
+        }
+
+        public String getMinVersion() {
+            return minVersion;
         }
     }
 
@@ -9393,6 +9858,7 @@ public class DatabaseManager {
         private final int checkpointsReached;
         private final boolean finished;
         private final long timeCreated;
+        private final OfficialTime officialTime;
 
         public TrackRecord(
             String playerName,
@@ -9401,11 +9867,23 @@ public class DatabaseManager {
             boolean finished,
             long timeCreated
         ) {
+            this(playerName, time, checkpointsReached, finished, timeCreated, null);
+        }
+
+        public TrackRecord(
+            String playerName,
+            double time,
+            int checkpointsReached,
+            boolean finished,
+            long timeCreated,
+            OfficialTime officialTime
+        ) {
             this.playerName = playerName;
             this.time = time;
             this.checkpointsReached = checkpointsReached;
             this.finished = finished;
             this.timeCreated = timeCreated;
+            this.officialTime = officialTime;
         }
 
         public String getPlayerName() {
@@ -9414,6 +9892,10 @@ public class DatabaseManager {
 
         public double getTime() {
             return time;
+        }
+
+        public OfficialTime getOfficialTime() {
+            return officialTime;
         }
 
         public int getCheckpointsReached() {
@@ -9805,7 +10287,8 @@ public class DatabaseManager {
             rs.getString("icon_name"),
             getCheckpointCount(effectiveTrackWS),
             getGameTimeFromResultSet(rs),
-            getOpenFromResultSet(rs)
+            getOpenFromResultSet(rs),
+            rs.getString("minVersion")
         );
     }
 

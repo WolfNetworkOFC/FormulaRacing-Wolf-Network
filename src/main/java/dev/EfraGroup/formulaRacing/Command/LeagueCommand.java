@@ -274,7 +274,7 @@ public class LeagueCommand extends BaseCommand {
             return;
         }
         plugin.getLeagueHologramService().removeHolograms(league);
-        leagueManager.getAllLeagues().remove(league);
+        leagueManager.deleteLeague(league);
         plugin.sendMessage(sender, "league_deleted", "{league}", league.getName());
     }
 
@@ -293,8 +293,10 @@ public class LeagueCommand extends BaseCommand {
             return;
         }
         try {
-            leagueManager.linkEvent(league, event, 1);
-            league.getCalendar().putIfAbsent(event.getId(), new LeagueCalendarEntry(event.getId()));
+            if (!leagueManager.linkEvent(league, event, 1)) {
+                plugin.sendMessage(sender, "league_link_error");
+                return;
+            }
             plugin.sendMessage(sender, "league_event_linked",
                 "{league}", league.getName(), "{event}", event.getDisplayName());
         } catch (Exception e) {
@@ -316,7 +318,7 @@ public class LeagueCommand extends BaseCommand {
             plugin.sendMessage(sender, "event_not_found");
             return;
         }
-        league.getCalendar().remove(event.getId());
+        leagueManager.unlinkEvent(league, event.getId());
         plugin.sendMessage(sender, "league_event_unlinked",
             "{league}", league.getName(), "{event}", event.getDisplayName());
     }

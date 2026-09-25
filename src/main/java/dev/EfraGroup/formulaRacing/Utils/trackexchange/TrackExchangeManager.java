@@ -193,7 +193,7 @@ public class TrackExchangeManager {
         data.worldName = worldName;
         data.regions = new ArrayList<>();
         data.locations = new ArrayList<>();
-        data.tags = new ArrayList<>();
+        data.tags = db.getTrackTags(finalTrackNameWS);
         data.options = new ArrayList<>();
         data.guiItem = "BIRCH_BOAT";
         data.weight = 0;
@@ -435,6 +435,9 @@ public class TrackExchangeManager {
             }
 
             String trackNameWS = finalTrackNameFinal.replaceAll("\\s+", "").toLowerCase();
+            if (finalData.tags != null) {
+                db.setTrackTags(trackNameWS, finalData.tags);
+            }
 
             // Import regions
             if (finalData.regions != null) {

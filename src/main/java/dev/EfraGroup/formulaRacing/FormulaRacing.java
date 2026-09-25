@@ -48,6 +48,7 @@ import dev.EfraGroup.formulaRacing.Participant.DriverLookup;
 import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.TimeTrial.TimeTrialController;
+import dev.EfraGroup.formulaRacing.TimeTrial.Timing.WolfTimingService;
 import dev.EfraGroup.formulaRacing.TVCamera.TVCameraController;
 import dev.EfraGroup.formulaRacing.TVCamera.TVCameraListener;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
@@ -187,6 +188,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private HologramManager hologramManager;
     private GhostManager ghostManager;
     private WolfMOD wolfMod;
+    private WolfTimingService wolfTimingService;
     private MedalManager medalManager;
 
     public static FormulaRacing getInstance() {
@@ -306,6 +308,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return wolfMod;
     }
 
+    public WolfTimingService getWolfTimingService() {
+        return wolfTimingService;
+    }
+
     public MedalManager getMedalManager() {
         if (this.medalManager == null) {
             this.medalManager = new MedalManager(this);
@@ -415,15 +421,17 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.aiOpponentManager = new AIOpponentManager(this);
             this.aiRacingLineManager = new AIRacingLineManager(this);
             this.aiRacingLineManager.initialize();
+            this.leagueManager = new LeagueManager(this);
             this.apiManager = new ApiManager(this);
             this.apiManager.init();
             this.gimmickManager = new GimmickManager(this);
             // Puts back anything a crash left pasted (backups are written before pasting).
             this.gimmickManager.schedulePendingRestore();
-            this.leagueManager = new LeagueManager(this);
             this.weatherManager = new WeatherManager(this);
             this.ghostManager = new GhostManager(this);
             this.wolfMod = new WolfMOD(this);
+            this.wolfTimingService = new WolfTimingService(this);
+            this.wolfMod.setTimingService(this.wolfTimingService);
             this.raceEventManager.loadActiveEventsFromDatabase();
             initializeEventIdCounter();
             SchedulerHelper.runTask(this, () -> {
@@ -664,6 +672,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
         if (this.tvCameraListener != null) {
             this.tvCameraListener.shutdown();
+        }
+
+        if (this.wolfTimingService != null) {
+            this.wolfTimingService.shutdown();
         }
 
         if (this.rcl != null) {
@@ -1458,6 +1470,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         }
 
         this.rcl.cleanupPlayer(uuid);
+        if (this.wolfTimingService != null) {
+            this.wolfTimingService.cleanupPlayer(uuid);
+        }
         if (this.raceCheckpointListener != null) {
             this.raceCheckpointListener.cleanupPlayer(uuid);
         }

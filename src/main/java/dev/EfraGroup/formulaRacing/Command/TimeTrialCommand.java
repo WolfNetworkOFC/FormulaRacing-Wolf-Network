@@ -153,6 +153,9 @@ import dev.EfraGroup.formulaRacing.PacketSender;
 
                     this.timerUtils.stopTimer(player);
                     this.timeTrialController.endSession(player);
+                    if (this.plugin.getWolfTimingService() != null) {
+                        this.plugin.getWolfTimingService().prepareTrack(player, trackName);
+                    }
                     this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);
                     this.plugin.getDebugManager().logTimeTrialSystem("[TT] Starting track '" + trackName + "' for player " + player.getName());
                     this.plugin.sendMessage(player, "timetrial_teleport", new String[]{"{track}", trackName});
@@ -218,6 +221,9 @@ import dev.EfraGroup.formulaRacing.PacketSender;
         public void onCancel(Player player) {
             this.timerUtils.stopTimer(player);
             this.timeTrialController.endSession(player);
+            if (this.plugin.getWolfTimingService() != null) {
+                this.plugin.getWolfTimingService().abort(player.getUniqueId(), true);
+            }
             // NOTE: o /ttc NÃO faz resetTrackGameTime — o tempo do jogador
             // permanece como está (aplica-se apenas ao sair para spawn/mudar de modo).
             // Clean up ghost recording and replay

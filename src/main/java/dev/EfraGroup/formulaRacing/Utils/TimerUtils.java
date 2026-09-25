@@ -39,16 +39,23 @@ public class TimerUtils {
     }
 
     public void startTimer(Player player, String trackName, long startTime) {
+        long startNanos = System.nanoTime() - Math.max(0L, System.currentTimeMillis() - startTime) * 1_000_000L;
+        this.startTimerAtNanos(player, trackName, startTime, startNanos, null);
+    }
+
+    public void startTimerAtNanos(
+        Player player,
+        String trackName,
+        long startTime,
+        long startNanos,
+        UUID runId
+    ) {
         this.stopTimer(player, trackName);
         UUID uuid = player.getUniqueId();
         String playerName = player.getName();
-        long nowNano = System.nanoTime();
-        long now = System.currentTimeMillis();
-        long diff = now - startTime;
-        long adjustedNano = nowNano - diff * 1000000L;
         int attemptId = (int)(startTime & 0xFFFFFFFL);
         int initialCPs = this.databaseManager.getCheckpointCount(trackName);
-        PlayerTimerData data = new PlayerTimerData(startTime, adjustedNano, initialCPs, attemptId);
+        PlayerTimerData data = new PlayerTimerData(startTime, startNanos, initialCPs, attemptId, runId);
         this.activeTimers.computeIfAbsent(uuid, k -> new ConcurrentHashMap()).put(trackName, data);
         this.startPlayerLoop(player);
         SchedulerHelper.runAsync(this.plugin, () -> {
@@ -455,6 +462,7 @@ public class TimerUtils {
         private final long startNanoTime;
         private int totalCheckpoints;
         private final int attemptId;
+        private final UUID runId;
         private final List<Double> checkpointTimes = new ArrayList<Double>();
         private int checkpointsReached;
         private Double lastDelta;
@@ -463,10 +471,21 @@ public class TimerUtils {
         private RaceSessionCache sessionCache;
 
         public PlayerTimerData(long startTime, long startNanoTime, int totalCheckpoints, int attemptId) {
+            this(startTime, startNanoTime, totalCheckpoints, attemptId, null);
+        }
+
+        public PlayerTimerData(
+            long startTime,
+            long startNanoTime,
+            int totalCheckpoints,
+            int attemptId,
+            UUID runId
+        ) {
             this.startTime = startTime;
             this.startNanoTime = startNanoTime;
             this.totalCheckpoints = totalCheckpoints;
             this.attemptId = attemptId;
+            this.runId = runId;
             this.lastDelta = Double.NaN;
             this.checkpointsReached = 0;
         }
@@ -513,6 +532,10 @@ public class TimerUtils {
 
         public int getAttemptId() {
             return this.attemptId;
+        }
+
+        public UUID getRunId() {
+            return this.runId;
         }
 
         public void addCheckpoint(int id, double elapsedTime) {

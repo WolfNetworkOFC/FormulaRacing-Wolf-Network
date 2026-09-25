@@ -87,6 +87,9 @@ public class JoinListener implements Listener {
         String rank = this.getPlayerRank(uuid);
         event.setJoinMessage(null);
         this.updatePlayerPrefix(player);
+        if (this.plugin.getWolfTimingService() != null) {
+            this.plugin.getWolfTimingService().onPlayerJoin(player);
+        }
         SchedulerHelper.runAsync(this.plugin, () -> {
             try {
                 boolean isFirstJoin = false;

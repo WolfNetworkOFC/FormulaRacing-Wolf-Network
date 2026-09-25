@@ -82,17 +82,6 @@ public class SettingsCommand extends BaseCommand {
         }
     }
 
-    @Subcommand("timetrial")
-    @CommandCompletion("true|false")
-    @Description("Ativa ou desativa o Time Trial")
-    public void onTimeTrial(Player player, @Optional Boolean value) {
-        UUID uuid = player.getUniqueId();
-        boolean newValue = value != null ? value : !this.databaseManager.getTimeTrialEnabled(uuid);
-        this.databaseManager.setTimeTrialEnabled(uuid, newValue);
-        String var10001 = String.valueOf(ChatColor.GREEN);
-        player.sendMessage(var10001 + "✅ Time Trial " + (newValue ? "ON" : "OFF"));
-    }
-
     @Subcommand("timetrialscoreboard")
     @CommandCompletion("true|false")
     @Description("Ativa ou desativa o Scoreboard do Time Trial")

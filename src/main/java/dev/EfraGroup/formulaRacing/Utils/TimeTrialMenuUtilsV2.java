@@ -8,6 +8,7 @@ import dev.EfraGroup.formulaRacing.PacketSender;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 
 public class TimeTrialMenuUtilsV2 implements Listener {
@@ -76,6 +78,10 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                 // Batch load ALL WRs and PBs in 2 queries instead of 900+ individual queries
                 Map<String, Double> allWRs = mysql.getAllBestTimes();
                 Map<String, Double> allPBs = mysql.getPlayerAllBestTimes(player.getName());
+                Map<String, String> allDifficulties = mysql.getAllTrackDifficulties();
+                Map<String, Integer> allTimeCounts = mysql.getAllTrackTimeCounts();
+                Map<String, DatabaseManager.TrackIconData> allIconData = mysql.getAllTrackIconData();
+                Map<String, List<String>> allTags = mysql.getAllTrackTags();
 
                 // Now the loop can iterate correctly with defined types
                 for (Map.Entry<
@@ -97,11 +103,25 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                     String trackNameWS = trackName.replaceAll("\\s+", "").toLowerCase();
                     Double wr = allWRs.get(trackNameWS);
                     Double pb = allPBs.get(trackNameWS);
-
-                    int pos = -1; // Default position (can be calculated later in sort)
+                    String difficulty = allDifficulties.getOrDefault(trackNameWS, "");
+                    int timeCount = allTimeCounts.getOrDefault(trackNameWS, 0);
+                    List<String> tags = allTags.getOrDefault(trackNameWS, Collections.emptyList());
+                    DatabaseManager.TrackIconData iconData = allIconData.getOrDefault(
+                        trackNameWS,
+                        new DatabaseManager.TrackIconData(icon, 1, null)
+                    );
 
                     loadedTracks.add(
-                        new TrackMenuInfo(trackName, data, icon, wr, pb, pos)
+                        new TrackMenuInfo(
+                            trackName,
+                            data,
+                            iconData,
+                            wr,
+                            pb,
+                            difficulty,
+                            timeCount,
+                            tags
+                        )
                     );
                 }
 
@@ -111,9 +131,9 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                 this.applySortAndFilter(session);
 
                 // Back to the main thread (Sync) to open the inventory
-                SchedulerHelper.runTask(this.plugin, () -> {
+                SchedulerHelper.runTaskFor(this.plugin, player, () -> {
                     this.sessions.put(player.getUniqueId(), session);
-                    this.openPage(player);
+                    this.captureAndOpenMenu(player, session);
                 });
             } catch (Exception e) {
                 this.plugin.getDebugManager().logRaceSystem(
@@ -125,6 +145,45 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                 player.sendMessage("§cError loading track data.");
             }
         });
+    }
+
+    private void captureAndOpenMenu(Player player, PlayerMenuSession session) {
+        PlayerInventory inventory = player.getInventory();
+        session.storedInventory = new StoredInventory(
+            inventory,
+            player.getItemOnCursor()
+        );
+        inventory.clear();
+        inventory.setArmorContents(new ItemStack[4]);
+        inventory.setItemInOffHand(null);
+        player.setItemOnCursor(null);
+        this.openPage(player);
+    }
+
+    private void restoreInventory(Player player, PlayerMenuSession session) {
+        StoredInventory storedInventory = session.storedInventory;
+        if (storedInventory == null) {
+            return;
+        }
+        StoredInventory snapshot = storedInventory;
+        SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            PlayerInventory inventory = player.getInventory();
+            inventory.clear();
+            inventory.setStorageContents(snapshot.storageContents);
+            inventory.setArmorContents(snapshot.armorContents);
+            inventory.setItemInOffHand(snapshot.offHandItem);
+            player.setItemOnCursor(snapshot.cursorItem);
+        });
+    }
+
+    private void discardStoredInventory(UUID uuid) {
+        PlayerMenuSession session = this.sessions.remove(uuid);
+        if (session != null) {
+            session.storedInventory = null;
+        }
     }
 
     private void openPage(Player player) {
@@ -148,8 +207,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         if (session.page >= totalPages) {
             session.page = totalPages - 1;
         }
-        String title =
-            "Time Trial (" + (session.page + 1) + "/" + totalPages + ")";
+        String title = "Tracks";
         Inventory inv = Bukkit.createInventory(
             (InventoryHolder) new TimeTrialMenuHolder(),
             (int) 54,
@@ -266,43 +324,41 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     }
 
     private ItemStack createTrackItem(TrackMenuInfo info, String langCode) {
-        Material mat;
-        try {
-            String icon = info.iconName;
-            if (icon == null || icon.isBlank() || "N/A".equalsIgnoreCase(icon)) {
-                mat = Material.PAPER;
-            } else {
-                mat = Material.valueOf(icon.toUpperCase());
-            }
-        } catch (Exception e) {
-            mat = Material.PAPER;
-        }
-
-        ItemStack item = new ItemStack(mat);
+        ItemStack item = info.iconData.toItemStack();
         ItemMeta meta = item.getItemMeta();
 
         if (meta != null) {
             meta.setDisplayName("§f§l" + info.trackName);
 
-            // FIX: Using List<String> instead of ArrayList<Object>
             List<String> lore = new ArrayList<>();
+            String difficulty = info.difficulty == null || info.difficulty.isBlank()
+                ? "UNKNOWN"
+                : info.difficulty.toUpperCase();
+            if (difficulty.equals("EXTREME")) {
+                difficulty = "INSANE";
+            }
+            lore.add(getDifficultyColor(difficulty) + difficulty + " §7▶ §a" + info.timeCount);
+            lore.add(
+                "§7by §f" + (info.trackData.getOwnerName() == null
+                    ? "Unknown"
+                    : info.trackData.getOwnerName())
+            );
 
-            String owner = info.trackData.getOwnerName();
-            lore.add("§7Owner: §e" + (owner != null ? owner : "Unknown"));
-            lore.add("");
-
-            String pb = (info.playerBestTime == null)
-                ? "§c---"
-                : "§a" + this.formatTime(info.playerBestTime);
-            lore.add("§fMeu Tempo: " + pb);
+            if (!info.tags.isEmpty()) {
+                lore.add("");
+                lore.add(
+                    info.tags.stream()
+                        .map(tag -> "§e" + ChatColor.translateAlternateColorCodes('&', tag))
+                        .collect(Collectors.joining("§7, "))
+                );
+            }
 
             String wr = (info.worldRecordTime == null)
                 ? "§c---"
                 : "§6" + this.formatTime(info.worldRecordTime);
-            lore.add("§fWorld Record: " + wr);
-
+            lore.add("§fRecorde mundial: " + wr);
             lore.add("");
-            lore.add("§eClick to race!");
+            lore.add("§a▶ Click to play!");
 
             // Now the compiler accepts the lore correctly
             meta.setLore(lore);
@@ -310,6 +366,16 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         }
 
         return item;
+    }
+
+    private String getDifficultyColor(String difficulty) {
+        return switch (difficulty) {
+            case "EASY" -> "§a";
+            case "MEDIUM" -> "§e";
+            case "HARD" -> "§c";
+            case "INSANE" -> "§5";
+            default -> "§7";
+        };
     }
 
     private ItemStack createControlItem(
@@ -336,11 +402,16 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         if (e.getInventory().getHolder() instanceof TimeTrialMenuHolder) {
             HumanEntity who = e.getPlayer();
             PlayerMenuSession session = this.sessions.get(who.getUniqueId());
-            // Ignore the close event fired when we reopen to change pages/sort/filter.
             if (session != null && session.refreshing) {
                 return;
             }
+            if (session != null && session.trackSelected) {
+                return;
+            }
             this.sessions.remove(who.getUniqueId());
+            if (session != null && who instanceof Player player) {
+                this.restoreInventory(player, session);
+            }
         }
     }
 
@@ -348,6 +419,12 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     public void onInventoryClick(InventoryClickEvent event) {
         if (
             !(event.getInventory().getHolder() instanceof TimeTrialMenuHolder)
+        ) {
+            return;
+        }
+        if (
+            event.getClickedInventory() == null ||
+            event.getClickedInventory() != event.getView().getTopInventory()
         ) {
             return;
         }
@@ -414,11 +491,12 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             return;
         }
         this.lastClickTime.put(uuid, now);
+        session.trackSelected = true;
         String trackName = ChatColor.stripColor(
             (String) clickedMeta.getDisplayName()
         );
         player.closeInventory();
-        this.startTrackFromMenu(player, trackName);
+        this.startTrackFromMenu(player, trackName, session);
     }
 
     @EventHandler
@@ -428,22 +506,29 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         this.lastClickTime.remove(uuid);
     }
 
-    private void startTrackFromMenu(Player player, String trackName) {
+    private void startTrackFromMenu(
+        Player player,
+        String trackName,
+        PlayerMenuSession session
+    ) {
         UUID uuid = player.getUniqueId();
 
         if (this.plugin.getTimeTrialDuels() != null && this.plugin.getTimeTrialDuels().isPlayerInDuel(uuid)) {
             this.plugin.sendMessage(player, "tt_error_duel_active");
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0F, 1.0F);
+            this.restoreAfterFailedSelection(player, session);
             return;
         }
         if (this.plugin.getQuickRaceManager() != null && this.plugin.getQuickRaceManager().isPlayerInActiveRace(uuid)) {
             this.plugin.sendMessage(player, "tt_error_quickrace");
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0F, 1.0F);
+            this.restoreAfterFailedSelection(player, session);
             return;
         }
         if (this.plugin.getRaceEventManager() != null && this.plugin.getRaceEventManager().getPlayerActiveHeat(uuid).isPresent()) {
             this.plugin.sendMessage(player, "tt_error_event");
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0F, 1.0F);
+            this.restoreAfterFailedSelection(player, session);
             return;
         }
 
@@ -482,6 +567,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                 "{track}",
                 trackName
             );
+            this.restoreAfterFailedSelection(player, session);
             return;
         }
 
@@ -491,6 +577,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         Location loc = this.mysql.getTrackSpawn(trackName);
         if (loc == null) {
             player.sendMessage("\u00a7cSpawn not found.");
+            this.restoreAfterFailedSelection(player, session);
             return;
         }
 
@@ -502,6 +589,9 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         this.timerUtils.stopTimer(player);
         if (this.plugin.getTimeTrialController() != null) {
             this.plugin.getTimeTrialController().endSession(player);
+        }
+        if (this.plugin.getWolfTimingService() != null) {
+            this.plugin.getWolfTimingService().prepareTrack(player, trackName);
         }
 
         this.plugin.setLastTimeTrialTrack(uuid, trackName);
@@ -529,8 +619,48 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             if (Boolean.TRUE.equals(success)) {
                 this.api.spawnBoatAt(player, loc, false, false, false);
                 this.plugin.getHotbarController().giveTimeTrialHotbar(player);
+                this.discardStoredInventory(uuid);
+            } else {
+                this.restoreAfterFailedSelection(player, session);
             }
         });
+    }
+
+    private void restoreAfterFailedSelection(Player player, PlayerMenuSession session) {
+        this.sessions.remove(player.getUniqueId());
+        this.lastClickTime.remove(player.getUniqueId());
+        this.restoreInventory(player, session);
+        session.storedInventory = null;
+    }
+
+    private static final class StoredInventory {
+
+        private final ItemStack[] storageContents;
+        private final ItemStack[] armorContents;
+        private final ItemStack offHandItem;
+        private final ItemStack cursorItem;
+
+        private StoredInventory(
+            PlayerInventory inventory,
+            ItemStack cursorItem
+        ) {
+            this.storageContents = cloneItems(inventory.getStorageContents());
+            this.armorContents = cloneItems(inventory.getArmorContents());
+            this.offHandItem = inventory.getItemInOffHand() == null
+                ? null
+                : inventory.getItemInOffHand().clone();
+            this.cursorItem = cursorItem == null ? null : cursorItem.clone();
+        }
+
+        private static ItemStack[] cloneItems(ItemStack[] items) {
+            ItemStack[] cloned = new ItemStack[items.length];
+            for (int i = 0; i < items.length; i++) {
+                if (items[i] != null) {
+                    cloned[i] = items[i].clone();
+                }
+            }
+            return cloned;
+        }
     }
 
     private String formatTime(double time) {
@@ -549,6 +679,8 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         // Set while we reopen the inventory to switch pages/sort/filter, so the
         // close event from the old inventory doesn't wipe the session.
         volatile boolean refreshing = false;
+        volatile boolean trackSelected = false;
+        StoredInventory storedInventory;
 
         private PlayerMenuSession() {}
     }
@@ -565,10 +697,12 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     private record TrackMenuInfo(
         String trackName,
         DatabaseManager.TrackData trackData,
-        String iconName,
+        DatabaseManager.TrackIconData iconData,
         Double worldRecordTime,
         Double playerBestTime,
-        int playerPos
+        String difficulty,
+        int timeCount,
+        List<String> tags
     ) {}
 
     public static enum SortType {

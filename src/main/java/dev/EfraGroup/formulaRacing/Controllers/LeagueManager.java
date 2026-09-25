@@ -1,12 +1,12 @@
 package dev.EfraGroup.formulaRacing.Controllers;
 
-import dev.EfraGroup.formulaRacing.Database.LeagueDatabaseManager;
 import dev.EfraGroup.formulaRacing.Event.Events;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.League.League;
 import dev.EfraGroup.formulaRacing.League.LeagueCalendarEntry;
 import dev.EfraGroup.formulaRacing.League.LeagueCategory;
 import dev.EfraGroup.formulaRacing.League.LeagueDriver;
+import dev.EfraGroup.formulaRacing.League.LeagueJsonStore;
 import dev.EfraGroup.formulaRacing.League.LeagueStanding;
 import dev.EfraGroup.formulaRacing.League.LeagueTeam;
 import dev.EfraGroup.formulaRacing.League.LeagueTeamStanding;
@@ -22,83 +22,75 @@ import java.util.concurrent.ConcurrentHashMap;
 public class LeagueManager {
 
     private final FormulaRacing plugin;
-    private final LeagueDatabaseManager databaseManager;
+    private final LeagueJsonStore storage;
     private final Map<Integer, League> leaguesById;
     private final Map<String, League> leaguesByName;
     private final Map<UUID, Integer> selectedLeagueByPlayer;
 
     public LeagueManager(FormulaRacing plugin) {
         this.plugin = plugin;
-        this.databaseManager = new LeagueDatabaseManager(plugin.getDatabaseManager(), plugin);
+        this.storage = new LeagueJsonStore(plugin);
         this.leaguesById = new ConcurrentHashMap<>();
         this.leaguesByName = new ConcurrentHashMap<>();
         this.selectedLeagueByPlayer = new ConcurrentHashMap<>();
+        this.loadLeagues();
     }
 
     public void loadLeagues() {
-        leaguesById.clear();
-        leaguesByName.clear();
-        for (League league : databaseManager.loadLeagues()) {
-            leaguesById.put(league.getId(), league);
-            leaguesByName.put(league.getName().toLowerCase(), league);
+        this.leaguesById.clear();
+        this.leaguesByName.clear();
+        for (League league : this.storage.loadLeagues()) {
+            this.leaguesById.put(league.getId(), league);
+            this.leaguesByName.put(league.getName().toLowerCase(), league);
         }
     }
 
     public Collection<League> getAllLeagues() {
-        return leaguesById.values();
+        return this.leaguesById.values();
     }
 
     public Optional<League> getLeagueByName(String name) {
-        if (name == null) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(leaguesByName.get(name.toLowerCase()));
+        return name == null ? Optional.empty() : Optional.ofNullable(this.leaguesByName.get(name.toLowerCase()));
+    }
+
+    public Optional<League> getLeagueByEventId(int eventId) {
+        return this.leaguesById.values().stream()
+            .filter(league -> league.getCalendar().containsKey(eventId))
+            .findFirst();
     }
 
     public Optional<League> getSelectedLeague(UUID playerUUID) {
-        Integer leagueId = selectedLeagueByPlayer.get(playerUUID);
-        return leagueId == null ? Optional.empty() : Optional.ofNullable(leaguesById.get(leagueId));
+        Integer leagueId = this.selectedLeagueByPlayer.get(playerUUID);
+        return leagueId == null ? Optional.empty() : Optional.ofNullable(this.leaguesById.get(leagueId));
     }
 
     public void selectLeague(UUID playerUUID, League league) {
-        selectedLeagueByPlayer.put(playerUUID, league.getId());
+        this.selectedLeagueByPlayer.put(playerUUID, league.getId());
     }
 
     public void deselectPlayer(UUID playerUUID) {
-        selectedLeagueByPlayer.remove(playerUUID);
+        this.selectedLeagueByPlayer.remove(playerUUID);
     }
 
     public League createLeague(UUID creatorUUID, String name) throws SQLException {
-        League league = databaseManager.createLeague(creatorUUID, name);
+        League league = this.storage.createLeague(creatorUUID, name);
         if (league != null) {
-            leaguesById.put(league.getId(), league);
-            leaguesByName.put(league.getName().toLowerCase(), league);
+            this.leaguesById.put(league.getId(), league);
+            this.leaguesByName.put(league.getName().toLowerCase(), league);
         }
         return league;
     }
 
     public LeagueTeam addTeam(League league, String teamName) throws SQLException {
-        LeagueTeam team = databaseManager.addTeam(league.getId(), teamName);
-        if (team != null) {
-            league.getTeams().put(team.getId(), team);
-        }
-        return team;
+        return this.storage.addTeam(league, teamName);
     }
 
-    public LeagueDriver addDriver(League league, UUID playerUUID, String teamName)
-        throws SQLException {
-        Integer teamId = null;
-        if (teamName != null && !teamName.isBlank()) {
-            teamId = findTeamId(league, teamName);
-            if (teamId == null) {
-                return null;
-            }
+    public LeagueDriver addDriver(League league, UUID playerUUID, String teamName) throws SQLException {
+        Integer teamId = teamName == null || teamName.isBlank() ? null : this.findTeamId(league, teamName);
+        if (teamName != null && !teamName.isBlank() && teamId == null) {
+            return null;
         }
-        LeagueDriver driver = databaseManager.addDriver(league.getId(), playerUUID, teamId);
-        if (driver != null) {
-            league.getDrivers().put(playerUUID, driver);
-        }
-        return driver;
+        return this.storage.addDriver(league, playerUUID, teamId);
     }
 
     public Integer findTeamId(League league, String teamName) {
@@ -112,124 +104,122 @@ public class LeagueManager {
 
     public boolean linkEvent(League league, Events event, int roundNumber) {
         try {
-            databaseManager.linkEvent(league.getId(), event.getId(), roundNumber);
-            plugin.getRaceEventManager().getDatabaseManager().updateEventLeague(
-                event.getId(),
-                league.getName()
-            );
-            event.setLeague(league.getName());
+            this.storage.linkEvent(league, event.getId(), roundNumber);
             return true;
-        } catch (SQLException e) {
-            plugin.getDebugManager().logDatabaseOperation(
-                "[League] Error linking event to league: " + e.getMessage()
+        } catch (SQLException exception) {
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[League] Erro ao vincular evento: " + exception.getMessage()
             );
             return false;
         }
     }
 
-    public void onEventFinished(Events event, List<Driver> results) {
-        if (event == null || event.getLeague() == null || event.getLeague().isBlank()) {
-            return;
+    public void unlinkEvent(League league, int eventId) {
+        try {
+            this.storage.unlinkEvent(league, eventId);
+        } catch (SQLException exception) {
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[League] Erro ao desvincular evento: " + exception.getMessage()
+            );
         }
+    }
 
-        League league = leaguesByName.get(event.getLeague().toLowerCase());
+    public void deleteLeague(League league) {
+        try {
+            this.storage.deleteLeague(league);
+            this.leaguesById.remove(league.getId());
+            this.leaguesByName.remove(league.getName().toLowerCase());
+            this.selectedLeagueByPlayer.entrySet().removeIf(entry -> entry.getValue() == league.getId());
+        } catch (SQLException exception) {
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[League] Erro ao excluir liga: " + exception.getMessage()
+            );
+        }
+    }
+
+    public void onEventFinished(Events event, List<Driver> results) {
+        League league = this.getLeagueByEventId(event.getId()).orElse(null);
         if (league == null) {
             return;
         }
-
-        if (!databaseManager.isEventLinkedToLeague(league.getId(), event.getId())) {
-            return;
-        }
-
-        String categoryName = resolveEventCategory(league, event.getId());
-        Integer pinnedHeatId = resolvePinnedHeat(league, event.getId());
-
-        boolean applied = databaseManager.storeEventResults(
-            league, event.getId(), results, categoryName, pinnedHeatId);
-        if (applied) {
-            plugin.getDebugManager().logRaceSystem(
-                "[League] Standings atualizadas para a liga " + league.getName()
+        String categoryName = this.resolveEventCategory(league, event.getId());
+        Integer pinnedHeatId = this.resolvePinnedHeat(league, event.getId());
+        try {
+            if (this.storage.storeEventResults(league, event.getId(), results, categoryName, pinnedHeatId)) {
+                this.plugin.getDebugManager().logRaceSystem(
+                    "[League] Standings atualizadas para a liga " + league.getName()
+                );
+            }
+        } catch (SQLException exception) {
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[League] Erro ao armazenar resultados: " + exception.getMessage()
             );
         }
     }
 
     private String resolveEventCategory(League league, int eventId) {
-        for (LeagueCalendarEntry entry : league.getCalendar().values()) {
-            if (entry.getEventId() == eventId && entry.hasCategory()) {
-                return entry.getCategoryName();
-            }
-        }
-        return null;
+        LeagueCalendarEntry entry = league.getCalendar().get(eventId);
+        return entry != null && entry.hasCategory() ? entry.getCategoryName() : null;
     }
 
     private Integer resolvePinnedHeat(League league, int eventId) {
-        for (LeagueCalendarEntry entry : league.getCalendar().values()) {
-            if (entry.getEventId() == eventId && entry.hasPinnedHeat()) {
-                return entry.getPinnedHeatId();
-            }
-        }
-        return null;
+        LeagueCalendarEntry entry = league.getCalendar().get(eventId);
+        return entry != null && entry.hasPinnedHeat() ? entry.getPinnedHeatId() : null;
     }
 
     public List<LeagueStanding> getDriverStandings(League league) {
-        return databaseManager.loadDriverStandings(league.getId());
+        return this.storage.loadDriverStandings(league.getId());
     }
 
     public List<LeagueTeamStanding> getTeamStandings(League league) {
-        return databaseManager.loadTeamStandings(league.getId());
+        return this.storage.loadTeamStandings(league.getId());
     }
 
     public void adjustPoints(League league, UUID playerUUID, int delta) {
         try {
-            databaseManager.adjustDriverPoints(league.getId(), playerUUID, delta, "ADMIN");
-        } catch (SQLException e) {
-            plugin.getDebugManager().logDatabaseOperation(
-                "[League] Erro ao ajustar pontos: " + e.getMessage()
+            this.storage.adjustDriverPoints(league, playerUUID, delta, "ADMIN");
+        } catch (SQLException exception) {
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[League] Erro ao ajustar pontos: " + exception.getMessage()
             );
         }
     }
 
     public void transferPoints(League league, UUID fromUUID, UUID toUUID, int amount) {
         try {
-            databaseManager.transferDriverPoints(league.getId(), fromUUID, toUUID, amount);
-        } catch (SQLException e) {
-            plugin.getDebugManager().logDatabaseOperation(
-                "[League] Erro ao transferir pontos: " + e.getMessage()
+            this.storage.transferDriverPoints(league, fromUUID, toUUID, amount);
+        } catch (SQLException exception) {
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[League] Erro ao transferir pontos: " + exception.getMessage()
             );
         }
     }
 
     public void saveLeagueConfig(League league) throws SQLException {
-        databaseManager.saveLeagueConfig(league);
+        this.storage.saveLeagueConfig(league);
     }
 
     public LeagueCategory addCategory(League league, String name) throws SQLException {
-        LeagueCategory cat = new LeagueCategory(name);
-        databaseManager.saveCategory(league, cat);
-        league.getCategories().put(cat.getName().toLowerCase(), cat);
-        return cat;
+        LeagueCategory category = new LeagueCategory(name);
+        this.storage.saveCategory(league, category);
+        return category;
     }
 
     public void removeCategory(League league, String name) throws SQLException {
-        databaseManager.removeCategory(league, name);
-        league.getCategories().remove(name.toLowerCase());
+        this.storage.removeCategory(league, name);
     }
 
     public void setEventMeta(League league, int eventId, String categoryName, Integer pinnedHeatId)
         throws SQLException {
-        databaseManager.setEventMeta(league.getId(), eventId, categoryName, pinnedHeatId);
-        LeagueCalendarEntry entry = league.getCalendar()
-            .computeIfAbsent(eventId, LeagueCalendarEntry::new);
-        if (categoryName != null) entry.setCategoryName(categoryName);
-        if (pinnedHeatId != null) entry.setPinnedHeatId(pinnedHeatId);
+        this.storage.setEventMeta(league, eventId, categoryName, pinnedHeatId);
     }
 
     public void recalculate(League league) {
         try {
-            databaseManager.recalculateStandings(league);
-        } catch (SQLException e) {
-            plugin.getDebugManager().logDatabaseOperation(
-                "[League] Erro ao recalcular standings: " + e.getMessage()
+            this.storage.recalculateStandings(league);
+        } catch (SQLException exception) {
+            this.plugin.getDebugManager().logDatabaseOperation(
+                "[League] Erro ao recalcular standings: " + exception.getMessage()
             );
         }
     }
