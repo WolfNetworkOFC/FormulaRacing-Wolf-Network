@@ -624,6 +624,21 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             }
         }
 
+        if (!this.mysql.checkPlayerMcVersion(player, trackName)) {
+            this.plugin.sendMessage(
+                player,
+                "mc_version_warning",
+                "{track}",
+                trackName,
+                "{current}",
+                MinecraftVersion.getName(player.getProtocolVersion()),
+                "{required}",
+                String.valueOf(this.mysql.getTrackMinVersion(trackName))
+            );
+            this.restoreAfterFailedSelection(player, session);
+            return;
+        }
+
         if (
             this.mysql.trackHaveBoatUtils(trackName) &&
             !FormulaRacing.hasOpenBoatUtilsMod(player)

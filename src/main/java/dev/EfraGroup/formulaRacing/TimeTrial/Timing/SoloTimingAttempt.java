@@ -86,6 +86,29 @@ public final class SoloTimingAttempt {
         return true;
     }
 
+    /**
+     * Re-bases a tentativa no início de um novo timer quando ela ficou presa em RUNNING de uma
+     * corrida anterior (o caminho de reset nãoabortou a tentativa).
+     *
+     * <p>Só avança quando o novo start é estritamente mais recente, então nunca mexe numa
+     * tentativa sã: se o {@code startNanos} recebido for anterior ou igual ao já gravado
+     * (mesma corrida, ou um pacote fora de ordem), a tentativa é mantida intacta.</p>
+     *
+     * <p>Os dados do cliente (sequence, start/finish de rede) são descartados junto: eles
+     * descrevem a corrida velha e reaproveitá-los contaminaria a resolução.</p>
+     */
+    public synchronized boolean tryRestart(long startNanos) {
+        if (this.state != State.RUNNING || startNanos <= 0L || startNanos <= this.startNanos) {
+            return false;
+        }
+        this.startNanos = startNanos;
+        this.lastSequence = -1L;
+        this.clientStartNanos = null;
+        this.clientFinishNanos = null;
+        this.finishNanos = 0L;
+        return true;
+    }
+
     public synchronized boolean acceptClientStart(long sequence, long startNanos) {
         if (
             (this.state != State.ARMED && this.state != State.RUNNING)

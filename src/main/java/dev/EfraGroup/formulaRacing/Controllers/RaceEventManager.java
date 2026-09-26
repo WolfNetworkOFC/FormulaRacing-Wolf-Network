@@ -12,6 +12,7 @@ import dev.EfraGroup.formulaRacing.Round.EliminationRound;
 import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.MinecraftVersion;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import java.util.Collection;
 import java.util.List;
@@ -747,6 +748,16 @@ public class RaceEventManager {
         }
     }
 
+    /**
+     * Finds the heat the player is genuinely taking part in, i.e. a heat that is still in use.
+     *
+     * <p>A signup alone must never count: {@link Heats#isPlayerInActiveHeat} also returns true
+     * for any heat of an event the player is merely subscribed/reserved in, and those signups are
+     * persisted across restarts. Without the {@link HeatState#isInUse()} guard, every player with
+     * a leftover signup in a set-up event was reported as racing right after the server booted,
+     * which wrongly blocked TimeTrial, duels and quick races until they logged out (the quit
+     * handler is what finally removes the signup).</p>
+     */
     public Optional<Heats> getPlayerActiveHeat(UUID playerUUID) {
         Optional<Events> eventOpt = this.getPlayerEvent(playerUUID);
         if (eventOpt.isPresent()) {
@@ -755,7 +766,7 @@ public class RaceEventManager {
             if (event.isSubscriber(playerUUID) || event.isReserve(playerUUID)) {
                 for (Rounds round : event.getEventSchedule().getRounds().values()) {
                     for (Heats heat : round.getHeats().values()) {
-                        if (heat.isPlayerInActiveHeat(playerUUID)) {
+                        if (heat.getHeatState().isInUse() && heat.isPlayerInActiveHeat(playerUUID)) {
                             return Optional.of(heat);
                         }
                     }
@@ -767,7 +778,7 @@ public class RaceEventManager {
             if (e.isSubscriber(playerUUID) || e.isReserve(playerUUID)) {
                 for (Rounds round : e.getEventSchedule().getRounds().values()) {
                     for (Heats heat : round.getHeats().values()) {
-                        if (heat.isPlayerInActiveHeat(playerUUID)) {
+                        if (heat.getHeatState().isInUse() && heat.isPlayerInActiveHeat(playerUUID)) {
                             this.playerActiveEvent.put(playerUUID, e);
                             return Optional.of(heat);
                         }
@@ -785,6 +796,11 @@ public class RaceEventManager {
             return false;
         } else {
             Player player = Bukkit.getPlayer(playerUUID);
+            if (player != null && !this.plugin.getDatabaseManager().checkPlayerMcVersion(player, event.getTrackNameWS())) {
+                this.plugin.sendMessage(player, "mc_version_warning", new String[]{"{track}", event.getTrackNameWS(), "{current}", MinecraftVersion.getName(player.getProtocolVersion()), "{required}", String.valueOf(this.plugin.getDatabaseManager().getTrackMinVersion(event.getTrackNameWS()))});
+                return false;
+            }
+
             if (player != null && this.plugin.getDatabaseManager().trackHaveBoatUtils(event.getTrackNameWS()) && !FormulaRacing.hasOpenBoatUtilsMod(player)) {
                 this.plugin.sendMessage(player, "obu_mandatory_warning", new String[]{"{track}", event.getTrackNameWS()});
                 return false;

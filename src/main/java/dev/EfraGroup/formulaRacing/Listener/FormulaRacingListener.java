@@ -213,6 +213,9 @@ public class FormulaRacingListener implements Listener {
                             if (this.plugin.getTimeTrialController() != null) {
                                 this.plugin.getTimeTrialController().endSession(player);
                             }
+                            if (this.plugin.getWolfTimingService() != null) {
+                                this.plugin.getWolfTimingService().abort(player.getUniqueId(), true);
+                            }
                             if (this.plugin.getGhostManager() != null) {
                                 this.plugin.getGhostManager().cleanupPlayer(player);
                             }
@@ -238,6 +241,9 @@ public class FormulaRacingListener implements Listener {
                     this.timerUtils.stopTimer(player);
                     if (this.plugin.getTimeTrialController() != null) {
                         this.plugin.getTimeTrialController().endSession(player);
+                    }
+                    if (this.plugin.getWolfTimingService() != null) {
+                        this.plugin.getWolfTimingService().abort(player.getUniqueId(), true);
                     }
                     if (this.plugin.getGhostManager() != null) {
                         this.plugin.getGhostManager().cleanupPlayer(player);

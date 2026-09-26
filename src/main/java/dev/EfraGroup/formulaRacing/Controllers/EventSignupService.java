@@ -4,6 +4,7 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Event.EventState;
 import dev.EfraGroup.formulaRacing.Event.Events;
 import dev.EfraGroup.formulaRacing.BoatUtils.OpenBoatUtilsVersion;
+import dev.EfraGroup.formulaRacing.Utils.MinecraftVersion;
 import java.util.UUID;
 import org.bukkit.entity.Player;
 
@@ -32,6 +33,11 @@ public class EventSignupService {
                 this.plugin.sendMessage(player, "obu_version_warning", new String[]{"{track}", event.getTrackNameWS(), "{required}", String.valueOf(minVersion), "{current}", String.valueOf(OpenBoatUtilsVersion.getPlayerVersion(playerUUID))});
                 return SignupResult.obuVersionMismatch();
             }
+        }
+
+        if (!this.plugin.getDatabaseManager().checkPlayerMcVersion(player, event.getTrackNameWS())) {
+            this.plugin.sendMessage(player, "mc_version_warning", new String[]{"{track}", event.getTrackNameWS(), "{current}", MinecraftVersion.getName(player.getProtocolVersion()), "{required}", String.valueOf(this.plugin.getDatabaseManager().getTrackMinVersion(event.getTrackNameWS()))});
+            return SignupResult.mcVersionMismatch();
         }
 
         if (event.isSubscriber(playerUUID)) {
@@ -73,7 +79,8 @@ public class EventSignupService {
         SIGNED,
         ERROR,
         OBU_REQUIRED,
-        OBU_VERSION_MISMATCH
+        OBU_VERSION_MISMATCH,
+        MC_VERSION_MISMATCH
     }
 
     public static final class SignupResult {
@@ -119,6 +126,10 @@ public class EventSignupService {
 
         public static SignupResult obuVersionMismatch() {
             return new SignupResult(Status.OBU_VERSION_MISMATCH, false);
+        }
+
+        public static SignupResult mcVersionMismatch() {
+            return new SignupResult(Status.MC_VERSION_MISMATCH, false);
         }
 
         public Status getStatus() {

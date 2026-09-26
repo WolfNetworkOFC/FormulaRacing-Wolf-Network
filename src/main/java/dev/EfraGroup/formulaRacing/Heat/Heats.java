@@ -1453,6 +1453,9 @@ public class Heats {
     public void stopTimeTrialTimer(Player player) {
         if (this.plugin.getTimerUtils() != null) {
             this.plugin.getTimerUtils().stopTimer(player);
+            if (this.plugin.getWolfTimingService() != null) {
+                this.plugin.getWolfTimingService().abort(player.getUniqueId(), true);
+            }
             this.plugin.getDebugManager().logRaceSystem(
                 "[RACE DEBUG] Time Trial timer stopped for " +
                     player.getName()

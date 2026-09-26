@@ -11,6 +11,7 @@ import dev.EfraGroup.formulaRacing.Round.RoundState;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.MinecraftVersion;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.BoatUtils.OpenBoatUtilsVersion;
 import java.time.Instant;
@@ -174,6 +175,7 @@ public class DailyRaceManager {
                 this.plugin.sendMessage(player, "event_none_selected", new String[0]);
                 return;
             case OBU_REQUIRED:
+            case MC_VERSION_MISMATCH:
                 return;
             case ERROR:
             default:
@@ -192,6 +194,11 @@ public class DailyRaceManager {
             if (loc == null) {
                 player.sendMessage(String.valueOf(ChatColor.RED) + "Track spawn location not found.");
             } else {
+                if (!this.plugin.getDatabaseManager().checkPlayerMcVersion(player, trackName)) {
+                    this.plugin.sendMessage(player, "mc_version_warning", new String[]{"{track}", trackName, "{current}", MinecraftVersion.getName(player.getProtocolVersion()), "{required}", String.valueOf(this.plugin.getDatabaseManager().getTrackMinVersion(trackName))});
+                    return;
+                }
+
                 if (this.plugin.getDatabaseManager().trackHaveBoatUtils(trackName)) {
                     if (!FormulaRacing.hasOpenBoatUtilsMod(player)) {
                         this.plugin.sendMessage(player, "obu_mandatory_warning", new String[]{"{track}", trackName});
@@ -475,6 +482,9 @@ public class DailyRaceManager {
         if (this.phase == DailyRaceManager.Phase.PRACTICE) {
             this.plugin.getDatabaseManager().setTimeTrialEnabled(player.getUniqueId(), false);
             this.plugin.getTimerUtils().stopTimer(player);
+            if (this.plugin.getWolfTimingService() != null) {
+                this.plugin.getWolfTimingService().abort(player.getUniqueId(), true);
+            }
             this.plugin.getScoreboardTimeTrialUtils().clearPlayerTrack(player);
             if (this.plugin.getPitStopManager() != null) {
                 this.plugin.getPitStopManager().clearPitStopState(player.getUniqueId());
@@ -666,14 +676,20 @@ public class DailyRaceManager {
     private String getOBUWarning(Player player, String track) {
         if (track == null) {
             return null;
-        } else if (this.plugin.getDatabaseManager().trackHaveBoatUtils(track)) {
+        }
+
+        String lang = this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
+
+        if (!this.plugin.getDatabaseManager().checkPlayerMcVersion(player, track)) {
+            return this.plugin.getTranslation("mc_version_warning", lang, new String[]{"{track}", track, "{current}", MinecraftVersion.getName(player.getProtocolVersion()), "{required}", String.valueOf(this.plugin.getDatabaseManager().getTrackMinVersion(track))});
+        }
+
+        if (this.plugin.getDatabaseManager().trackHaveBoatUtils(track)) {
             if (!FormulaRacing.hasOpenBoatUtilsMod(player)) {
-                String lang = this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
                 return this.plugin.getTranslation("obu_mandatory_warning", lang, new String[]{"{track}", track});
             }
             int minVersion = this.plugin.getDatabaseManager().getTrackMinObuVersion(track);
             if (!OpenBoatUtilsVersion.hasMinVersion(player.getUniqueId(), minVersion)) {
-                String lang = this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
                 return this.plugin.getTranslation("obu_version_warning", lang, new String[]{"{track}", track, "{required}", String.valueOf(minVersion), "{current}", String.valueOf(OpenBoatUtilsVersion.getPlayerVersion(player.getUniqueId()))});
             }
         }

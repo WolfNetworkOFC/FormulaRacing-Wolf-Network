@@ -132,6 +132,11 @@ public final class WolfTimingService {
         }
         if (attempt.getState() == SoloTimingAttempt.State.ARMED) {
             attempt.tryStart(startNanos);
+        } else if (attempt.getState() == SoloTimingAttempt.State.RUNNING) {
+            // A fresh timer started while the previous attempt was still marked RUNNING: its
+            // startNanos belongs to the abandoned run, and trusting it would add the dead time
+            // to the next official result. Re-base on the new start instead.
+            attempt.tryRestart(startNanos);
         }
         return attempt.getState() == SoloTimingAttempt.State.RUNNING ? attempt : null;
     }
@@ -147,9 +152,15 @@ public final class WolfTimingService {
             );
         }
         SoloTimingAttempt attempt = this.getAttempt(player.getUniqueId());
-        long effectiveStart = attempt != null && attempt.getStartNanos() > 0L
-            ? attempt.getStartNanos()
-            : startNanos;
+        // The start handed in by the caller is authoritative: it comes from the live
+        // PlayerTimerData of this run. Only fall back to the attempt when the caller has none,
+        // never the other way round — an attempt left over from an abandoned run must not
+        // extend the measured window backwards.
+        long effectiveStart = startNanos > 0L
+            ? startNanos
+            : (attempt != null && attempt.getStartNanos() > 0L
+                ? attempt.getStartNanos()
+                : finishNanos);
         long observedMillis = Math.max(0L, finishNanos - effectiveStart) / 1_000_000L;
         if (attempt == null || attempt.getState() != SoloTimingAttempt.State.RUNNING) {
             return CompletableFuture.completedFuture(

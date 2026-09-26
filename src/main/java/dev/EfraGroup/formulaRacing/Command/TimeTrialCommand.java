@@ -8,6 +8,7 @@
     import dev.EfraGroup.formulaRacing.APIFormulaRacing;
     import dev.EfraGroup.formulaRacing.Command.Help.CommandHelpService;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.MinecraftVersion;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TimeTrialTeleportMessage;
 import dev.EfraGroup.formulaRacing.PacketSender;
@@ -133,6 +134,11 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                         );
                     }
                 }
+            }
+
+            if (!this.mysql.checkPlayerMcVersion(player, trackName)) {
+                this.plugin.sendMessage(player, "mc_version_warning", new String[]{"{track}", trackName, "{current}", MinecraftVersion.getName(player.getProtocolVersion()), "{required}", String.valueOf(this.mysql.getTrackMinVersion(trackName))});
+                return;
             }
 
             if (this.mysql.trackHaveBoatUtils(trackName) && !FormulaRacing.hasOpenBoatUtilsMod(player)) {
@@ -286,6 +292,7 @@ import dev.EfraGroup.formulaRacing.PacketSender;
             final UUID uuid = player.getUniqueId();
             final String playerName = player.getName();
             final boolean hasBoatUtils = FormulaRacing.hasOpenBoatUtilsMod(player);
+            final int clientProtocol = player.getProtocolVersion();
             final String currentTrackWS = normalizeTrackName(this.plugin.getLastTimeTrialTrack(uuid));
 
             // 2. Building the pool and picking the track reads the database, so it runs off
@@ -314,7 +321,7 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                 while (trackName == null && !validTracks.isEmpty()) {
                     int index = this.random.nextInt(validTracks.size());
                     String candidate = validTracks.get(index);
-                    if (hasBoatUtils || !this.mysql.trackHaveBoatUtils(candidate)) {
+                    if (this.mysql.checkMcVersion(clientProtocol, candidate) && (hasBoatUtils || !this.mysql.trackHaveBoatUtils(candidate))) {
                         trackName = candidate;
                     } else {
                         validTracks.remove(index);
@@ -476,6 +483,9 @@ import dev.EfraGroup.formulaRacing.PacketSender;
 
                                 this.timerUtils.stopTimer(player);
                                 this.timeTrialController.endSession(player);
+                                if (this.plugin.getWolfTimingService() != null) {
+                                    this.plugin.getWolfTimingService().abort(player.getUniqueId(), true);
+                                }
                             } else {
                                 this.timerUtils.stopTimer(player, trackName);
                                 this.timeTrialController.endSession(player);

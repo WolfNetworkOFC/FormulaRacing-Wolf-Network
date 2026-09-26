@@ -575,25 +575,27 @@ public class RegionListener implements Listener {
                             if (activeTrackKey != null) {
                                 regionTrackWS = activeTrackKey;
                                 targetLoc = this.plugin.getTrackIntegrationManager().getTrackSpawn(regionTrackWS);
-                                if (targetLoc != null) {
-                                    // Parar o timer IMEDIATAMENTE no momento do reset (mesmo
-                                    // comportamento do /reset), em vez de só quando cruzar a
-                                    // linha START/END novamente.
-                                    this.timerUtils.stopTimer(player);
-                                    this.timeTrialController.endSession(player);
-                                    if (this.timingService != null) {
-                                        this.timingService.abort(uuid, true);
-                                    }
-                                    // Cancelar a gravação de ghost para não acumular frames
-                                    // da volta abortada (memory leak no buffer de gravação).
-                                    if (this.plugin.getGhostManager() != null) {
-                                        this.plugin.getGhostManager().cancelRecording(player);
-                                        // Esconder as linhas de PB/medalha — só reaparecem
-                                        // ao cruzar START/END de novo (startSoloTimer).
-                                        this.plugin.getGhostManager().stopReplay(player);
-                                    }
-                                    this.plugin.getDebugManager().logTimeTrialSystem("[RESET-SOLO] " + player.getName() + " -> Track Spawn (full reset)");
+                                // Parar o timer IMEDIATAMENTE no momento do reset (mesmo
+                                // comportamento do /reset), em vez de só quando cruzar a
+                                // linha START/END novamente. Fora do getTrackSpawn: sem
+                                // alvo de teleporte o reset continua sendo um reset, e a
+                                // tentativa de tempo abandonada precisa ser abortada assim
+                                // mesmo, senão o startNanos dela sobrevive e vaza para o
+                                // próximo tempo oficial.
+                                this.timerUtils.stopTimer(player);
+                                this.timeTrialController.endSession(player);
+                                if (this.timingService != null) {
+                                    this.timingService.abort(uuid, true);
                                 }
+                                // Cancelar a gravação de ghost para não acumular frames
+                                // da volta abortada (memory leak no buffer de gravação).
+                                if (this.plugin.getGhostManager() != null) {
+                                    this.plugin.getGhostManager().cancelRecording(player);
+                                    // Esconder as linhas de PB/medalha — só reaparecem
+                                    // ao cruzar START/END de novo (startSoloTimer).
+                                    this.plugin.getGhostManager().stopReplay(player);
+                                }
+                                this.plugin.getDebugManager().logTimeTrialSystem("[RESET-SOLO] " + player.getName() + " -> Track Spawn (full reset)");
                             }
                         }
 

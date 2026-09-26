@@ -24,6 +24,11 @@ track_not_found: "&cTrack not found with that name."
 track_is_closed: "&cThis track is closed and cannot be used at the moment!"
 obu_mandatory_warning: "&c&l⚠ WARNING: &7The track &f{track} &7requires the &bOpenBoatUtils &7mod for full racing conditions. Without it, you may get stuck on elevations!"
 obu_version_warning: "&c&l⚠ VERSION MISMATCH: &7Your OpenBoatUtils version (&f{current}&7) is outdated for track &f{track}&7. Minimum required: &f{required}&7. Please update your mod!"
+mc_version_warning: "&c&l⚠ VERSION MISMATCH: &7Your Minecraft version (&f{current}&7) is too old for track &f{track}&7. Minimum required: &f{required}&7. Please update your client!"
+
+te_minversion_invalid: "&cUnknown Minecraft version '&f{version}&c'. Use one of: &f{valid}&c."
+te_minversion_set: "&a✅ Minimum Minecraft version &f{version} &aset for track &f{track}&a."
+te_minversion_cleared: "&a✅ Minimum version cleared for track &f{track}&a."
 partial_time_saved: "&aPartial time from previous track &e{track} &awas saved: &e{time}"
 timetrial_cancelled: "&cTime trial cancelled."
 

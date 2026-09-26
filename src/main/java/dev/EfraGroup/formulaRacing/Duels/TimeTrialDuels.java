@@ -4,6 +4,7 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.PacketSender;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.MinecraftVersion;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.ScoreboardDuelsTimeUtils;
 import dev.EfraGroup.formulaRacing.Utils.TimeTrialDuelsAction;
@@ -94,6 +95,15 @@ public class TimeTrialDuels implements Listener {
             p1.sendMessage(this.plugin.getDirectTranslation("duel_error_spawn", lang1));
             p2.sendMessage(this.plugin.getDirectTranslation("duel_error_spawn", lang2));
         } else {
+            if (!this.dm.checkPlayerMcVersion(p1, trackName)) {
+                this.plugin.sendMessage(p1, "mc_version_warning", new String[]{"{track}", trackName, "{current}", MinecraftVersion.getName(p1.getProtocolVersion()), "{required}", String.valueOf(this.dm.getTrackMinVersion(trackName))});
+                return;
+            }
+            if (!this.dm.checkPlayerMcVersion(p2, trackName)) {
+                this.plugin.sendMessage(p2, "mc_version_warning", new String[]{"{track}", trackName, "{current}", MinecraftVersion.getName(p2.getProtocolVersion()), "{required}", String.valueOf(this.dm.getTrackMinVersion(trackName))});
+                return;
+            }
+
             if (this.dm.trackHaveBoatUtils(trackName)) {
                 if (!FormulaRacing.hasOpenBoatUtilsMod(p1)) {
                     this.plugin.sendMessage(p1, "obu_mandatory_warning", new String[]{"{track}", trackName});
@@ -1089,6 +1099,9 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
         if (player != null && player.isOnline()) {
             UUID uuid = player.getUniqueId();
             this.plugin.getTimerUtils().stopTimer(player);
+            if (this.plugin.getWolfTimingService() != null) {
+                this.plugin.getWolfTimingService().abort(uuid, true);
+            }
             this.dm.setTimeTrialEnabled(uuid, false);
             SchedulerHelper.runTask(this.plugin, () -> {
                 if (player.isOnline()) {

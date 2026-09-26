@@ -412,6 +412,7 @@ public class EventCommand extends BaseCommand {
                 );
                 return;
             case OBU_REQUIRED:
+            case MC_VERSION_MISMATCH:
                 return;
             case ERROR:
                 this.plugin.sendMessage(

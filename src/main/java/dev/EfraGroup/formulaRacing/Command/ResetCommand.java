@@ -127,6 +127,12 @@ public class ResetCommand implements CommandExecutor {
         // Reset timer
         // =========================
         timerUtils.stopTimer(player, lastTrack);
+        if (this.plugin.getTimeTrialController() != null) {
+            this.plugin.getTimeTrialController().endSession(player);
+        }
+        if (this.plugin.getWolfTimingService() != null) {
+            this.plugin.getWolfTimingService().abort(player.getUniqueId(), true);
+        }
 
         // =========================
         // Teleport and create boat

@@ -4,6 +4,7 @@ import dev.EfraGroup.formulaRacing.FileManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.GimmickConfig;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
+import dev.EfraGroup.formulaRacing.Utils.MinecraftVersion;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
 import dev.EfraGroup.formulaRacing.TimeTrial.Timing.OfficialTime;
@@ -10701,5 +10702,13 @@ public class DatabaseManager {
         int playerVersion = FormulaRacing.getInstance().getOpenBoatUtilsVersion(playerUUID);
         int minVersion = getTrackMinObuVersion(trackNameWS);
         return playerVersion >= minVersion;
+    }
+
+    public synchronized boolean checkPlayerMcVersion(Player player, String trackNameWS) {
+        return checkMcVersion(player.getProtocolVersion(), trackNameWS);
+    }
+
+    public synchronized boolean checkMcVersion(int currentProtocol, String trackNameWS) {
+        return MinecraftVersion.meetsMinimum(currentProtocol, getTrackMinVersion(trackNameWS));
     }
 }

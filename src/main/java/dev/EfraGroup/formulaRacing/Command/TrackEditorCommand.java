@@ -5,6 +5,7 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.PacketSender;
 import dev.EfraGroup.formulaRacing.TrackLeaderboard;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Utils.MinecraftVersion;
 import dev.EfraGroup.formulaRacing.Database.GridPosition;
 import dev.EfraGroup.formulaRacing.Gui.PitStopEditorGui;
 import dev.EfraGroup.formulaRacing.Heat.PitStopManager;
@@ -544,8 +545,8 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("minversion")
-    @Description("Sets the minimum compatible version of a track")
-    @CommandCompletion("clear|reset @nothing @tracks")
+    @Description("Sets the minimum Minecraft version required to race on a track")
+    @CommandCompletion("@mc_versions @nothing @tracks")
     public void onTrackMinVersion(Player player, String version, @Optional String trackNameArg) {
         String trackName = this.getExistingTargetTrack(player, trackNameArg);
         if (trackName == null) {
@@ -560,15 +561,27 @@ public class TrackEditorCommand extends BaseCommand {
 
         if (minVersion.equalsIgnoreCase("clear") || minVersion.equalsIgnoreCase("reset")) {
             if (this.mysql.setTrackMinVersion(trackName, null)) {
-                player.sendMessage("§aMinimum version cleared for track '" + trackName + "'.");
+                this.plugin.sendMessage(player, "te_minversion_cleared", "{track}", trackName);
             } else {
                 player.sendMessage("§cCould not clear the minimum version for track '" + trackName + "'.");
             }
             return;
         }
 
+        if (!MinecraftVersion.isKnownVersion(minVersion)) {
+            this.plugin.sendMessage(
+                player,
+                "te_minversion_invalid",
+                "{version}",
+                minVersion,
+                "{valid}",
+                String.join(", ", MinecraftVersion.knownVersionNames())
+            );
+            return;
+        }
+
         if (this.mysql.setTrackMinVersion(trackName, minVersion)) {
-            player.sendMessage("§aMinimum version '" + minVersion + "' set for track '" + trackName + "'.");
+            this.plugin.sendMessage(player, "te_minversion_set", "{version}", minVersion, "{track}", trackName);
         } else {
             player.sendMessage("§cCould not set the minimum version for track '" + trackName + "'.");
         }

@@ -60,6 +60,7 @@ import org.bstats.charts.SingleLineChart;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
 import dev.EfraGroup.formulaRacing.Utils.RaceActionBarManager;
 import dev.EfraGroup.formulaRacing.Utils.LightningRodListener;
+import dev.EfraGroup.formulaRacing.Utils.MinecraftVersion;
 import dev.EfraGroup.formulaRacing.Utils.MojangApiClient;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardService;
@@ -1891,6 +1892,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 Arrays.stream(BoatUtilsGroupMode.values())
                     .map(Enum::name)
                     .toList()
+        );
+        this.commandManager.getCommandCompletions().registerCompletion(
+            "mc_versions",
+            c -> MinecraftVersion.knownVersionNames()
         );
         this.commandManager.getCommandCompletions().registerCompletion(
             "materials",
