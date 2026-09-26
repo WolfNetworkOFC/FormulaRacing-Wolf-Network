@@ -21,6 +21,7 @@ public class SettingsMenu extends BaseGui {
         super(plugin.getTranslation("gui_title_settings", plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId()), new String[0]), 4);
         this.plugin = plugin;
         this.dm = plugin.getDatabaseManager();
+        this.setHidePlayerInventory(true);
     }
 
     public void show(Player player) {

@@ -7,6 +7,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 
 public class GuiListener implements Listener {
     private final GuiManager guiManager;
@@ -56,6 +57,20 @@ public class GuiListener implements Listener {
                 this.guiManager.removeOpenGui(player);
             }
 
+            // Give the inventory back once the player leaves the menu chain. If
+            // another menu that also hides the inventory was opened (e.g. the
+            // colour/language submenus), keep it hidden instead.
+            BaseGui current = this.guiManager.getOpenGui(player);
+            if (current == null || !current.isHidingPlayerInventory()) {
+                this.guiManager.restoreInventory(player);
+            }
         }
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        // Safety net: never let a player disconnect while their inventory is hidden.
+        this.guiManager.restoreInventory(event.getPlayer());
+        this.guiManager.removeOpenGui(event.getPlayer());
     }
 }

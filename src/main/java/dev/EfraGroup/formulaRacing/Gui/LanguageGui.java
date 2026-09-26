@@ -57,6 +57,7 @@ public class LanguageGui extends BaseGui {
         this.plugin = plugin;
         this.db = plugin.getDatabaseManager();
         this.player = player;
+        this.setHidePlayerInventory(true);
         this.setupContent();
     }
 
