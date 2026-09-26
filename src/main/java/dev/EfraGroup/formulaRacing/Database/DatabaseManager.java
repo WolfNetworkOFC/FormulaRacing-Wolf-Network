@@ -1740,6 +1740,14 @@ public class DatabaseManager {
 
             int totalUpdated = 0;
 
+            // 0. Desduplica as variantes de caixa do trackNameWS desta pista.
+            // As PRIMARY KEY que incluem trackNameWS comparam TEXT de forma case-sensitive,
+            // mas o trackNameWS nem sempre é gravado em minúsculas (createTrack grava em
+            // minúsculas, saveCheckpointTimes gravava como vinha do jogador). Assim
+            // "PoraoDoGaber" e "poraodogaber" coexistiam em linhas distintas, que colidiam
+            // assim que os UPDATEs abaixo normalizavam ambas para minúsculas.
+            dedupeTrackCaseVariants(conn, oldNameWS);
+
             // 1. fr_tracks
             try (PreparedStatement ps = conn.prepareStatement(
                     "UPDATE fr_tracks SET trackName = ?, trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
@@ -2002,6 +2010,104 @@ public class DatabaseManager {
                 } catch (SQLException ignored) {}
             }
         }
+    }
+
+    /**
+     * Colapsa as variantes de caixa do trackNameWS de uma pista numa só, antes de o
+     * renomeTrack normalizar o nome para minúsculas em todas as tabelas.
+     *
+     * <p>As PRIMARY KEY e UNIQUE que incluem {@code trackNameWS} comparam TEXT de forma
+     * case-sensitive, enquanto o resto do plugin trata o nome de forma case-insensitive.
+     * Guardar "PoraoDoGaber" e "poraodogaber" em linhas distintas é legal no SQLite, mas
+     * as duas colidem assim que o mesmo UPDATE as normaliza para minúsculas.
+     *
+     * <p>A ordem importa: primeiro são apagadas as linhas duplicadas (um DELETE nunca
+     * viola a própria constraint), só depois o trackNameWS é posto em minúsculas. Entre
+     * as duplicatas sobrevive a que tem o nome ainda por normalizar, por ser a que
+     * corresponde à pista tal como foi configurada; havendo várias, a mais antiga. Uma
+     * falha por tabela é ignorada para não abortar a renomeação.
+     */
+    private void dedupeTrackCaseVariants(Connection conn, String trackNameWS) {
+        if (trackNameWS == null || trackNameWS.isBlank()) return;
+
+        // Tabelas onde o trackNameWS é a única chave.
+        String[] singleKeyTables = {
+            "fr_boatutils", "fr_pit_stops", "fr_holograms"
+        };
+        // Tabelas com chave composta, mapeadas às restantes colunas da constraint.
+        String[][] compositeKeyTables = {
+            {"fr_checkpoint_times", "player_uuid, checkpointId"},
+            {"fr_timetrial_duels_checkpoint_times", "player_uuid, checkpointId"},
+            {"fr_track_finish_positions", "position"},
+            {"fr_track_medals", "medal"},
+            {"fr_player_medals", "player_uuid, medal"},
+            {"fr_pit_lanes", "pitId"},
+            {"fr_grid_positions", "id, positionIndex"},
+            {"fr_qualigrid_positions", "id, positionIndex"},
+            {"fr_gimmicks", "name"},
+        };
+
+        for (String table : singleKeyTables) {
+            dedupeAndNormaliseTable(conn, table, new String[0], trackNameWS);
+        }
+        for (String[] spec : compositeKeyTables) {
+            dedupeAndNormaliseTable(conn, spec[0], spec[1].split(","), trackNameWS);
+        }
+    }
+
+    /**
+     * Apaga de {@code table} as linhas duplicadas que só diferem na caixa do
+     * trackNameWS e depois normaliza o nome da pista para minúsculas.
+     *
+     * @param otherKeyColumns restantes colunas da constraint; vazio quando a chave é
+     *                        apenas o trackNameWS
+     */
+    private void dedupeAndNormaliseTable(
+            Connection conn, String table, String[] otherKeyColumns, String trackNameWS) {
+        StringBuilder sameKey = new StringBuilder();
+        for (String column : otherKeyColumns) {
+            sameKey.append(" AND t2.").append(column.trim()).append(" IS t.").append(column.trim());
+        }
+
+        // Para cada linha, remove-a se não for a que sobrevive dentro do seu próprio
+        // grupo: o nome por normalizar tem prioridade, depois a linha mais antiga.
+        String deleteSql =
+            "DELETE FROM " + table + " AS t "
+            + "WHERE LOWER(t.trackNameWS) = LOWER(?) AND t.rowid NOT IN ("
+            + "  SELECT t2.rowid FROM " + table + " AS t2 "
+            + "  WHERE LOWER(t2.trackNameWS) = LOWER(?)" + sameKey + " "
+            + "  ORDER BY (t2.trackNameWS <> LOWER(t2.trackNameWS)) DESC, t2.rowid ASC LIMIT 1)";
+        try (PreparedStatement ps = conn.prepareStatement(deleteSql)) {
+            ps.setString(1, trackNameWS);
+            ps.setString(2, trackNameWS);
+            logRenameFix(table, "duplicata(s) removida(s)", ps.executeUpdate());
+        } catch (SQLException e) {
+            logRenameSkip(table, e);
+            return;
+        }
+
+        // Já não há duplicados, por isso normalizar é seguro.
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE " + table + " SET trackNameWS = LOWER(trackNameWS) WHERE LOWER(trackNameWS) = LOWER(?)")) {
+            ps.setString(1, trackNameWS);
+            logRenameFix(table, "variante(s) normalizada(s)", ps.executeUpdate());
+        } catch (SQLException e) {
+            logRenameSkip(table, e);
+        }
+    }
+
+    private void logRenameFix(String table, String what, int affected) {
+        if (affected > 0) {
+            plugin
+                .getDebugManager()
+                .logDatabaseOperation("  🔧 " + table + ": " + affected + " " + what);
+        }
+    }
+
+    private void logRenameSkip(String table, SQLException e) {
+        plugin
+            .getDebugManager()
+            .logDatabaseOperation("  ⚠️ " + table + ": " + e.getMessage());
     }
 
     /**
@@ -4693,8 +4799,11 @@ public class DatabaseManager {
         boolean newFinished
     ) throws SQLException {
         try {
-            // ✅ Remove only spaces, without toLowerCase
-            String trackNameWS = trackName.replaceAll("\\s+", "");
+            // O trackNameWS é sempre guardado em minúsculas (ver createTrack). Gravar
+            // aqui a forma como veio do jogador criava linhas duplicadas que só diferiam
+            // em caixa, e que colidiam na PRIMARY KEY (player_uuid, trackNameWS, checkpointId)
+            // assim que o nome era normalizado.
+            String trackNameWS = trackName.replaceAll("\\s+", "").toLowerCase();
             double roundedNewTime = Math.round(newTime * 1000.0) / 1000.0;
 
             List<TimerUtils.CheckpointData> newCheckpoints = plugin
@@ -5481,7 +5590,7 @@ public class DatabaseManager {
         int lastCheckpoint
     ) {
         if (lastCheckpoint <= 0) return;
-        String trackNameWS = trackName.replaceAll("\\s+", "");
+        String trackNameWS = trackName.replaceAll("\\s+", "").toLowerCase();
         // Round to nearest tick (50ms) for clean display on Folia
         long roundedMs = Math.round(time * 1000.0);
         roundedMs = (roundedMs + 25L) / 50L * 50L;
@@ -5832,23 +5941,43 @@ public class DatabaseManager {
         return null;
     }
 
+    /**
+     * Returns the player's position on the track's time-trial board, or {@code 0}
+     * when they have no recorded time on it at all.
+     *
+     * <p>Unfinished runs are included: a player who reset mid-lap still has a
+     * partial time, and excluding them left the position blank. Ordering mirrors
+     * {@link #getTopTimes(String)} exactly — finished runs first (by official
+     * ticks, then display millis), then unfinished ones ranked by how many
+     * checkpoints they reached — so the number shown next to a player always
+     * matches their actual row on the board.
+     *
+     * <p>Each player is reduced to their single best run first
+     * ({@code player_rn = 1}), then {@code DENSE_RANK} assigns the position,
+     * preserving the legacy tie semantics (equal times share a position).
+     */
     public synchronized int getPlayerRank(UUID playerUUID, String trackNameWS) {
         if (playerUUID == null) return 0;
         String cleanTrack = trackNameWS.replaceAll("\\s+", "");
 
-        // Select each player's best run using the official ordering, then rank the
-        // resulting rows. DENSE_RANK preserves the legacy tie semantics.
+        // Finished runs are ordered by their official time; unfinished ones have
+        // no meaningful total time, so they fall to the end of the board sorted
+        // by checkpoints reached. The CASE guards keep a finished run's time from
+        // being compared against a NULL for an unfinished one.
+        String boardOrder =
+            " finished DESC," +
+            " CASE WHEN finished = 0 THEN checkpointsReached END DESC," +
+            " CASE WHEN finished = 1 THEN " + officialTicksExpression("") + " END ASC," +
+            " CASE WHEN finished = 1 THEN " + displayMillisExpression("") + " END ASC," +
+            " bestTime ASC, created_at ASC, id ASC";
+
         String sql =
             "WITH player_bests AS (" +
-            " SELECT t.*, ROW_NUMBER() OVER (PARTITION BY t.player_uuid ORDER BY " +
-            officialOrderBy("t.") +
-            ") AS player_rn" +
+            " SELECT t.*, ROW_NUMBER() OVER (PARTITION BY t.player_uuid ORDER BY" + boardOrder + ") AS player_rn" +
             " FROM fr_player_times t" +
-            " WHERE LOWER(t.trackNameWS) = LOWER(?) AND t.finished = TRUE" +
+            " WHERE LOWER(t.trackNameWS) = LOWER(?)" +
             "), ranked_bests AS (" +
-            " SELECT player_uuid, DENSE_RANK() OVER (ORDER BY " +
-            officialOrderBy("") +
-            ") AS rank" +
+            " SELECT player_uuid, DENSE_RANK() OVER (ORDER BY" + boardOrder + ") AS rank" +
             " FROM player_bests WHERE player_rn = 1" +
             ") SELECT rank FROM ranked_bests WHERE player_uuid = ? LIMIT 1";
         try {

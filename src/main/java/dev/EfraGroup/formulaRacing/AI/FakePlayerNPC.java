@@ -126,7 +126,7 @@ public class FakePlayerNPC {
                         // without an entity), which corrupts subsequent player_info
                         // payloads and can kick the viewer.
                         Object infoAdd = buildPlayerInfoAdd();
-                        Object spawn = buildSpawnPlayer(loc);
+                        Object spawn = buildSpawnPlayer(loc, viewer);
                         Object passengers = buildSetPassengers();
                         send(connection, infoAdd);
                         send(connection, spawn);
@@ -299,7 +299,7 @@ public class FakePlayerNPC {
      * with {@code ClientboundAddEntityPacket} using {@code EntityType.PLAYER} plus the
      * profile UUID (the client resolves the skin from the tab-list ADD_PLAYER entry).
      */
-    private Object buildSpawnPlayer(Location loc) throws Exception {
+    private Object buildSpawnPlayer(Location loc, Player viewer) throws Exception {
         double x = loc.getX();
         double y = loc.getY();
         double z = loc.getZ();
@@ -310,7 +310,7 @@ public class FakePlayerNPC {
         // a dedicated AddPlayerPacket and spawn through the generic AddEntity packet.
         Exception variantAError = null;
         try {
-            return buildViaAddEntityPacket(x, y, z, yaw, pitch);
+            return buildViaAddEntityPacket(x, y, z, yaw, pitch, viewer);
         } catch (ReflectiveOperationException | RuntimeException e) {
             variantAError = e;
         }
@@ -334,11 +334,13 @@ public class FakePlayerNPC {
             ctor.setAccessible(true);
             return ctor.newInstance(entityId, profileUuid, x, y, z, yaw, pitch);
         } catch (NoSuchMethodException | ClassNotFoundException e) {
+            // On 1.21.5+ ClientboundAddPlayerPacket is gone, so this branch only ever
+            // fails with ClassNotFoundException. Report variant A (the real cause)
+            // rather than this leftover, which would send the reader chasing the
+            // removed packet.
             IllegalStateException ex = new IllegalStateException(
-                    "Player spawn packet constructor not found", e);
-            if (variantAError != null) {
-                ex.addSuppressed(variantAError);
-            }
+                    "Player spawn packet constructor not found; ClientboundAddPlayerPacket absent"
+                            + " (expected on 1.21.5+). Falha real: " + rootMessage(variantAError), variantAError);
             throw ex;
         } catch (ReflectiveOperationException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
@@ -352,6 +354,20 @@ public class FakePlayerNPC {
     }
 
     /**
+     * Returns the most specific message available: reflection wraps real failures
+     * several layers deep, so the top-level message is often uninformative.
+     */
+    private static String rootMessage(Throwable t) {
+        Throwable root = t;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String message = root.getMessage();
+        return root.getClass().getSimpleName()
+                + (message != null ? ": " + message : "");
+    }
+
+    /**
      * Builds the 1.21.5+ {@code ClientboundAddEntityPacket} for the NPC player.
      *
      * <p>First tries the canonical 11-arg constructor; if the signature drifted on
@@ -359,7 +375,7 @@ public class FakePlayerNPC {
      * parameter-by-parameter. On failure the thrown exception carries a diagnostic
      * listing every available constructor.
      */
-    private Object buildViaAddEntityPacket(double x, double y, double z, float yaw, float pitch)
+    private Object buildViaAddEntityPacket(double x, double y, double z, float yaw, float pitch, Player viewer)
             throws ReflectiveOperationException {
         Class<?> packetClass;
         try {
@@ -368,7 +384,7 @@ public class FakePlayerNPC {
             throw new NoSuchMethodException("ClientboundAddEntityPacket ausente no servidor: " + e.getMessage());
         }
         Class<?> entityTypeClass = Class.forName("net.minecraft.world.entity.EntityType");
-        Object playerType = resolveEntityType(entityTypeClass, "PLAYER", "player");
+        Object playerType = resolveEntityType(entityTypeClass, "PLAYER", "player", viewer);
         Class<?> vec3Class = Class.forName("net.minecraft.world.phys.Vec3");
         Constructor<?> vecCtor = vec3Class.getConstructor(double.class, double.class, double.class);
         vecCtor.setAccessible(true);
@@ -465,10 +481,12 @@ public class FakePlayerNPC {
      *
      * <p>{@code getField("PLAYER")} can fail on remapped/rewritten servers even
      * when the field exists in the jar (Paper's plugin reflection rewriter),
-     * so we also try the declared field and the registry lookup
-     * {@code EntityType.byString("player")}.
+     * and {@code EntityType.byString(String)} was dropped on newer versions, so
+     * both static lookups can fail at once. As a last resort we read the type off
+     * a live player entity: that value is the PLAYER type by definition and
+     * depends on no field name at all.
      */
-    private static Object resolveEntityType(Class<?> entityTypeClass, String fieldName, String registryName)
+    private static Object resolveEntityType(Class<?> entityTypeClass, String fieldName, String registryName, Player viewer)
             throws ReflectiveOperationException {
         try {
             Field field = entityTypeClass.getField(fieldName);
@@ -482,13 +500,52 @@ public class FakePlayerNPC {
             return field.get(null);
         } catch (NoSuchFieldException ignored) {
         }
+        // NMS module classloader: resolve the class through the loader that owns it
+        // instead of the plugin's, in case the field lives on a different copy.
+        try {
+            Class<?> reloaded = Class.forName(
+                    "net.minecraft.world.entity.EntityType", true, entityTypeClass.getClassLoader());
+            Field field = reloaded.getField(fieldName);
+            field.setAccessible(true);
+            return field.get(null);
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+        }
+        Object fromViewer = playerTypeFromEntity(viewer);
+        if (fromViewer != null) {
+            return fromViewer;
+        }
         Method byString = entityTypeClass.getMethod("byString", String.class);
         Object optional = byString.invoke(null, registryName);
         Method isPresent = optional.getClass().getMethod("isPresent");
         if (Boolean.TRUE.equals(isPresent.invoke(optional))) {
             return optional.getClass().getMethod("get").invoke(optional);
         }
-        throw new NoSuchFieldException(fieldName + " (field and registry lookup '" + registryName + "' failed)");
+        throw new NoSuchFieldException(fieldName + " (field, NMS module classloader, live player entity and registry '"
+                + registryName + "' all failed)");
+    }
+
+    /**
+     * Reads the NMS entity type from a live player entity. Returns null when the
+     * handle or the type accessor is unavailable on this server version.
+     */
+    private static Object playerTypeFromEntity(Player player) {
+        if (player == null) {
+            return null;
+        }
+        try {
+            Object handle = player.getClass().getMethod("getHandle").invoke(player);
+            for (String accessor : new String[]{"getType", "getEntityType"}) {
+                try {
+                    Object type = handle.getClass().getMethod(accessor).invoke(handle);
+                    if (type != null) {
+                        return type;
+                    }
+                } catch (NoSuchMethodException ignored) {
+                }
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+        }
+        return null;
     }
 
     /**

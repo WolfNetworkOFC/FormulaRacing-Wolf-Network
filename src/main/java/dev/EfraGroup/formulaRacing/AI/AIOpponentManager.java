@@ -488,6 +488,22 @@ public class AIOpponentManager {
                 return;
             }
 
+            // Sem chunk carregada não há entity viva para conduzir, e spawnar aqui
+            // recriaria o barco em cada tick em que a região carrega — o que
+            // multiplicava milhares de barcos órfãos sempre que o jogador se
+            // afastava. O barco legítimo continua a existir no mundo, por isso o
+            // boatUuid é mantido intacto: quando a chunk volta a estar carregada,
+            // getControlledEntity() volta a encontrá-lo e o AI retoma sem respawn.
+            World spawnWorld = spawn.getWorld();
+            if (!spawnWorld.isChunkLoaded(spawn.getBlockX() >> 4, spawn.getBlockZ() >> 4)) {
+                return;
+            }
+
+            // A chunk está carregada mas a entity não existe (barco destruído ou
+            // removido por outro plugin). A referência antiga aponta para algo morto,
+            // por isso é abandonada antes de criar a substituição.
+            boatUuid = null;
+
             // Entity creation AND the block reads of the safe-Y search must run on
             // the world's region thread (Folia). Boat is an interface, so we spawn
             // the concrete OAK_BOAT entity type.
@@ -875,10 +891,23 @@ public class AIOpponentManager {
                 steerErr = wrapDegrees(brakeAnchorYaw + steeringBiasDeg * 0.5D - currentLoc.getYaw());
             }
 
-            double lead = Math.abs(AIBoatController.getDeltaRotation(controlledEntity));
-            if (steerErr > STEER_DEADZONE_DEG + lead) {
+            // Proportional steering. The old code was bang-bang and widened its
+            // deadzone by the boat's current turn rate, so a held key kept
+            // widening the band it was already inside: the AI kept steering past
+            // the target, flipped sign, and circled the racing line.
+            //
+            // Instead, pick a turn rate from the error (small error -> small
+            // correction, no oscillation; big corner -> real turn rate), and only
+            // hold a key when the turn it produces cannot overshoot the target.
+            double absErr = Math.abs(steerErr);
+            double turnScale = Math.max(1.0D, Math.min(AIBoatController.MAX_TURN_SCALE, absErr / 25.0D));
+            double turnThisTick = AIBoatController.TURN_PER_TICK_DEG * turnScale;
+            // Release the key once the remaining error is within what this tick's
+            // turn would consume, plus a small margin for the boat's inertia.
+            double releaseBelow = turnThisTick + STEER_DEADZONE_DEG;
+            if (steerErr > releaseBelow) {
                 right = true;
-            } else if (steerErr < -(STEER_DEADZONE_DEG + lead)) {
+            } else if (steerErr < -releaseBelow) {
                 left = true;
             }
 
@@ -896,7 +925,7 @@ public class AIOpponentManager {
                 up = true;
             }
 
-            AIBoatController.drive(boat, left, right, up, down);
+            AIBoatController.drive(boat, left, right, up, down, turnScale);
         }
 
         private void maybeBeginBrake(double velYaw, double horizSpeed, double desiredBt) {

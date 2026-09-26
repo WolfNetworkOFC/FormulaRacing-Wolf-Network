@@ -40,6 +40,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.ChatColor;
+
 import org.bukkit.Sound;
 import org.bukkit.entity.Boat;
 import org.bukkit.entity.Entity;
@@ -75,6 +77,9 @@ public class RegionListener implements Listener {
     private final Set<UUID> justTeleported = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<UUID, Long> lastTTDisabledWarning = new ConcurrentHashMap<>();
     private static final long TT_DISABLED_WARNING_COOLDOWN = 60000L;
+    private final Map<UUID, Long> lastTTBlockReport = new ConcurrentHashMap<>();
+    private static final long TT_BLOCK_REPORT_COOLDOWN_MS = 1500L;
+
     private static final double BEDROCK_REGION_Y_OFFSET = 0.25D;
 
     public void cleanupPlayer(UUID uuid) {
@@ -86,6 +91,7 @@ public class RegionListener implements Listener {
         this.lastTimeLimitLog.remove(uuid);
         this.justTeleported.remove(uuid);
         this.lastTTDisabledWarning.remove(uuid);
+        this.lastTTBlockReport.remove(uuid);
     }
 
     public void cleanupHeatPlayers(java.util.Collection<UUID> uuids) {
@@ -97,8 +103,61 @@ public class RegionListener implements Listener {
             this.lastTimeLimitLog.remove(uuid);
             this.justTeleported.remove(uuid);
             this.lastTTDisabledWarning.remove(uuid);
+            this.lastTTBlockReport.remove(uuid);
         }
     }
+    /**
+     * Avisa o jogador que cruzou a linha de chegada/largada mas o cronômetro
+     * NÃO iniciou, junto com o portão interno que bloqueou a execução.
+     *
+     * <p>A maioria dos portões em {@link #handleSoloTimeTrial} e
+     * {@link #startSoloTimer} falha em silêncio (simples {@code return}), o que
+     * tornava impossível diagnosticar casos como "no primeiro login o timer não
+     * sobe, mas no segundo funciona". Este método centraliza o reporte.
+     *
+     * <p>Limitado por cooldown para não inundar o chat: os portões são
+     * avaliados a cada tick enquanto o jogador está sobre a região.
+     *
+     * @param player jogador que cruzou a linha
+     * @param gate identificador curto do portão que bloqueou (ex.: "NOT_BOAT")
+     * @param reason descrição legível do bloqueio
+     */
+    private void reportTTBlocked(Player player, String gate, String reason) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        UUID uuid = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        Long last = this.lastTTBlockReport.get(uuid);
+        if (last != null && now - last < TT_BLOCK_REPORT_COOLDOWN_MS) {
+            return;
+        }
+        this.lastTTBlockReport.put(uuid, now);
+
+        // No Folia o envio de mensagem é feito na thread da região do jogador.
+        SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            String langCode = this.database.getPlayerLanguage(uuid);
+            String prefix = this.plugin.getDirectTranslation("tt_blocked_title", langCode);
+            if (prefix == null || prefix.isEmpty()) {
+                prefix = "§c§lTIMER NÃO INICIOU §8» §7";
+            }
+            String detail = this.plugin.getDirectTranslation("tt_blocked_reason", langCode);
+            if (detail == null || detail.isEmpty()) {
+                detail = "Motivo: §f{reason} §8({gate})";
+            }
+            String message = ChatColor.translateAlternateColorCodes('&',
+                    detail.replace("{reason}", reason).replace("{gate}", gate));
+            player.sendMessage(ChatColor.translateAlternateColorCodes('&', prefix) + message);
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0F, 0.8F);
+        });
+
+        this.plugin.getDebugManager().logTimeTrialSystem(
+                "[TT-BLOCKED] " + player.getName() + " gate=" + gate + " reason=" + reason);
+    }
+
 
     public RegionListener(FormulaRacing plugin, DatabaseManager database, TimerUtils timerUtils, PacketSender packetSender, ScoreboardTimeTrialUtils stt, TimeTrialDuelsAction DuelsTimer, TimeTrialDuels timeTrialDuels, TimeTrialController timeTrialController) {
         this(plugin, database, timerUtils, packetSender, stt, DuelsTimer, timeTrialDuels, timeTrialController, plugin.getWolfTimingService());
@@ -254,6 +313,7 @@ public class RegionListener implements Listener {
                         if (vehicle instanceof Boat) {
                             List<Entity> passengers = vehicle.getPassengers();
                             if (!passengers.contains(player) && !bedrockBoatDetection) {
+                                this.reportTTBlocked(player, "NOT_THE_DRIVER", "voce esta como carona, nao como piloto do barco");
                                 return;
                             }
                         }
@@ -312,6 +372,8 @@ public class RegionListener implements Listener {
                                             crossingNanos
                                         )
                                     );
+                                } else {
+                                    this.reportIfStandingInStartLine(player, current, worldRegions);
                                 }
 
                             // Checkpoints and duels logic
@@ -402,8 +464,8 @@ public class RegionListener implements Listener {
                                 this.warnedWorlds.add(worldName);
                                 this.plugin.getDebugManager().logRegionDetection("[FormulaRacing] No regions registered for world " + worldName);
                             }
-
                         }
+
                     }
                 }
             }
@@ -418,6 +480,46 @@ public class RegionListener implements Listener {
         double clamped = Math.max(0.0, Math.min(1.0, fraction));
         long value = Math.round(beforeNanos + span * clamped);
         return Math.max(beforeNanos, Math.min(afterNanos, value));
+    }
+
+    /**
+     * Diagnóstico do portão "nenhuma região detectada": quando o jogador está
+     * fisicamente parado DENTRO de uma região START/END da pista que ele
+     * pretende correr, mas o cruzamento por movimento não disparou.
+     *
+     * <p>Este é o cenário clássico de "chegou na linha mas o timer não sobe":
+     * o jogador já está parado sobre a faixa, então {@code previous == current}
+     * e o teste de interseção de segmento nunca casa. Só reporta quando o
+     * jogador tem intenção de corrida declarada ({@code /tt} ou timer ativo),
+     * para não poluir jogadores que só estão passeando pela pista.
+     */
+    private void reportIfStandingInStartLine(
+        Player player,
+        Location current,
+        List<DatabaseManager.RegionData> worldRegions
+    ) {
+        if (player == null || current == null || current.getWorld() == null || worldRegions == null) {
+            return;
+        }
+        String intendedTrack = this.resolveIntendedTrack(player);
+        if (intendedTrack == null) {
+            return;
+        }
+        String normalized = intendedTrack.replaceAll("\\s+", "").toLowerCase();
+        for (DatabaseManager.RegionData r : worldRegions) {
+            String type = r.getType().toUpperCase();
+            if (!type.equals("START") && !type.equals("END") && !type.equals("RESET")) {
+                continue;
+            }
+            if (!this.matchesNormalizedTrack(r, normalized)) {
+                continue;
+            }
+            if (RegionMathUtils.intersectsRegion(current, current, r)) {
+                this.reportTTBlocked(player, "STANDING_IN_LINE",
+                    "voce esta parado dentro da regiao " + type + " - a deteccao exige movimento; cruze a linha pilotando");
+                return;
+            }
+        }
     }
 
     private void handleRegion(
@@ -687,6 +789,7 @@ public class RegionListener implements Listener {
                         DebugManager var66 = this.plugin.getDebugManager();
                         String var69 = player.getName();
                         var66.logTimeTrialSystem(var69 + " is in duel #" + activeDuelId + ", solo time trial blocked");
+                        this.reportTTBlocked(player, "IN_DUEL_REGION", "voce esta num duelo #" + activeDuelId);
                     } else if (!ttEnabled && justFinishedDuelOnThisTrack) {
                         this.plugin.getDebugManager().logTimeTrialSystem(player.getName() + " had TT disabled before duel, not auto-starting");
                         this.plugin.clearLastDuelTrack(uuid);
@@ -723,12 +826,15 @@ public class RegionListener implements Listener {
         UUID uuid = player.getUniqueId();
 
         if (this.plugin.getDriverLookup().isRacing(uuid)) {
+            this.reportTTBlocked(player, "IN_HEAT", "voce esta num heat de campeonato");
             return;
         }
         if (this.plugin.getQuickRaceManager() != null && this.plugin.getQuickRaceManager().isPlayerInActiveRace(uuid)) {
+            this.reportTTBlocked(player, "IN_QUICK_RACE", "voce esta numa Quick Race ativa");
             return;
         }
         if (this.timeTrialDuels.isPlayerInDuel(uuid)) {
+            this.reportTTBlocked(player, "IN_DUEL", "voce esta num duelo");
             return;
         }
 
@@ -737,6 +843,7 @@ public class RegionListener implements Listener {
         Long lastCross = (Long)this.lastStartEndCross.get(uuid);
         if (lastCross != null && now - lastCross < 2000L) {
             this.plugin.getDebugManager().logTimeTrialSystem("Ignorando cruz de " + type + " por debounce (< 2s) para " + player.getName());
+            this.reportTTBlocked(player, "DEBOUNCE", "cruzamento ignorado por debounce (< 2s)");
         } else {
             this.lastStartEndCross.put(uuid, now);
             boolean isRunningSolo = this.timerUtils.isTimerRunning(player, regionTrackWS);
@@ -880,6 +987,22 @@ public class RegionListener implements Listener {
             || this.plugin.getDriverLookup().isRacing(uuid)
             || (this.plugin.getQuickRaceManager() != null && this.plugin.getQuickRaceManager().isPlayerInActiveRace(uuid))
             || this.timeTrialDuels.isPlayerInDuel(uuid)) {
+            String reason;
+            String gate;
+            if (!isDrivingBoat(player)) {
+                gate = "NOT_DRIVING_BOAT";
+                reason = "voce nao esta pilotando o barco (piloto = primeiro passageiro)";
+            } else if (this.plugin.getDriverLookup().isRacing(uuid)) {
+                gate = "IN_HEAT";
+                reason = "voce esta num heat de campeonato";
+            } else if (this.plugin.getQuickRaceManager() != null && this.plugin.getQuickRaceManager().isPlayerInActiveRace(uuid)) {
+                gate = "IN_QUICK_RACE";
+                reason = "voce esta numa Quick Race ativa";
+            } else {
+                gate = "IN_DUEL";
+                reason = "voce esta num duelo";
+            }
+            this.reportTTBlocked(player, gate, reason);
             return;
         }
 
@@ -912,6 +1035,7 @@ public class RegionListener implements Listener {
         TimeTrialStartEvent event = new TimeTrialStartEvent(player, session);
         Bukkit.getPluginManager().callEvent(event);
         if (event.isCancelled()) {
+            this.reportTTBlocked(player, "EVENT_CANCELLED", "o evento TimeTrialStart foi cancelado por outro plugin");
             if (this.timingService != null && timingAttempt != null) {
                 this.timingService.markAttemptFailed(player, timingAttempt);
             }

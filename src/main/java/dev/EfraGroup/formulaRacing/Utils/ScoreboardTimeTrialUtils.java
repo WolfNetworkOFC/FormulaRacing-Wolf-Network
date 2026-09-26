@@ -252,9 +252,7 @@ public class ScoreboardTimeTrialUtils {
         }
 
         lines.add("");
-        lines.add(
-            "§e§l" + tu.getTranslated(player, "scoreboard_tt_leaderboard")
-        );
+        lines.add(this.boldTitle("§e" + tu.getTranslated(player, "scoreboard_tt_leaderboard")));
 
         List<DatabaseManager.TrackRecord> neighbors = new ArrayList<>();
         DatabaseManager.TrackRecord firstPlace = null;
@@ -324,7 +322,7 @@ public class ScoreboardTimeTrialUtils {
         boolean isMe = tr.getPlayerName().equals(observerName);
         String color;
         if (isMe) {
-            color = "§e";
+            color = "§f";
         } else {
             switch (pos) {
                 case 1 -> color = "§6";
@@ -340,7 +338,7 @@ public class ScoreboardTimeTrialUtils {
               "CP (" +
               this.formatTime(tr.getTime()) +
               ")";
-        String timeDisplay = "§b" + TimingScoreboardStyle.padRight(timeRaw, 12);
+        String timeDisplay = "§f" + TimingScoreboardStyle.padRight(timeRaw, 12);
         String configured = FormulaRacing.getInstance()
             .getConfig()
             .getString("scoreboard.style.accent-marker", "┃");
@@ -362,7 +360,10 @@ public class ScoreboardTimeTrialUtils {
             nameColor +
                 TimingScoreboardStyle.padRight(nameBase, compact ? 3 : 14) +
                 "§r";
-        String rank = color + pos + ". ";
+        // The viewer's own row is highlighted by bold weight rather than colour, so the
+        // time column stays readable in the same white as everyone else's. The §r after
+        // the number stops the bold from leaking into the time column.
+        String rank = (isMe ? color + "§l" : color) + pos + (isMe ? "§r" : "");
 
         // Separator bars (||): first bar uses the player's chosen primary colour
         // (color1), second bar uses their accent colour (color2), both bold+italic.
@@ -375,7 +376,7 @@ public class ScoreboardTimeTrialUtils {
             : color;
         String marker = bar1Color + "§o§l" + accent + "§r" + bar2Color + "§o§l" + accent + "§r";
 
-        return rank + "§7| " + timeDisplay + " " + marker + " " + nameDisplay;
+        return rank + " " + timeDisplay + " " + marker + " " + nameDisplay;
     }
 
     private UUID resolvePlayerUuid(String playerName) {

@@ -750,12 +750,7 @@ public class HeatCommand extends BaseCommand {
                 );
             } else {
                 for (Driver driver : displayDrivers) {
-                    String playerName = Bukkit.getOfflinePlayer(
-                        driver.getUuid()
-                    ).getName();
-                    if (playerName == null) {
-                        playerName = "Unknown";
-                    }
+                    String playerName = resolveDriverName(driver);
 
                     int pos = driver.getPosition();
                     if (
@@ -886,6 +881,24 @@ public class HeatCommand extends BaseCommand {
                     "═══════════════════════════════"
             );
         }
+    }
+
+    /**
+     * Resolve o nome a mostrar de um piloto.
+     *
+     * <p>As IAs nunca são jogadores reais, por isso o Bukkit não sabe o nome delas e
+     * {@code getOfflinePlayer(...).getName()} devolve null. O nome da IA vive no
+     * customName do Driver (ver AIOpponentManager#createAIOpponent), tal como o
+     * scoreboard já faz. Um jogador offline mantém o nome real, que o perfilMojang
+     * consegue resolver a partir do UUID.
+     */
+    private String resolveDriverName(Driver driver) {
+        if (driver.isAiControlled() && driver.getCustomName() != null
+                && !driver.getCustomName().isEmpty()) {
+            return driver.getCustomName();
+        }
+        String offlineName = Bukkit.getOfflinePlayer(driver.getUuid()).getName();
+        return offlineName != null ? offlineName : "Unknown";
     }
 
     private TextComponent formattedSetting(
@@ -1828,7 +1841,6 @@ public class HeatCommand extends BaseCommand {
         sender.sendMessage("");
 
         for (UUID uuid : sortedDrivers) {
-            String name = Bukkit.getOfflinePlayer(uuid).getName();
             Driver d = targetHeat.getDriver(uuid);
             if (d != null) {
                 sender.sendMessage(
@@ -1837,7 +1849,7 @@ public class HeatCommand extends BaseCommand {
                         d.getStartPosition() +
                         ". " +
                         ChatColor.WHITE +
-                        name
+                        resolveDriverName(d)
                 );
             }
         }

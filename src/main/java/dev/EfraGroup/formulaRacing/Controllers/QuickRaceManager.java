@@ -375,6 +375,9 @@ public class QuickRaceManager {
                 return false;
             } else if (this.currentHeat.getHeatState() == HeatState.RACING) {
                 driver.setDnf(true);
+                if (this.plugin.getQuickRaceBossBarManager() != null) {
+                    this.plugin.getQuickRaceBossBarManager().hideFrom(player);
+                }
                 if (this.plugin.getPTP() != null) {
                     this.plugin.getPTP().disablePTP(player, driver);
                 }
@@ -582,6 +585,10 @@ public class QuickRaceManager {
 
     private void deleteQuickRace() {
         this.stopCompletionMonitor();
+        if (this.plugin.getQuickRaceBossBarManager() != null) {
+            this.plugin.getQuickRaceBossBarManager().hideAll();
+        }
+
         if (this.currentQuickRace != null) {
             // QuickRace NÃO é removido quando acaba - apenas limpa referências locais
             this.plugin.getDebugManager().logRaceSystem("Quick Race finalizado: " + this.currentQuickRace.getDisplayName());

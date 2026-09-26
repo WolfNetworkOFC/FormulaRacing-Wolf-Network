@@ -9,6 +9,7 @@
     import dev.EfraGroup.formulaRacing.Command.Help.CommandHelpService;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import dev.EfraGroup.formulaRacing.Utils.TimeTrialTeleportMessage;
 import dev.EfraGroup.formulaRacing.PacketSender;
     import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
     import dev.EfraGroup.formulaRacing.AI.AIRacingLineManager;
@@ -158,7 +159,7 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                     }
                     this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);
                     this.plugin.getDebugManager().logTimeTrialSystem("[TT] Starting track '" + trackName + "' for player " + player.getName());
-                    this.plugin.sendMessage(player, "timetrial_teleport", new String[]{"{track}", trackName});
+                    sendTimeTrialTeleportMessage(player, trackName);
 
                     try {
                         this.stt.setPlayerTrack(player, trackName, ownerName);
@@ -214,6 +215,36 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                     });
                 }
             }
+        }
+
+        /**
+         * Sends the {@code /tt} "Teleported to [track]" message, appending the
+         * player's leaderboard position when they already have a finished time on
+         * that track.
+         *
+         * <p>The rank lives in the database, so it is fetched asynchronously and the
+         * message is sent from the completion callback — the main thread is never
+         * blocked on a query. {@code getPlayerRank} returns {@code 0} when the player
+         * has no finished run on this track, in which case the message renders
+         * exactly as before (the position suffix is empty).
+         *
+         * @param player    the teleported player
+         * @param trackName the track display name; normalized for the lookup query
+         */
+        private void sendTimeTrialTeleportMessage(Player player, String trackName) {
+            String trackWS = trackName.replaceAll("\\s+", "");
+            this.mysql.getPlayerRankAsync(player.getUniqueId(), trackWS).thenAccept(rank -> {
+                // Never touch a player from a worker thread: they may have logged
+                // off while the query was still in flight.
+                if (!player.isOnline()) {
+                    return;
+                }
+                this.plugin.sendMessage(
+                        player,
+                        "timetrial_teleport",
+                        new String[]{"{track}", trackName, "{position}", TimeTrialTeleportMessage.rankSuffix(rank)}
+                );
+            });
         }
 
         @CommandAlias("timetrialcancel|ttc|timetrialc|ttcancel")

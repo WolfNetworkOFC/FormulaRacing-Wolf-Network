@@ -16,6 +16,7 @@ import dev.EfraGroup.formulaRacing.Controllers.HotbarController;
 import dev.EfraGroup.formulaRacing.Controllers.LonelyController;
 import dev.EfraGroup.formulaRacing.Controllers.PodiumManager;
 import dev.EfraGroup.formulaRacing.Controllers.PartyRaceManager;
+import dev.EfraGroup.formulaRacing.Controllers.QuickRaceBossBarManager;
 import dev.EfraGroup.formulaRacing.Controllers.QuickRaceManager;
 import dev.EfraGroup.formulaRacing.Controllers.RaceEventManager;
 import dev.EfraGroup.formulaRacing.Controllers.RaceVoteManager;
@@ -154,6 +155,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private SpectatorManager spectatorManager;
     private QuickRaceManager quickRaceManager;
     private PartyRaceManager partyRaceManager;
+    private QuickRaceBossBarManager quickRaceBossBarManager;
     private RaceVoteManager raceVoteManager;
     private DrsManager drsManager;
     private PTPManager ptpManager;
@@ -400,6 +402,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 this.raceEventManager,
                 this.dm
             );
+            this.quickRaceBossBarManager = new QuickRaceBossBarManager(this);
             this.partyRaceManager = new PartyRaceManager(
                 this,
                 this.raceEventManager,
@@ -651,6 +654,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
         if (this.quickRaceManager != null) {
             this.quickRaceManager.shutdown();
+        }
+
+        if (this.quickRaceBossBarManager != null) {
+            this.quickRaceBossBarManager.shutdown();
         }
 
         if (this.api != null) {
@@ -1346,6 +1353,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     public QuickRaceManager getQuickRaceManager() {
         return this.quickRaceManager;
+    }
+
+    public QuickRaceBossBarManager getQuickRaceBossBarManager() {
+        return this.quickRaceBossBarManager;
     }
 
     public PartyRaceManager getPartyRaceManager() {
