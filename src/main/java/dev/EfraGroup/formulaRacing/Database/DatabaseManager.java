@@ -5536,16 +5536,14 @@ public class DatabaseManager {
         String playerName,
         String trackName
     ) {
-        String sql = """
-                SELECT pt.bestTime, pt.checkpointsReached, pt.finished, pt.created_at
-                FROM fr_player_times pt
-                WHERE pt.player_name = ?
-                  AND LOWER(pt.trackNameWS) = LOWER(?)
-                  AND pt.finished = TRUE
-                ORDER BY
-""" + officialOrderBy("pt.") + """
-                LIMIT 1
-            """;
+        String sql =
+            "SELECT pt.bestTime, pt.checkpointsReached, pt.finished, pt.created_at " +
+            "FROM fr_player_times pt " +
+            "WHERE pt.player_name = ? " +
+            "AND LOWER(pt.trackNameWS) = LOWER(?) " +
+            "AND pt.finished = TRUE " +
+            "ORDER BY " + officialOrderBy("pt.") + " " +
+            "LIMIT 1";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -5576,16 +5574,14 @@ public class DatabaseManager {
         String playerName,
         String trackName
     ) {
-        String sql = """
-            SELECT bestTime, official_ticks, display_millis, timing_source, run_id
-            FROM fr_player_times
-            WHERE player_name = ?
-              AND LOWER(trackNameWS) = LOWER(?)
-              AND finished = TRUE
-            ORDER BY
-""" + officialOrderBy("") + """
-            LIMIT 1
-            """;
+        String sql =
+            "SELECT bestTime, official_ticks, display_millis, timing_source, run_id " +
+            "FROM fr_player_times " +
+            "WHERE player_name = ? " +
+            "AND LOWER(trackNameWS) = LOWER(?) " +
+            "AND finished = TRUE " +
+            "ORDER BY " + officialOrderBy("") + " " +
+            "LIMIT 1";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -5615,16 +5611,14 @@ public class DatabaseManager {
         String trackName
     ) {
         if (playerUUID == null) return null;
-        String sql = """
-            SELECT bestTime, official_ticks, display_millis, timing_source, run_id
-            FROM fr_player_times
-            WHERE player_uuid = ?
-              AND LOWER(trackNameWS) = LOWER(?)
-              AND finished = TRUE
-            ORDER BY
-""" + officialOrderBy("") + """
-            LIMIT 1
-            """;
+        String sql =
+            "SELECT bestTime, official_ticks, display_millis, timing_source, run_id " +
+            "FROM fr_player_times " +
+            "WHERE player_uuid = ? " +
+            "AND LOWER(trackNameWS) = LOWER(?) " +
+            "AND finished = TRUE " +
+            "ORDER BY " + officialOrderBy("") + " " +
+            "LIMIT 1";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -5822,23 +5816,21 @@ public class DatabaseManager {
      */
     public synchronized Map<String, Double> getAllBestTimes() {
         Map<String, Double> bestTimes = new HashMap<>();
-        String sql = """
-            SELECT t.trackNameWS,
-                   COALESCE(ranked.display_millis / 1000.0, ranked.bestTime) AS wr
-            FROM fr_tracks t
-            LEFT JOIN (
-                SELECT p.trackNameWS, p.bestTime, p.display_millis,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY p.trackNameWS
-                           ORDER BY
-""" + officialOrderBy("p.") + """
-                       ) AS rn
-                FROM fr_player_times p
-                WHERE p.finished = TRUE
-            ) ranked
-              ON LOWER(t.trackNameWS) = LOWER(ranked.trackNameWS)
-             AND ranked.rn = 1
-            """;
+        String sql =
+            "SELECT t.trackNameWS, " +
+            "COALESCE(ranked.display_millis / 1000.0, ranked.bestTime) AS wr " +
+            "FROM fr_tracks t " +
+            "LEFT JOIN ( " +
+            "SELECT p.trackNameWS, p.bestTime, p.display_millis, " +
+            "ROW_NUMBER() OVER ( " +
+            "PARTITION BY p.trackNameWS " +
+            "ORDER BY " + officialOrderBy("p.") + " " +
+            ") AS rn " +
+            "FROM fr_player_times p " +
+            "WHERE p.finished = TRUE " +
+            ") ranked " +
+            "ON LOWER(t.trackNameWS) = LOWER(ranked.trackNameWS) " +
+            "AND ranked.rn = 1";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -5864,21 +5856,19 @@ public class DatabaseManager {
      */
     public synchronized Map<String, Double> getPlayerAllBestTimes(String playerName) {
         Map<String, Double> pbTimes = new HashMap<>();
-        String sql = """
-            SELECT ranked.trackNameWS,
-                   COALESCE(ranked.display_millis / 1000.0, ranked.bestTime) AS pb
-            FROM (
-                SELECT p.trackNameWS, p.bestTime, p.display_millis,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY p.trackNameWS
-                           ORDER BY
-""" + officialOrderBy("p.") + """
-                       ) AS rn
-                FROM fr_player_times p
-                WHERE p.player_name = ? AND p.finished = TRUE
-            ) ranked
-            WHERE ranked.rn = 1
-            """;
+        String sql =
+            "SELECT ranked.trackNameWS, " +
+            "COALESCE(ranked.display_millis / 1000.0, ranked.bestTime) AS pb " +
+            "FROM ( " +
+            "SELECT p.trackNameWS, p.bestTime, p.display_millis, " +
+            "ROW_NUMBER() OVER ( " +
+            "PARTITION BY p.trackNameWS " +
+            "ORDER BY " + officialOrderBy("p.") + " " +
+            ") AS rn " +
+            "FROM fr_player_times p " +
+            "WHERE p.player_name = ? AND p.finished = TRUE " +
+            ") ranked " +
+            "WHERE ranked.rn = 1";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
