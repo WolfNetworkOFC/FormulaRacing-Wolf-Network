@@ -174,13 +174,12 @@ public class DuelCommand extends BaseCommand implements Listener {
 
         for (String trackName : tracks) {
             if (slot >= 45) break;
-            ItemStack iconStack = databaseManager.getTrackIconData(trackName).toItemStack();
-            ItemMeta iconMeta = iconStack.getItemMeta();
-            if (iconMeta != null) {
-                iconMeta.setDisplayName("§b" + trackName);
-                iconMeta.setLore(Collections.singletonList("§7Click to select this track"));
-                iconStack.setItemMeta(iconMeta);
-            }
+            // Name/lore on the same ItemMeta as the icon's block state (e.g. LIGHT
+            // level) so the level isn't dropped by a second meta round-trip.
+            ItemStack iconStack = databaseManager.getTrackIconData(trackName).toItemStack(
+                "§b" + trackName,
+                Collections.singletonList("§7Click to select this track")
+            );
             inv.setItem(slot++, iconStack);
         }
 

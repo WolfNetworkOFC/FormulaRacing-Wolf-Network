@@ -232,6 +232,43 @@ public class GhostManager {
     }
 
     // ========================
+    //  RENAME (track renamed)
+    // ========================
+
+    /**
+     * Renomeia no disco todos os ghosts guardados para uma pista. Usa o mesmo
+     * {@link #sanitizeFileName(String)} do caminho de gravação, pelo que o novo
+     * ficheiro é exatamente o que o plugin procura depois. Também descarta as
+     * entradas de cache antigas.
+     */
+    public synchronized void renameTrack(String oldTrackName, String newTrackName) {
+        if (oldTrackName == null || newTrackName == null) return;
+        String oldSafe = sanitizeFileName(oldTrackName);
+        String newSafe = sanitizeFileName(newTrackName);
+        if (oldSafe.equals(newSafe)) return;
+
+        ghostCache.keySet().removeIf(key -> key.endsWith(":" + oldSafe));
+
+        File[] playerFolders = ghostsRootFolder.listFiles(File::isDirectory);
+        if (playerFolders == null) return;
+
+        int renamed = 0;
+        for (File playerFolder : playerFolders) {
+            File oldGhost = new File(playerFolder, oldSafe + ".json");
+            if (!oldGhost.exists()) continue;
+            File newGhost = new File(playerFolder, newSafe + ".json");
+            if (oldGhost.renameTo(newGhost)) {
+                renamed++;
+            } else {
+                plugin.getDebugManager().logTimeTrialSystem(
+                        "[GHOST-RENAME] Falha ao renomear ghost " + oldGhost.getAbsolutePath());
+            }
+        }
+        plugin.getDebugManager().logTimeTrialSystem(
+                "[GHOST-RENAME] " + renamed + " ghost(s) renomeado(s) '" + oldSafe + "' -> '" + newSafe + "'");
+    }
+
+    // ========================
     //  REPLAY (ArmorStand + Heart Particles)
     // ========================
 

@@ -472,6 +472,13 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                             SchedulerHelper.teleportAsync(player, spawn).thenAccept(success -> {
                                 if (Boolean.TRUE.equals(success)) {
                                     this.api.spawnBoatAt(player, spawn, false, false, false);
+                                    // O barco novo nasce com física vanilla: o OpenBoatUtils perde
+                                    // a config da pista quando a entidade do barco troca. Reenvia o
+                                    // pacote (mesmo efeito do /tt) ou o reset deixa o barco vanilla.
+                                    if (this.packetsender != null) {
+                                        this.packetsender.resetBoatUtilsToVanilla(player);
+                                        this.packetsender.applyBoatUtilsToPlayer(player, finalTrackName);
+                                    }
                                     // Apply track game time (day/night cycle)
                                     this.plugin.applyTrackGameTime(player, finalTrackName);
                                     // Set time trial hotbar after teleport + boat spawn

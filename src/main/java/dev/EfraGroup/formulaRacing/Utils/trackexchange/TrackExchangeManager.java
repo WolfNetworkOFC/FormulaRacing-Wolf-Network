@@ -500,6 +500,10 @@ public class TrackExchangeManager {
 
             plugin.getRegionListener().reloadRegions();
 
+            // A imported track has a new geometry, so any delta stored for it is stale.
+            db.clearCheckpointTimesForTrack(trackNameWS);
+            db.clearCheckpointsCache(trackNameWS);
+
             player.sendMessage("§aPista '" + finalTrackNameFinal + "' importada com sucesso!");
 
             // Paste schematic if present

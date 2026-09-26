@@ -213,10 +213,8 @@ public class ScoreboardTimeTrialUtils {
             player,
             this.boldTitle(tu.getTranslated(player, "scoreboard_tt_title"))
         );
-        // Compact mode (/settings compact) shrinks the board horizontally: shorter
-        // separator lines so they don't keep the board as wide as the normal layout.
+        // Compact mode (/settings compact) shrinks the board horizontally.
         boolean compact = this.isCompactMode(player);
-        String separator = "§l" + "§7" + (compact ? "------------" : "-------------------------");
         String footer = "§ewolfnetwork.com.br";
 
         List<String> lines = new ArrayList<>();
@@ -253,7 +251,6 @@ public class ScoreboardTimeTrialUtils {
             );
         }
 
-        lines.add(separator);
         lines.add("");
         lines.add(
             "§e§l" + tu.getTranslated(player, "scoreboard_tt_leaderboard")
@@ -303,7 +300,7 @@ public class ScoreboardTimeTrialUtils {
             );
         }
         if (includeSeparator) {
-            lines.add(separator);
+            lines.add("");
         }
         for (DatabaseManager.TrackRecord tr : neighbors) {
             int actualPos = allRecords.indexOf(tr) + 1;
@@ -448,6 +445,15 @@ public class ScoreboardTimeTrialUtils {
         }
         this.playerTracks.clear();
         this.playerTrackOwners.clear();
+    }
+
+    /**
+     * Invalida os caches por pista (melhores tempos e dono da pista). Usado quando
+     * uma pista é renomeada para o scoreboard não mostrar dados do nome antigo.
+     */
+    public void clearTrackCaches() {
+        this.leaderboardCache.clear();
+        this.trackOwnerCache.clear();
     }
 
     private static class CachedLeaderboard {

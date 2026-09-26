@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Bukkit;
@@ -219,57 +220,102 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             TrackMenuInfo info = session.currentView.get(i);
             inv.setItem(i - startIndex, this.createTrackItem(info, langCode));
         }
-        ItemStack glass = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
-        ItemMeta glassMeta = glass.getItemMeta();
-        glassMeta.setDisplayName(" ");
-        glass.setItemMeta(glassMeta);
+        // ---- Bottom control bar (slots 45-53) ----
+        ItemStack filler = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        ItemMeta fillerMeta = filler.getItemMeta();
+        fillerMeta.setDisplayName(" ");
+        filler.setItemMeta(fillerMeta);
         for (int i = 45; i < 54; ++i) {
-            inv.setItem(i, glass);
+            inv.setItem(i, filler);
         }
+
+        // Navigation
         if (session.page > 0) {
-            inv.setItem(
-                45,
-                this.createControlItem(
-                    Material.ARROW,
-                    "\u00a7a\u25c4 Previous Page"
+            inv.setItem(45, this.createControlItem(
+                Material.ARROW,
+                "\u00a7a\u00a7l\u25c4 Previous Page",
+                Arrays.asList(
+                    "\u00a77Page \u00a7e" + session.page + "\u00a77/\u00a7f" + totalPages,
+                    "\u00a78Go back one page.",
+                    "",
+                    "\u00a7eClick to go back"
                 )
-            );
+            ));
         }
+        if (session.page < totalPages - 1) {
+            inv.setItem(53, this.createControlItem(
+                Material.ARROW,
+                "\u00a7a\u00a7lNext Page \u25ba",
+                Arrays.asList(
+                    "\u00a77Page \u00a7e" + (session.page + 2) + "\u00a77/\u00a7f" + totalPages,
+                    "\u00a78Advance one page.",
+                    "",
+                    "\u00a7eClick to continue"
+                )
+            ));
+        }
+
+        // Sort / filter
         List<String> sortLore = Arrays.asList(
             "\u00a77Current: \u00a7e" + session.sort.label,
+            "\u00a78Reorders the track list.",
             "",
-            "\u00a7eClick to change!"
+            "\u00a7eClick to cycle the order"
         );
-        inv.setItem(
-            48,
-            this.createControlItem(
-                session.sort.icon,
-                "\u00a76Sorting",
-                sortLore
-            )
-        );
+        inv.setItem(48, this.createControlItem(
+            session.sort.icon,
+            "\u00a76\u00a7lSorting",
+            sortLore
+        ));
         List<String> filterLore = Arrays.asList(
             "\u00a77Showing: \u00a7e" + session.filter.label,
+            "\u00a78Hides tracks you don't need.",
             "",
-            "\u00a7eClick to change!"
+            "\u00a7eClick to cycle the filter"
         );
-        inv.setItem(
-            50,
-            this.createControlItem(
-                session.filter.icon,
-                "\u00a7bFilter",
-                filterLore
+        inv.setItem(50, this.createControlItem(
+            session.filter.icon,
+            "\u00a76\u00a7lFilter",
+            filterLore
+        ));
+
+        // Page info (centre)
+        int firstShown = totalItems == 0 ? 0 : startIndex + 1;
+        inv.setItem(49, this.createControlItem(
+            Material.PAPER,
+            "\u00a7b\u00a7lTrack Browser",
+            Arrays.asList(
+                "\u00a77Page: \u00a7e" + (session.page + 1) + "\u00a77/\u00a7f" + totalPages,
+                "\u00a77Showing: \u00a7e" + firstShown + "-\u00a7e" + endIndex + "\u00a77/\u00a7f" + totalItems,
+                "",
+                "\u00a77Sort: \u00a7e" + session.sort.label,
+                "\u00a77Filter: \u00a7e" + session.filter.label
             )
-        );
-        if (session.page < totalPages - 1) {
-            inv.setItem(
-                53,
-                this.createControlItem(
-                    Material.ARROW,
-                    "\u00a7aNext Page \u25ba"
-                )
-            );
-        }
+        ));
+
+        // Random track
+        inv.setItem(47, this.createControlItem(
+            Material.ENDER_EYE,
+            "\u00a7d\u00a7lRandom Track",
+            Arrays.asList(
+                "\u00a77Picks a track at random from",
+                "\u00a77the current list and starts it.",
+                "",
+                "\u00a7eClick to play a random track"
+            )
+        ));
+
+        // Close
+        inv.setItem(52, this.createControlItem(
+            Material.BARRIER,
+            "\u00a7c\u00a7lClose",
+            Arrays.asList(
+                "\u00a77Close this menu.",
+                "",
+                "\u00a7eClick to close"
+            )
+        ));
+
         player.openInventory(inv);
         session.refreshing = false;
     }
@@ -324,48 +370,35 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     }
 
     private ItemStack createTrackItem(TrackMenuInfo info, String langCode) {
-        ItemStack item = info.iconData.toItemStack();
-        ItemMeta meta = item.getItemMeta();
+        List<String> lore = new ArrayList<>();
+        String difficulty = info.difficulty == null || info.difficulty.isBlank()
+            ? "UNKNOWN"
+            : info.difficulty.toUpperCase();
+        if (difficulty.equals("EXTREME")) {
+            difficulty = "INSANE";
+        }
+        lore.add(getDifficultyColor(difficulty) + difficulty + " §7▶ §a" + info.timeCount);
+        lore.add(
+            "§7by §f" + (info.trackData.getOwnerName() == null
+                ? "Unknown"
+                : info.trackData.getOwnerName())
+        );
 
-        if (meta != null) {
-            meta.setDisplayName("§f§l" + info.trackName);
-
-            List<String> lore = new ArrayList<>();
-            String difficulty = info.difficulty == null || info.difficulty.isBlank()
-                ? "UNKNOWN"
-                : info.difficulty.toUpperCase();
-            if (difficulty.equals("EXTREME")) {
-                difficulty = "INSANE";
-            }
-            lore.add(getDifficultyColor(difficulty) + difficulty + " §7▶ §a" + info.timeCount);
-            lore.add(
-                "§7by §f" + (info.trackData.getOwnerName() == null
-                    ? "Unknown"
-                    : info.trackData.getOwnerName())
-            );
-
-            if (!info.tags.isEmpty()) {
-                lore.add("");
-                lore.add(
-                    info.tags.stream()
-                        .map(tag -> "§e" + ChatColor.translateAlternateColorCodes('&', tag))
-                        .collect(Collectors.joining("§7, "))
-                );
-            }
-
-            String wr = (info.worldRecordTime == null)
-                ? "§c---"
-                : "§6" + this.formatTime(info.worldRecordTime);
-            lore.add("§fRecorde mundial: " + wr);
+        if (!info.tags.isEmpty()) {
             lore.add("");
-            lore.add("§a▶ Click to play!");
-
-            // Now the compiler accepts the lore correctly
-            meta.setLore(lore);
-            item.setItemMeta(meta);
+            lore.add(
+                info.tags.stream()
+                    .map(tag -> "§e" + ChatColor.translateAlternateColorCodes('&', tag))
+                    .collect(Collectors.joining("§7, "))
+            );
         }
 
-        return item;
+        lore.add("");
+        lore.add("§a▶ Click to play!");
+
+        // Name/lore are applied on the same ItemMeta as the icon's block state
+        // (e.g. LIGHT level), so the level survives the menu round-trip.
+        return info.iconData.toItemStack("§f§l" + info.trackName, lore);
     }
 
     private String getDifficultyColor(String difficulty) {
@@ -471,6 +504,16 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                     this.openPage(player);
                     break;
                 }
+                case 47: {
+                    if (session.currentView.isEmpty()) break;
+                    TrackMenuInfo random = session.currentView.get(
+                        ThreadLocalRandom.current().nextInt(session.currentView.size())
+                    );
+                    session.trackSelected = true;
+                    player.closeInventory();
+                    this.startTrackFromMenu(player, random.trackName, session);
+                    break;
+                }
                 case 48: {
                     session.sort = session.sort.next();
                     this.applySortAndFilter(session);
@@ -481,6 +524,11 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                     session.filter = session.filter.next();
                     this.applySortAndFilter(session);
                     this.openPage(player);
+                    break;
+                }
+                case 52: {
+                    player.closeInventory();
+                    break;
                 }
             }
             return;

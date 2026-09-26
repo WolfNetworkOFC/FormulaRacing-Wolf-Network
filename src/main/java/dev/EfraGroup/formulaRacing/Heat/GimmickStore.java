@@ -74,8 +74,11 @@ public final class GimmickStore {
 
     /** heatId -> triggerLap schedules stored in the gimmick file. */
     public synchronized Map<Integer, Integer> loadSchedules(GimmickConfig gimmick) {
+        return readSchedules(resolveFile(gimmick));
+    }
+
+    private Map<Integer, Integer> readSchedules(File file) {
         Map<Integer, Integer> result = new LinkedHashMap<>();
-        File file = resolveFile(gimmick);
         if (file == null || !file.exists()) return result;
         try (Reader reader = new FileReader(file, StandardCharsets.UTF_8)) {
             JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
@@ -90,6 +93,21 @@ public final class GimmickStore {
         } catch (Exception ignored) {
         }
         return result;
+    }
+
+    /**
+     * Move o ficheiro de definição quando a pista é renomeada, preservando os
+     * schedules do heat. O {@code gimmick} já deve trazer o novo trackNameWS.
+     */
+    public synchronized void renameTrack(GimmickConfig gimmick, String oldTrackNameWS) {
+        if (gimmick == null) return;
+        File oldFile = resolveFile(gimmick.getName(), oldTrackNameWS);
+        Map<Integer, Integer> schedules = readSchedules(oldFile);
+        write(gimmick, schedules);
+        File newFile = resolveFile(gimmick);
+        if (oldFile != null && oldFile.exists() && (newFile == null || !oldFile.equals(newFile))) {
+            oldFile.delete();
+        }
     }
 
     /** Persists the definition, keeping existing schedules. */
@@ -143,13 +161,17 @@ public final class GimmickStore {
 
     private File resolveFile(GimmickConfig gimmick) {
         if (gimmick == null) return null;
+        return resolveFile(gimmick.getName(), gimmick.getTrackNameWS());
+    }
+
+    private File resolveFile(String name, String trackNameWS) {
         // Exact match first.
-        File exact = fileOf(gimmick.getName(), gimmick.getTrackNameWS());
+        File exact = fileOf(name, trackNameWS);
         if (exact.exists()) return exact;
         // Case-insensitive fallback: find the existing file.
-        File[] files = folder.listFiles((dir, name) -> name.endsWith(".json"));
+        File[] files = folder.listFiles((dir, n) -> n.endsWith(".json"));
         if (files == null) return exact;
-        String wanted = fileName(gimmick.getName(), gimmick.getTrackNameWS());
+        String wanted = fileName(name, trackNameWS);
         for (File file : files) {
             if (file.getName().equalsIgnoreCase(wanted)) return file;
         }

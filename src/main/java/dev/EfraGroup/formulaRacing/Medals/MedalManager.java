@@ -447,6 +447,29 @@ public class MedalManager {
     }
 
     /**
+     * Renomeia o ficheiro de medalhas da pista ({@code medals/<pista>_medals.json})
+     * e invalida os caches em memória quando a pista é renomeada. Os tempos no
+     * banco de dados são renomeados pelo DatabaseManager.
+     */
+    public synchronized void renameTrack(String oldTrackName, String newTrackName) {
+        String oldWS = norm(oldTrackName);
+        String newWS = norm(newTrackName);
+        if (oldWS.isEmpty() || oldWS.equals(newWS)) return;
+
+        File oldFile = new File(medalsFolder, safeName(oldWS) + "_medals.json");
+        File newFile = new File(medalsFolder, safeName(newWS) + "_medals.json");
+        if (oldFile.exists() && !oldFile.equals(newFile) && !oldFile.renameTo(newFile)) {
+            plugin.getDebugManager().logTimeTrialSystem(
+                    "[MEDALS] Falha ao renomear JSON: " + oldFile.getName());
+        }
+
+        medalLineCache.remove(oldWS);
+        medalTimesCache.remove(oldWS);
+        medalLineCache.remove(newWS);
+        medalTimesCache.remove(newWS);
+    }
+
+    /**
      * Remove um record pendente (ex.: quando o jogador sai do servidor).
      */
     public void clearPending(UUID uuid) {

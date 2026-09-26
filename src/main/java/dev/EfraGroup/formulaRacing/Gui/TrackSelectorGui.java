@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.function.Consumer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 public class TrackSelectorGui extends BaseGui {
     public TrackSelectorGui(FormulaRacing plugin, Player player, Consumer<String> onTrackSelected) {
@@ -30,14 +29,12 @@ public class TrackSelectorGui extends BaseGui {
             String trackName = (String)entry.getKey();
             if (db.isTrackOpen(trackName)) {
                 DatabaseManager.TrackIconData iconData = db.getTrackIconData(trackName);
-                ItemStack item = iconData.toItemStack();
-
-                ItemMeta meta = item.getItemMeta();
-                if (meta != null) {
-                    meta.setDisplayName("§e" + trackName);
-                    meta.setLore(plugin.getTranslationList("gui_track_lore_select", langCode, new String[0]));
-                    item.setItemMeta(meta);
-                }
+                // Name/lore on the same ItemMeta as the icon's block state (e.g. LIGHT
+                // level) so the level isn't dropped by a second meta round-trip.
+                ItemStack item = iconData.toItemStack(
+                    "§e" + trackName,
+                    plugin.getTranslationList("gui_track_lore_select", langCode, new String[0])
+                );
 
                 this.setItem(new GuiButton(item, (event) -> {
                     event.getWhoClicked().closeInventory();

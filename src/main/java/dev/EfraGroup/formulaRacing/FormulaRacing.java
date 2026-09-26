@@ -1131,6 +1131,54 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         });
     }
 
+    /**
+     * Remove qualquer leaderboard em memória registado para uma pista e apaga os
+     * respetivos hologramas. Aceita tanto a chave em WS (sem espaços) como o nome
+     * de exibição, porque o mapa é populado com os dois formatos dependendo da
+     * origem (loadLeaderboards vs comandos).
+     */
+    public void removeTrackLeaderboard(String trackName) {
+        if (trackName == null) return;
+        String ws = trackName.replaceAll("\\s+", "");
+        List<String> keys = new ArrayList<>();
+        for (String key : new ArrayList<>(trackLeaderboards.keySet())) {
+            if (
+                key.equalsIgnoreCase(trackName) ||
+                key.replaceAll("\\s+", "").equalsIgnoreCase(ws)
+            ) {
+                keys.add(key);
+            }
+        }
+        for (String key : keys) {
+            TrackLeaderboard board = trackLeaderboards.remove(key);
+            if (board != null) {
+                board.removeHologram();
+            }
+        }
+    }
+
+    /**
+     * Atualiza as referências em memória à pista antiga (último track de TT/duelo
+     * de cada jogador) quando uma pista é renomeada, para ninguém ficar preso ao
+     * nome antigo até reiniciar.
+     */
+    public void remapLastTrackReferences(String oldTrackName, String newTrackName) {
+        if (oldTrackName == null || newTrackName == null) return;
+        String oldWS = oldTrackName.replaceAll("\\s+", "");
+        for (Map.Entry<UUID, String> entry : new ArrayList<>(lastTimeTrialTrack.entrySet())) {
+            String value = entry.getValue();
+            if (value != null && value.replaceAll("\\s+", "").equalsIgnoreCase(oldWS)) {
+                lastTimeTrialTrack.put(entry.getKey(), newTrackName);
+            }
+        }
+        for (Map.Entry<UUID, String> entry : new ArrayList<>(lastDuelTrack.entrySet())) {
+            String value = entry.getValue();
+            if (value != null && value.replaceAll("\\s+", "").equalsIgnoreCase(oldWS)) {
+                lastDuelTrack.put(entry.getKey(), newTrackName);
+            }
+        }
+    }
+
     private void loadLeaderboards() {
         if (this.leaderboardsLoaded) {
             return;

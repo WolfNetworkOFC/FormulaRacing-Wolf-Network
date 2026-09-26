@@ -49,6 +49,46 @@ public class TrackEditorCommand extends BaseCommand {
     private final TrackExchangeManager trackExchange;
     private final Map<UUID, String> selectedTracks = new HashMap<>();
 
+    /**
+     * Columns printed by /te boatutils list: {dbKey, label, vanillaValue}. The vanilla
+     * defaults mirror the constants in {@link dev.EfraGroup.formulaRacing.PacketSender#applyBoatUtilsToPlayer},
+     * which is what decides whether a stored value is actually sent to the client.
+     */
+    private static final Object[][] BOAT_UTILS_FIELDS = {
+        { "stepHeight", "Step Height", 0.0f },
+        { "defaultSlipperiness", "Default Slipperiness", 0.6f },
+        { "fallDamage", "Fall Damage", Boolean.TRUE },
+        { "waterElevation", "Water Elevation", Boolean.FALSE },
+        { "airControl", "Air Control", Boolean.FALSE },
+        { "jumpForce", "Jump Force", 0.0f },
+        { "gravity", "Gravity", -0.03999999910593033d },
+        { "yawAcceleration", "Yaw Acceleration", 1.0f },
+        { "forwardAcceleration", "Forward Acceleration", 0.04f },
+        { "backwardAcceleration", "Backward Acceleration", 0.005f },
+        { "turningForwardAcceleration", "Turning Forward Acceleration", 0.005f },
+        { "allowAccelerationStacking", "Allow Acceleration Stacking", Boolean.TRUE },
+        { "underwaterControl", "Underwater Control", Boolean.FALSE },
+        { "surfaceWaterControl", "Surface Water Control", Boolean.FALSE },
+        { "coyoteTime", "Coyote Time", 0 },
+        { "waterJumping", "Water Jumping", Boolean.FALSE },
+        { "swimForce", "Swim Force", 0.0f },
+        { "collisionMode", "Collision Mode", 0 },
+        { "airStepping", "Air Stepping", Boolean.FALSE },
+        { "tenStepInterpolation", "Ten Step Interpolation", Boolean.FALSE },
+        { "collisionResolution", "Collision Resolution", 5 },
+        { "walltapMultiplier", "Walltap Multiplier", 0.0f },
+        { "jumps", "Jumps", 1 },
+        { "scale", "Scale", 1.0f },
+        { "stepUpSlipperiness", "Step Up Slipperiness", 1.0f },
+        { "fixDoubleWaterElevation", "Fix Double Water Elevation", Boolean.FALSE },
+        { "lateralSlipperiness", "Lateral Slipperiness", 1.0f },
+        { "brakeSlipperiness", "Brake Slipperiness", 1.0f },
+        { "multiStepping", "Multi Stepping", Boolean.FALSE },
+        { "maxSpeed", "Max Speed", -1.0f },
+        { "maxSpeedResistance", "Max Speed Resistance", 0.0f },
+        { "honeyCompatibility", "Honey Compatibility", Boolean.FALSE }
+    };
+
     public TrackEditorCommand(FormulaRacing plugin, DatabaseManager mysql, PacketSender packetSender, WorldEditSelect worldEditSelect, TrackExchangeManager trackExchange) {
         this.plugin = plugin;
         this.mysql = mysql;
@@ -258,17 +298,115 @@ public class TrackEditorCommand extends BaseCommand {
         }
 
         boolean success = this.mysql.renameTrack(trackName, newName);
-        if (success) {
-            player.sendMessage("§a✅ Track renamed to '" + newName + "'!");
-            player.sendMessage("§7All database references, regions, checkpoints, "
-                    + "boatutils settings, ghost files, and leaderboards have been updated.");
-            this.plugin.getTrackLeaderboards().remove(trackNameWS);
-            org.bukkit.Location holoLoc = this.mysql.getHologramLocation(newNameWS);
-            if (holoLoc != null) {
-                this.plugin.getOrCreateLeaderboard(newNameWS, holoLoc);
-            }
-        } else {
+        if (!success) {
             player.sendMessage("§c❌ Error renaming track. Check console for details.");
+            return;
+        }
+
+        player.sendMessage("§a✅ Track renamed to '" + newName + "'!");
+        renameExternalReferences(trackName, newName, trackNameWS, newNameWS);
+        player.sendMessage("§7All database references, regions, checkpoints, boatutils "
+                + "settings, medals, gimmicks, ghost/AI files, holograms, weather and "
+                + "configs have been updated.");
+    }
+
+    /**
+     * Renomeia tudo o que vive fora do banco de dados: ficheiros (ghosts, medalhas,
+     * gimmicks, linhas de IA), hologramas/leaderboards, configs (weather.yml e
+     * daily-race) e caches em memória. Cada passo é isolado para que uma falha
+     * pontual não impeça os restantes (a transação da DB já foi concluída).
+     */
+    private void renameExternalReferences(String trackName, String newName, String trackNameWS, String newNameWS) {
+        FormulaRacing plugin = this.plugin;
+
+        // 1. Ficheiros em disco
+        try {
+            plugin.getGhostManager().renameTrack(trackNameWS, newNameWS);
+        } catch (Exception e) {
+            plugin.getDebugManager().logDatabaseOperation("[RENAME] ⚠️ ghost: " + e.getMessage());
+        }
+        try {
+            plugin.getMedalManager().renameTrack(trackNameWS, newNameWS);
+        } catch (Exception e) {
+            plugin.getDebugManager().logDatabaseOperation("[RENAME] ⚠️ medals: " + e.getMessage());
+        }
+        try {
+            plugin.getGimmickManager().renameTrack(trackNameWS, newNameWS);
+        } catch (Exception e) {
+            plugin.getDebugManager().logDatabaseOperation("[RENAME] ⚠️ gimmicks: " + e.getMessage());
+        }
+        try {
+            plugin.getAIRacingLineManager().renameTrack(trackNameWS, newNameWS);
+        } catch (Exception e) {
+            plugin.getDebugManager().logDatabaseOperation("[RENAME] ⚠️ ailines: " + e.getMessage());
+        }
+
+        // 2. Weather por pista (weather.yml)
+        try {
+            plugin.getWeatherManager().getConfigManager().renameDynamicWeather(trackNameWS, newNameWS);
+        } catch (Exception e) {
+            plugin.getDebugManager().logDatabaseOperation("[RENAME] ⚠️ weather: " + e.getMessage());
+        }
+
+        // 3. config.yml (daily-race)
+        try {
+            renameDailyRaceConfig(trackNameWS, newNameWS);
+        } catch (Exception e) {
+            plugin.getDebugManager().logDatabaseOperation("[RENAME] ⚠️ config: " + e.getMessage());
+        }
+
+        // 4. Leaderboards / hologramas (apaga os antigos e recria com o novo nome)
+        try {
+            plugin.removeTrackLeaderboard(trackName);
+        } catch (Exception e) {
+            plugin.getDebugManager().logDatabaseOperation("[RENAME] ⚠️ leaderboard remove: " + e.getMessage());
+        }
+        try {
+            org.bukkit.Location holoLoc = this.mysql.getHologramLocation(newNameWS);
+            dev.EfraGroup.formulaRacing.TrackLeaderboard board =
+                    plugin.getOrCreateLeaderboard(newName, holoLoc);
+            board.updateJavaLeaderboard();
+            board.updateBedrockLeaderboard();
+        } catch (Exception e) {
+            plugin.getDebugManager().logDatabaseOperation("[RENAME] ⚠️ leaderboard create: " + e.getMessage());
+        }
+
+        // 5. Caches em memória
+        this.mysql.clearCheckpointsCache(null);
+        try {
+            plugin.getTrackIntegrationManager().clearCheckpointCache(null);
+        } catch (Exception ignored) {}
+        try {
+            plugin.getRegionListener().reloadRegions();
+        } catch (Exception ignored) {}
+        try {
+            plugin.getScoreboardTimeTrialUtils().clearTrackCaches();
+        } catch (Exception ignored) {}
+        plugin.remapLastTrackReferences(trackNameWS, newNameWS);
+    }
+
+    private void renameDailyRaceConfig(String trackNameWS, String newNameWS) {
+        org.bukkit.configuration.file.FileConfiguration cfg = this.plugin.getConfig();
+        String oldNorm = trackNameWS.replaceAll("\\s+", "");
+        boolean changed = false;
+
+        String lastTrack = cfg.getString("daily-race.last-track");
+        if (lastTrack != null && lastTrack.replaceAll("\\s+", "").equalsIgnoreCase(oldNorm)) {
+            cfg.set("daily-race.last-track", newNameWS);
+            changed = true;
+        }
+
+        List<String> exclude = cfg.getStringList("daily-race.exclude-tracks");
+        for (int i = 0; i < exclude.size(); i++) {
+            String entry = exclude.get(i);
+            if (entry != null && entry.replaceAll("\\s+", "").equalsIgnoreCase(oldNorm)) {
+                exclude.set(i, newNameWS);
+                changed = true;
+            }
+        }
+        if (changed) {
+            cfg.set("daily-race.exclude-tracks", exclude);
+            this.plugin.saveConfig();
         }
     }
 
@@ -1206,6 +1344,87 @@ public class TrackEditorCommand extends BaseCommand {
         String trackName = track.replace(" ", "").toLowerCase();
         this.mysql.resetBoatUtilsSettings(trackName);
         player.sendMessage("§a✔ BoatUtils settings reset to §fVanilla §aon track §e" + trackName);
+    }
+
+    @Subcommand("boatutils list")
+    @Description("Lists all BoatUtils settings of a track")
+    @CommandCompletion("@tracks")
+    public void onBoatUtilsList(Player player, @Optional String trackArg) {
+        String trackName = this.getTargetTrack(player, trackArg);
+        if (trackName == null) {
+            return;
+        }
+
+        String normalized = trackName.replace(" ", "").toLowerCase();
+        if (!this.mysql.trackHaveBoatUtils(normalized)) {
+            player.sendMessage("§eTrack §f" + trackName + " §ehas no BoatUtils configuration (everything is vanilla).");
+            return;
+        }
+
+        Map<String, Object> data = this.mysql.getBoatUtilsRaw(normalized);
+        if (data == null || data.isEmpty()) {
+            player.sendMessage("§eTrack §f" + trackName + " §ehas no BoatUtils configuration.");
+            return;
+        }
+
+        player.sendMessage("§6§lBoatUtils §7(§f" + trackName + "§7)");
+        player.sendMessage("§8» §7non-default values in §agreen§7, vanilla in §8gray§8");
+
+        int custom = 0;
+        for (Object[] entry : BOAT_UTILS_FIELDS) {
+            String key = (String) entry[0];
+            String label = (String) entry[1];
+            Object vanilla = entry[2];
+            Object value = data.get(key);
+
+            if (value == null) {
+                continue;
+            }
+
+            boolean isDefault = vanilla instanceof Number && value instanceof Number
+                    ? ((Number) vanilla).doubleValue() == ((Number) value).doubleValue()
+                    : vanilla.equals(value);
+
+            if (isDefault) {
+                player.sendMessage(" §8• §7" + label + " §8= §8" + formatBoatUtilsValue(value));
+            } else {
+                player.sendMessage(" §8• §7" + label + " §8= §a" + formatBoatUtilsValue(value)
+                        + " §8(vanilla: §7" + formatBoatUtilsValue(vanilla) + "§8)");
+            }
+        }
+
+        String perBlock = (String) data.get("perBlockSetting");
+        if (perBlock != null && !perBlock.isEmpty()) {
+            player.sendMessage(" §8• §7Per Block Setting §8= §a" + perBlock);
+            custom++;
+        }
+
+        String collisionFilter = (String) data.get("collisionFilter");
+        if (collisionFilter != null && !collisionFilter.isEmpty()) {
+            player.sendMessage(" §8• §7Collision Filter §8= §a" + collisionFilter);
+            custom++;
+        }
+
+        Map<String, Float> slipMap = this.mysql.getCustomSlipperiness(normalized);
+        if (slipMap != null && !slipMap.isEmpty()) {
+            player.sendMessage(" §8• §7Custom Slipperiness §8= §a" + slipMap.size() + " §7entries §8(§ate"
+                    + " /te boatutils config customslipperiness list §8)");
+        }
+
+        if (custom == 0 && (slipMap == null || slipMap.isEmpty())) {
+            player.sendMessage("§8» §7All values are vanilla.");
+        }
+    }
+
+    /** Renders a BoatUtils value without trailing noise (1.0 instead of 1.0f, false instead of false). */
+    private String formatBoatUtilsValue(Object value) {
+        if (value instanceof Float f) {
+            return String.valueOf(f.floatValue());
+        }
+        if (value instanceof Double d) {
+            return String.valueOf(d.doubleValue());
+        }
+        return String.valueOf(value);
     }
 
     @Subcommand("boatutils group set")
