@@ -1533,9 +1533,6 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         if (this.wolfTimingService != null) {
             this.wolfTimingService.cleanupPlayer(uuid);
         }
-        if (this.raceCheckpointListener != null) {
-            this.raceCheckpointListener.cleanupPlayer(uuid);
-        }
         if (this.driverLookup != null) {
             this.driverLookup.unregister(uuid);
         }

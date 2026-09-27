@@ -1071,11 +1071,6 @@ public class Heats {
             if (this.plugin.getRegionListener() != null) {
                 this.plugin.getRegionListener().cleanupHeatPlayers(driverUUIDs);
             }
-            if (this.plugin.getRaceCheckpointListener() != null) {
-                this.plugin.getRaceCheckpointListener().cleanupHeatPlayers(
-                    driverUUIDs
-                );
-            }
             this.plugin.getLonelyController().clearGhostForPlayers(
                 this.drivers.keySet()
             );
@@ -1406,11 +1401,6 @@ public class Heats {
             for (UUID uuid : this.drivers.keySet()) {
                 this.plugin.getDriverLookup().unregister(uuid);
             }
-        }
-
-        // Clear checkpoints in listener (prevents cooldown blocking new CPs)
-        if (this.plugin.getRaceCheckpointListener() != null) {
-            this.plugin.getRaceCheckpointListener().cleanupHeatPlayers(this.drivers.keySet());
         }
 
         // Return to initial state

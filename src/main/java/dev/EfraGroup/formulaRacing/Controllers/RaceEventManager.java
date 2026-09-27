@@ -1019,9 +1019,6 @@ public class RaceEventManager {
                 if (this.plugin.getRegionListener() != null) {
                     this.plugin.getRegionListener().cleanupHeatPlayers(heat.getDrivers().keySet());
                 }
-                if (this.plugin.getRaceCheckpointListener() != null) {
-                    this.plugin.getRaceCheckpointListener().cleanupHeatPlayers(heat.getDrivers().keySet());
-                }
             }
             round.getHeats().clear();
         }
