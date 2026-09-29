@@ -1029,6 +1029,10 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
         Player player = Bukkit.getPlayer(uuid);
         this.playerStates.remove(uuid);
         playersBeingLapReset.remove(uuid);
+        // Devolve a preferência de time trial do jogador (ver suspendTimeTrialFlag).
+        // Depois disso o RegionListener auto-inicia o TT dele ao cruzar a
+        // linha, se ainda estiver apontando pra esta pista.
+        this.dm.restoreTimeTrialFlag(uuid);
         if (player != null && player.isOnline()) {
             this.ttda.stopAll(player);
             this.scoreboardDuelsUtils.removeBoard(player);
@@ -1089,7 +1093,11 @@ SchedulerHelper.runTaskFor(this.plugin, p1, () -> {
         if (player != null && player.isOnline()) {
             UUID uuid = player.getUniqueId();
             this.plugin.getTimerUtils().stopTimer(player);
-            this.dm.setTimeTrialEnabled(uuid, false);
+            // Suspende (guardando o valor anterior) em vez de zerar o flag: sem
+            // isso o time trial do jogador ficava desativado para sempre depois
+            // do duelo e ele recebia o aviso de "Time Trial desativado" ao
+            // voltar a cruzar a linha de largada.
+            this.dm.suspendTimeTrialFlag(uuid);
             SchedulerHelper.runTask(this.plugin, () -> {
                 if (player.isOnline()) {
                     player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(""));

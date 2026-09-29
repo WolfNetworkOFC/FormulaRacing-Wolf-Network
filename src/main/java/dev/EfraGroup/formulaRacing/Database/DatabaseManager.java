@@ -56,6 +56,8 @@ public class DatabaseManager {
         new ConcurrentHashMap<>();
     private final Map<UUID, String> playerColor2Cache =
         new ConcurrentHashMap<>();
+    private final Map<UUID, Boolean> suspendedTimeTrialFlag =
+        new ConcurrentHashMap<>();
 
     public enum DatabaseType {
         SQLITE,
@@ -2392,6 +2394,36 @@ public class DatabaseManager {
 
         ttEnabledCache.put(playerUUID, enabled);
         return enabled;
+    }
+
+    /**
+     * Desliga o time trial de um jogador temporariamente (duelo, practice de
+     * corrida) guardando o valor anterior, para que restoreTimeTrialFlag()
+     * devolva a preferência real dele em vez de deixar o flag persistido em 0.
+     * Chamar de novo enquanto já está suspenso não sobrescreve o valor salvo.
+     */
+    public synchronized void suspendTimeTrialFlag(UUID playerUUID) {
+        if (this.suspendedTimeTrialFlag.containsKey(playerUUID)) {
+            return;
+        }
+        this.suspendedTimeTrialFlag.put(playerUUID, this.getTimeTrialEnabled(playerUUID));
+        this.setTimeTrialEnabled(playerUUID, false);
+    }
+
+    /**
+     * Devolve o flag de time trial ao valor que o jogador tinha antes de
+     * suspendTimeTrialFlag(). Não faz nada se o jogador não estiver suspenso.
+     */
+    public synchronized void restoreTimeTrialFlag(UUID playerUUID) {
+        Boolean previous = this.suspendedTimeTrialFlag.remove(playerUUID);
+        if (previous == null) {
+            return;
+        }
+        this.setTimeTrialEnabled(playerUUID, previous);
+    }
+
+    public synchronized boolean isTimeTrialFlagSuspended(UUID playerUUID) {
+        return this.suspendedTimeTrialFlag.containsKey(playerUUID);
     }
 
     public synchronized void setTimeTrialEnabled(

@@ -27,6 +27,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import net.md_5.bungee.api.chat.ClickEvent;
@@ -56,6 +57,8 @@ public class DailyRaceManager {
     private volatile String activeEventName;
     private volatile Phase phase;
     private volatile Long practiceStartTime;
+    // Participantes cujo flag de time trial foi suspenso ao entrar no practice.
+    private final java.util.Set<UUID> practiceSuspendedPlayers = ConcurrentHashMap.newKeySet();
 
     public DailyRaceManager(FormulaRacing plugin) {
         this.phase = DailyRaceManager.Phase.IDLE;
@@ -366,6 +369,7 @@ public class DailyRaceManager {
     }
 
     private void endPracticeAndStartQualification() {
+        this.restoreSuspendedTimeTrialFlags();
         Optional<Events> eventOpt = this.getActiveDailyEvent();
         if (eventOpt.isEmpty()) {
             this.resetRuntime();
@@ -473,7 +477,12 @@ public class DailyRaceManager {
 
     public void notifyPlayerJoinPractice(Player player) {
         if (this.phase == DailyRaceManager.Phase.PRACTICE) {
-            this.plugin.getDatabaseManager().setTimeTrialEnabled(player.getUniqueId(), false);
+            // Suspende o flag guardando o valor anterior: zerar deixava o time
+            // trial do jogador desativado permanentemente após o practice, e ele
+            // passava a receber o aviso de "Time Trial desativado" ao voltar a
+            // cruzar a linha de largada.
+            this.plugin.getDatabaseManager().suspendTimeTrialFlag(player.getUniqueId());
+            this.practiceSuspendedPlayers.add(player.getUniqueId());
             this.plugin.getTimerUtils().stopTimer(player);
             this.plugin.getScoreboardTimeTrialUtils().clearPlayerTrack(player);
             if (this.plugin.getPitStopManager() != null) {
@@ -514,6 +523,19 @@ public class DailyRaceManager {
     public void notifyPlayerCrossStartLine(Player player) {
         if (this.phase == DailyRaceManager.Phase.PRACTICE) {
             ;
+        }
+    }
+
+    /**
+     * Chamado quando o jogador sai do evento durante o practice: devolve a
+     * preferência de time trial dele imediatamente, em vez de esperar o fim do
+     * practice, para não deixar o flag zerado no banco durante todo o resto da
+     * corrida diária.
+     */
+    public void notifyPlayerLeavePractice(UUID uuid) {
+        if (this.practiceSuspendedPlayers.remove(uuid)) {
+            this.plugin.getDatabaseManager().restoreTimeTrialFlag(uuid);
+            this.plugin.getDebugManager().logRaceSystem("[DailyRace] Restored time trial flag for player leaving practice");
         }
     }
 
@@ -1001,7 +1023,25 @@ public class DailyRaceManager {
         fm.saveConfig();
     }
 
+    /**
+     * Devolve a preferência de time trial dos participantes do practice que
+     * tiveram o flag suspenso ao entrar (ver DatabaseManager#suspendTimeTrialFlag).
+     * Sem isso o jogador saía do practice com o time trial permanentemente
+     * desativado e era avisado a cada cruzamento da linha de largada.
+     */
+    private void restoreSuspendedTimeTrialFlags() {
+        if (this.practiceSuspendedPlayers.isEmpty()) {
+            return;
+        }
+        for (UUID uuid : this.practiceSuspendedPlayers) {
+            this.plugin.getDatabaseManager().restoreTimeTrialFlag(uuid);
+        }
+        this.practiceSuspendedPlayers.clear();
+        this.plugin.getDebugManager().logRaceSystem("[DailyRace] Restored time trial flag for practice participants");
+    }
+
     private void resetRuntime() {
+        this.restoreSuspendedTimeTrialFlags();
         this.activeEventId = null;
         this.activeEventName = null;
         this.phase = DailyRaceManager.Phase.IDLE;

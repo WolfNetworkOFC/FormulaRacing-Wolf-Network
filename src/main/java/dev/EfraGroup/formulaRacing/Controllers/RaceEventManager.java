@@ -933,6 +933,9 @@ public class RaceEventManager {
                 });
                 event.removeSubscriber(uuid);
                 this.playerActiveEvent.remove(uuid);
+                if (this.plugin.getDailyRaceManager() != null) {
+                    this.plugin.getDailyRaceManager().notifyPlayerLeavePractice(uuid);
+                }
                 player.sendMessage(
                     "§e⚠ Você saiu do evento: §f" + event.getDisplayName()
                 );

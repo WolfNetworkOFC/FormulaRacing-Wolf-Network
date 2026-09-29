@@ -1449,6 +1449,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.raceEventManager.removePlayerFromEvent(uuid);
         }
 
+        if (this.dailyRaceManager != null) {
+            this.dailyRaceManager.notifyPlayerLeavePractice(uuid);
+        }
+
         if (this.timeTrialController != null) {
             this.timeTrialController.endSession(uuid);
         }
