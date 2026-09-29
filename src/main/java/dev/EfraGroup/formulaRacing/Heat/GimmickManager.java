@@ -110,6 +110,41 @@ public class GimmickManager {
         scheduleCache.clear();
     }
 
+    /**
+     * Renomeia no disco todos os gimmicks de uma pista: o ficheiro de definição
+     * JSON ({@code gimmicks/<Nome>-<pista>.json}), os ficheiros de build e backup
+     * ({@code gimmicks/<pista>/}) e recarrega o cache em memória.
+     */
+    public synchronized void renameTrack(String oldTrackName, String newTrackName) {
+        String oldWS = GimmickConfig.normalizeTrack(oldTrackName);
+        String newWS = GimmickConfig.normalizeTrack(newTrackName);
+        if (oldWS == null || newWS == null || oldWS.equalsIgnoreCase(newWS)) return;
+
+        ensureDefinitionsLoaded();
+        List<GimmickConfig> affected = new ArrayList<>();
+        for (GimmickConfig gimmick : new ArrayList<>(gimmicksByKey.values())) {
+            if (oldWS.equalsIgnoreCase(GimmickConfig.normalizeTrack(gimmick.getTrackNameWS()))) {
+                affected.add(gimmick);
+            }
+        }
+
+        for (GimmickConfig gimmick : affected) {
+            String oldTrack = gimmick.getTrackNameWS();
+            gimmick.setTrackNameWS(newWS);
+            store.renameTrack(gimmick, oldTrack);
+        }
+
+        // Pasta das builds/backups: gimmicks/<pista>/
+        File oldFolder = GimmickFile.trackFolder(rootFolder, oldWS);
+        File newFolder = GimmickFile.trackFolder(rootFolder, newWS);
+        if (oldFolder.exists() && !newFolder.exists() && !oldFolder.renameTo(newFolder)) {
+            plugin.getDebugManager().logRaceSystem(
+                    "[GIMMICK] Falha ao renomear a pasta " + oldFolder.getName());
+        }
+
+        reload();
+    }
+
     public List<GimmickConfig> getGimmicksForTrack(String trackName) {
         ensureDefinitionsLoaded();
         String trackWS = GimmickConfig.normalizeTrack(trackName);

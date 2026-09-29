@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import org.bukkit.Bukkit;
@@ -217,59 +218,111 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         int endIndex = Math.min(startIndex + itemsPerPage, totalItems);
         for (int i = startIndex; i < endIndex; ++i) {
             TrackMenuInfo info = session.currentView.get(i);
-            inv.setItem(i - startIndex, this.createTrackItem(info, langCode));
+            inv.setItem(i - startIndex, this.createTrackItem(player, info, langCode));
         }
-        ItemStack glass = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
-        ItemMeta glassMeta = glass.getItemMeta();
-        glassMeta.setDisplayName(" ");
-        glass.setItemMeta(glassMeta);
+        // ---- Bottom control bar (slots 45-53) ----
+        ItemStack filler = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        ItemMeta fillerMeta = filler.getItemMeta();
+        fillerMeta.setDisplayName(" ");
+        filler.setItemMeta(fillerMeta);
         for (int i = 45; i < 54; ++i) {
-            inv.setItem(i, glass);
+            inv.setItem(i, filler);
         }
+
+        // Navigation
         if (session.page > 0) {
-            inv.setItem(
-                45,
-                this.createControlItem(
-                    Material.ARROW,
-                    "\u00a7a\u25c4 Previous Page"
+            inv.setItem(45, this.createControlItem(
+                player,
+                Material.ARROW,
+                "\u00a7a\u00a7l\u25c4 Previous Page",
+                Arrays.asList(
+                    "\u00a77Page \u00a7e" + session.page + "\u00a77/\u00a7f" + totalPages,
+                    "\u00a78Go back one page.",
+                    "",
+                    "\u00a7eClick to go back"
                 )
-            );
+            ));
         }
+        if (session.page < totalPages - 1) {
+            inv.setItem(53, this.createControlItem(
+                player,
+                Material.ARROW,
+                "\u00a7a\u00a7lNext Page \u25ba",
+                Arrays.asList(
+                    "\u00a77Page \u00a7e" + (session.page + 2) + "\u00a77/\u00a7f" + totalPages,
+                    "\u00a78Advance one page.",
+                    "",
+                    "\u00a7eClick to continue"
+                )
+            ));
+        }
+
+        // Sort / filter
         List<String> sortLore = Arrays.asList(
             "\u00a77Current: \u00a7e" + session.sort.label,
+            "\u00a78Reorders the track list.",
             "",
-            "\u00a7eClick to change!"
+            "\u00a7eClick to cycle the order"
         );
-        inv.setItem(
-            48,
-            this.createControlItem(
-                session.sort.icon,
-                "\u00a76Sorting",
-                sortLore
-            )
-        );
+        inv.setItem(48, this.createControlItem(
+            player,
+            session.sort.icon,
+            "\u00a76\u00a7lSorting",
+            sortLore
+        ));
         List<String> filterLore = Arrays.asList(
             "\u00a77Showing: \u00a7e" + session.filter.label,
+            "\u00a78Hides tracks you don't need.",
             "",
-            "\u00a7eClick to change!"
+            "\u00a7eClick to cycle the filter"
         );
-        inv.setItem(
-            50,
-            this.createControlItem(
-                session.filter.icon,
-                "\u00a7bFilter",
-                filterLore
+        inv.setItem(50, this.createControlItem(
+            player,
+            session.filter.icon,
+            "\u00a76\u00a7lFilter",
+            filterLore
+        ));
+
+        // Page info (centre)
+        int firstShown = totalItems == 0 ? 0 : startIndex + 1;
+        inv.setItem(49, this.createControlItem(
+            player,
+            Material.PAPER,
+            "\u00a7b\u00a7lTrack Browser",
+            Arrays.asList(
+                "\u00a77Page: \u00a7e" + (session.page + 1) + "\u00a77/\u00a7f" + totalPages,
+                "\u00a77Showing: \u00a7e" + firstShown + "-\u00a7e" + endIndex + "\u00a77/\u00a7f" + totalItems,
+                "",
+                "\u00a77Sort: \u00a7e" + session.sort.label,
+                "\u00a77Filter: \u00a7e" + session.filter.label
             )
-        );
-        if (session.page < totalPages - 1) {
-            inv.setItem(
-                53,
-                this.createControlItem(
-                    Material.ARROW,
-                    "\u00a7aNext Page \u25ba"
-                )
-            );
-        }
+        ));
+
+        // Random track
+        inv.setItem(47, this.createControlItem(
+            player,
+            Material.ENDER_EYE,
+            "\u00a7d\u00a7lRandom Track",
+            Arrays.asList(
+                "\u00a77Picks a track at random from",
+                "\u00a77the current list and starts it.",
+                "",
+                "\u00a7eClick to play a random track"
+            )
+        ));
+
+        // Close
+        inv.setItem(52, this.createControlItem(
+            player,
+            Material.BARRIER,
+            "\u00a7c\u00a7lClose",
+            Arrays.asList(
+                "\u00a77Close this menu.",
+                "",
+                "\u00a7eClick to close"
+            )
+        ));
+
         player.openInventory(inv);
         session.refreshing = false;
     }
@@ -323,49 +376,46 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         session.page = 0;
     }
 
-    private ItemStack createTrackItem(TrackMenuInfo info, String langCode) {
-        ItemStack item = info.iconData.toItemStack();
-        ItemMeta meta = item.getItemMeta();
+    private ItemStack createTrackItem(Player player, TrackMenuInfo info, String langCode) {
+        List<String> lore = new ArrayList<>();
+        String difficulty = info.difficulty == null || info.difficulty.isBlank()
+            ? "UNKNOWN"
+            : info.difficulty.toUpperCase();
+        if (difficulty.equals("EXTREME")) {
+            difficulty = "INSANE";
+        }
+        lore.add(getDifficultyColor(difficulty) + difficulty + " §7▶ §a" + info.timeCount);
+        lore.add(
+            "§7by §f" + (info.trackData.getOwnerName() == null
+                ? "Unknown"
+                : info.trackData.getOwnerName())
+        );
 
-        if (meta != null) {
-            meta.setDisplayName("§f§l" + info.trackName);
-
-            List<String> lore = new ArrayList<>();
-            String difficulty = info.difficulty == null || info.difficulty.isBlank()
-                ? "UNKNOWN"
-                : info.difficulty.toUpperCase();
-            if (difficulty.equals("EXTREME")) {
-                difficulty = "INSANE";
-            }
-            lore.add(getDifficultyColor(difficulty) + difficulty + " §7▶ §a" + info.timeCount);
-            lore.add(
-                "§7by §f" + (info.trackData.getOwnerName() == null
-                    ? "Unknown"
-                    : info.trackData.getOwnerName())
-            );
-
-            if (!info.tags.isEmpty()) {
-                lore.add("");
-                lore.add(
-                    info.tags.stream()
-                        .map(tag -> "§e" + ChatColor.translateAlternateColorCodes('&', tag))
-                        .collect(Collectors.joining("§7, "))
-                );
-            }
-
-            String wr = (info.worldRecordTime == null)
-                ? "§c---"
-                : "§6" + this.formatTime(info.worldRecordTime);
-            lore.add("§fRecorde mundial: " + wr);
+        if (!info.tags.isEmpty()) {
             lore.add("");
-            lore.add("§a▶ Click to play!");
-
-            // Now the compiler accepts the lore correctly
-            meta.setLore(lore);
-            item.setItemMeta(meta);
+            lore.add(
+                info.tags.stream()
+                    .map(tag -> "§e" + ChatColor.translateAlternateColorCodes('&', tag))
+                    .collect(Collectors.joining("§7, "))
+            );
         }
 
-        return item;
+        lore.add("");
+        lore.add("§a▶ Click to play!");
+
+        // Name/lore are applied on the same ItemMeta as the icon's block state
+        // (e.g. LIGHT level), so the level survives the menu round-trip.
+        return info.iconData.toItemStack(
+            this.plugin.applyPapi(player, "§f§l" + info.trackName),
+            this.applyPapi(player, lore)
+        );
+    }
+
+    private List<String> applyPapi(Player player, List<String> lines) {
+        if (lines == null) return null;
+        return lines.stream()
+            .map(line -> this.plugin.applyPapi(player, line))
+            .toList();
     }
 
     private String getDifficultyColor(String difficulty) {
@@ -379,22 +429,23 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     }
 
     private ItemStack createControlItem(
+        Player player,
         Material mat,
         String name,
         List<String> lore
     ) {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(name);
+        meta.setDisplayName(this.plugin.applyPapi(player, name));
         if (lore != null) {
-            meta.setLore(lore);
+            meta.setLore(this.applyPapi(player, lore));
         }
         item.setItemMeta(meta);
         return item;
     }
 
-    private ItemStack createControlItem(Material mat, String name) {
-        return this.createControlItem(mat, name, null);
+    private ItemStack createControlItem(Player player, Material mat, String name) {
+        return this.createControlItem(player, mat, name, null);
     }
 
     @EventHandler
@@ -438,10 +489,6 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         if (clicked == null || clicked.getType() == Material.AIR) {
             return;
         }
-        ItemMeta clickedMeta = clicked.getItemMeta();
-        if (clickedMeta == null) {
-            return;
-        }
         UUID uuid = player.getUniqueId();
         PlayerMenuSession session = this.sessions.get(uuid);
         if (session == null) {
@@ -471,6 +518,16 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                     this.openPage(player);
                     break;
                 }
+                case 47: {
+                    if (session.currentView.isEmpty()) break;
+                    TrackMenuInfo random = session.currentView.get(
+                        ThreadLocalRandom.current().nextInt(session.currentView.size())
+                    );
+                    session.trackSelected = true;
+                    player.closeInventory();
+                    this.startTrackFromMenu(player, random.trackName, session);
+                    break;
+                }
                 case 48: {
                     session.sort = session.sort.next();
                     this.applySortAndFilter(session);
@@ -481,6 +538,11 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                     session.filter = session.filter.next();
                     this.applySortAndFilter(session);
                     this.openPage(player);
+                    break;
+                }
+                case 52: {
+                    player.closeInventory();
+                    break;
                 }
             }
             return;
@@ -491,10 +553,15 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             return;
         }
         this.lastClickTime.put(uuid, now);
+        // Resolve the track by its slot in the current view: the display name is
+        // no longer a reliable key now that PAPI can rewrite it (and any
+        // placeholder in it would break the lookup entirely).
+        int indexInView = session.page * 45 + slot;
+        if (indexInView < 0 || indexInView >= session.currentView.size()) {
+            return;
+        }
         session.trackSelected = true;
-        String trackName = ChatColor.stripColor(
-            (String) clickedMeta.getDisplayName()
-        );
+        String trackName = session.currentView.get(indexInView).trackName;
         player.closeInventory();
         this.startTrackFromMenu(player, trackName, session);
     }
@@ -557,6 +624,21 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             }
         }
 
+        if (!this.mysql.checkPlayerMcVersion(player, trackName)) {
+            this.plugin.sendMessage(
+                player,
+                "mc_version_warning",
+                "{track}",
+                trackName,
+                "{current}",
+                MinecraftVersion.getName(player.getProtocolVersion()),
+                "{required}",
+                String.valueOf(this.mysql.getTrackMinVersion(trackName))
+            );
+            this.restoreAfterFailedSelection(player, session);
+            return;
+        }
+
         if (
             this.mysql.trackHaveBoatUtils(trackName) &&
             !FormulaRacing.hasOpenBoatUtilsMod(player)
@@ -601,11 +683,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                 "' for player " +
                 player.getName()
         );
-        this.plugin.sendMessage(
-            player,
-            "timetrial_teleport",
-            new String[] { "{track}", trackName }
-        );
+        this.sendTimeTrialTeleportMessage(player, trackName);
 
         try {
             String ownerName = this.mysql.getTrackOwner(trackName);
@@ -623,6 +701,35 @@ public class TimeTrialMenuUtilsV2 implements Listener {
             } else {
                 this.restoreAfterFailedSelection(player, session);
             }
+        });
+    }
+
+    /**
+     * Sends the "Teleported to [track]" message, appending the player's
+     * leaderboard position when they already have a finished time on that track.
+     *
+     * <p>The rank lives in the database, so it is fetched asynchronously and the
+     * message is sent from the completion callback — the main thread is never
+     * blocked on a query. {@code getPlayerRank} returns {@code 0} when the player
+     * has no finished run on this track, in which case the message renders
+     * exactly as before (the position suffix is empty).
+     *
+     * @param player    the teleported player
+     * @param trackName the track display name; normalized for the lookup query
+     */
+    private void sendTimeTrialTeleportMessage(Player player, String trackName) {
+        String trackWS = trackName.replaceAll("\\s+", "");
+        this.mysql.getPlayerRankAsync(player.getUniqueId(), trackWS).thenAccept(rank -> {
+            // Never touch a player from a worker thread: they may have logged off
+            // while the query was still in flight.
+            if (!player.isOnline()) {
+                return;
+            }
+            this.plugin.sendMessage(
+                    player,
+                    "timetrial_teleport",
+                    new String[] { "{track}", trackName, "{position}", TimeTrialTeleportMessage.rankSuffix(rank) }
+            );
         });
     }
 

@@ -340,9 +340,12 @@ public class RoundCommand extends BaseCommand {
                 "═══════════════════════════════"
         );
         Map<UUID, Long> bestLaps = new HashMap();
+        // As IAs não são jogadores reais, por isso o nome tem de vir do Driver.
+        Map<UUID, String> driverNames = new HashMap();
 
         for (Heats heat : round.getHeats().values()) {
             for (Driver driver : heat.getDrivers().values()) {
+                driverNames.putIfAbsent(driver.getUuid(), resolveDriverName(driver));
                 if (driver.getFastestLap() != null) {
                     long time = driver.getFastestLap().getLapTime();
                     if (
@@ -367,7 +370,7 @@ public class RoundCommand extends BaseCommand {
             int pos = 1;
 
             for (UUID uuid : sortedDrivers) {
-                String name = Bukkit.getOfflinePlayer(uuid).getName();
+                String name = driverNames.get(uuid);
                 String time = ApiUtilities.formatRaceTime(
                     (Long) bestLaps.get(uuid)
                 );
@@ -401,6 +404,23 @@ public class RoundCommand extends BaseCommand {
 
             sender.sendMessage("");
         }
+    }
+
+    /**
+     * Resolve o nome a mostrar de um piloto.
+     *
+     * <p>As IAs nunca são jogadores reais, por isso o Bukkit não sabe o nome delas e
+     * {@code getOfflinePlayer(...).getName()} devolve null. O nome da IA vive no
+     * customName do Driver (ver AIOpponentManager#createAIOpponent), tal como o
+     * scoreboard e o /heat info já fazem.
+     */
+    private String resolveDriverName(Driver driver) {
+        if (driver.isAiControlled() && driver.getCustomName() != null
+                && !driver.getCustomName().isEmpty()) {
+            return driver.getCustomName();
+        }
+        String offlineName = Bukkit.getOfflinePlayer(driver.getUuid()).getName();
+        return offlineName != null ? offlineName : "Unknown";
     }
 
     @Subcommand("start")

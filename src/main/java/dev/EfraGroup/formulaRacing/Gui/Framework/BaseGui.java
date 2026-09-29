@@ -15,6 +15,7 @@ public class BaseGui implements InventoryHolder {
     protected final String title;
     protected final Map<Integer, GuiButton> buttons = new HashMap();
     protected final FormulaRacing plugin;
+    protected boolean hidePlayerInventory = false;
 
     public BaseGui(String title, int rows) {
         this.title = title;
@@ -53,8 +54,23 @@ public class BaseGui implements InventoryHolder {
         }
     }
 
+    /**
+     * Whether this GUI temporarily removes the player's inventory items while
+     * it is open (like the Time Trial menu), restoring them once it is closed.
+     */
+    public boolean isHidingPlayerInventory() {
+        return this.hidePlayerInventory;
+    }
+
+    public void setHidePlayerInventory(boolean hidePlayerInventory) {
+        this.hidePlayerInventory = hidePlayerInventory;
+    }
+
     public void show(Player player) {
         this.plugin.getGuiManager().setOpenGui(player, this);
+        if (this.hidePlayerInventory) {
+            this.plugin.getGuiManager().hideInventory(player);
+        }
         player.openInventory(this.inventory);
     }
 

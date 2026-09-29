@@ -107,6 +107,8 @@ credentials.yml
 
 # Local tool data
 .freebuff/
+.commandcode/
+%TEMP%/
 
 # MinGW / MSYS2 toolchain (not project files)
 include/

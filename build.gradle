@@ -64,8 +64,9 @@ dependencies {
     runtimeOnly 'net.megavex:scoreboard-library-implementation:2.8.2'
 
     // ---- Tests ----
+    testCompileOnly 'io.papermc.paper:paper-api:26.2.build.121-stable'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.0'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.0'
 }
 
 test {

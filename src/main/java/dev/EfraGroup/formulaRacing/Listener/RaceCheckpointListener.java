@@ -12,16 +12,15 @@ import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Heat.Lap;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Participant.DriverLookup;
+import dev.EfraGroup.formulaRacing.Utils.CheckpointSkipRule;
 import dev.EfraGroup.formulaRacing.Utils.RegionMathUtils;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Sound;
@@ -38,19 +37,6 @@ public class RaceCheckpointListener implements Listener {
     private final RaceEventManager raceEventManager;
     private final TrackIntegrationManager trackManager;
     private final DriverLookup driverLookup;
-    private final Map<UUID, Long> lastCheckpointSkip =
-        new ConcurrentHashMap<>();
-    private static final long CHECKPOINT_SKIP_COOLDOWN_MS = 2000L;
-
-    public void cleanupPlayer(UUID uuid) {
-        this.lastCheckpointSkip.remove(uuid);
-    }
-
-    public void cleanupHeatPlayers(java.util.Collection<UUID> uuids) {
-        for (UUID uuid : uuids) {
-            this.lastCheckpointSkip.remove(uuid);
-        }
-    }
 
     public RaceCheckpointListener(FormulaRacing plugin) {
         this.plugin = plugin;
@@ -227,14 +213,26 @@ public class RaceCheckpointListener implements Listener {
                                     }
                                 }
 
+                                // Re-crossing a checkpoint that was ALREADY
+                                // passed this lap is free — driving back over
+                                // the line is legal. Only a checkpoint AHEAD of
+                                // the expected one counts as a skip. Without
+                                // this, wide checkpoint regions re-trigger on
+                                // every Y-axis bob, which used to be masked by a
+                                // 2s cooldown that also swallowed real skips.
+                                // See CheckpointSkipRule.
                                 for (Map.Entry<
                                     Integer,
                                     List<DatabaseManager.RegionData>
                                 > entry : checkpointsById.entrySet()) {
                                     int checkpointId = entry.getKey();
                                     if (
-                                        expectedCheckpointId != null &&
-                                        checkpointId == expectedCheckpointId
+                                        !CheckpointSkipRule.isSkip(
+                                            checkpointId,
+                                            checkpointsReached,
+                                            orderedCheckpointIds,
+                                            expectedCheckpointId
+                                        )
                                     ) {
                                         continue;
                                     }
@@ -252,29 +250,12 @@ public class RaceCheckpointListener implements Listener {
                                                 skipRegion
                                             )
                                         ) {
-                                            UUID playerUuid =
-                                                player.getUniqueId();
-                                            long now =
-                                                System.currentTimeMillis();
-                                            Long lastSkip =
-                                                this.lastCheckpointSkip.get(
-                                                    playerUuid
-                                                );
-                                            if (
-                                                lastSkip != null &&
-                                                now - lastSkip <
-                                                CHECKPOINT_SKIP_COOLDOWN_MS
-                                            ) {
-                                                return;
-                                            }
                                             this.handleCheckpointSkipped(
                                                 driver,
                                                 currentHeat,
                                                 player,
                                                 checkpointId,
-                                                expectedCheckpointId != null
-                                                    ? expectedCheckpointId
-                                                    : checkpointId
+                                                expectedCheckpointId
                                             );
                                             return;
                                         }
@@ -349,10 +330,6 @@ public class RaceCheckpointListener implements Listener {
                 driver.getCheckpointsReached(),
                 this.trackManager.getOrderedCheckpointIds(heat.getTrackNameWS())
             )
-        );
-        this.lastCheckpointSkip.put(
-            player.getUniqueId(),
-            System.currentTimeMillis()
         );
         driver.resetLagFlags();
         if (

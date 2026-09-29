@@ -26,6 +26,27 @@ public final class AIBoatController {
     private static final float FORWARD_THRUST = 0.04F;
     private static final float BACKWARD_THRUST = 0.005F;
 
+    /**
+     * Yaw change (deg) a single held turn key contributes in one tick, matching
+     * vanilla {@code controlBoat()}. Exposed so the AI's steering deadzone can
+     * compensate for the turn it is already committing this tick.
+     */
+    public static final float TURN_PER_TICK_DEG = 1.0F;
+
+    /**
+     * Upper bound on {@code turnScale}. Vanilla turns 1 deg/tick, which is far
+     * too slow to hold a racing line through a corner at ice speed, so the AI
+     * scales it up — but an unbounded gain turns any overshoot into a full spin,
+     * so the scale is capped here.
+     */
+    public static final double MAX_TURN_SCALE = 4.0D;
+    /** Absolute cap on the yaw change (deg) a single tick may apply. */
+    private static final float MAX_TURN_DEG_PER_TICK = TURN_PER_TICK_DEG * (float) MAX_TURN_SCALE;
+
+    private static float clampTurn(float deg) {
+        return Math.max(-MAX_TURN_DEG_PER_TICK, Math.min(MAX_TURN_DEG_PER_TICK, deg));
+    }
+
     private static Method getHandleMethod;
     private static Method setInputMethod;
     private static Field deltaRotationField;
@@ -36,12 +57,17 @@ public final class AIBoatController {
     }
 
     /**
-     * Applies WASD inputs to the boat using vanilla controlBoat math.
+     * Applies WASD inputs to the boat using vanilla controlBoat math, with the
+     * turn rate scaled up so tight corners are drivable at speed.
      * Must be called on the boat's region thread.
      *
+     * @param turnScale multiplier on the vanilla 1 deg/tick turn rate, clamped
+     *                  to {@link #MAX_TURN_SCALE} so a corner can never become
+     *                  an instant spin
      * @return false when NMS reflection is unavailable (boat is left untouched)
      */
-    public static boolean drive(Entity boat, boolean left, boolean right, boolean up, boolean down) {
+    public static boolean drive(Entity boat, boolean left, boolean right, boolean up, boolean down,
+                                 double turnScale) {
         if (boat == null) {
             return false;
         }
@@ -53,22 +79,34 @@ public final class AIBoatController {
             Object handle = getHandleMethod.invoke(boat);
             setInputMethod.invoke(handle, left, right, up, down);
 
-            float deltaRotation = deltaRotationField.getFloat(handle);
             float thrust = 0.0F;
 
-            // Same order as vanilla AbstractBoat.controlBoat().
+            // Vanilla controlBoat() folds the turn input into deltaRotation and
+            // rotates the boat by that value ONCE per tick, relative to the
+            // previous tick's yaw. The old code added the *accumulated*
+            // deltaRotation to the already-rotated yaw, so every tick re-applied
+            // the whole pending rotation on top of the last one: one held key
+            // compounded without bound (1 deg, then 2, then 3...), any correction
+            // massively overshot, and the boat span in circles on the racing line.
+            float turn = 0.0F;
             if (left) {
-                deltaRotation -= 1.0F;
+                turn -= TURN_PER_TICK_DEG;
             }
             if (right) {
-                deltaRotation += 1.0F;
+                turn += TURN_PER_TICK_DEG;
             }
             if (right != left && !up && !down) {
                 thrust += TURN_ONLY_THRUST;
             }
 
+            // A gain above 1 is what makes a tight corner drivable (one vanilla
+            // key is only 1 deg/tick); the clamp is what stops a large gain from
+            // turning into a spin. Callers must still release the key inside
+            // their deadzone instead of riding the clamp.
+            float appliedTurn = clampTurn(turn * (float) turnScale);
+
             Location location = boat.getLocation();
-            float yaw = location.getYaw() + deltaRotation;
+            float yaw = location.getYaw() + appliedTurn;
             if (up) {
                 thrust += FORWARD_THRUST;
             }
@@ -76,7 +114,10 @@ public final class AIBoatController {
                 thrust -= BACKWARD_THRUST;
             }
 
-            deltaRotationField.setFloat(handle, deltaRotation);
+            // Persist only the rotation actually applied, so the value read back
+            // next tick reports the boat's real turn rate instead of a sum that
+            // grows every tick.
+            deltaRotationField.setFloat(handle, appliedTurn);
             boat.setRotation(yaw, location.getPitch());
 
             if (thrust != 0.0F) {
@@ -102,6 +143,15 @@ public final class AIBoatController {
             }
             return false;
         }
+    }
+
+    /**
+     * Convenience overload using the default turn scale.
+     *
+     * @see #drive(Entity, boolean, boolean, boolean, boolean, double)
+     */
+    public static boolean drive(Entity boat, boolean left, boolean right, boolean up, boolean down) {
+        return drive(boat, left, right, up, down, 1.0D);
     }
 
     /** Current NMS {@code deltaRotation} (damped by vanilla {@code floatBoat}). */

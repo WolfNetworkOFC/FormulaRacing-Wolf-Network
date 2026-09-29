@@ -101,6 +101,33 @@ public class WeatherConfigManager {
     }
 
     /**
+     * Move a sequência de clima de uma pista antiga para a nova, quando a pista
+     * é renomeada. As chaves em {@code dynamic_weather} podem estar em WS ou em
+     * nome de exibição, por isso a comparação ignora espaços/caixa.
+     */
+    public void renameDynamicWeather(String oldTrackName, String newTrackName) {
+        if (oldTrackName == null || newTrackName == null) return;
+        String oldNorm = oldTrackName.replaceAll("\\s+", "").toLowerCase();
+        if (oldNorm.isEmpty()) return;
+        String newWS = newTrackName.replaceAll("\\s+", "");
+
+        org.bukkit.configuration.ConfigurationSection section =
+                config.getConfigurationSection("dynamic_weather");
+        if (section == null) return;
+
+        boolean changed = false;
+        for (String key : new ArrayList<>(section.getKeys(false))) {
+            if (key.replaceAll("\\s+", "").equalsIgnoreCase(oldNorm)) {
+                List<String> list = config.getStringList("dynamic_weather." + key);
+                config.set("dynamic_weather." + key, null);
+                config.set("dynamic_weather." + newWS, list);
+                changed = true;
+            }
+        }
+        if (changed) saveConfig();
+    }
+
+    /**
      * Saves the configuration
      */
     public void saveConfig() {

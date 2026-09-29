@@ -16,6 +16,7 @@ import dev.EfraGroup.formulaRacing.Controllers.HotbarController;
 import dev.EfraGroup.formulaRacing.Controllers.LonelyController;
 import dev.EfraGroup.formulaRacing.Controllers.PodiumManager;
 import dev.EfraGroup.formulaRacing.Controllers.PartyRaceManager;
+import dev.EfraGroup.formulaRacing.Controllers.QuickRaceBossBarManager;
 import dev.EfraGroup.formulaRacing.Controllers.QuickRaceManager;
 import dev.EfraGroup.formulaRacing.Controllers.RaceEventManager;
 import dev.EfraGroup.formulaRacing.Controllers.RaceVoteManager;
@@ -59,6 +60,7 @@ import org.bstats.charts.SingleLineChart;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
 import dev.EfraGroup.formulaRacing.Utils.RaceActionBarManager;
 import dev.EfraGroup.formulaRacing.Utils.LightningRodListener;
+import dev.EfraGroup.formulaRacing.Utils.MinecraftVersion;
 import dev.EfraGroup.formulaRacing.Utils.MojangApiClient;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.RaceScoreboardService;
@@ -154,6 +156,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private SpectatorManager spectatorManager;
     private QuickRaceManager quickRaceManager;
     private PartyRaceManager partyRaceManager;
+    private QuickRaceBossBarManager quickRaceBossBarManager;
     private RaceVoteManager raceVoteManager;
     private DrsManager drsManager;
     private PTPManager ptpManager;
@@ -400,6 +403,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 this.raceEventManager,
                 this.dm
             );
+            this.quickRaceBossBarManager = new QuickRaceBossBarManager(this);
             this.partyRaceManager = new PartyRaceManager(
                 this,
                 this.raceEventManager,
@@ -651,6 +655,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
         if (this.quickRaceManager != null) {
             this.quickRaceManager.shutdown();
+        }
+
+        if (this.quickRaceBossBarManager != null) {
+            this.quickRaceBossBarManager.shutdown();
         }
 
         if (this.api != null) {
@@ -1131,6 +1139,54 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         });
     }
 
+    /**
+     * Remove qualquer leaderboard em memória registado para uma pista e apaga os
+     * respetivos hologramas. Aceita tanto a chave em WS (sem espaços) como o nome
+     * de exibição, porque o mapa é populado com os dois formatos dependendo da
+     * origem (loadLeaderboards vs comandos).
+     */
+    public void removeTrackLeaderboard(String trackName) {
+        if (trackName == null) return;
+        String ws = trackName.replaceAll("\\s+", "");
+        List<String> keys = new ArrayList<>();
+        for (String key : new ArrayList<>(trackLeaderboards.keySet())) {
+            if (
+                key.equalsIgnoreCase(trackName) ||
+                key.replaceAll("\\s+", "").equalsIgnoreCase(ws)
+            ) {
+                keys.add(key);
+            }
+        }
+        for (String key : keys) {
+            TrackLeaderboard board = trackLeaderboards.remove(key);
+            if (board != null) {
+                board.removeHologram();
+            }
+        }
+    }
+
+    /**
+     * Atualiza as referências em memória à pista antiga (último track de TT/duelo
+     * de cada jogador) quando uma pista é renomeada, para ninguém ficar preso ao
+     * nome antigo até reiniciar.
+     */
+    public void remapLastTrackReferences(String oldTrackName, String newTrackName) {
+        if (oldTrackName == null || newTrackName == null) return;
+        String oldWS = oldTrackName.replaceAll("\\s+", "");
+        for (Map.Entry<UUID, String> entry : new ArrayList<>(lastTimeTrialTrack.entrySet())) {
+            String value = entry.getValue();
+            if (value != null && value.replaceAll("\\s+", "").equalsIgnoreCase(oldWS)) {
+                lastTimeTrialTrack.put(entry.getKey(), newTrackName);
+            }
+        }
+        for (Map.Entry<UUID, String> entry : new ArrayList<>(lastDuelTrack.entrySet())) {
+            String value = entry.getValue();
+            if (value != null && value.replaceAll("\\s+", "").equalsIgnoreCase(oldWS)) {
+                lastDuelTrack.put(entry.getKey(), newTrackName);
+            }
+        }
+    }
+
     private void loadLeaderboards() {
         if (this.leaderboardsLoaded) {
             return;
@@ -1298,6 +1354,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     public QuickRaceManager getQuickRaceManager() {
         return this.quickRaceManager;
+    }
+
+    public QuickRaceBossBarManager getQuickRaceBossBarManager() {
+        return this.quickRaceBossBarManager;
     }
 
     public PartyRaceManager getPartyRaceManager() {
@@ -1476,9 +1536,6 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         this.rcl.cleanupPlayer(uuid);
         if (this.wolfTimingService != null) {
             this.wolfTimingService.cleanupPlayer(uuid);
-        }
-        if (this.raceCheckpointListener != null) {
-            this.raceCheckpointListener.cleanupPlayer(uuid);
         }
         if (this.driverLookup != null) {
             this.driverLookup.unregister(uuid);
@@ -1836,6 +1893,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 Arrays.stream(BoatUtilsGroupMode.values())
                     .map(Enum::name)
                     .toList()
+        );
+        this.commandManager.getCommandCompletions().registerCompletion(
+            "mc_versions",
+            c -> MinecraftVersion.knownVersionNames()
         );
         this.commandManager.getCommandCompletions().registerCompletion(
             "materials",

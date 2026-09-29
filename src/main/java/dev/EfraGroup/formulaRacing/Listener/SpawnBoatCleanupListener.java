@@ -43,6 +43,9 @@ public class SpawnBoatCleanupListener implements Listener {
             if (this.plugin.getTimeTrialController() != null) {
                 this.plugin.getTimeTrialController().endSession(player);
             }
+            if (this.plugin.getWolfTimingService() != null) {
+                this.plugin.getWolfTimingService().abort(uuid, true);
+            }
             if (this.plugin.getScoreboardTimeTrialUtils() != null) {
                 this.plugin.getScoreboardTimeTrialUtils().clearPlayerTrack(player);
             }

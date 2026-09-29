@@ -61,6 +61,7 @@ public class ColorSettingsGui extends BaseGui {
 
     public ColorSettingsGui(FormulaRacing plugin, Player player) {
         super(getTitle(plugin, player), 6);
+        setHidePlayerInventory(true);
         setupContent(plugin, player);
     }
 

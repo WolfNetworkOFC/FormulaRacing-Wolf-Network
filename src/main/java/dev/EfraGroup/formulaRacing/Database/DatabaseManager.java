@@ -4,6 +4,7 @@ import dev.EfraGroup.formulaRacing.FileManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.GimmickConfig;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
+import dev.EfraGroup.formulaRacing.Utils.MinecraftVersion;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
 import dev.EfraGroup.formulaRacing.TimeTrial.Timing.OfficialTime;
@@ -1606,6 +1607,14 @@ public class DatabaseManager {
                     );
             }
 
+            // ========== STEPS 11-16: tabelas extra que também referenciam a pista ==========
+            normalizeTrackColumn(conn, "fr_track_medals", "trackNameWS", trackNameMapping, "fr_track_medals");
+            normalizeTrackColumn(conn, "fr_player_medals", "trackNameWS", trackNameMapping, "fr_player_medals");
+            normalizeTrackColumn(conn, "fr_qualigrid_positions", "trackNameWS", trackNameMapping, "fr_qualigrid_positions");
+            normalizeTrackColumn(conn, "fr_pit_lanes", "trackNameWS", trackNameMapping, "fr_pit_lanes");
+            normalizeTrackColumn(conn, "fr_gimmicks", "trackNameWS", trackNameMapping, "fr_gimmicks");
+            normalizeTrackColumn(conn, "fr_timetrial_duels_checkpoint_times", "trackNameWS", trackNameMapping, "fr_timetrial_duels_checkpoint_times");
+
             plugin
                 .getDebugManager()
                 .logDatabaseOperation(
@@ -1641,6 +1650,39 @@ public class DatabaseManager {
     }
 
     /**
+     * Normaliza uma coluna de pista ({@code trackNameWS}) numa tabela durante a
+     * migração de arranque. Ignora tabelas inexistentes.
+     */
+    private int normalizeTrackColumn(
+            Connection conn,
+            String table,
+            String column,
+            Map<String, String> mapping,
+            String label) {
+        int total = 0;
+        String sql =
+            "UPDATE " + table + " SET " + column + " = ? WHERE LOWER(" + column + ") = LOWER(?)";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (Map.Entry<String, String> entry : mapping.entrySet()) {
+                ps.setString(1, entry.getValue());
+                ps.setString(2, entry.getKey());
+                total += ps.executeUpdate();
+            }
+        } catch (SQLException e) {
+            plugin.getDebugManager().logDatabaseOperation(
+                "[MIGRAÇÃO]   ⚠️ " + label + ": " + e.getMessage()
+            );
+            return 0;
+        }
+        if (total > 0) {
+            plugin.getDebugManager().logDatabaseOperation(
+                "[MIGRAÇÃO]   ✅ " + label + ": " + total + " registos atualizados"
+            );
+        }
+        return total;
+    }
+
+    /**
      * Busca o nome da pista vinculada a um Duelo específico
      */
     public String getTrackNameFromDuelId(int duelId) {
@@ -1666,11 +1708,18 @@ public class DatabaseManager {
     }
 
     /**
-     * Renomeia uma pista em TODAS as tabelas do banco de dados.
-     * Atualiza trackNameWS em fr_tracks, fr_player_times, fr_checkpoint,
-     * fr_checkpoint_times, fr_boatutils, fr_grid_positions, fr_cameras,
-     * fr_track_finish_positions, fr_timetrial_duels, fr_events, fr_regions,
-     * fr_drs, fr_pit_stops, fr_holograms, fr_laps e renomeia o ficheiro ghost.
+     * Renomeia uma pista em TODAS as tabelas do banco de dados (comparação
+     * case-insensitive, já que o trackNameWS é sempre guardado em minúsculas).
+     * Atualiza fr_tracks, fr_player_times, fr_checkpoint, fr_checkpoint_times,
+     * fr_boatutils, fr_grid_positions, fr_cameras, fr_track_finish_positions,
+     * fr_timetrial_duels, fr_events, fr_regions, fr_drs, fr_pit_stops,
+     * fr_holograms, fr_laps, fr_track_medals, fr_player_medals,
+     * fr_qualigrid_positions, fr_pit_lanes, fr_gimmicks e
+     * fr_timetrial_duels_checkpoint_times.
+     *
+     * <p>Ficheiros em disco (ghosts, medalhas, gimmicks, linhas de IA), configs,
+     * hologramas e caches são tratados por
+     * {@code TrackEditorCommand#renameExternalReferences}.
      *
      * @param oldName Nome antigo da pista (trackName original com espaços)
      * @param newName Novo nome da pista (trackName original com espaços)
@@ -1679,8 +1728,10 @@ public class DatabaseManager {
     public synchronized boolean renameTrack(String oldName, String newName) {
         if (oldName == null || newName == null || oldName.equals(newName)) return false;
 
+        // trackNameWS is always stored lowercased (see createTrack), so normalise
+        // the new value the same way and match case-insensitively everywhere.
         String oldNameWS = oldName.replaceAll("\\s+", "");
-        String newNameWS = newName.replaceAll("\\s+", "");
+        String newNameWS = newName.replaceAll("\\s+", "").toLowerCase();
 
         plugin.getDebugManager().logDatabaseOperation(
                 "[RENAME] Renomeando pista '" + oldName + "' -> '" + newName + "'");
@@ -1692,9 +1743,17 @@ public class DatabaseManager {
 
             int totalUpdated = 0;
 
+            // 0. Desduplica as variantes de caixa do trackNameWS desta pista.
+            // As PRIMARY KEY que incluem trackNameWS comparam TEXT de forma case-sensitive,
+            // mas o trackNameWS nem sempre é gravado em minúsculas (createTrack grava em
+            // minúsculas, saveCheckpointTimes gravava como vinha do jogador). Assim
+            // "PoraoDoGaber" e "poraodogaber" coexistiam em linhas distintas, que colidiam
+            // assim que os UPDATEs abaixo normalizavam ambas para minúsculas.
+            dedupeTrackCaseVariants(conn, oldNameWS);
+
             // 1. fr_tracks
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_tracks SET trackName = ?, trackNameWS = ? WHERE trackNameWS = ?")) {
+                    "UPDATE fr_tracks SET trackName = ?, trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
                 ps.setString(1, newName);
                 ps.setString(2, newNameWS);
                 ps.setString(3, oldNameWS);
@@ -1707,7 +1766,7 @@ public class DatabaseManager {
 
             // 2. fr_player_times
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_player_times SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                    "UPDATE fr_player_times SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
                 ps.setString(1, newNameWS);
                 ps.setString(2, oldNameWS);
                 int r = ps.executeUpdate();
@@ -1717,7 +1776,7 @@ public class DatabaseManager {
 
             // 3. fr_checkpoint
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_checkpoint SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                    "UPDATE fr_checkpoint SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
                 ps.setString(1, newNameWS);
                 ps.setString(2, oldNameWS);
                 int r = ps.executeUpdate();
@@ -1727,7 +1786,7 @@ public class DatabaseManager {
 
             // 4. fr_checkpoint_times
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_checkpoint_times SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                    "UPDATE fr_checkpoint_times SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
                 ps.setString(1, newNameWS);
                 ps.setString(2, oldNameWS);
                 int r = ps.executeUpdate();
@@ -1737,7 +1796,7 @@ public class DatabaseManager {
 
             // 5. fr_boatutils
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_boatutils SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                    "UPDATE fr_boatutils SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
                 ps.setString(1, newNameWS);
                 ps.setString(2, oldNameWS);
                 int r = ps.executeUpdate();
@@ -1747,7 +1806,7 @@ public class DatabaseManager {
 
             // 6. fr_grid_positions
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_grid_positions SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                    "UPDATE fr_grid_positions SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
                 ps.setString(1, newNameWS);
                 ps.setString(2, oldNameWS);
                 int r = ps.executeUpdate();
@@ -1757,7 +1816,7 @@ public class DatabaseManager {
 
             // 7. fr_cameras
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_cameras SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                    "UPDATE fr_cameras SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
                 ps.setString(1, newNameWS);
                 ps.setString(2, oldNameWS);
                 int r = ps.executeUpdate();
@@ -1767,7 +1826,7 @@ public class DatabaseManager {
 
             // 8. fr_track_finish_positions
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_track_finish_positions SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                    "UPDATE fr_track_finish_positions SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
                 ps.setString(1, newNameWS);
                 ps.setString(2, oldNameWS);
                 int r = ps.executeUpdate();
@@ -1777,7 +1836,7 @@ public class DatabaseManager {
 
             // 9. fr_timetrial_duels
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_timetrial_duels SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                    "UPDATE fr_timetrial_duels SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
                 ps.setString(1, newNameWS);
                 ps.setString(2, oldNameWS);
                 int r = ps.executeUpdate();
@@ -1787,7 +1846,7 @@ public class DatabaseManager {
 
             // 10. fr_events
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_events SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                    "UPDATE fr_events SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
                 ps.setString(1, newNameWS);
                 ps.setString(2, oldNameWS);
                 int r = ps.executeUpdate();
@@ -1800,7 +1859,7 @@ public class DatabaseManager {
 
             // 11. fr_regions
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_regions SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                    "UPDATE fr_regions SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
                 ps.setString(1, newNameWS);
                 ps.setString(2, oldNameWS);
                 int r = ps.executeUpdate();
@@ -1810,7 +1869,7 @@ public class DatabaseManager {
 
             // 12. fr_drs
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_drs SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                    "UPDATE fr_drs SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
                 ps.setString(1, newNameWS);
                 ps.setString(2, oldNameWS);
                 int r = ps.executeUpdate();
@@ -1820,7 +1879,7 @@ public class DatabaseManager {
 
             // 13. fr_pit_stops
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_pit_stops SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                    "UPDATE fr_pit_stops SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
                 ps.setString(1, newNameWS);
                 ps.setString(2, oldNameWS);
                 int r = ps.executeUpdate();
@@ -1830,7 +1889,7 @@ public class DatabaseManager {
 
             // 14. fr_holograms
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_holograms SET trackNameWS = ? WHERE trackNameWS = ?")) {
+                    "UPDATE fr_holograms SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
                 ps.setString(1, newNameWS);
                 ps.setString(2, oldNameWS);
                 int r = ps.executeUpdate();
@@ -1843,7 +1902,7 @@ public class DatabaseManager {
 
             // 15. fr_laps
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE fr_laps SET tracknameWS = ? WHERE tracknameWS = ?")) {
+                    "UPDATE fr_laps SET tracknameWS = ? WHERE LOWER(tracknameWS) = LOWER(?)")) {
                 ps.setString(1, newNameWS);
                 ps.setString(2, oldNameWS);
                 int r = ps.executeUpdate();
@@ -1851,19 +1910,86 @@ public class DatabaseManager {
                 totalUpdated += r;
             }
 
+            // 16. fr_track_medals (metas de medalha da pista)
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_track_medals SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_track_medals: " + r + " registo(s)");
+                totalUpdated += r;
+            } catch (SQLException e) {
+                plugin.getDebugManager().logDatabaseOperation("  ⚠️ fr_track_medals: tabela não encontrada");
+            }
+
+            // 17. fr_player_medals (medalhas conquistadas pelos jogadores)
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_player_medals SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_player_medals: " + r + " registo(s)");
+                totalUpdated += r;
+            } catch (SQLException e) {
+                plugin.getDebugManager().logDatabaseOperation("  ⚠️ fr_player_medals: tabela não encontrada");
+            }
+
+            // 18. fr_qualigrid_positions (grid de qualificação)
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_qualigrid_positions SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_qualigrid_positions: " + r + " registo(s)");
+                totalUpdated += r;
+            } catch (SQLException e) {
+                plugin.getDebugManager().logDatabaseOperation("  ⚠️ fr_qualigrid_positions: tabela não encontrada");
+            }
+
+            // 19. fr_pit_lanes (faixas de pit lane)
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_pit_lanes SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_pit_lanes: " + r + " registo(s)");
+                totalUpdated += r;
+            } catch (SQLException e) {
+                plugin.getDebugManager().logDatabaseOperation("  ⚠️ fr_pit_lanes: tabela não encontrada");
+            }
+
+            // 20. fr_gimmicks (definições de gimmick gravadas na DB)
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_gimmicks SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_gimmicks: " + r + " registo(s)");
+                totalUpdated += r;
+            } catch (SQLException e) {
+                plugin.getDebugManager().logDatabaseOperation("  ⚠️ fr_gimmicks: tabela não encontrada");
+            }
+
+            // 21. fr_timetrial_duels_checkpoint_times (checkpoints de duelo)
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE fr_timetrial_duels_checkpoint_times SET trackNameWS = ? WHERE LOWER(trackNameWS) = LOWER(?)")) {
+                ps.setString(1, newNameWS);
+                ps.setString(2, oldNameWS);
+                int r = ps.executeUpdate();
+                if (r > 0) plugin.getDebugManager().logDatabaseOperation("  ✅ fr_timetrial_duels_checkpoint_times: " + r + " registo(s)");
+                totalUpdated += r;
+            } catch (SQLException e) {
+                plugin.getDebugManager().logDatabaseOperation("  ⚠️ fr_timetrial_duels_checkpoint_times: tabela não encontrada");
+            }
+
             conn.commit();
 
             plugin.getDebugManager().logDatabaseOperation(
                     "[RENAME] ✅ Renomeação concluída! Total de registos atualizados: " + totalUpdated);
 
-            // Renomear ficheiro ghost no disco (se existir)
-            try {
-                renameGhostFile(oldNameWS, newNameWS);
-            } catch (Exception ghostEx) {
-                plugin.getDebugManager().logDatabaseOperation(
-                        "[RENAME] ⚠️ Ghost rename failed (non-critical): " + ghostEx.getMessage());
-            }
-
+            // Os ficheiros em disco (ghosts, medalhas, gimmicks, linhas de IA), os
+            // ficheiros de config, os hologramas e as caches em memória são tratados
+            // pelo TrackEditorCommand.renameExternalReferences. Aqui só mexemos no banco.
             return true;
 
         } catch (SQLException e) {
@@ -1890,28 +2016,101 @@ public class DatabaseManager {
     }
 
     /**
-     * Renomeia ficheiro ghost no disco.
+     * Colapsa as variantes de caixa do trackNameWS de uma pista numa só, antes de o
+     * renomeTrack normalizar o nome para minúsculas em todas as tabelas.
+     *
+     * <p>As PRIMARY KEY e UNIQUE que incluem {@code trackNameWS} comparam TEXT de forma
+     * case-sensitive, enquanto o resto do plugin trata o nome de forma case-insensitive.
+     * Guardar "PoraoDoGaber" e "poraodogaber" em linhas distintas é legal no SQLite, mas
+     * as duas colidem assim que o mesmo UPDATE as normaliza para minúsculas.
+     *
+     * <p>A ordem importa: primeiro são apagadas as linhas duplicadas (um DELETE nunca
+     * viola a própria constraint), só depois o trackNameWS é posto em minúsculas. Entre
+     * as duplicatas sobrevive a que tem o nome ainda por normalizar, por ser a que
+     * corresponde à pista tal como foi configurada; havendo várias, a mais antiga. Uma
+     * falha por tabela é ignorada para não abortar a renomeação.
      */
-    private void renameGhostFile(String oldNameWS, String newNameWS) {
-        java.io.File ghostsRoot = new java.io.File(plugin.getDataFolder(), "ghosts");
-        if (!ghostsRoot.exists()) return;
+    private void dedupeTrackCaseVariants(Connection conn, String trackNameWS) {
+        if (trackNameWS == null || trackNameWS.isBlank()) return;
 
-        java.io.File[] playerFolders = ghostsRoot.listFiles(java.io.File::isDirectory);
-        if (playerFolders == null) return;
+        // Tabelas onde o trackNameWS é a única chave.
+        String[] singleKeyTables = {
+            "fr_boatutils", "fr_pit_stops", "fr_holograms"
+        };
+        // Tabelas com chave composta, mapeadas às restantes colunas da constraint.
+        String[][] compositeKeyTables = {
+            {"fr_checkpoint_times", "player_uuid, checkpointId"},
+            {"fr_timetrial_duels_checkpoint_times", "player_uuid, checkpointId"},
+            {"fr_track_finish_positions", "position"},
+            {"fr_track_medals", "medal"},
+            {"fr_player_medals", "player_uuid, medal"},
+            {"fr_pit_lanes", "pitId"},
+            {"fr_grid_positions", "id, positionIndex"},
+            {"fr_qualigrid_positions", "id, positionIndex"},
+            {"fr_gimmicks", "name"},
+        };
 
-        String oldFile = oldNameWS.toLowerCase() + ".json";
-        String newFile = newNameWS.toLowerCase() + ".json";
-
-        for (java.io.File playerFolder : playerFolders) {
-            java.io.File oldGhost = new java.io.File(playerFolder, oldFile);
-            if (oldGhost.exists()) {
-                java.io.File newGhost = new java.io.File(playerFolder, newFile);
-                if (oldGhost.renameTo(newGhost)) {
-                    plugin.getDebugManager().logDatabaseOperation(
-                            "  ✅ Ghost renomeado: " + playerFolder.getName());
-                }
-            }
+        for (String table : singleKeyTables) {
+            dedupeAndNormaliseTable(conn, table, new String[0], trackNameWS);
         }
+        for (String[] spec : compositeKeyTables) {
+            dedupeAndNormaliseTable(conn, spec[0], spec[1].split(","), trackNameWS);
+        }
+    }
+
+    /**
+     * Apaga de {@code table} as linhas duplicadas que só diferem na caixa do
+     * trackNameWS e depois normaliza o nome da pista para minúsculas.
+     *
+     * @param otherKeyColumns restantes colunas da constraint; vazio quando a chave é
+     *                        apenas o trackNameWS
+     */
+    private void dedupeAndNormaliseTable(
+            Connection conn, String table, String[] otherKeyColumns, String trackNameWS) {
+        StringBuilder sameKey = new StringBuilder();
+        for (String column : otherKeyColumns) {
+            sameKey.append(" AND t2.").append(column.trim()).append(" IS t.").append(column.trim());
+        }
+
+        // Para cada linha, remove-a se não for a que sobrevive dentro do seu próprio
+        // grupo: o nome por normalizar tem prioridade, depois a linha mais antiga.
+        String deleteSql =
+            "DELETE FROM " + table + " AS t "
+            + "WHERE LOWER(t.trackNameWS) = LOWER(?) AND t.rowid NOT IN ("
+            + "  SELECT t2.rowid FROM " + table + " AS t2 "
+            + "  WHERE LOWER(t2.trackNameWS) = LOWER(?)" + sameKey + " "
+            + "  ORDER BY (t2.trackNameWS <> LOWER(t2.trackNameWS)) DESC, t2.rowid ASC LIMIT 1)";
+        try (PreparedStatement ps = conn.prepareStatement(deleteSql)) {
+            ps.setString(1, trackNameWS);
+            ps.setString(2, trackNameWS);
+            logRenameFix(table, "duplicata(s) removida(s)", ps.executeUpdate());
+        } catch (SQLException e) {
+            logRenameSkip(table, e);
+            return;
+        }
+
+        // Já não há duplicados, por isso normalizar é seguro.
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE " + table + " SET trackNameWS = LOWER(trackNameWS) WHERE LOWER(trackNameWS) = LOWER(?)")) {
+            ps.setString(1, trackNameWS);
+            logRenameFix(table, "variante(s) normalizada(s)", ps.executeUpdate());
+        } catch (SQLException e) {
+            logRenameSkip(table, e);
+        }
+    }
+
+    private void logRenameFix(String table, String what, int affected) {
+        if (affected > 0) {
+            plugin
+                .getDebugManager()
+                .logDatabaseOperation("  🔧 " + table + ": " + affected + " " + what);
+        }
+    }
+
+    private void logRenameSkip(String table, SQLException e) {
+        plugin
+            .getDebugManager()
+            .logDatabaseOperation("  ⚠️ " + table + ": " + e.getMessage());
     }
 
     /**
@@ -2654,6 +2853,7 @@ public class DatabaseManager {
 
                 conn.commit();
                 clearCheckpointsCache(trackNameWS);
+                clearCheckpointTimesForTrack(trackNameWS);
                 return true;
             } catch (SQLException ex) {
                 conn.rollback();
@@ -2724,6 +2924,7 @@ public class DatabaseManager {
 
                 conn.commit();
                 clearCheckpointsCache(trackNameWS);
+                clearCheckpointTimesForTrack(trackNameWS);
                 return true;
             } catch (SQLException ex) {
                 conn.rollback();
@@ -2739,7 +2940,7 @@ public class DatabaseManager {
 
     /* =======================================================
           MÉTODOS DE REGIÕES, CHECKPOINTS E CRIAÇÃO
-======================================================= */
+     ======================================================= */
 
     public synchronized List<RegionData> getAllRegions() {
         List<RegionData> list = new ArrayList<>();
@@ -2860,17 +3061,58 @@ public class DatabaseManager {
     }
 
     public synchronized boolean deleteRegionById(int regionId) {
+        String trackOfRegion = getTrackNameWSForRegion(regionId);
         String sql = "DELETE FROM fr_regions WHERE id = ?";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setInt(1, regionId);
-                return stmt.executeUpdate() > 0;
+                boolean deleted = stmt.executeUpdate() > 0;
+                if (deleted && trackOfRegion != null) {
+                    clearCheckpointTimesForTrack(trackOfRegion);
+                }
+                return deleted;
             }
         } catch (SQLException e) {
             handleSqlError(e);
             return false;
         }
+    }
+
+    /** Resolves the track that owns a region so geometry changes can drop stale deltas. */
+    private String getTrackNameWSForRegion(int regionId) {
+        try (Connection conn = getOrConnect();
+             PreparedStatement ps = conn.prepareStatement(
+                 "SELECT trackNameWS FROM fr_regions WHERE id = ?"
+             )) {
+            ps.setInt(1, regionId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("trackNameWS");
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return null;
+    }
+
+    /** Resolves the track that owns a checkpoint so geometry changes can drop stale deltas. */
+    private String getTrackNameWSForCheckpoint(int checkpointRowId) {
+        try (Connection conn = getOrConnect();
+             PreparedStatement ps = conn.prepareStatement(
+                 "SELECT trackNameWS FROM fr_checkpoint WHERE id = ?"
+             )) {
+            ps.setInt(1, checkpointRowId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("trackNameWS");
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return null;
     }
 
     public synchronized boolean removeCheckpoint(
@@ -2884,7 +3126,12 @@ public class DatabaseManager {
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, trackName.replaceAll("\\s+", ""));
                 stmt.setInt(2, checkpointId);
-                return stmt.executeUpdate() > 0;
+                boolean deleted = stmt.executeUpdate() > 0;
+                if (deleted) {
+                    clearCheckpointTimesForTrack(trackName);
+                    clearCheckpointsCache(trackName.replaceAll("\\s+", ""));
+                }
+                return deleted;
             }
         } catch (SQLException e) {
             handleSqlError(e);
@@ -2893,12 +3140,18 @@ public class DatabaseManager {
     }
 
     public synchronized boolean removeCheckpointById(int id) {
+        String trackOfCheckpoint = getTrackNameWSForCheckpoint(id);
         String sql = "DELETE FROM fr_checkpoint WHERE id = ?";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setInt(1, id);
-                return stmt.executeUpdate() > 0;
+                boolean deleted = stmt.executeUpdate() > 0;
+                if (deleted && trackOfCheckpoint != null) {
+                    clearCheckpointTimesForTrack(trackOfCheckpoint);
+                    clearCheckpointsCache(trackOfCheckpoint);
+                }
+                return deleted;
             }
         } catch (SQLException e) {
             handleSqlError(e);
@@ -2915,6 +3168,7 @@ public class DatabaseManager {
         double maxY,
         double maxZ
     ) {
+        String trackOfRegion = getTrackNameWSForRegion(regionId);
         String sql =
             "UPDATE fr_regions SET min_x=?, min_y=?, min_z=?, max_x=?, max_y=?, max_z=? WHERE id=?";
         try {
@@ -2927,7 +3181,11 @@ public class DatabaseManager {
                 stmt.setDouble(5, maxY);
                 stmt.setDouble(6, maxZ);
                 stmt.setInt(7, regionId);
-                return stmt.executeUpdate() > 0;
+                boolean updated = stmt.executeUpdate() > 0;
+                if (updated && trackOfRegion != null) {
+                    clearCheckpointTimesForTrack(trackOfRegion);
+                }
+                return updated;
             }
         } catch (SQLException e) {
             handleSqlError(e);
@@ -2955,7 +3213,7 @@ public class DatabaseManager {
             "airStepping, tenStepInterpolation, collisionResolution, walltapMultiplier, jumps, scale, " +
             "stepUpSlipperiness, fixDoubleWaterElevation, lateralSlipperiness, brakeSlipperiness, " +
             "multiStepping, maxSpeed, maxSpeedResistance, honeyCompatibility) " +
-            "VALUES (?, 0.0, 0.6, 1, 0, 0, 0.0, -0.04, 1.0, 0.04, 0.005, 0.005, 1, 0, 0, 0, 0, 0.0, 0, 0, 0, 5, " +
+            "VALUES (?, 0.0, 0.6, 1, 0, 0, 0.0, -0.03999999910593033, 1.0, 0.04, 0.005, 0.005, 1, 0, 0, 0, 0, 0.0, 0, 0, 0, 5, " +
             "0.0, 1, 1.0, 1.0, 0, 1.0, 1.0, 0, -1.0, 0.0, 0) " +
             "ON CONFLICT(trackNameWS) DO UPDATE SET " +
             "stepHeight = excluded.stepHeight, " +
@@ -3295,7 +3553,10 @@ public class DatabaseManager {
                 psIns.setString(11, pointsStr);
                 psIns.executeUpdate();
                 try (ResultSet keys = psIns.getGeneratedKeys()) {
-                    if (keys.next()) return keys.getInt(1);
+                    if (keys.next()) {
+                        clearCheckpointTimesForTrack(trackWS);
+                        return keys.getInt(1);
+                    }
                 }
             }
         } catch (SQLException e) {
@@ -4571,8 +4832,11 @@ public class DatabaseManager {
         boolean newFinished
     ) throws SQLException {
         try {
-            // ✅ Remove only spaces, without toLowerCase
-            String trackNameWS = trackName.replaceAll("\\s+", "");
+            // O trackNameWS é sempre guardado em minúsculas (ver createTrack). Gravar
+            // aqui a forma como veio do jogador criava linhas duplicadas que só diferiam
+            // em caixa, e que colidiam na PRIMARY KEY (player_uuid, trackNameWS, checkpointId)
+            // assim que o nome era normalizado.
+            String trackNameWS = trackName.replaceAll("\\s+", "").toLowerCase();
             double roundedNewTime = Math.round(newTime * 1000.0) / 1000.0;
 
             List<TimerUtils.CheckpointData> newCheckpoints = plugin
@@ -5359,7 +5623,7 @@ public class DatabaseManager {
         int lastCheckpoint
     ) {
         if (lastCheckpoint <= 0) return;
-        String trackNameWS = trackName.replaceAll("\\s+", "");
+        String trackNameWS = trackName.replaceAll("\\s+", "").toLowerCase();
         // Round to nearest tick (50ms) for clean display on Folia
         long roundedMs = Math.round(time * 1000.0);
         roundedMs = (roundedMs + 25L) / 50L * 50L;
@@ -5568,16 +5832,14 @@ public class DatabaseManager {
         String playerName,
         String trackName
     ) {
-        String sql = """
-                SELECT pt.bestTime, pt.checkpointsReached, pt.finished, pt.created_at
-                FROM fr_player_times pt
-                WHERE pt.player_name = ?
-                  AND LOWER(pt.trackNameWS) = LOWER(?)
-                  AND pt.finished = TRUE
-                ORDER BY
-""" + officialOrderBy("pt.") + """
-                LIMIT 1
-            """;
+        String sql =
+            "SELECT pt.bestTime, pt.checkpointsReached, pt.finished, pt.created_at " +
+            "FROM fr_player_times pt " +
+            "WHERE pt.player_name = ? " +
+            "AND LOWER(pt.trackNameWS) = LOWER(?) " +
+            "AND pt.finished = TRUE " +
+            "ORDER BY " + officialOrderBy("pt.") + " " +
+            "LIMIT 1";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -5608,16 +5870,14 @@ public class DatabaseManager {
         String playerName,
         String trackName
     ) {
-        String sql = """
-            SELECT bestTime, official_ticks, display_millis, timing_source, run_id
-            FROM fr_player_times
-            WHERE player_name = ?
-              AND LOWER(trackNameWS) = LOWER(?)
-              AND finished = TRUE
-            ORDER BY
-""" + officialOrderBy("") + """
-            LIMIT 1
-            """;
+        String sql =
+            "SELECT bestTime, official_ticks, display_millis, timing_source, run_id " +
+            "FROM fr_player_times " +
+            "WHERE player_name = ? " +
+            "AND LOWER(trackNameWS) = LOWER(?) " +
+            "AND finished = TRUE " +
+            "ORDER BY " + officialOrderBy("") + " " +
+            "LIMIT 1";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -5647,16 +5907,14 @@ public class DatabaseManager {
         String trackName
     ) {
         if (playerUUID == null) return null;
-        String sql = """
-            SELECT bestTime, official_ticks, display_millis, timing_source, run_id
-            FROM fr_player_times
-            WHERE player_uuid = ?
-              AND LOWER(trackNameWS) = LOWER(?)
-              AND finished = TRUE
-            ORDER BY
-""" + officialOrderBy("") + """
-            LIMIT 1
-            """;
+        String sql =
+            "SELECT bestTime, official_ticks, display_millis, timing_source, run_id " +
+            "FROM fr_player_times " +
+            "WHERE player_uuid = ? " +
+            "AND LOWER(trackNameWS) = LOWER(?) " +
+            "AND finished = TRUE " +
+            "ORDER BY " + officialOrderBy("") + " " +
+            "LIMIT 1";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -5716,23 +5974,43 @@ public class DatabaseManager {
         return null;
     }
 
+    /**
+     * Returns the player's position on the track's time-trial board, or {@code 0}
+     * when they have no recorded time on it at all.
+     *
+     * <p>Unfinished runs are included: a player who reset mid-lap still has a
+     * partial time, and excluding them left the position blank. Ordering mirrors
+     * {@link #getTopTimes(String)} exactly — finished runs first (by official
+     * ticks, then display millis), then unfinished ones ranked by how many
+     * checkpoints they reached — so the number shown next to a player always
+     * matches their actual row on the board.
+     *
+     * <p>Each player is reduced to their single best run first
+     * ({@code player_rn = 1}), then {@code DENSE_RANK} assigns the position,
+     * preserving the legacy tie semantics (equal times share a position).
+     */
     public synchronized int getPlayerRank(UUID playerUUID, String trackNameWS) {
         if (playerUUID == null) return 0;
         String cleanTrack = trackNameWS.replaceAll("\\s+", "");
 
-        // Select each player's best run using the official ordering, then rank the
-        // resulting rows. DENSE_RANK preserves the legacy tie semantics.
+        // Finished runs are ordered by their official time; unfinished ones have
+        // no meaningful total time, so they fall to the end of the board sorted
+        // by checkpoints reached. The CASE guards keep a finished run's time from
+        // being compared against a NULL for an unfinished one.
+        String boardOrder =
+            " finished DESC," +
+            " CASE WHEN finished = 0 THEN checkpointsReached END DESC," +
+            " CASE WHEN finished = 1 THEN " + officialTicksExpression("") + " END ASC," +
+            " CASE WHEN finished = 1 THEN " + displayMillisExpression("") + " END ASC," +
+            " bestTime ASC, created_at ASC, id ASC";
+
         String sql =
             "WITH player_bests AS (" +
-            " SELECT t.*, ROW_NUMBER() OVER (PARTITION BY t.player_uuid ORDER BY " +
-            officialOrderBy("t.") +
-            ") AS player_rn" +
+            " SELECT t.*, ROW_NUMBER() OVER (PARTITION BY t.player_uuid ORDER BY" + boardOrder + ") AS player_rn" +
             " FROM fr_player_times t" +
-            " WHERE LOWER(t.trackNameWS) = LOWER(?) AND t.finished = TRUE" +
+            " WHERE LOWER(t.trackNameWS) = LOWER(?)" +
             "), ranked_bests AS (" +
-            " SELECT player_uuid, DENSE_RANK() OVER (ORDER BY " +
-            officialOrderBy("") +
-            ") AS rank" +
+            " SELECT player_uuid, DENSE_RANK() OVER (ORDER BY" + boardOrder + ") AS rank" +
             " FROM player_bests WHERE player_rn = 1" +
             ") SELECT rank FROM ranked_bests WHERE player_uuid = ? LIMIT 1";
         try {
@@ -5854,23 +6132,21 @@ public class DatabaseManager {
      */
     public synchronized Map<String, Double> getAllBestTimes() {
         Map<String, Double> bestTimes = new HashMap<>();
-        String sql = """
-            SELECT t.trackNameWS,
-                   COALESCE(ranked.display_millis / 1000.0, ranked.bestTime) AS wr
-            FROM fr_tracks t
-            LEFT JOIN (
-                SELECT p.trackNameWS, p.bestTime, p.display_millis,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY p.trackNameWS
-                           ORDER BY
-""" + officialOrderBy("p.") + """
-                       ) AS rn
-                FROM fr_player_times p
-                WHERE p.finished = TRUE
-            ) ranked
-              ON LOWER(t.trackNameWS) = LOWER(ranked.trackNameWS)
-             AND ranked.rn = 1
-            """;
+        String sql =
+            "SELECT t.trackNameWS, " +
+            "COALESCE(ranked.display_millis / 1000.0, ranked.bestTime) AS wr " +
+            "FROM fr_tracks t " +
+            "LEFT JOIN ( " +
+            "SELECT p.trackNameWS, p.bestTime, p.display_millis, " +
+            "ROW_NUMBER() OVER ( " +
+            "PARTITION BY p.trackNameWS " +
+            "ORDER BY " + officialOrderBy("p.") + " " +
+            ") AS rn " +
+            "FROM fr_player_times p " +
+            "WHERE p.finished = TRUE " +
+            ") ranked " +
+            "ON LOWER(t.trackNameWS) = LOWER(ranked.trackNameWS) " +
+            "AND ranked.rn = 1";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -5896,21 +6172,19 @@ public class DatabaseManager {
      */
     public synchronized Map<String, Double> getPlayerAllBestTimes(String playerName) {
         Map<String, Double> pbTimes = new HashMap<>();
-        String sql = """
-            SELECT ranked.trackNameWS,
-                   COALESCE(ranked.display_millis / 1000.0, ranked.bestTime) AS pb
-            FROM (
-                SELECT p.trackNameWS, p.bestTime, p.display_millis,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY p.trackNameWS
-                           ORDER BY
-""" + officialOrderBy("p.") + """
-                       ) AS rn
-                FROM fr_player_times p
-                WHERE p.player_name = ? AND p.finished = TRUE
-            ) ranked
-            WHERE ranked.rn = 1
-            """;
+        String sql =
+            "SELECT ranked.trackNameWS, " +
+            "COALESCE(ranked.display_millis / 1000.0, ranked.bestTime) AS pb " +
+            "FROM ( " +
+            "SELECT p.trackNameWS, p.bestTime, p.display_millis, " +
+            "ROW_NUMBER() OVER ( " +
+            "PARTITION BY p.trackNameWS " +
+            "ORDER BY " + officialOrderBy("p.") + " " +
+            ") AS rn " +
+            "FROM fr_player_times p " +
+            "WHERE p.player_name = ? AND p.finished = TRUE " +
+            ") ranked " +
+            "WHERE ranked.rn = 1";
         try {
             Connection conn = getOrConnect();
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -6462,6 +6736,17 @@ public class DatabaseManager {
          * and the parsed meta (e.g. level=2, custom_model_data=42).
          */
         public ItemStack toItemStack() {
+            return toItemStack(null, null);
+        }
+
+        /**
+         * Builds the icon and applies the given display name/lore on the same
+         * {@link ItemMeta} as the block-state props (e.g. LIGHT level). Setting the
+         * block state resets item deviations on 1.20.5+, so the name/lore must be set
+         * after it — doing everything in one pass avoids losing the level on a later
+         * getItemMeta()/setItemMeta() round-trip.
+         */
+        public ItemStack toItemStack(String displayName, java.util.List<String> lore) {
             Material mat;
             try {
                 mat = Material.valueOf(materialName.toUpperCase());
@@ -6469,19 +6754,28 @@ public class DatabaseManager {
                 mat = Material.PAPER;
             }
             ItemStack item = new ItemStack(mat, Math.max(1, amount));
-            if (meta != null && !meta.isEmpty()) {
-                applyMeta(item, meta);
+            ItemMeta itemMeta = item.getItemMeta();
+            if (itemMeta == null) {
+                return item;
             }
+            if (meta != null && !meta.isEmpty()) {
+                applyMeta(itemMeta, mat, meta);
+            }
+            if (displayName != null) {
+                itemMeta.setDisplayName(displayName);
+            }
+            if (lore != null) {
+                itemMeta.setLore(lore);
+            }
+            item.setItemMeta(itemMeta);
             return item;
         }
 
         /**
-         * Applies comma-separated key=value meta props to the item.
+         * Applies comma-separated key=value meta props to the item meta.
          * Supported: level=N (LIGHT), custom_model_data=N / cmd=N.
          */
-        private static void applyMeta(ItemStack item, String meta) {
-            ItemMeta itemMeta = item.getItemMeta();
-            if (itemMeta == null) return;
+        private static void applyMeta(ItemMeta itemMeta, Material type, String meta) {
             for (String prop : meta.split(",")) {
                 prop = prop.trim();
                 int eq = prop.indexOf('=');
@@ -6491,9 +6785,13 @@ public class DatabaseManager {
                 try {
                     switch (key) {
                         case "level" -> {
-                            if (item.getType() == Material.LIGHT && itemMeta instanceof BlockStateMeta blockMeta) {
+                            if (type == Material.LIGHT && itemMeta instanceof BlockStateMeta blockMeta) {
                                 org.bukkit.block.BlockState blockState = blockMeta.getBlockState();
-                                if (blockState.getBlockData() instanceof org.bukkit.block.data.type.Light light) {
+                                org.bukkit.block.data.BlockData data = blockState.getBlockData();
+                                if (!(data instanceof org.bukkit.block.data.type.Light)) {
+                                    data = Material.LIGHT.createBlockData();
+                                }
+                                if (data instanceof org.bukkit.block.data.type.Light light) {
                                     light.setLevel(Math.max(0, Math.min(15, Integer.parseInt(value))));
                                     blockState.setBlockData(light);
                                     blockMeta.setBlockState(blockState);
@@ -6505,7 +6803,6 @@ public class DatabaseManager {
                     }
                 } catch (NumberFormatException ignored) {}
             }
-            item.setItemMeta(itemMeta);
         }
     }
 
@@ -10437,5 +10734,13 @@ public class DatabaseManager {
         int playerVersion = FormulaRacing.getInstance().getOpenBoatUtilsVersion(playerUUID);
         int minVersion = getTrackMinObuVersion(trackNameWS);
         return playerVersion >= minVersion;
+    }
+
+    public synchronized boolean checkPlayerMcVersion(Player player, String trackNameWS) {
+        return checkMcVersion(player.getProtocolVersion(), trackNameWS);
+    }
+
+    public synchronized boolean checkMcVersion(int currentProtocol, String trackNameWS) {
+        return MinecraftVersion.meetsMinimum(currentProtocol, getTrackMinVersion(trackNameWS));
     }
 }

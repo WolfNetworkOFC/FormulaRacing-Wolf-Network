@@ -1,5 +1,7 @@
 package dev.EfraGroup.formulaRacing.Heat;
 
+import dev.EfraGroup.formulaRacing.Controllers.QuickRaceBossBarManager;
+import dev.EfraGroup.formulaRacing.Controllers.QuickRaceManager;
 import dev.EfraGroup.formulaRacing.Event.EventAnnouncements;
 import dev.EfraGroup.formulaRacing.Event.EventState;
 import dev.EfraGroup.formulaRacing.Event.Events;
@@ -818,6 +820,7 @@ public class Heats {
         if (driver == null) {
             return;
         }
+        this.hideQuickRaceBossBar(driver.getUuid());
 
         int before = this.finishedDriverCount.incrementAndGet();
         this.plugin.getDebugManager().logRaceSystem(
@@ -1067,11 +1070,6 @@ public class Heats {
                 new java.util.ArrayList<>(this.drivers.keySet());
             if (this.plugin.getRegionListener() != null) {
                 this.plugin.getRegionListener().cleanupHeatPlayers(driverUUIDs);
-            }
-            if (this.plugin.getRaceCheckpointListener() != null) {
-                this.plugin.getRaceCheckpointListener().cleanupHeatPlayers(
-                    driverUUIDs
-                );
             }
             this.plugin.getLonelyController().clearGhostForPlayers(
                 this.drivers.keySet()
@@ -1405,11 +1403,6 @@ public class Heats {
             }
         }
 
-        // Clear checkpoints in listener (prevents cooldown blocking new CPs)
-        if (this.plugin.getRaceCheckpointListener() != null) {
-            this.plugin.getRaceCheckpointListener().cleanupHeatPlayers(this.drivers.keySet());
-        }
-
         // Return to initial state
         if (this.heatState != HeatState.SETUP) {
             this.setHeatStateForLoad(HeatState.SETUP);
@@ -1450,6 +1443,9 @@ public class Heats {
     public void stopTimeTrialTimer(Player player) {
         if (this.plugin.getTimerUtils() != null) {
             this.plugin.getTimerUtils().stopTimer(player);
+            if (this.plugin.getWolfTimingService() != null) {
+                this.plugin.getWolfTimingService().abort(player.getUniqueId(), true);
+            }
             this.plugin.getDebugManager().logRaceSystem(
                 "[RACE DEBUG] Time Trial timer stopped for " +
                     player.getName()
@@ -2083,10 +2079,90 @@ public class Heats {
                 this.plugin.getGimmickManager().onHeatFinished(this);
             }
         }
+
+        this.syncQuickRaceBossBar(previous, heatState);
+    }
+
+    /**
+     * Drops the "Race on &lt;track&gt;" bar for a single driver, when this heat is
+     * the quick race's current one. No-op for other event types.
+     */
+    private void hideQuickRaceBossBar(UUID uuid) {
+        if (this.plugin == null || uuid == null) {
+            return;
+        }
+        QuickRaceManager quickRaceManager = this.plugin.getQuickRaceManager();
+        QuickRaceBossBarManager bossBars = this.plugin.getQuickRaceBossBarManager();
+        if (quickRaceManager == null || bossBars == null) {
+            return;
+        }
+        if (quickRaceManager.getCurrentHeat().orElse(null) != this) {
+            return;
+        }
+        Player player = Bukkit.getPlayer(uuid);
+        if (player != null) {
+            bossBars.hideFrom(player);
+        } else {
+            // Offline player: drop it from the map so a later join does not reuse it.
+            bossBars.hideOffline(uuid);
+        }
+    }
+
+    /**
+     * Keeps the "Race on &lt;track&gt;" bar in sync with the heat lifecycle: shown
+     * while the heat goes live, dropped once it ends (or a driver finishes/DNFs).
+     */
+    private void syncQuickRaceBossBar(HeatState previous, HeatState current) {
+        if (this.plugin == null) {
+            return;
+        }
+        QuickRaceManager quickRaceManager = this.plugin.getQuickRaceManager();
+        if (quickRaceManager == null) {
+            return;
+        }
+        // Only the quick race's own heat drives the bar; other events sharing
+        // Heats must not claim it.
+        if (quickRaceManager.getCurrentHeat().orElse(null) != this) {
+            return;
+        }
+        QuickRaceBossBarManager bossBars = this.plugin.getQuickRaceBossBarManager();
+        if (bossBars == null) {
+            return;
+        }
+        // The bar appears as soon as the grid is loaded, and rides through the
+        // countdown (STARTING) and the race itself (RACING) untouched.
+        boolean nowOnGrid = current == HeatState.LOADED
+            || current == HeatState.STARTING
+            || current == HeatState.RACING;
+        boolean wasOnGrid = previous == HeatState.LOADED
+            || previous == HeatState.STARTING
+            || previous == HeatState.RACING;
+        if (nowOnGrid && !wasOnGrid) {
+            for (UUID uuid : this.drivers.keySet()) {
+                Player player = Bukkit.getPlayer(uuid);
+                if (player != null && player.isOnline()) {
+                    bossBars.showFor(player, this.getTrackNameWS());
+                }
+            }
+        } else if (current == HeatState.FINISHED) {
+            bossBars.hideAll();
+        }
     }
 
     public void setHeatStateForLoad(HeatState heatState) {
+        HeatState previous = this.heatState;
         this.heatState = heatState;
+        // resetHeat() cancels a session through this setter (bypassing
+        // setHeatState), so the bar has to be dropped here too or it would
+        // survive a cancelled quick race.
+        if (previous != heatState && (heatState == HeatState.SETUP || heatState == HeatState.FINISHED)) {
+            QuickRaceBossBarManager bossBars = this.plugin != null
+                ? this.plugin.getQuickRaceBossBarManager()
+                : null;
+            if (bossBars != null) {
+                bossBars.hideAll();
+            }
+        }
     }
 
     public void startSessionTimer() {
@@ -2448,6 +2524,7 @@ public class Heats {
         driver.setEndTime(System.currentTimeMillis());
         driver.setPtpActive(false);
         driver.setPtpEnergy(0.0);
+        this.hideQuickRaceBossBar(driver.getUuid());
         EventAnnouncements announcements = this.round != null && this.round.getEvent() != null
             ? this.round.getEvent().getAnnouncements()
             : this.plugin.getEventAnnouncements();

@@ -13,6 +13,7 @@ import dev.EfraGroup.formulaRacing.Round.RoundState;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.MinecraftVersion;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import dev.EfraGroup.formulaRacing.BoatUtils.OpenBoatUtilsVersion;
@@ -277,6 +278,9 @@ public class QuickRaceManager {
                     if (this.plugin.getTimeTrialController() != null && this.plugin.getTimeTrialController().hasActiveSession(player)) {
                         this.plugin.getTimerUtils().stopTimer(player);
                         this.plugin.getTimeTrialController().endSession(player);
+                        if (this.plugin.getWolfTimingService() != null) {
+                            this.plugin.getWolfTimingService().abort(player.getUniqueId(), true);
+                        }
                         if (this.plugin.getPacketSender() != null) {
                             this.plugin.getPacketSender().resetBoatUtilsToVanilla(player);
                         }
@@ -286,6 +290,11 @@ public class QuickRaceManager {
 
                     if (this.plugin.getPitStopManager() != null) {
                         this.plugin.getPitStopManager().clearPitStopState(player.getUniqueId());
+                    }
+
+                    if (!this.plugin.getDatabaseManager().checkPlayerMcVersion(player, this.currentHeat.getTrackNameWS())) {
+                        this.plugin.sendMessage(player, "mc_version_warning", new String[]{"{track}", this.currentHeat.getTrackNameWS(), "{current}", MinecraftVersion.getName(player.getProtocolVersion()), "{required}", String.valueOf(this.plugin.getDatabaseManager().getTrackMinVersion(this.currentHeat.getTrackNameWS()))});
+                        return false;
                     }
 
                     if (this.plugin.getDatabaseManager().trackHaveBoatUtils(this.currentHeat.getTrackNameWS())) {
@@ -375,6 +384,9 @@ public class QuickRaceManager {
                 return false;
             } else if (this.currentHeat.getHeatState() == HeatState.RACING) {
                 driver.setDnf(true);
+                if (this.plugin.getQuickRaceBossBarManager() != null) {
+                    this.plugin.getQuickRaceBossBarManager().hideFrom(player);
+                }
                 if (this.plugin.getPTP() != null) {
                     this.plugin.getPTP().disablePTP(player, driver);
                 }
@@ -582,6 +594,10 @@ public class QuickRaceManager {
 
     private void deleteQuickRace() {
         this.stopCompletionMonitor();
+        if (this.plugin.getQuickRaceBossBarManager() != null) {
+            this.plugin.getQuickRaceBossBarManager().hideAll();
+        }
+
         if (this.currentQuickRace != null) {
             // QuickRace NÃO é removido quando acaba - apenas limpa referências locais
             this.plugin.getDebugManager().logRaceSystem("Quick Race finalizado: " + this.currentQuickRace.getDisplayName());

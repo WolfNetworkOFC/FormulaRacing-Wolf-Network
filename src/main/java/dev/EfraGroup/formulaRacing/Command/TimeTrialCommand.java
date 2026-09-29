@@ -8,7 +8,9 @@
     import dev.EfraGroup.formulaRacing.APIFormulaRacing;
     import dev.EfraGroup.formulaRacing.Command.Help.CommandHelpService;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Utils.MinecraftVersion;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import dev.EfraGroup.formulaRacing.Utils.TimeTrialTeleportMessage;
 import dev.EfraGroup.formulaRacing.PacketSender;
     import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
     import dev.EfraGroup.formulaRacing.AI.AIRacingLineManager;
@@ -134,6 +136,11 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                 }
             }
 
+            if (!this.mysql.checkPlayerMcVersion(player, trackName)) {
+                this.plugin.sendMessage(player, "mc_version_warning", new String[]{"{track}", trackName, "{current}", MinecraftVersion.getName(player.getProtocolVersion()), "{required}", String.valueOf(this.mysql.getTrackMinVersion(trackName))});
+                return;
+            }
+
             if (this.mysql.trackHaveBoatUtils(trackName) && !FormulaRacing.hasOpenBoatUtilsMod(player)) {
                 this.plugin.sendMessage(player, "obu_mandatory_warning", new String[]{"{track}", trackName});
             } else {
@@ -158,7 +165,7 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                     }
                     this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);
                     this.plugin.getDebugManager().logTimeTrialSystem("[TT] Starting track '" + trackName + "' for player " + player.getName());
-                    this.plugin.sendMessage(player, "timetrial_teleport", new String[]{"{track}", trackName});
+                    sendTimeTrialTeleportMessage(player, trackName);
 
                     try {
                         this.stt.setPlayerTrack(player, trackName, ownerName);
@@ -216,6 +223,36 @@ import dev.EfraGroup.formulaRacing.PacketSender;
             }
         }
 
+        /**
+         * Sends the {@code /tt} "Teleported to [track]" message, appending the
+         * player's leaderboard position when they already have a finished time on
+         * that track.
+         *
+         * <p>The rank lives in the database, so it is fetched asynchronously and the
+         * message is sent from the completion callback — the main thread is never
+         * blocked on a query. {@code getPlayerRank} returns {@code 0} when the player
+         * has no finished run on this track, in which case the message renders
+         * exactly as before (the position suffix is empty).
+         *
+         * @param player    the teleported player
+         * @param trackName the track display name; normalized for the lookup query
+         */
+        private void sendTimeTrialTeleportMessage(Player player, String trackName) {
+            String trackWS = trackName.replaceAll("\\s+", "");
+            this.mysql.getPlayerRankAsync(player.getUniqueId(), trackWS).thenAccept(rank -> {
+                // Never touch a player from a worker thread: they may have logged
+                // off while the query was still in flight.
+                if (!player.isOnline()) {
+                    return;
+                }
+                this.plugin.sendMessage(
+                        player,
+                        "timetrial_teleport",
+                        new String[]{"{track}", trackName, "{position}", TimeTrialTeleportMessage.rankSuffix(rank)}
+                );
+            });
+        }
+
         @CommandAlias("timetrialcancel|ttc|timetrialc|ttcancel")
         @Description("Cancels the current Time Trial")
         public void onCancel(Player player) {
@@ -255,6 +292,7 @@ import dev.EfraGroup.formulaRacing.PacketSender;
             final UUID uuid = player.getUniqueId();
             final String playerName = player.getName();
             final boolean hasBoatUtils = FormulaRacing.hasOpenBoatUtilsMod(player);
+            final int clientProtocol = player.getProtocolVersion();
             final String currentTrackWS = normalizeTrackName(this.plugin.getLastTimeTrialTrack(uuid));
 
             // 2. Building the pool and picking the track reads the database, so it runs off
@@ -283,7 +321,7 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                 while (trackName == null && !validTracks.isEmpty()) {
                     int index = this.random.nextInt(validTracks.size());
                     String candidate = validTracks.get(index);
-                    if (hasBoatUtils || !this.mysql.trackHaveBoatUtils(candidate)) {
+                    if (this.mysql.checkMcVersion(clientProtocol, candidate) && (hasBoatUtils || !this.mysql.trackHaveBoatUtils(candidate))) {
                         trackName = candidate;
                     } else {
                         validTracks.remove(index);
@@ -445,6 +483,9 @@ import dev.EfraGroup.formulaRacing.PacketSender;
 
                                 this.timerUtils.stopTimer(player);
                                 this.timeTrialController.endSession(player);
+                                if (this.plugin.getWolfTimingService() != null) {
+                                    this.plugin.getWolfTimingService().abort(player.getUniqueId(), true);
+                                }
                             } else {
                                 this.timerUtils.stopTimer(player, trackName);
                                 this.timeTrialController.endSession(player);
@@ -472,6 +513,13 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                             SchedulerHelper.teleportAsync(player, spawn).thenAccept(success -> {
                                 if (Boolean.TRUE.equals(success)) {
                                     this.api.spawnBoatAt(player, spawn, false, false, false);
+                                    // O barco novo nasce com física vanilla: o OpenBoatUtils perde
+                                    // a config da pista quando a entidade do barco troca. Reenvia o
+                                    // pacote (mesmo efeito do /tt) ou o reset deixa o barco vanilla.
+                                    if (this.packetsender != null) {
+                                        this.packetsender.resetBoatUtilsToVanilla(player);
+                                        this.packetsender.applyBoatUtilsToPlayer(player, finalTrackName);
+                                    }
                                     // Apply track game time (day/night cycle)
                                     this.plugin.applyTrackGameTime(player, finalTrackName);
                                     // Set time trial hotbar after teleport + boat spawn

@@ -344,6 +344,31 @@ public class AIRacingLineManager {
         racingLines.remove(key);
     }
 
+    /**
+     * Move a linha de IA (mapa em memória + ficheiro {@code ailines/<pista>.bin})
+     * quando a pista é renomeada.
+     */
+    public synchronized void renameTrack(String oldTrackName, String newTrackName) {
+        if (oldTrackName == null || newTrackName == null) return;
+        String oldKey = getTrackKey(oldTrackName);
+        String newKey = getTrackKey(newTrackName);
+        if (oldKey.equals(newKey)) return;
+
+        AIRacingLine line = racingLines.remove(oldKey);
+        if (line != null) {
+            racingLines.put(newKey, line);
+        }
+
+        File oldFile = new File(linesDir, oldKey + ".bin");
+        if (oldFile.exists()) {
+            File newFile = new File(linesDir, newKey + ".bin");
+            if (!oldFile.renameTo(newFile)) {
+                plugin.getDebugManager().logRaceSystem(
+                        "[AI] Failed to rename racing line file " + oldFile.getName() + " -> " + newFile.getName());
+            }
+        }
+    }
+
     private static String sanitizeFileName(String name) {
         if (name == null || name.isEmpty()) {
             return "unknown";
