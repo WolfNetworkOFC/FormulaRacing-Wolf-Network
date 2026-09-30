@@ -65,12 +65,27 @@ public class AIOpponentManager {
     private static final double WATER_MAX_SPEED = 8.0D / 20.0D;       // 0.4 b/t
     private static final double LAND_MAX_SPEED = 2.0D / 20.0D;        // 0.1 b/t
 
-    /** Yaw error (deg) inside which the AI releases the turn keys. */
     private static final double STEER_DEADZONE_DEG = 5.0D;
     /** Horiz speed / desired above which the AI simply lifts the throttle (coast). */
     private static final double COAST_OVERSPEED_RATIO = 1.12D;
-    /** Horiz speed / desired above which the AI starts the ice-boat turnaround brake. */
-    private static final double BRAKE_OVERSPEED_RATIO = 1.45D;
+    /**
+     * Ice boats on blue ice have almost no friction: once at speed nothing slows
+     * them but turning the bow. So the 180° turnaround brake must stay a rare,
+     * last-resort event — a common brake turned every corner into a spin.
+     */
+    private static final double HARD_BRAKE_OVERSPEED_RATIO = 2.6D;
+    /**
+     * Absolute speed (blocks/tick) below which the turnaround brake is pointless:
+     * there is no momentum left to scrub, so spinning the boat 180° only costs
+     * time. Under this the AI simply lifts the throttle and steers.
+     */
+    private static final double BRAKE_MIN_ABS_SPEED = 1.2D;
+    /**
+     * Ticks after a brake finishes before another may start. Without it the
+     * brake re-triggered the very tick RECOVERY ended (the overspeed that
+     * caused it is still true), locking the AI into an endless spin.
+     */
+    private static final int BRAKE_COOLDOWN_TICKS = 60;
     /** Yaw error to the reverse of velocity that ends the 180° turnaround. */
     private static final double TURNAROUND_DONE_DEG = 40.0D;
     /** Yaw error to the racing line that ends recovery after a brake. */
@@ -78,6 +93,12 @@ public class AIOpponentManager {
     private static final int MAX_TURNAROUND_TICKS = 35;
     private static final int MAX_BRAKING_TICKS = 50;
     private static final int MAX_RECOVERY_TICKS = 60;
+    /** Distance from the recorded line that activates deliberate return-to-line steering. */
+    private static final double OFF_LINE_RECOVERY_BLOCKS = 7.0D;
+    /** A nearly stationary boat enters recovery after this many racing ticks. */
+    private static final int STUCK_RECOVERY_TICKS = 50;
+    /** Stanley-style lateral correction is capped so it cannot cause a spin. */
+    private static final double MAX_LATERAL_CORRECTION_DEG = 22.0D;
 
     /**
      * Ice-boat brake phases. Real ice racing does not use S (barely any grip);
@@ -89,6 +110,14 @@ public class AIOpponentManager {
         TURN_AROUND,
         BRAKING,
         RECOVERY
+    }
+
+    public enum TrafficState {
+        FOLLOW_LINE,
+        FOLLOW_CAR,
+        OVERTAKE_LEFT,
+        OVERTAKE_RIGHT,
+        RETURN_TO_LINE
     }
 
     /**
@@ -111,6 +140,15 @@ public class AIOpponentManager {
             max = surfaceMaxForSkippingSnow(block);
         }
         return max < 0.0D ? 1.0D : max;
+    }
+
+    /**
+     * Fastest surface speed a boat can reach (blue ice, blocks/tick). Used as
+     * the reference scale when converting an absolute recorded speed back into
+     * the 0..1 fraction that marker derivation and previews expect.
+     */
+    public static double getBlueIceMaxSpeed() {
+        return BLUE_ICE_MAX_SPEED;
     }
 
     /**
@@ -303,8 +341,9 @@ public class AIOpponentManager {
             }
         }
 
-        if (heat.getHeatState() == HeatState.RACING) {
-            checkAICollisions(opponentsInHeat);
+        if (heat.getHeatState() == HeatState.RACING
+                && heat.getCollisionMode() != CollisionMode.DISABLED) {
+            checkAICollisions(opponentsInHeat, heat.getCollisionMode());
         }
     }
 
@@ -319,9 +358,11 @@ public class AIOpponentManager {
         return result;
     }
 
-    private void checkAICollisions(List<AIOpponent> opponents) {
+    private void checkAICollisions(List<AIOpponent> opponents, CollisionMode collisionMode) {
         final double collisionDistanceSquared = 4.0;
-        final double bumpForce = 0.35; // Increased from 0.18 for more noticeable collisions
+        // LOW is a light nudge; HIGH keeps the stronger contact used by the
+        // original system. DISABLED never reaches this method.
+        final double bumpForce = collisionMode == CollisionMode.LOW ? 0.15D : 0.35D;
 
         for (int i = 0; i < opponents.size(); i++) {
             for (int j = i + 1; j < opponents.size(); j++) {
@@ -443,6 +484,22 @@ public class AIOpponentManager {
          */
         private double steeringBiasDeg;
         private long lastBiasUpdateMs;
+        /** Mistakes are rolled at discrete opportunities, never once per tick. */
+        private long nextMistakeCheckMs;
+        /** Consecutive ticks with almost no horizontal movement. */
+        private int lowSpeedTicks;
+        /** Ticks remaining before the 180° turnaround brake may trigger again. */
+        private int brakeCooldownTicks;
+        /** True while deliberately steering back to the recorded corridor. */
+        private boolean returningToLine;
+        /** Travel-relative lane offset: negative left, positive right. */
+        private double laneOffset;
+        private double desiredLaneOffset;
+        private int trafficClearTicks;
+        private TrafficState trafficState = TrafficState.FOLLOW_LINE;
+
+        private record TrafficPlan(double speedFactor) {
+        }
 
         public AIOpponent(Driver driver, String displayName, AIDifficulty difficulty, FormulaRacing plugin) {
             this.driver = driver;
@@ -464,6 +521,13 @@ public class AIOpponentManager {
             this.lastStartEndCrossTime = 0L;
             this.steeringBiasDeg = 0.0D;
             this.lastBiasUpdateMs = 0L;
+            this.nextMistakeCheckMs = System.currentTimeMillis() + 10000L;
+            this.lowSpeedTicks = 0;
+            this.brakeCooldownTicks = 0;
+            this.returningToLine = false;
+            this.laneOffset = 0.0D;
+            this.desiredLaneOffset = 0.0D;
+            this.trafficClearTicks = 0;
             resetLearnedValues();
         }
 
@@ -686,13 +750,21 @@ public class AIOpponentManager {
                 long maxDuration = (long) (2800 - (learnedLineAccuracy * 1600));
                 if (duration > maxDuration) {
                     isMakingMistake = false;
+                    // Give the driver a clean section after a mistake. Previously
+                    // the probability was rolled every tick after the cooldown,
+                    // making a new mistake practically guaranteed immediately.
+                    nextMistakeCheckMs = currentTime + 7000L;
                 }
-            } else if (currentTime - lastMistakeTime >= 10000L
-                    && ThreadLocalRandom.current().nextDouble() < learnedErrorRate) {
-                isMakingMistake = true;
-                mistakeStartTime = currentTime;
-                lastMistakeTime = currentTime;
-                mistakesMade++;
+            } else if (currentTime >= nextMistakeCheckMs) {
+                // One opportunity every 6-10 seconds. errorRate is therefore a
+                // probability per driving situation, not a probability per tick.
+                nextMistakeCheckMs = currentTime + ThreadLocalRandom.current().nextLong(6000L, 10001L);
+                if (ThreadLocalRandom.current().nextDouble() < learnedErrorRate) {
+                    isMakingMistake = true;
+                    mistakeStartTime = currentTime;
+                    lastMistakeTime = currentTime;
+                    mistakesMade++;
+                }
             }
 
             // Refresh the held steering bias: immediately when the mistake state
@@ -712,13 +784,42 @@ public class AIOpponentManager {
 
             if (line != null && line.isUsable() && currentLoc != null) {
                 int closestIndex = resolvedIndex;
-                desiredSpeed = line.getIdealSpeedAtIndex(closestIndex) * learnedSpeedMultiplier;
+                double surfaceMax = Math.max(0.05D, getSurfaceMaxSpeed(currentLoc));
+
+                // v3 lines store ABSOLUTE blocks/tick; v1/v2 store the fraction of
+                // the local surface max. Both must become a 0..1 throttle fraction
+                // against the surface under the boat.
+                double recordedHere = line.hasAbsoluteSpeeds()
+                        ? line.getIdealSpeedAtIndex(closestIndex) / surfaceMax
+                        : line.getIdealSpeedAtIndex(closestIndex);
+
+                // Minecraft ice boats preserve momentum, so reacting at the apex
+                // is too late. Read farther ahead as pace rises and begin preparing
+                // for the slowest recorded section / strongest bend in that window.
+                double previewDistance = 20.0D + currentSpeed * 45.0D;
+                AIRacingLine.Preview preview = line.previewAhead(closestIndex, previewDistance);
+                double turnFactor = preview.maximumTurnDegrees() <= 18.0D
+                        ? 1.0D
+                        : Math.max(0.38D, 1.0D - ((preview.maximumTurnDegrees() - 18.0D) / 150.0D) * 0.62D);
+                // previewAhead() reports the line's own units, so convert the
+                // minimum it found with the same rule before comparing.
+                double anticipatedAbsolute = line.hasAbsoluteSpeeds()
+                        ? preview.minimumRecordedSpeed() / surfaceMax
+                        : preview.minimumRecordedSpeed();
+                double anticipated = Math.min(anticipatedAbsolute, turnFactor);
+
+                // Do not jump instantly to the future speed on every mild bend;
+                // blend it with the pace at the boat, while hard bends naturally
+                // pull the target down sooner and trigger the 180-degree ice brake.
+                double anticipationWeight = preview.maximumTurnDegrees() > 55.0D ? 0.85D : 0.55D;
+                desiredSpeed = (recordedHere * (1.0D - anticipationWeight)
+                        + anticipated * anticipationWeight) * learnedSpeedMultiplier;
 
                 if (line.isNearBrakingPoint(currentLoc, 4.0)) {
-                    desiredSpeed *= 0.72;
+                    desiredSpeed *= 0.82D;
                 }
                 if (line.isNearAccelerationPoint(currentLoc, 4.0)) {
-                    desiredSpeed *= 1.06;
+                    desiredSpeed *= 1.04D;
                 }
             }
 
@@ -806,12 +907,36 @@ public class AIOpponentManager {
             double desiredBt;
             if (line != null && line.isUsable()) {
                 int index = resolvedIndex;
-                // Look ~0.3s of travel ahead (clamped) so the AI starts turning
-                // before the apex — same distance-based lookahead as before, but
-                // it now only feeds the yaw error (velocity is never lerped).
-                double lookAheadBlocks = Math.max(MIN_LOOKAHEAD_BLOCKS,
-                        Math.min(MAX_LOOKAHEAD_BLOCKS, horizSpeed * 6.0D));
+                double lineDistance = Math.sqrt(line.getHorizontalDistanceSquared(currentLoc, index));
+
+                if (brakePhase == BrakePhase.NONE) {
+                    lowSpeedTicks = horizSpeed < 0.035D ? lowSpeedTicks + 1 : 0;
+                } else {
+                    lowSpeedTicks = 0; // being slow while intentionally braking is not "stuck"
+                }
+                if (lineDistance > OFF_LINE_RECOVERY_BLOCKS || lowSpeedTicks >= STUCK_RECOVERY_TICKS) {
+                    returningToLine = true;
+                    // A recovery and an ice-brake fight for opposite headings.
+                    // Return to the corridor first; normal braking resumes there.
+                    brakePhase = BrakePhase.NONE;
+                    brakeTicks = 0;
+                } else if (returningToLine && lineDistance < 2.5D && lowSpeedTicks == 0) {
+                    returningToLine = false;
+                }
+
+                // Look ~0.3s of travel ahead (clamped). During recovery use a
+                // nearby point: a distant pursuit target can keep a displaced
+                // boat running parallel to the track instead of rejoining it.
+                TrafficPlan trafficPlan = updateTrafficPlan(boat, line, currentLoc, index, velDir, horizSpeed);
+                double lookAheadBlocks = returningToLine
+                        ? 5.0D
+                        : Math.max(MIN_LOOKAHEAD_BLOCKS, Math.min(MAX_LOOKAHEAD_BLOCKS, horizSpeed * 6.0D));
                 Location target = getSteerTarget(line, index, lookAheadBlocks);
+                if (target != null && Math.abs(laneOffset) > 0.01D) {
+                    Vector tangent = line.getTangentAt(index);
+                    Vector right = new Vector(tangent.getZ(), 0.0D, -tangent.getX());
+                    target.add(right.multiply(laneOffset));
+                }
                 if (target == null || target.getWorld() == null || !target.getWorld().equals(currentLoc.getWorld())) {
                     return;
                 }
@@ -835,10 +960,6 @@ public class AIOpponentManager {
                     }
                 }
                 double effectiveTurn = Math.max(headingChange, bendAhead);
-                double cornerFactor = 1.0D;
-                if (effectiveTurn > 25.0D) {
-                    cornerFactor = Math.max(0.35, 1.0D - ((effectiveTurn - 25.0D) / 155.0D) * 0.65D);
-                }
 
                 // Shorter arc target through the apex so the boat does not cut
                 // the chord of a tight corner (pure-pursuit refinement).
@@ -859,13 +980,35 @@ public class AIOpponentManager {
                 }
 
                 double targetYaw = Math.toDegrees(Math.atan2(-idealDirection.getX(), idealDirection.getZ()));
+
+                // Stanley-style cross-track correction on top of pure pursuit.
+                // Pure pursuit alone may run parallel several blocks away from
+                // the recorded boat line after contact with a wall or opponent.
+                double lateralError = line.getSignedLateralError(currentLoc, index);
+                double lateralGain = returningToLine ? 1.15D : 0.42D;
+                double lateralCorrection = Math.toDegrees(Math.atan2(
+                        lateralGain * lateralError,
+                        Math.max(0.35D, horizSpeed)));
+                lateralCorrection = Math.max(-MAX_LATERAL_CORRECTION_DEG,
+                        Math.min(MAX_LATERAL_CORRECTION_DEG, lateralCorrection));
+                targetYaw -= lateralCorrection;
+
                 yawErr = wrapDegrees(targetYaw + steeringBiasDeg - currentLoc.getYaw());
 
                 double surfaceMax = getSurfaceMaxSpeed(currentLoc);
-                desiredBt = currentSpeed * surfaceMax * cornerFactor;
+                // No cornerFactor here on purpose: calculateSpeed() already
+                // anticipated the bend (previewAhead -> turnFactor) and applied
+                // it to the throttle target. Scaling desiredBt by the curvature
+                // a second time crushed the target to ~0.35 on every corner while
+                // the boat was still doing 3.6 b/t on ice, which tripped the
+                // 180° brake on every single corner — the AI spun instead of
+                // turning. desiredBt is now the same anticipated target the
+                // throttle is already chasing, so the boat and the target
+                // agree and the corner is taken at the recorded pace.
+                desiredBt = currentSpeed * surfaceMax * trafficPlan.speedFactor();
 
-                if (line.isNearBrakingPoint(currentLoc, 6.0D)
-                        && horizSpeed > desiredBt * BRAKE_OVERSPEED_RATIO) {
+                if (!returningToLine && line.isNearBrakingPoint(currentLoc, 6.0D)
+                        && horizSpeed > Math.max(desiredBt * HARD_BRAKE_OVERSPEED_RATIO, BRAKE_MIN_ABS_SPEED)) {
                     maybeBeginBrake(velYaw, horizSpeed, desiredBt);
                 }
                 currentLineIndex = index;
@@ -875,7 +1018,12 @@ public class AIOpponentManager {
                 desiredBt = currentSpeed * getSurfaceMaxSpeed(currentLoc);
             }
 
-            updateBrakePhase(currentLoc, velYaw, horizSpeed, desiredBt, yawErr);
+            if (returningToLine) {
+                brakePhase = BrakePhase.NONE;
+                brakeTicks = 0;
+            } else {
+                updateBrakePhase(currentLoc, velYaw, horizSpeed, desiredBt, yawErr);
+            }
 
             boolean left = false;
             boolean right = false;
@@ -928,11 +1076,128 @@ public class AIOpponentManager {
             AIBoatController.drive(boat, left, right, up, down, turnScale);
         }
 
+        /**
+         * Chooses a bounded lateral corridor around slower boats. It never moves
+         * outside the widths stored by the hybrid bounds editor. If neither side
+         * is safe, it follows the car and lets the normal Minecraft 180-degree
+         * brake handle a critical closing distance.
+         */
+        private TrafficPlan updateTrafficPlan(Boat boat, AIRacingLine line, Location currentLoc,
+                                              int index, Vector travelDirection, double horizSpeed) {
+            double safeLeft = Math.max(0.0D, line.getLeftWidthAtIndex(index) - 1.25D);
+            double safeRight = Math.max(0.0D, line.getRightWidthAtIndex(index) - 1.25D);
+
+            if (returningToLine || brakePhase != BrakePhase.NONE) {
+                desiredLaneOffset = 0.0D;
+                trafficState = TrafficState.RETURN_TO_LINE;
+                approachLaneOffset(safeLeft, safeRight);
+                return new TrafficPlan(1.0D);
+            }
+
+            Vector forward = travelDirection.clone().setY(0.0D);
+            if (forward.lengthSquared() < 0.0001D) forward = line.getTangentAt(index);
+            else forward.normalize();
+            Vector right = new Vector(forward.getZ(), 0.0D, -forward.getX());
+
+            Entity closest = null;
+            double closestForward = Double.MAX_VALUE;
+            double closestLateral = 0.0D;
+            List<Entity> nearbyBoats = new ArrayList<>();
+            for (Entity entity : boat.getNearbyEntities(22.0D, 4.0D, 22.0D)) {
+                if (!(entity instanceof Boat) || entity.getUniqueId().equals(boat.getUniqueId()) || !entity.isValid()) continue;
+                Location other = entity.getLocation();
+                if (!currentLoc.getWorld().equals(other.getWorld())) continue;
+                Vector relative = other.toVector().subtract(currentLoc.toVector()).setY(0.0D);
+                double ahead = relative.dot(forward);
+                double lateral = relative.dot(right);
+                nearbyBoats.add(entity);
+                if (ahead > 0.0D && ahead < closestForward
+                        && Math.abs(lateral - laneOffset) < 2.4D) {
+                    closest = entity;
+                    closestForward = ahead;
+                    closestLateral = lateral;
+                }
+            }
+
+            if (closest == null) {
+                trafficClearTicks++;
+                if (trafficClearTicks >= 12) {
+                    desiredLaneOffset = 0.0D;
+                    trafficState = Math.abs(laneOffset) > 0.15D
+                            ? TrafficState.RETURN_TO_LINE : TrafficState.FOLLOW_LINE;
+                }
+                approachLaneOffset(safeLeft, safeRight);
+                return new TrafficPlan(1.0D);
+            }
+
+            trafficClearTicks = 0;
+            AIRacingLine.Preview preview = line.previewAhead(index, 28.0D);
+            boolean cornerTooSharp = preview.maximumTurnDegrees() > 62.0D;
+            double leftTarget = -Math.min(2.5D, safeLeft);
+            double rightTarget = Math.min(2.5D, safeRight);
+            boolean leftClear = safeLeft >= 1.55D
+                    && isTrafficLaneClear(nearbyBoats, currentLoc, forward, right, leftTarget, closestForward);
+            boolean rightClear = safeRight >= 1.55D
+                    && isTrafficLaneClear(nearbyBoats, currentLoc, forward, right, rightTarget, closestForward);
+
+            if (!cornerTooSharp && (leftClear || rightClear)) {
+                // Keep an existing choice to prevent left/right oscillation. For a
+                // new move, prefer the side opposite the obstacle, then the wider side.
+                if (trafficState == TrafficState.OVERTAKE_LEFT && leftClear) {
+                    desiredLaneOffset = leftTarget;
+                } else if (trafficState == TrafficState.OVERTAKE_RIGHT && rightClear) {
+                    desiredLaneOffset = rightTarget;
+                } else if (leftClear && rightClear) {
+                    boolean chooseLeft = closestLateral >= 0.0D
+                            || (Math.abs(closestLateral) < 0.25D && safeLeft > safeRight);
+                    desiredLaneOffset = chooseLeft ? leftTarget : rightTarget;
+                    trafficState = chooseLeft ? TrafficState.OVERTAKE_LEFT : TrafficState.OVERTAKE_RIGHT;
+                } else if (leftClear) {
+                    desiredLaneOffset = leftTarget;
+                    trafficState = TrafficState.OVERTAKE_LEFT;
+                } else {
+                    desiredLaneOffset = rightTarget;
+                    trafficState = TrafficState.OVERTAKE_RIGHT;
+                }
+                approachLaneOffset(safeLeft, safeRight);
+                return new TrafficPlan(1.0D);
+            }
+
+            desiredLaneOffset = 0.0D;
+            trafficState = TrafficState.FOLLOW_CAR;
+            approachLaneOffset(safeLeft, safeRight);
+            double speedFactor = closestForward < 4.0D ? 0.35D
+                    : closestForward < 8.0D ? 0.62D : 0.82D;
+            return new TrafficPlan(speedFactor);
+        }
+
+        private boolean isTrafficLaneClear(List<Entity> boats, Location origin, Vector forward,
+                                           Vector right, double targetOffset, double obstacleDistance) {
+            for (Entity entity : boats) {
+                Location other = entity.getLocation();
+                Vector relative = other.toVector().subtract(origin.toVector()).setY(0.0D);
+                double ahead = relative.dot(forward);
+                double lateral = relative.dot(right);
+                if (ahead > -2.0D && ahead < obstacleDistance + 7.0D
+                        && Math.abs(lateral - targetOffset) < 2.2D) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void approachLaneOffset(double safeLeft, double safeRight) {
+            desiredLaneOffset = Math.max(-safeLeft, Math.min(safeRight, desiredLaneOffset));
+            laneOffset += (desiredLaneOffset - laneOffset) * 0.10D;
+            if (Math.abs(laneOffset) < 0.01D && Math.abs(desiredLaneOffset) < 0.01D) laneOffset = 0.0D;
+            laneOffset = Math.max(-safeLeft, Math.min(safeRight, laneOffset));
+        }
+
         private void maybeBeginBrake(double velYaw, double horizSpeed, double desiredBt) {
-            if (brakePhase != BrakePhase.NONE) {
+            if (brakePhase != BrakePhase.NONE || brakeCooldownTicks > 0) {
                 return;
             }
-            if (horizSpeed > desiredBt * BRAKE_OVERSPEED_RATIO) {
+            if (horizSpeed > Math.max(desiredBt * HARD_BRAKE_OVERSPEED_RATIO, BRAKE_MIN_ABS_SPEED)) {
                 beginBrake(velYaw);
             }
         }
@@ -945,9 +1210,19 @@ public class AIOpponentManager {
 
         private void updateBrakePhase(Location currentLoc, double velYaw, double horizSpeed,
                                       double desiredBt, double lineYawErr) {
+            if (brakeCooldownTicks > 0) {
+                brakeCooldownTicks--;
+            }
+
             if (brakePhase == BrakePhase.NONE) {
                 // Opportunistic brake when massively overspeed for a slow target.
-                if (horizSpeed > desiredBt * BRAKE_OVERSPEED_RATIO
+                // The 1.45 ratio that used to fire here was the main source of
+                // the endless spin: as soon as RECOVERY ended, the boat was
+                // still over that ratio, so the brake re-armed on the very next
+                // tick. It now needs a genuinely hard overspeed, real momentum
+                // left to scrub, and a clear cooldown.
+                if (brakeCooldownTicks == 0
+                        && horizSpeed > Math.max(desiredBt * HARD_BRAKE_OVERSPEED_RATIO, BRAKE_MIN_ABS_SPEED)
                         && desiredBt < getSurfaceMaxSpeed(currentLoc) * 0.55D) {
                     beginBrake(velYaw);
                 }
@@ -979,6 +1254,10 @@ public class AIOpponentManager {
                     if (Math.abs(lineYawErr) <= RECOVERY_DONE_DEG || brakeTicks >= MAX_RECOVERY_TICKS) {
                         brakePhase = BrakePhase.NONE;
                         brakeTicks = 0;
+                        // Hold the brake off for a few seconds: right now the
+                        // boat is still carrying the speed that triggered it, so
+                        // without this it re-enters TURN_AROUND immediately.
+                        brakeCooldownTicks = BRAKE_COOLDOWN_TICKS;
                     }
                 }
                 case NONE -> {

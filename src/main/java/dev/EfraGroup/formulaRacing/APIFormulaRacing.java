@@ -308,20 +308,86 @@ public class APIFormulaRacing {
         }
     }
 
+    /**
+     * Removes every boat and boat-riding anchor this plugin owns.
+     *
+     * Runs from onDisable(), so nothing may be handed to a scheduler: on Folia
+     * the region/global schedulers are already stopped by then and a scheduled
+     * remove would silently never happen, leaving the boat in the world save.
+     * Removal is therefore done inline, off-thread, which is safe here because
+     * no region is ticking.
+     *
+     * Covers three cases the old version missed:
+     * <ul>
+     *   <li>boats of online players currently riding (getVehicle)</li>
+     *   <li>boats tracked in {@link #playerBoats} whose player already left</li>
+     *   <li>the invisible ArmorStand anchors in {@link #lockedBoats} that carry
+     *       grid-locked boats — they are not boats themselves, so removing only
+     *       boats left the anchor (and its passenger) in the world</li>
+     * </ul>
+     */
     public void clearAllBoats() {
         FormulaRacing fr = (FormulaRacing) this.plugin;
         if (fr.getLightningRodListener() != null) {
             for (Player player : Bukkit.getOnlinePlayers()) {
-                fr.getLightningRodListener().removeRodForPlayer(player.getUniqueId());
+                try {
+                    fr.getLightningRodListener().removeRodForPlayer(player.getUniqueId());
+                } catch (Throwable ignored) {
+                }
             }
         }
+
+        int removed = 0;
+
+        // 1. Boats of players who are online and riding right now.
         for (Player player : Bukkit.getOnlinePlayers()) {
-            Entity vehicle = player.getVehicle();
-            if (vehicle instanceof Boat) {
-                player.leaveVehicle();
-                vehicle.remove();
+            try {
+                Entity vehicle = player.getVehicle();
+                if (vehicle instanceof Boat) {
+                    player.leaveVehicle();
+                    if (vehicle.isValid()) {
+                        vehicle.remove();
+                        removed++;
+                    }
+                }
+            } catch (Throwable ignored) {
             }
         }
-        lockedBoats.clear();
+
+        // 2. Boats we spawned, including ones whose player is gone (orphans).
+        for (Entity boat : this.playerBoats.values()) {
+            if (boat != null && boat.isValid()) {
+                try {
+                    boat.remove();
+                    removed++;
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        this.playerBoats.clear();
+
+        // 3. Grid-lock anchors: invisible ArmorStands carrying the boat.
+        for (ArmorStand anchor : this.lockedBoats.values()) {
+            if (anchor == null || !anchor.isValid()) {
+                continue;
+            }
+            try {
+                for (Entity passenger : anchor.getPassengers()) {
+                    if (passenger.isValid()) {
+                        passenger.remove();
+                        removed++;
+                    }
+                }
+                anchor.remove();
+            } catch (Throwable ignored) {
+            }
+        }
+        this.lockedBoats.clear();
+
+        if (removed > 0) {
+            this.plugin.getLogger().info(
+                    "[FormulaRacing] Removed " + removed + " boat(s)/anchor(s) on disable."
+            );
+        }
     }
 }

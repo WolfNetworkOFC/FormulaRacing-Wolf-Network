@@ -2,10 +2,13 @@ package dev.EfraGroup.formulaRacing.Command;
 
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.CommandAlias;
+import co.aikar.commands.annotation.CommandPermission;
 import co.aikar.commands.annotation.Description;
 import co.aikar.commands.annotation.Subcommand;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.integration.WolfLangIntegration;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 
 @CommandAlias("formularacing")
@@ -15,6 +18,17 @@ public class FormulaRacingCommand extends BaseCommand {
 
     public FormulaRacingCommand(FormulaRacing plugin) {
         this.plugin = plugin;
+    }
+
+    @Subcommand("reload")
+    @Description("Recarrega as traducoes e re-registra no WolfLang")
+    @CommandPermission("formularacing.admin")
+    public void onReload(CommandSender sender) {
+        plugin.reloadLangCache();
+        sender.sendMessage(ChatColor.GREEN + "Traducoes recarregadas"
+            + (WolfLangIntegration.isEnabled()
+                ? " e reintegradas ao WolfLang."
+                : " (WolfLang nao ativo)."));
     }
 
     @Subcommand("version")

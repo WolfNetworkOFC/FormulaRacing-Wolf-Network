@@ -54,6 +54,7 @@ import dev.EfraGroup.formulaRacing.TVCamera.TVCameraController;
 import dev.EfraGroup.formulaRacing.TVCamera.TVCameraListener;
 import dev.EfraGroup.formulaRacing.Utils.ClickableMessageUtil;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.integration.WolfLangIntegration;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.SimplePie;
 import org.bstats.charts.SingleLineChart;
@@ -101,6 +102,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
@@ -341,7 +344,8 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.translationUtil = new TranslationUtil(this, this.dm);
 
             // Inicializar integração com WolfLang
-            dev.EfraGroup.formulaRacing.integration.WolfLangIntegration.init(this);
+            WolfLangIntegration.setDebug(this.fileManager.getConfig().getBoolean("debug.wolflang", false));
+            WolfLangIntegration.init(this);
             registerWolfLangTranslations();
             this.tu = new TimeUtils();
             this.worldEditSelect = new WorldEditSelect();
@@ -568,7 +572,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     public void onDisable() {
         try {
-            dev.EfraGroup.formulaRacing.integration.WolfLangIntegration.unregisterTranslations("FormulaRacing");
+            WolfLangIntegration.unregisterTranslations(WolfLangIntegration.NAMESPACE);
         } catch (Throwable ignored) {
         }
         if (this.debugManager != null) {
@@ -653,16 +657,20 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.aiOpponentManager.clearAll();
         }
 
+        // Boats are removed before the database pool is closed and before the
+        // remaining managers wind down: on Folia their region schedulers stop
+        // early during shutdown, so anything that would have been despawned
+        // through a scheduler never runs and the boat ends up in the save.
+        if (this.api != null) {
+            this.api.clearAllBoats();
+        }
+
         if (this.quickRaceManager != null) {
             this.quickRaceManager.shutdown();
         }
 
         if (this.quickRaceBossBarManager != null) {
             this.quickRaceBossBarManager.shutdown();
-        }
-
-        if (this.api != null) {
-            this.api.clearAllBoats();
         }
 
         if (this.raceEventManager != null) {
@@ -914,6 +922,11 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         String langCode,
         String... placeholders
     ) {
+        List<String> wolfLangList = this.resolveWolfLangList(key, langCode, placeholders);
+        if (wolfLangList != null) {
+            return wolfLangList;
+        }
+
         YamlConfiguration config = (YamlConfiguration) this.langConfigCache.get(
             langCode
         );
@@ -969,8 +982,31 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return translated;
     }
 
+    /**
+     * Verifica se existe um idioma válido para o código informado, olhando a pasta
+     * do plugin e caindo para o recurso empacotado. Usado para validar o idioma
+     * devolvido pelo WolfLang antes de adotá-lo como idioma do jogador.
+     */
+    public boolean hasLangFile(String langCode) {
+        if (langCode == null || langCode.isEmpty()) {
+            return false;
+        }
+
+        if (new File(getDataFolder(), "lang/" + langCode + ".yml").exists()) {
+            return true;
+        }
+
+        return getResource("lang/" + langCode + ".yml") != null;
+    }
+
+    /**
+     * Limpa o cache local e re-registra as traduções no WolfLang, para que
+     * edições em lang/*.yml passem a valer sem reiniciar o servidor.
+     */
     public void reloadLangCache() {
         this.langConfigCache.clear();
+        WolfLangIntegration.setDebug(this.fileManager.getConfig().getBoolean("debug.wolflang", false));
+        registerWolfLangTranslations();
     }
 
     public String getTranslation(
@@ -978,7 +1014,15 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         String langCode,
         String... placeholders
     ) {
-        String message = this.getDirectTranslation(key, langCode);
+        String message = this.resolveWolfLangByLanguage(key, langCode, placeholders);
+        if (message == null) {
+            // getDirectTranslation já devolve o texto com as cores convertidas.
+            message = this.getDirectTranslation(key, langCode);
+        } else {
+            // O WolfLang devolve o valor cru do YML, então as cores ficam por nossa conta.
+            message = ChatColor.translateAlternateColorCodes('&', message);
+        }
+
         if (placeholders != null && placeholders.length > 0) {
             for (int i = 0; i < placeholders.length - 1; i += 2) {
                 String placeholder = placeholders[i];
@@ -992,6 +1036,74 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         }
 
         return message;
+    }
+
+    /**
+     * Tenta resolver a chave pelo WolfLang usando o idioma informado.
+     * <p>Devolve o texto ainda cru: o {@link #getTranslation(String, String, String...)}
+     * aplica placeholders, legado {@code %s} e cores depois, igual faz com o
+     * YML local, para os dois caminhos terem o mesmo resultado.</p>
+     *
+     * @return o texto traduzido, ou {@code null} para o caller cair no YML local.
+     */
+    private String resolveWolfLangByLanguage(String key, String langCode, String... placeholders) {
+        if (!WolfLangIntegration.isEnabled()) {
+            return null;
+        }
+
+        return WolfLangIntegration.translateWithLang(key, langCode, toPlaceholderMap(placeholders));
+    }
+
+    /**
+     * Converte o array varargs de pares chave/valor em um mapa para a API do WolfLang.
+     */
+    private static Map<String, String> toPlaceholderMap(String... placeholders) {
+        Map<String, String> map = new HashMap<>();
+        if (placeholders == null) {
+            return map;
+        }
+
+        for (int i = 0; i < placeholders.length - 1; i += 2) {
+            if (placeholders[i] != null) {
+                map.put(placeholders[i], placeholders[i + 1] == null ? "" : placeholders[i + 1]);
+            }
+        }
+
+        return map;
+    }
+
+    /**
+     * Resolve uma chave de lista (lores de GUI, etc.) pelo WolfLang.
+     * <p>As listas são registradas no WolfLang como uma string única separada por
+     * {@link WolfLangIntegration#LIST_SEPARATOR}, já que a API do WolfLang só
+     * aceita valores escalares. Aqui a string volta a ser quebrada em lista.</p>
+     *
+     * @return a lista traduzida, ou {@code null} para o caller usar o YML local.
+     */
+    private List<String> resolveWolfLangList(String key, String langCode, String... placeholders) {
+        if (!WolfLangIntegration.isEnabled()) {
+            return null;
+        }
+
+        String translated = WolfLangIntegration.translateWithLang(key, langCode, toPlaceholderMap(placeholders));
+        if (translated == null) {
+            return null;
+        }
+
+        List<String> lines = new ArrayList<>();
+        for (String line : translated.split(WolfLangIntegration.LIST_SEPARATOR, -1)) {
+            if (placeholders != null) {
+                for (int i = 0; i < placeholders.length - 1; i += 2) {
+                    if (placeholders[i] != null) {
+                        line = line.replace(placeholders[i], placeholders[i + 1] == null ? "" : placeholders[i + 1]);
+                    }
+                }
+                line = this.applyLegacyStringPlaceholders(line, placeholders);
+            }
+            lines.add(ChatColor.translateAlternateColorCodes('&', line));
+        }
+
+        return lines;
     }
 
     private String applyLegacyStringPlaceholders(
@@ -1052,18 +1164,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
      * os arquivos lang/*.yml locais.</p>
      */
     private String resolveForPlayer(Player player, String key, String langCode, String... placeholders) {
-        if (dev.EfraGroup.formulaRacing.integration.WolfLangIntegration.isEnabled()) {
+        if (WolfLangIntegration.isEnabled() && player != null) {
             try {
-                if (dev.EfraGroup.formulaRacing.integration.WolfLangIntegration.hasTranslation(key)) {
-                    Map<String, String> map = new HashMap<>();
-                    if (placeholders != null) {
-                        for (int i = 0; i < placeholders.length - 1; i += 2) {
-                            if (placeholders[i] != null) {
-                                map.put(placeholders[i], placeholders[i + 1] == null ? "" : placeholders[i + 1]);
-                            }
-                        }
-                    }
-                    String translated = dev.EfraGroup.formulaRacing.integration.WolfLangIntegration.translate(key, player, map);
+                if (WolfLangIntegration.hasTranslation(key)) {
+                    String translated = WolfLangIntegration.translate(key, player, toPlaceholderMap(placeholders));
                     if (translated != null && !translated.equals(key)) {
                         String resolved = applyPapi(player, translated);
                         resolved = this.applyLegacyStringPlaceholders(resolved, placeholders);
@@ -2187,41 +2291,108 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
      * Lê os arquivos lang/*.yml (pasta do plugin primeiro, recurso
      * empacotado como fallback) para que o WolfLang conheça as mesmas
      * chaves do sistema local de tradução.
+     * <p>As listas YAML são registradas como uma string separada por
+     * {@link WolfLangIntegration#LIST_SEPARATOR} e quebradas novamente em
+     * {@link #getTranslationList(String, String, String...)}.</p>
      */
     private void registerWolfLangTranslations() {
-        if (!dev.EfraGroup.formulaRacing.integration.WolfLangIntegration.isEnabled()) return;
+        if (!WolfLangIntegration.isEnabled()) return;
 
         try {
             Map<String, Map<String, String>> translations = new HashMap<>();
-            String[] langs = {"en_US", "pt_BR", "pt_PT", "es_ES", "es_MX", "es_AR", "de_DE", "fr_FR", "it_IT", "ru_RU", "ja_JP", "zh_CN", "zh_TW", "ko_KR", "tr_TR", "nl_NL", "pl_PL", "uk_UA", "sv_SE", "nb_NO", "da_DK", "fi_FI", "el_GR", "cs_CZ", "hu_HU", "ro_RO", "th_TH", "vi_VN", "id_ID", "ms_MY", "hi_IN", "ar_SA"};
 
-            for (String lang : langs) {
-                YamlConfiguration cfg;
-                File dataFile = new File(getDataFolder(), "lang/" + lang + ".yml");
-                if (dataFile.exists()) {
-                    cfg = YamlConfiguration.loadConfiguration(dataFile);
-                } else {
-                    try (InputStream in = getResource("lang/" + lang + ".yml")) {
-                        if (in == null) continue;
-                        cfg = YamlConfiguration.loadConfiguration(new InputStreamReader(in, StandardCharsets.UTF_8));
-                    } catch (Exception ignored) {
-                        continue;
-                    }
-                }
+            for (String lang : this.discoverLanguageCodes()) {
+                YamlConfiguration cfg = this.loadLangConfig(lang);
+                if (cfg == null) continue;
+
                 for (String key : cfg.getKeys(true)) {
                     if (cfg.isConfigurationSection(key)) continue;
-                    String value = cfg.getString(key);
+
+                    String value;
+                    if (cfg.isList(key)) {
+                        List<String> lines = cfg.getStringList(key);
+                        if (lines == null || lines.isEmpty()) continue;
+                        value = String.join(WolfLangIntegration.LIST_SEPARATOR, lines);
+                    } else {
+                        value = cfg.getString(key);
+                    }
+
                     if (value == null) continue;
                     translations.computeIfAbsent(key, k -> new HashMap<>()).put(lang, value);
                 }
             }
 
             // Register all translations
-            dev.EfraGroup.formulaRacing.integration.WolfLangIntegration.registerTranslations("FormulaRacing", translations);
+            WolfLangIntegration.registerTranslations(WolfLangIntegration.NAMESPACE, translations);
 
-            getLogger().info("WolfLang: " + translations.size() + " chaves registradas.");
+            getLogger().info("WolfLang: " + translations.size() + " chaves registradas em "
+                + this.discoverLanguageCodes().size() + " idiomas.");
         } catch (Exception e) {
-            getLogger().warning("WolfLang: falha ao registrar traduções: " + e.getMessage());
+            getLogger().warning("WolfLang: falha ao registrar traduções: " + e);
+        }
+    }
+
+    /**
+     * Descobre os códigos de idioma disponíveis sem hardcode: junta os arquivos da
+     * pasta lang/ com os recursos empacotados no jar. Assim um lang/xx_XX.yml novo
+     * entra no registro sem precisar de alteração no código.
+     */
+    private List<String> discoverLanguageCodes() {
+        Set<String> langs = new TreeSet<>();
+        langs.add(WolfLangIntegration.DEFAULT_LANGUAGE);
+
+        File langFolder = new File(getDataFolder(), "lang");
+        File[] files = langFolder.listFiles((dir, name) -> name.endsWith(".yml"));
+        if (files != null) {
+            for (File file : files) {
+                String code = file.getName().substring(0, file.getName().length() - 4);
+                if (!code.isEmpty()) {
+                    langs.add(code);
+                }
+            }
+        }
+
+        // Recursos empacotados cobrem installs onde a pasta ainda não foi populada.
+        try {
+            java.net.URL url = getClass().getResource("/lang");
+            if (url != null && "jar".equals(url.getProtocol())) {
+                String jar = url.toString();
+                int bang = jar.indexOf("!");
+                if (bang > 0) {
+                    try (java.util.jar.JarFile jf = new java.util.jar.JarFile(
+                        java.net.URI.create(jar.substring(0, bang)).getPath().replace("/", "\\"))) {
+                        jf.stream()
+                            .map(java.util.jar.JarEntry::getName)
+                            .filter(n -> n.startsWith("lang/") && n.endsWith(".yml"))
+                            .map(n -> n.substring("lang/".length(), n.length() - 4))
+                            .forEach(langs::add);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            if (getConfig().getBoolean("debug.wolflang", false)) {
+                getLogger().warning("WolfLang: falha ao varrer recursos empacotados: " + e);
+            }
+        }
+
+        return new ArrayList<>(langs);
+    }
+
+    /**
+     * Carrega a configuração de um idioma, preferindo o arquivo da pasta do plugin
+     * e caindo para o recurso empacotado.
+     */
+    private YamlConfiguration loadLangConfig(String lang) {
+        File dataFile = new File(getDataFolder(), "lang/" + lang + ".yml");
+        if (dataFile.exists()) {
+            return YamlConfiguration.loadConfiguration(dataFile);
+        }
+
+        try (InputStream in = getResource("lang/" + lang + ".yml")) {
+            if (in == null) return null;
+            return YamlConfiguration.loadConfiguration(new InputStreamReader(in, StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            return null;
         }
     }
 

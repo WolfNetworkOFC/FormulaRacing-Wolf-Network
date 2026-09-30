@@ -2,10 +2,12 @@ package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.integration.WolfLangIntegration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -19,8 +21,25 @@ public class TranslationUtil {
         this.databaseManager = databaseManager;
     }
 
+    /**
+     * Carrega o idioma do jogador ao entrar.
+     * <p>Quando o WolfLang está ativo ele é a fonte da verdade (pode ter sido
+     * alterado fora do FormulaRacing, por exemplo por um comando do próprio
+     * WolfLang). O banco continua sendo o fallback permanente.</p>
+     */
     public void loadPlayerLanguage(UUID uuid) {
         String lang = this.databaseManager.getPlayerLanguage(uuid);
+
+        if (WolfLangIntegration.isEnabled()) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                String wolfLang = WolfLangIntegration.getLanguage(player);
+                if (wolfLang != null && this.plugin.hasLangFile(wolfLang)) {
+                    lang = wolfLang;
+                }
+            }
+        }
+
         this.languageCache.put(uuid, lang);
     }
 

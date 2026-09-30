@@ -224,4 +224,42 @@ public class RegionMathUtils {
       public static boolean isEnteringRegion(Location from, Location to, DatabaseManager.RegionData r) {
           return !isInsideRegion(from, r) && intersectsRegion(from, to, r);
       }
+
+      /**
+      * Point-in-region test using whole-block coordinates, the way TimingSystem
+      * (FrostHex) does it in TrackCuboidRegion.contains().
+      *
+      * Unlike {@link #isInsideRegion(Location, DatabaseManager.RegionData)} this
+      * never inspects the movement segment, so a thin region cannot be entered
+      * by a boat that merely brushes past its top face. That swept slab test is
+      * what produced spurious RESET teleports on regions drawn one block tall on
+      * the track surface.
+      */
+      public static boolean isInsideRegionBlocks(Location loc, DatabaseManager.RegionData r) {
+          if (loc == null || r == null) {
+              return false;
+          }
+          double minY = Math.min(r.getMinY(), r.getMaxY());
+          double maxY = Math.max(r.getMinY(), r.getMaxY());
+          if (loc.getBlockY() < minY || loc.getBlockY() > maxY) {
+              return false;
+          }
+
+          double x = loc.getX();
+          double z = loc.getZ();
+          if (r.isPoly()) {
+              double[][] polygon = r.getPolyPoints();
+              if (polygon == null || polygon.length < 3) {
+                  return true;
+              }
+              return pointInPolygon(x, z, polygon);
+          }
+
+          double minX = Math.min(r.getMinX(), r.getMaxX());
+          double maxX = Math.max(r.getMinX(), r.getMaxX());
+          double minZ = Math.min(r.getMinZ(), r.getMaxZ());
+          double maxZ = Math.max(r.getMinZ(), r.getMaxZ());
+          return loc.getBlockX() >= minX && loc.getBlockX() <= maxX
+              && loc.getBlockZ() >= minZ && loc.getBlockZ() <= maxZ;
+      }
   }

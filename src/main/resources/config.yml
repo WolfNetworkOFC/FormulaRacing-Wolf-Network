@@ -177,6 +177,10 @@ debug:
   # Useful for: Finding slow operations, optimizing performance
   performance-metrics: false
 
+  # WolfLang integration (stack traces das falhas de reflection)
+  # Useful for: Translations not applying, keys not found, plugin not detected
+  wolflang: false
+
   # Race system (official races: Event → Round → Heat)
   # Useful for: Race bugs, heat loading issues, driver tracking
   race-system: true
@@ -288,6 +292,26 @@ elo:
   kfactor: 32       # ELO calculation multiplier
   minchange: 1      # minimum ELO change per duel
   maxchange: 50     # maximum ELO change per duel
+
+# =========================================================#
+#                         DRS                              #
+# =========================================================#
+# DRS detection window. When a driver crosses a `detect` region, the instant is
+# compared against every other driver's crossing of the SAME region.
+#
+#   gap in [min-delta, max-delta]  -> DRS granted
+#   gap <  min-delta, but the car in front was itself granted
+#   DRS within max-delta           -> DRS granted (chaining)
+#
+# Tune min-delta up if drivers are earning DRS while clearly far back; tune
+# max-delta down if the boost is too easy to get in a pack.
+drs:
+  min-delta: 650         # ms, lower bound of the detection window
+  max-delta: 1150        # ms, upper bound of the detection window
+  duration: 2000         # ms the forward-accel boost stays applied
+  forward-accel: 0.06    # DRS forward acceleration (vanilla is 0.04).
+                         # If a heat sets its own "DRS Power" (/heat set drspower)
+                         # and it is higher, the heat value wins.
 
 # =========================================================#
 #                       HOLOGRAMS                         #

@@ -77,8 +77,6 @@ public class RegionListener implements Listener {
     private final Set<UUID> justTeleported = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<UUID, Long> lastTTDisabledWarning = new ConcurrentHashMap<>();
     private static final long TT_DISABLED_WARNING_COOLDOWN = 60000L;
-    private final Map<UUID, Long> lastTTBlockReport = new ConcurrentHashMap<>();
-    private static final long TT_BLOCK_REPORT_COOLDOWN_MS = 1500L;
 
     private static final double BEDROCK_REGION_Y_OFFSET = 0.25D;
 
@@ -91,7 +89,6 @@ public class RegionListener implements Listener {
         this.lastTimeLimitLog.remove(uuid);
         this.justTeleported.remove(uuid);
         this.lastTTDisabledWarning.remove(uuid);
-        this.lastTTBlockReport.remove(uuid);
     }
 
     public void cleanupHeatPlayers(java.util.Collection<UUID> uuids) {
@@ -103,57 +100,22 @@ public class RegionListener implements Listener {
             this.lastTimeLimitLog.remove(uuid);
             this.justTeleported.remove(uuid);
             this.lastTTDisabledWarning.remove(uuid);
-            this.lastTTBlockReport.remove(uuid);
         }
     }
     /**
-     * Avisa o jogador que cruzou a linha de chegada/largada mas o cronômetro
-     * NÃO iniciou, junto com o portão interno que bloqueou a execução.
+     * Registra no log de debug o portão que bloqueou a subida do cronômetro.
      *
-     * <p>A maioria dos portões em {@link #handleSoloTimeTrial} e
-     * {@link #startSoloTimer} falha em silêncio (simples {@code return}), o que
-     * tornava impossível diagnosticar casos como "no primeiro login o timer não
-     * sobe, mas no segundo funciona". Este método centraliza o reporte.
-     *
-     * <p>Limitado por cooldown para não inundar o chat: os portões são
-     * avaliados a cada tick enquanto o jogador está sobre a região.
+     * <p>A mensagem ao jogador ("TIMER NÃO INICIOU" + motivo) foi removida a
+     * pedido; o reporte continua apenas no console via {@link DebugManager}.
      *
      * @param player jogador que cruzou a linha
      * @param gate identificador curto do portão que bloqueou (ex.: "NOT_BOAT")
      * @param reason descrição legível do bloqueio
      */
     private void reportTTBlocked(Player player, String gate, String reason) {
-        if (player == null || !player.isOnline()) {
+        if (player == null) {
             return;
         }
-        UUID uuid = player.getUniqueId();
-        long now = System.currentTimeMillis();
-        Long last = this.lastTTBlockReport.get(uuid);
-        if (last != null && now - last < TT_BLOCK_REPORT_COOLDOWN_MS) {
-            return;
-        }
-        this.lastTTBlockReport.put(uuid, now);
-
-        // No Folia o envio de mensagem é feito na thread da região do jogador.
-        SchedulerHelper.runTaskFor(this.plugin, player, () -> {
-            if (!player.isOnline()) {
-                return;
-            }
-            String langCode = this.database.getPlayerLanguage(uuid);
-            String prefix = this.plugin.getDirectTranslation("tt_blocked_title", langCode);
-            if (prefix == null || prefix.isEmpty()) {
-                prefix = "§c§lTIMER NÃO INICIOU §8» §7";
-            }
-            String detail = this.plugin.getDirectTranslation("tt_blocked_reason", langCode);
-            if (detail == null || detail.isEmpty()) {
-                detail = "Motivo: §f{reason} §8({gate})";
-            }
-            String message = ChatColor.translateAlternateColorCodes('&',
-                    detail.replace("{reason}", reason).replace("{gate}", gate));
-            player.sendMessage(ChatColor.translateAlternateColorCodes('&', prefix) + message);
-            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0F, 0.8F);
-        });
-
         this.plugin.getDebugManager().logTimeTrialSystem(
                 "[TT-BLOCKED] " + player.getName() + " gate=" + gate + " reason=" + reason);
     }
@@ -533,7 +495,7 @@ public class RegionListener implements Listener {
         String regionTrackDisplayName = region.getTrackName();
         String regionTrackWS = region.getTrackNameWS();
         String type = region.getType().toUpperCase();
-        if (player.getVehicle() instanceof Boat || type.equals("RESET")) {
+        if (player.getVehicle() instanceof Boat) {
             this.database.getPlayerLanguage(uuid);
             if (type.equals("START") || type.equals("END") || type.equals("RESET")) {
                 int activeDuelId = this.timeTrialDuels.getActiveDuelIdCached(uuid);
@@ -1221,7 +1183,19 @@ public class RegionListener implements Listener {
                 : intendedTrack.replaceAll("\\s+", "").toLowerCase();
         for(DatabaseManager.RegionData r : worldRegions) {
             String type = r.getType().toUpperCase();
-            if ((type.equals("START") || type.equals("END") || type.equals("RESET")) && RegionMathUtils.intersectsRegion(from, to, r)) {
+            boolean isReset = type.equals("RESET");
+            if (type.equals("START") || type.equals("END") || isReset) {
+                // RESET uses a point-in-region test on block coordinates: a region
+                // drawn one block tall on the track surface would otherwise be
+                // "entered" by any boat brushing past it, teleporting the driver
+                // mid-lap. START/END keep the swept test so the recorded crossing
+                // instant stays sub-tick accurate.
+                boolean hit = isReset
+                        ? RegionMathUtils.isInsideRegionBlocks(to, r)
+                        : RegionMathUtils.intersectsRegion(from, to, r);
+                if (!hit) {
+                    continue;
+                }
                 // With an intended track selected, ignore regions from other tracks
                 // (they may share the same position and would hijack the time trial).
                 if (normalizedTrack != null && !matchesNormalizedTrack(r, normalizedTrack)) {

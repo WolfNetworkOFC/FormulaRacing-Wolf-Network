@@ -4,6 +4,7 @@ import dev.EfraGroup.formulaRacing.Command.Help.CommandHelpService;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Gui.LanguageGui;
+import dev.EfraGroup.formulaRacing.integration.WolfLangIntegration;
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.CatchUnknown;
 import co.aikar.commands.annotation.CommandAlias;
@@ -60,7 +61,7 @@ public class LanguageCommand extends BaseCommand {
         } else {
             this.db.setPlayerLanguage(player.getUniqueId(), langCode);
             this.plugin.getTranslationUtil().updatePlayerLanguage(player.getUniqueId(), langCode);
-            dev.EfraGroup.formulaRacing.integration.WolfLangIntegration.setLanguage(player, langCode);
+            WolfLangIntegration.setLanguage(player, langCode);
             YamlConfiguration langConfig = YamlConfiguration.loadConfiguration(langFile);
             String prefix = langConfig.getString("lang_set", "§aSeu idioma foi alterado para:");
             prefix = ChatColor.translateAlternateColorCodes('&', prefix);

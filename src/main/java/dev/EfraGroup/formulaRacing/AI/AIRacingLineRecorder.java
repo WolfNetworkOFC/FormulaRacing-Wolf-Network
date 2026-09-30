@@ -25,6 +25,12 @@ public class AIRacingLineRecorder {
 
     private final FormulaRacing plugin;
     private final AIRacingLineManager racingLineManager;
+    /**
+     * Upper bound (blocks/tick) accepted as a plausible boat speed. Blue ice
+     * tops out near 3.6; anything beyond 8 is a teleport/chunk-stall artifact
+     * and must not become a pace target.
+     */
+    private static final double MAX_PLAUSIBLE_SPEED = 8.0D;
     private final Map<UUID, RecordingSession> activeSessions;
     private FRTask cleanupTask;
 
@@ -176,14 +182,6 @@ public class AIRacingLineRecorder {
         private final Object recordingLock = new Object();
         private final List<Location> recordedPoints;
         private final List<Double> recordedSpeeds;
-        /**
-         * Surface max speed (blocks/tick) captured WHEN each point was recorded.
-         * complete() runs on the GLOBAL scheduler (heat-state polling), and
-         * getSurfaceMaxSpeed reads block types — illegal off-region on Folia —
-         * so the surface must be sampled here, on the player's region thread,
-         * while the point is being taken.
-         */
-        private final List<Double> recordedSurfaceMaxes;
         private final long registerTime;
         private long lastUpdateTime;
         private long recordingStartTime;
@@ -198,7 +196,6 @@ public class AIRacingLineRecorder {
             this.trackName = trackName == null ? "" : trackName.replace(" ", "").toLowerCase();
             this.recordedPoints = new ArrayList<>();
             this.recordedSpeeds = new ArrayList<>();
-            this.recordedSurfaceMaxes = new ArrayList<>();
             this.registerTime = System.currentTimeMillis();
             this.lastUpdateTime = registerTime;
             this.recordingStartTime = 0L;
@@ -293,13 +290,10 @@ public class AIRacingLineRecorder {
                     speed = currentPlayer.getVehicle().getVelocity().length();
                 }
                 recordedSpeeds.add(speed);
-                // Sample the surface max HERE (region thread): complete() runs on the
-                // global scheduler and cannot read block types on Folia.
-                recordedSurfaceMaxes.add(Math.max(0.1D, AIOpponentManager.getSurfaceMaxSpeed(loc)));
                 // Braking/acceleration markers are NOT recorded per-tick: raw
                 // single-tick speeds are too noisy. They are derived from the
-                // smoothed, surface-normalized speeds when the recording
-                // completes (AIRacingLineManager.deriveMarkersFor).
+                // smoothed absolute speeds when the recording completes
+                // (AIRacingLineManager.deriveMarkersFor).
             }
         }
 
@@ -338,13 +332,16 @@ public class AIRacingLineRecorder {
             // left every AI already running on this track without a usable line
             // (they park) until the rebuild finished.
             AIRacingLine line = new AIRacingLine(trackName);
+            // Absolute blocks/tick (v3). The old code normalized each sample by
+            // the surface it was recorded on, which is lossless on a MIXED track
+            // but destroyed any pace profile on a single-surface track: on pure
+            // blue ice the driver did ~3.6 b/t against a 3.6365 b/t max, so
+            // every point became 1.0 and the saved line was perfectly flat —
+            // the AI could only ever drive one constant speed. Storing the real
+            // b/t keeps the driver's actual braking/acceleration points.
+            line.setAbsoluteSpeeds(true);
 
-            // Normalize each recorded speed against the surface it was measured
-            // on, so line speeds stay true to the real pace per section: a fast
-            // straight on blue ice and a slow corner on regular ice are scaled
-            // independently, and at runtime (lineSpeed * surfaceMaxSpeed) they
-            // come back to the recorded speeds.
-            List<Double> pointSpeeds = normalizeAndSmoothSpeeds(recordedSpeedsSnapshot, snapshotRecorded);
+            List<Double> pointSpeeds = smoothSpeeds(recordedSpeedsSnapshot);
 
             int totalPoints = snapshotRecorded.size();
             for (int i = 0; i < totalPoints; i++) {
@@ -357,18 +354,28 @@ public class AIRacingLineRecorder {
             // (first → second crossing of the START region) so the line is a
             // closed loop: otherwise the AI's wrap-around target at the end of
             // the line jumps back to the grid and it drives backward.
-            racingLineManager.trimLineToSingleLap(line, trackName);
+            boolean closedLap = racingLineManager.trimLineToSingleLap(line, trackName);
+            if (!closedLap || !line.isUsable()) {
+                // Never replace a known-good racing line with an open recording.
+                // getSteerTarget wraps the last point to the first one; on an open
+                // line that makes the boat turn back toward the grid or leave the
+                // circuit at the end of every lap.
+                activeSessions.remove(player.getUniqueId());
+                if (p != null && p.isOnline()) {
+                    p.sendMessage(tr(p, "ai_record_discarded"));
+                }
+                plugin.getDebugManager().logRaceSystem(
+                        "[AI-RECORDER] Recording discarded for " + player.getName()
+                                + " — no complete closed lap was detected; previous line preserved.");
+                return;
+            }
 
-            // Markers must match the (possibly trimmed) line: derive them from
-            // the smoothed speeds instead of trusting noisy per-tick samples.
+            // Markers must match the trimmed, closed lap: derive them from the
+            // smoothed speeds instead of trusting noisy per-tick samples.
             racingLineManager.deriveMarkersFor(line);
 
-            // Swap the fully-built line into the manager (atomic replace of the
-            // shared instance). Only when usable — a failed trim keeps whatever
-            // line the track already had instead of replacing it with a stub.
-            if (line.isUsable()) {
-                racingLineManager.setRacingLine(trackName, line);
-            }
+            // Swap the fully-built line into the manager atomically.
+            racingLineManager.setRacingLine(trackName, line);
 
             // Save to file (incremental — only this track, async to avoid blocking the tick)
             String finalTrackName = trackName;
@@ -396,40 +403,36 @@ public class AIRacingLineRecorder {
         }
 
         /**
-         * Normalizes the raw recorded velocities (blocks/tick) to the AI speed
-         * scale (0.1..1.0, where 1.0 == the surface max of the point itself) and
-         * applies a 3-point moving average to remove spikes. Each point is
-         * scaled by the surface it was recorded on, so mixed-surface laps keep
-         * their true per-section pace.
+         * Applies a 3-point moving average to the raw recorded velocities
+         * (blocks/tick) to remove per-tick spikes, and drops impossible samples
+         * (a teleport, a chunk stall or a respawn records a huge jump that would
+         * otherwise make the AI try to reach it).
+         *
+         * <p>Speeds are kept ABSOLUTE: dividing by the surface max flattened
+         * every single-surface track into a constant 1.0, which is what made the
+         * AI hold one speed everywhere. The surface max is still captured per
+         * point at record time and is now only used by the runtime to cap the
+         * target, not to scale the recording.
          */
-        private List<Double> normalizeAndSmoothSpeeds(List<Double> rawSpeeds, List<Location> recordedPoints) {
-            List<Double> normalized = new ArrayList<>(rawSpeeds.size());
+        private List<Double> smoothSpeeds(List<Double> rawSpeeds) {
+            List<Double> smoothed = new ArrayList<>(rawSpeeds.size());
             for (int i = 0; i < rawSpeeds.size(); i++) {
-                double surfaceMax = 1.0D;
-                // Use the surface max captured at RECORD time (same index as the
-                // point): reading blocks here would be an off-region access on
-                // Folia — complete() runs on the global scheduler.
-                if (i < recordedSurfaceMaxes.size()) {
-                    surfaceMax = recordedSurfaceMaxes.get(i);
-                }
-                normalized.add(clampSpeed(rawSpeeds.get(i) / surfaceMax));
-            }
-
-            List<Double> smoothed = new ArrayList<>(normalized.size());
-            for (int i = 0; i < normalized.size(); i++) {
                 int start = Math.max(0, i - 1);
-                int end = Math.min(normalized.size() - 1, i + 1);
+                int end = Math.min(rawSpeeds.size() - 1, i + 1);
                 double sum = 0.0;
+                int samples = 0;
                 for (int j = start; j <= end; j++) {
-                    sum += normalized.get(j);
+                    double v = rawSpeeds.get(j);
+                    // A believable boat never exceeds ~8 b/t (blue ice tops out
+                    // near 3.6); anything above is a recording glitch.
+                    if (v >= 0.0 && v <= MAX_PLAUSIBLE_SPEED) {
+                        sum += v;
+                        samples++;
+                    }
                 }
-                smoothed.add(clampSpeed(sum / (end - start + 1)));
+                smoothed.add(samples == 0 ? 0.0 : sum / samples);
             }
             return smoothed;
-        }
-
-        private double clampSpeed(double speed) {
-            return Math.max(0.1, Math.min(1.0, speed));
         }
 
         public void cancel() {

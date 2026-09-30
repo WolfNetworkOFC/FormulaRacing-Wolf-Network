@@ -262,6 +262,12 @@ public class JoinListener implements Listener {
         if (this.plugin.getGhostManager() != null) {
             this.plugin.getGhostManager().cleanupPlayer(uuid);
         }
+        // Drop DRS detection state so a rejoining player does not inherit the
+        // crossing timestamps (and potential chaining eligibility) of the
+        // previous session.
+        if (this.plugin.getDRS() != null) {
+            this.plugin.getDRS().cleanupPlayer(uuid);
+        }
         
         this.plugin.getTranslationUtil().removePlayer(uuid);
         if (this.plugin.getRaceActionBarManager() != null) {

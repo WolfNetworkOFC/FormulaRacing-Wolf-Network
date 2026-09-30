@@ -17,6 +17,7 @@ softdepend:
   - PlaceholderAPI
   - floodgate
   - Geyser-Spigot
+  - WolfLang
 commands:
   boat:
     description: Dá um barco ao jogador

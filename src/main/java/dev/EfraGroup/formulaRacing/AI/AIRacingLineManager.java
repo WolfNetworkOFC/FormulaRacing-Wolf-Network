@@ -293,6 +293,13 @@ public class AIRacingLineManager {
         if (points == null || speeds == null || points.size() != speeds.size()) {
             return;
         }
+        // Braking/acceleration thresholds are fractions of the blue-ice ceiling.
+        // A v1/v2 line stores that same 0..1 fraction directly; a v3 line stores
+        // absolute blocks/tick, so it must be converted before comparing —
+        // otherwise every point on an ice track read as "0.0 relative to 3.6"
+        // and the whole lap was marked as a braking zone.
+        final double referenceMax = AIOpponentManager.getBlueIceMaxSpeed();
+        boolean absolute = line.hasAbsoluteSpeeds();
         Location lastBrake = null;
         Location lastAccel = null;
         for (int i = 10; i < points.size(); i++) {
@@ -300,10 +307,10 @@ public class AIRacingLineManager {
             if (loc == null || loc.getWorld() == null) {
                 continue;
             }
-            // The line speeds are already surface-normalized to the 0.1..1.0
-            // scale (raw blocks/tick / surfaceMax), so braking/acceleration
-            // fractions are fixed: raw < surfaceMax*0.35 ⟺ normalized < 0.35.
             double speed = speeds.get(i);
+            if (absolute) {
+                speed /= referenceMax;
+            }
             if (speed < 0.35) {
                 if (lastBrake == null || lastBrake.distanceSquared(loc) > 25.0) {
                     line.addBrakingPoint(loc);
