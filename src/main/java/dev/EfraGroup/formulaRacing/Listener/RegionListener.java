@@ -375,13 +375,24 @@ public class RegionListener implements Listener {
 
                                                 int cpId = nextCp.getId();
                                                 double elapsed = session != null ? splitTime / 1000.0F : this.timerUtils.getPlayerElapsedTime(player);
-                                                SchedulerHelper.runTask(this.plugin, () -> {
+                                                // O incremento de checkpointsReached precisa acontecer AGORA, no
+                                                // mesmo instante da detecção: ele é o índice usado para
+                                                // escolher o próximo checkpoint no ciclo seguinte do
+                                                // detector. Se ficasse dentro do runTask (1 tick depois),
+                                                // uma região de checkpoint larga — cujo ponto de destino
+                                                // ainda está dentro dela — seria detectada de novo antes
+                                                // do índice avançar, contando o mesmo CP duas vezes e
+                                                // dessincronizando session.checkpointTimes de
+                                                // data.checkpointTimes. addCheckpoint/addTempCheckpoint
+                                                // só tocam estado em memória; o som e o evento ficam no
+                                                // runTask porque dependem da thread do jogador.
+                                                this.timerUtils.addCheckpoint(player, cpId);
+                                                this.timerUtils.addTempCheckpoint(uuid, cpId, elapsed, activeTrack);
+                                                SchedulerHelper.runTaskFor(this.plugin, player, () -> {
                                                     if (session != null) {
                                                         TimeTrialCheckpointEvent event = new TimeTrialCheckpointEvent(player, session, cpId, splitTime);
                                                         Bukkit.getPluginManager().callEvent(event);
                                                     }
-                                                    this.timerUtils.addCheckpoint(player, cpId);
-                                                    this.timerUtils.addTempCheckpoint(uuid, cpId, elapsed, activeTrack);
                                                     player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.5F);
                                                     this.plugin.getDebugManager().logRegionDetection(player.getName() + " collected checkpoint on track " + activeTrack);
                                                 });

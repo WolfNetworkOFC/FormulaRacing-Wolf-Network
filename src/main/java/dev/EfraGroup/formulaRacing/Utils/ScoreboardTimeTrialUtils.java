@@ -2,12 +2,12 @@ package dev.EfraGroup.formulaRacing.Utils;
 
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.TimeTrial.Timing.OfficialTime;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.ScoreboardOwnershipCoordinator;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.style.TimingScoreboardStyle;
 import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.provider.ScoreboardAdapter;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -181,17 +181,13 @@ public class ScoreboardTimeTrialUtils {
             if (allRecords == null) {
                 allRecords = new ArrayList<>();
             }
-            allRecords.sort(
-                Comparator.comparingInt((DatabaseManager.TrackRecord tr) ->
-                    tr.isFinished() ? 0 : 1
-                )
-                    .thenComparing(
-                        Comparator.comparingInt(
-                            DatabaseManager.TrackRecord::getCheckpointsReached
-                        ).reversed()
-                    )
-                    .thenComparingDouble(DatabaseManager.TrackRecord::getTime)
-            );
+            // Ordering must mirror getTopTimes() exactly, otherwise the position shown
+            // next to a player disagrees with getPlayerRank(). Note checkpointsReached
+            // ranks UNFINISHED runs only — the SQL guards it with
+            // "CASE WHEN finished = 0", so applying it to finished runs (as the previous
+            // comparator did) scrambled the board into non-ascending times. official_ticks
+            // is the primary key; getTime() alone is only the display_millis fallback.
+            allRecords.sort(ScoreboardTimeTrialUtils::compareBoardRecords);
             this.leaderboardCache.put(
                 trackName,
                 new CachedLeaderboard(allRecords)
@@ -254,7 +250,10 @@ public class ScoreboardTimeTrialUtils {
         lines.add("");
         lines.add(this.boldTitle("§e" + tu.getTranslated(player, "scoreboard_tt_leaderboard")));
 
-        List<DatabaseManager.TrackRecord> neighbors = new ArrayList<>();
+        // Track board positions by index into allRecords instead of by record object:
+        // allRecords.indexOf(tr) resolved by identity (TrackRecord has no equals)
+        // and was O(n^2) across the rows rendered every second per viewer.
+        List<Integer> neighborIndexes = new ArrayList<>();
         DatabaseManager.TrackRecord firstPlace = null;
         boolean includeSeparator = false;
         int footerLines = 3;
@@ -266,7 +265,7 @@ public class ScoreboardTimeTrialUtils {
         if (myPos == -1 || myPos < 5) {
             int limit = Math.min(allRecords.size(), availableForEntries);
             for (int i = 0; i < limit; i++) {
-                neighbors.add(allRecords.get(i));
+                neighborIndexes.add(i);
             }
         } else {
             boolean canShowLeaderAndStillCenter = availableForEntries >= 7;
@@ -288,7 +287,7 @@ public class ScoreboardTimeTrialUtils {
                 if (canShowLeaderAndStillCenter && i == 0) {
                     continue;
                 }
-                neighbors.add(allRecords.get(i));
+                neighborIndexes.add(i);
             }
         }
 
@@ -300,16 +299,78 @@ public class ScoreboardTimeTrialUtils {
         if (includeSeparator) {
             lines.add("");
         }
-        for (DatabaseManager.TrackRecord tr : neighbors) {
-            int actualPos = allRecords.indexOf(tr) + 1;
+        for (int index : neighborIndexes) {
             lines.add(
-                formatRecordLine(tr, actualPos, player.getName(), player, compact)
+                formatRecordLine(
+                    allRecords.get(index),
+                    index + 1,
+                    player.getName(),
+                    player,
+                    compact
+                )
             );
         }
 
         lines.add("");
         lines.add(footer);
         this.adapter.updateLines(player, lines);
+    }
+
+    /**
+     * Reproduces the board order of {@link DatabaseManager#getTopTimes(String)}:
+     * finished runs first, then checkpoints reached — but only among unfinished
+     * runs — and finally official ticks as the primary key with display millis
+     * and bestTime as fallbacks.
+     *
+     * <p>Implemented as a single comparison method on purpose. Building this out of
+     * {@code Comparator.thenComparing(...)} with a conditional lambda that returns 0
+     * for finished runs produces an inconsistent comparator, which can make TimSort
+     * fail with "Comparison method violates its general contract!".
+     */
+    private static int compareBoardRecords(
+        DatabaseManager.TrackRecord a,
+        DatabaseManager.TrackRecord b
+    ) {
+        if (a.isFinished() != b.isFinished()) {
+            return a.isFinished() ? -1 : 1;
+        }
+        if (!a.isFinished()) {
+            int checkpoints = Integer.compare(
+                b.getCheckpointsReached(),
+                a.getCheckpointsReached()
+            );
+            if (checkpoints != 0) {
+                return checkpoints;
+            }
+        }
+        int ticks = Integer.compare(officialTicksOf(a), officialTicksOf(b));
+        if (ticks != 0) {
+            return ticks;
+        }
+        int millis = Integer.compare(displayMillisOf(a), displayMillisOf(b));
+        if (millis != 0) {
+            return millis;
+        }
+        int bestTime = Double.compare(a.getTime(), b.getTime());
+        return bestTime != 0
+            ? bestTime
+            : Long.compare(a.getTimeCreated(), b.getTimeCreated());
+    }
+
+    /** Official tick count, falling back to bestTime for legacy rows. */
+    private static int officialTicksOf(DatabaseManager.TrackRecord tr) {
+        OfficialTime official = tr.getOfficialTime();
+        return official != null
+            ? official.officialTicks()
+            : (int) Math.max(0L, Math.round(tr.getTime() * 20.0));
+    }
+
+    /** Display milliseconds, falling back to bestTime for legacy rows. */
+    private static int displayMillisOf(DatabaseManager.TrackRecord tr) {
+        OfficialTime official = tr.getOfficialTime();
+        return official != null
+            ? official.displayMillis()
+            : (int) Math.max(0L, Math.round(tr.getTime() * 1000.0));
     }
 
     private String formatRecordLine(
