@@ -5,12 +5,14 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.sk89q.worldedit.EditSession;
 import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.bukkit.BukkitPlayer;
 import com.sk89q.worldedit.extent.clipboard.Clipboard;
 import com.sk89q.worldedit.extent.clipboard.io.BuiltInClipboardFormat;
+import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormat;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardReader;
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardWriter;
 import com.sk89q.worldedit.function.operation.ForwardExtentCopy;
@@ -25,9 +27,8 @@ import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -35,20 +36,30 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Stack;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 public class TrackExchangeManager {
 
+    public static final int TRACK_VERSION = 5;
+
+    private static final ClipboardFormat SCHEMATIC_FORMAT = BuiltInClipboardFormat.FAST_V3;
+
     private final FormulaRacing plugin;
     private final DatabaseManager db;
     private final Gson gson;
     private final File exportDir;
+    private final Map<UUID, Stack<Runnable>> playerActions = new ConcurrentHashMap<>();
 
     public static class SimpleLocation {
         public double x, y, z;
@@ -84,6 +95,8 @@ public class TrackExchangeManager {
         public int index;
         public String type;
         public SimpleLocation location;
+        public Double minX, minY, minZ;
+        public Double maxX, maxY, maxZ;
     }
 
     public static class TrackExchangeData {
@@ -261,6 +274,12 @@ public class TrackExchangeManager {
                     loc.location.yaw = 0;
                     loc.location.pitch = 0;
                     loc.location.world = rs.getString("worldName");
+                    loc.minX = rs.getDouble("min_x");
+                    loc.minY = rs.getDouble("min_y");
+                    loc.minZ = rs.getDouble("min_z");
+                    loc.maxX = rs.getDouble("max_x");
+                    loc.maxY = rs.getDouble("max_y");
+                    loc.maxZ = rs.getDouble("max_z");
                     data.locations.add(loc);
                 }
             }
@@ -280,7 +299,46 @@ public class TrackExchangeManager {
 
         // Build JSON
         String trackJson = gson.toJson(data);
-        String dataComponentJson = gson.toJson(new DataComponent(5, null, null));
+        String dataComponentJson = gson.toJson(new DataComponent(TRACK_VERSION, null, null));
+        byte[] schematicBytes = null;
+
+        // schematic.component (optional - from WorldEdit selection)
+        try {
+            com.sk89q.worldedit.regions.Region weRegion = null;
+            BukkitPlayer bukkitPlayer = BukkitAdapter.adapt(player);
+            com.sk89q.worldedit.LocalSession session = WorldEdit.getInstance().getSessionManager().get(bukkitPlayer);
+            if (session != null) {
+                weRegion = session.getSelection(bukkitPlayer.getWorld());
+            }
+            if (weRegion != null) {
+                Clipboard clipboard = new com.sk89q.worldedit.extent.clipboard.BlockArrayClipboard(weRegion);
+                clipboard.setOrigin(weRegion.getMinimumPoint());
+
+                try (EditSession editSession = WorldEdit.getInstance().newEditSession(bukkitPlayer.getWorld())) {
+                    ForwardExtentCopy copy = new ForwardExtentCopy(editSession, weRegion, clipboard, weRegion.getMinimumPoint());
+                    Operations.completeLegacy(copy);
+                }
+
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                try (ClipboardWriter writer = SCHEMATIC_FORMAT.getWriter(baos)) {
+                    writer.write(clipboard);
+                }
+
+                BlockVector3 exportOrigin = BlockVector3.at(data.origin.x, data.origin.y, data.origin.z);
+                BlockVector3 offset = clipboard.getOrigin().subtract(exportOrigin);
+                JsonObject clipboardOffset = new JsonObject();
+                clipboardOffset.addProperty("x", offset.x());
+                clipboardOffset.addProperty("y", offset.y());
+                clipboardOffset.addProperty("z", offset.z());
+                clipboardOffset.addProperty("yaw", 0);
+                clipboardOffset.addProperty("pitch", 0);
+
+                dataComponentJson = gson.toJson(new DataComponent(TRACK_VERSION, SCHEMATIC_FORMAT.getName(), clipboardOffset));
+                schematicBytes = baos.toByteArray();
+            }
+        } catch (Exception e) {
+            debug.logDatabaseOperation("§e[TrackExchange] No WorldEdit selection for schematic (optional): " + e.getMessage());
+        }
 
         // Write ZIP
         String outputFileName = fileName != null && !fileName.isEmpty() ? fileName : finalDisplayName;
@@ -288,65 +346,11 @@ public class TrackExchangeManager {
             outputFileName += ".trackexchange";
         }
         File outputFile = new File(exportDir, outputFileName);
-
-        try (FileOutputStream fos = new FileOutputStream(outputFile);
-             ZipOutputStream zos = new ZipOutputStream(fos)) {
-
-            // data.component
-            zos.putNextEntry(new ZipEntry("data.component"));
-            zos.write(dataComponentJson.getBytes("UTF-8"));
-            zos.closeEntry();
-
-            // track.component
-            zos.putNextEntry(new ZipEntry("track.component"));
-            zos.write(trackJson.getBytes("UTF-8"));
-            zos.closeEntry();
-
-            // schematic.component (optional - from WorldEdit selection)
-            try {
-                com.sk89q.worldedit.regions.Region weRegion = null;
-                BukkitPlayer bukkitPlayer = BukkitAdapter.adapt(player);
-                com.sk89q.worldedit.LocalSession session = WorldEdit.getInstance().getSessionManager().get(bukkitPlayer);
-                if (session != null) {
-                    weRegion = session.getSelection(bukkitPlayer.getWorld());
-                }
-                if (weRegion != null) {
-                    Clipboard clipboard = new com.sk89q.worldedit.extent.clipboard.BlockArrayClipboard(weRegion);
-                    clipboard.setOrigin(weRegion.getMinimumPoint());
-
-                    try (EditSession editSession = WorldEdit.getInstance().newEditSession(bukkitPlayer.getWorld())) {
-                        ForwardExtentCopy copy = new ForwardExtentCopy(editSession, weRegion, clipboard, weRegion.getMinimumPoint());
-                        Operations.completeLegacy(copy);
-                    }
-
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    try (ClipboardWriter writer = BuiltInClipboardFormat.SPONGE_V3_SCHEMATIC.getWriter(baos)) {
-                        writer.write(clipboard);
-                    }
-
-                    BlockVector3 offset = weRegion.getMinimumPoint().subtract(weRegion.getMinimumPoint());
-                    JsonObject clipboardOffset = new JsonObject();
-                    clipboardOffset.addProperty("x", offset.x());
-                    clipboardOffset.addProperty("y", offset.y());
-                    clipboardOffset.addProperty("z", offset.z());
-                    clipboardOffset.addProperty("yaw", 0);
-                    clipboardOffset.addProperty("pitch", 0);
-
-                    dataComponentJson = gson.toJson(new DataComponent(5, "SPONGE_V3_SCHEMATIC", clipboardOffset));
-
-                    // Re-write data.component with schematic info
-                    zos.putNextEntry(new ZipEntry("data.component"));
-                    zos.write(dataComponentJson.getBytes("UTF-8"));
-                    zos.closeEntry();
-
-                    zos.putNextEntry(new ZipEntry("schematic.component"));
-                    zos.write(baos.toByteArray());
-                    zos.closeEntry();
-                }
-            } catch (Exception e) {
-                debug.logDatabaseOperation("§e[TrackExchange] No WorldEdit selection for schematic (optional): " + e.getMessage());
-            }
-        }
+        Files.write(outputFile.toPath(), compressBytes(
+            dataComponentJson.getBytes("UTF-8"),
+            trackJson.getBytes("UTF-8"),
+            schematicBytes
+        ));
 
         String finalOutputFileName = outputFileName;
         String finalDisplayName2 = finalDisplayName;
@@ -368,35 +372,41 @@ public class TrackExchangeManager {
             throw new IOException("Arquivo '" + fileName + "' não encontrado em " + exportDir.getAbsolutePath());
         }
 
-        String trackComponentStr = null;
-        String dataComponentStr = null;
-        byte[] schematicBytes = null;
+        TrackExchangeBytes components = splitBytes(Files.readAllBytes(importFile.toPath()));
+        String trackComponentStr = new String(components.trackBytes, "UTF-8");
+        String dataComponentStr = new String(components.dataBytes, "UTF-8");
+        byte[] schematicBytes = components.schematicBytes;
 
-        try (FileInputStream fis = new FileInputStream(importFile);
-             ZipInputStream zis = new ZipInputStream(fis)) {
-            ZipEntry entry;
-            while ((entry = zis.getNextEntry()) != null) {
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                byte[] buffer = new byte[8192];
-                int len;
-                while ((len = zis.read(buffer)) != -1) {
-                    baos.write(buffer, 0, len);
-                }
-                byte[] content = baos.toByteArray();
+        JsonElement dataEl;
+        try {
+            dataEl = JsonParser.parseString(dataComponentStr);
+        } catch (Exception e) {
+            throw new IOException("Arquivo .trackexchange inválido: data.component não é JSON válido.");
+        }
+        if (!dataEl.isJsonObject() || !dataEl.getAsJsonObject().has("version")) {
+            throw new IOException("Arquivo .trackexchange inválido: versão não encontrada em data.component.");
+        }
+        JsonObject dataObj = dataEl.getAsJsonObject();
+        int fileVersion = dataObj.get("version").getAsInt();
+        if (fileVersion != TRACK_VERSION) {
+            throw new IOException("Versão do arquivo incompatível: arquivo v" + fileVersion + ", servidor espera v" + TRACK_VERSION + ".");
+        }
 
-                if (entry.getName().equals("track.component")) {
-                    trackComponentStr = new String(content, "UTF-8");
-                } else if (entry.getName().equals("data.component")) {
-                    dataComponentStr = new String(content, "UTF-8");
-                } else if (entry.getName().equals("schematic.component")) {
-                    schematicBytes = content;
-                }
-                zis.closeEntry();
+        ClipboardFormat schematicFormat = SCHEMATIC_FORMAT;
+        JsonElement fmtEl = dataObj.get("schematic_format");
+        if (fmtEl != null && fmtEl.isJsonPrimitive() && !fmtEl.getAsString().isEmpty()) {
+            try {
+                schematicFormat = BuiltInClipboardFormat.valueOf(fmtEl.getAsString());
+            } catch (Exception ex) {
+                debug.logDatabaseOperation("§e[TrackExchange] Formato de schematic desconhecido '" + fmtEl.getAsString() + "', usando " + SCHEMATIC_FORMAT.getName() + ".");
             }
         }
 
-        if (trackComponentStr == null) {
-            throw new IOException("Arquivo .trackexchange inválido: track.component não encontrado.");
+        BlockVector3 clipboardOffset = BlockVector3.at(0, 0, 0);
+        JsonElement offEl = dataObj.get("clipboardOffset");
+        if (offEl != null && offEl.isJsonObject()) {
+            JsonObject offObj = offEl.getAsJsonObject();
+            clipboardOffset = BlockVector3.at(offObj.get("x").getAsDouble(), offObj.get("y").getAsDouble(), offObj.get("z").getAsDouble());
         }
 
         TrackExchangeData data = gson.fromJson(trackComponentStr, TrackExchangeData.class);
@@ -409,25 +419,41 @@ public class TrackExchangeManager {
         // Get existing world or use the one from the file
         String spawnWorldName = data.spawn.world;
         final World targetWorld;
+        boolean worldFallback;
         if (spawnWorldName != null) {
             World w = org.bukkit.Bukkit.getWorld(spawnWorldName);
             if (w != null) {
                 targetWorld = w;
+                worldFallback = false;
             } else {
                 targetWorld = player.getWorld();
+                worldFallback = true;
             }
         } else {
             targetWorld = player.getWorld();
+            worldFallback = true;
         }
 
         final Location spawnLocation = new Location(targetWorld, data.spawn.x, data.spawn.y, data.spawn.z, data.spawn.yaw, data.spawn.pitch);
         final TrackExchangeData finalData = data;
         final byte[] finalSchematic = schematicBytes;
+        final ClipboardFormat finalFormat = schematicFormat;
+        final BlockVector3 finalClipboardOffset = clipboardOffset;
         final String finalTrackNameFinal = finalTrackName;
         final DebugManager debugFinal = debug;
 
         // Create track in database
+        final boolean worldFallbackFinal = worldFallback;
         SchedulerHelper.runTask(plugin, () -> {
+            if (db.isTrackExists(finalTrackNameFinal)) {
+                player.sendMessage("§cJá existe uma pista chamada '" + finalTrackNameFinal + "'. Importe com outro nome: /trackedit import <arquivo> <novoNome>");
+                return;
+            }
+
+            if (worldFallbackFinal) {
+                player.sendMessage("§eAviso: o mundo '" + spawnWorldName + "' do arquivo não está carregado. Usando seu mundo atual (" + targetWorld.getName() + ").");
+            }
+
             boolean created = db.createTrack(finalTrackNameFinal, spawnLocation, player.getName(), player.getUniqueId().toString());
             if (!created) {
                 player.sendMessage("§cErro ao criar pista no banco de dados.");
@@ -439,10 +465,21 @@ public class TrackExchangeManager {
                 db.setTrackTags(trackNameWS, finalData.tags);
             }
 
+            // Persist the GUI icon stored in the file (falls back to the export default)
+            String icon = "BIRCH_BOAT";
+            if (finalData.guiItem != null && Material.matchMaterial(finalData.guiItem) != null) {
+                icon = finalData.guiItem;
+            }
+            db.setTrackIcon(trackNameWS, icon);
+
             // Import regions
             if (finalData.regions != null) {
                 for (TrackExchangeRegion r : finalData.regions) {
                     if (r.shape == null) r.shape = "AABB";
+                    if (!validCoords(r.minX, r.minY, r.minZ, r.maxX, r.maxY, r.maxZ)) {
+                        debugFinal.logDatabaseOperation("§e[TrackExchange] Região #" + r.index + " ignorada: coordenadas inválidas.");
+                        continue;
+                    }
 
                     Location min = new Location(targetWorld, r.minX, r.minY, r.minZ);
                     Location max = new Location(targetWorld, r.maxX, r.maxY, r.maxZ);
@@ -474,8 +511,24 @@ public class TrackExchangeManager {
                         double cy = loc.location.y;
                         double cz = loc.location.z;
 
-                        Location cpMin = new Location(cpWorld, cx - 1, cy - 1, cz - 1);
-                        Location cpMax = new Location(cpWorld, cx + 1, cy + 1, cz + 1);
+                        // Files with real bounds keep the original checkpoint size;
+                        // older files only store the center and fall back to a 3x3x3 box
+                        Location cpMin;
+                        Location cpMax;
+                        if (loc.minX != null && loc.minY != null && loc.minZ != null
+                            && loc.maxX != null && loc.maxY != null && loc.maxZ != null
+                            && validCoords(loc.minX, loc.minY, loc.minZ, loc.maxX, loc.maxY, loc.maxZ)) {
+                            cpMin = new Location(cpWorld,
+                                Math.min(loc.minX, loc.maxX), Math.min(loc.minY, loc.maxY), Math.min(loc.minZ, loc.maxZ));
+                            cpMax = new Location(cpWorld,
+                                Math.max(loc.minX, loc.maxX), Math.max(loc.minY, loc.maxY), Math.max(loc.minZ, loc.maxZ));
+                        } else if (validCoords(cx, cy, cz)) {
+                            cpMin = new Location(cpWorld, cx - 1, cy - 1, cz - 1);
+                            cpMax = new Location(cpWorld, cx + 1, cy + 1, cz + 1);
+                        } else {
+                            debugFinal.logDatabaseOperation("§e[TrackExchange] Checkpoint #" + loc.index + " ignorado: coordenadas inválidas.");
+                            continue;
+                        }
 
                         try (Connection conn = db.getOrConnect()) {
                             String insertCp = "INSERT INTO fr_checkpoint (checkpointId, trackNameWS, worldName, min_x, min_y, min_z, max_x, max_y, max_z) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -507,33 +560,139 @@ public class TrackExchangeManager {
             player.sendMessage("§aPista '" + finalTrackNameFinal + "' importada com sucesso!");
 
             // Paste schematic if present
+            EditSession pasteSession = null;
             if (finalSchematic != null) {
                 try {
-                    pasteSchematic(player, finalSchematic, finalData);
+                    pasteSession = pasteSchematic(player, finalSchematic, finalFormat, finalClipboardOffset);
                 } catch (Exception e) {
                     player.sendMessage("§eAviso: Erro ao colar schematic: " + e.getMessage());
                 }
             }
+
+            // Register the undo action (schematic revert + track removal), like the official TrackExchange
+            pushInverse(player, finalTrackNameFinal, pasteSession);
         });
     }
 
-    private void pasteSchematic(Player player, byte[] schematicBytes, TrackExchangeData data) throws Exception {
+    private EditSession pasteSchematic(Player player, byte[] schematicBytes, ClipboardFormat format, BlockVector3 clipboardOffset) throws Exception {
         BukkitPlayer bukkitPlayer = BukkitAdapter.adapt(player);
         ByteArrayInputStream bais = new ByteArrayInputStream(schematicBytes);
 
-        ClipboardReader reader = BuiltInClipboardFormat.SPONGE_V3_SCHEMATIC.getReader(bais);
+        ClipboardReader reader = format.getReader(bais);
         Clipboard clipboard = reader.read();
 
-        try (EditSession editSession = WorldEdit.getInstance().newEditSession(bukkitPlayer.getWorld())) {
+        Location playerLoc = player.getLocation();
+        BlockVector3 pasteAt = clipboardOffset.add(BlockVector3.at(playerLoc.getX(), playerLoc.getY(), playerLoc.getZ()));
+
+        EditSession editSession = WorldEdit.getInstance().newEditSession(bukkitPlayer);
+        try {
             com.sk89q.worldedit.function.operation.Operation operation = new ClipboardHolder(clipboard)
                 .createPaste(editSession)
-                .to(clipboard.getOrigin())
+                .to(pasteAt)
                 .ignoreAirBlocks(true)
                 .build();
             Operations.completeLegacy(operation);
+        } catch (Exception e) {
+            editSession.close();
+            throw e;
         }
 
         player.sendMessage("§aSchematic colado com sucesso!");
+        return editSession;
+    }
+
+    private void pushInverse(Player player, String trackName, EditSession pasteSession) {
+        Runnable inverse = () -> {
+            if (pasteSession != null) {
+                SchedulerHelper.runAsync(plugin, () -> {
+                    try (EditSession undoSession = WorldEdit.getInstance().newEditSession(BukkitAdapter.adapt(player))) {
+                        pasteSession.undo(undoSession);
+                    } catch (Exception e) {
+                        player.sendMessage("§eAviso: Erro ao desfazer schematic: " + e.getMessage());
+                    }
+                });
+            }
+            SchedulerHelper.runTask(plugin, () -> {
+                db.deleteTrack(trackName);
+                plugin.getDebugManager().logDatabaseOperation("§6[TrackExchange] Undo: pista '" + trackName + "' removida.");
+                player.sendMessage("§aPista '" + trackName + "' removida (undo).");
+            });
+        };
+        playerActions.computeIfAbsent(player.getUniqueId(), k -> new Stack<>()).push(inverse);
+    }
+
+    public Optional<Runnable> popAction(UUID playerUuid) {
+        Stack<Runnable> actions = playerActions.get(playerUuid);
+        if (actions == null || actions.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(actions.pop());
+    }
+
+    private static boolean validCoords(double... coords) {
+        for (double c : coords) {
+            if (Double.isNaN(c) || Double.isInfinite(c)) return false;
+        }
+        return true;
+    }
+
+    private static byte[] compressBytes(byte[] dataBytes, byte[] trackBytes, byte[] schematicBytes) throws IOException {
+        ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
+        try (ZipOutputStream zipOut = new ZipOutputStream(byteOut)) {
+            zipOut.putNextEntry(new ZipEntry("data.component"));
+            zipOut.write(dataBytes);
+            zipOut.closeEntry();
+
+            zipOut.putNextEntry(new ZipEntry("track.component"));
+            zipOut.write(trackBytes);
+            zipOut.closeEntry();
+
+            if (schematicBytes != null) {
+                zipOut.putNextEntry(new ZipEntry("schematic.component"));
+                zipOut.write(schematicBytes);
+                zipOut.closeEntry();
+            }
+        }
+        return byteOut.toByteArray();
+    }
+
+    private static TrackExchangeBytes splitBytes(byte[] zipBytes) throws IOException {
+        byte[] dataBytes = null;
+        byte[] trackBytes = null;
+        byte[] schematicBytes = null;
+
+        try (ZipInputStream zipStream = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+            ZipEntry entry;
+            while ((entry = zipStream.getNextEntry()) != null) {
+                byte[] content = zipStream.readAllBytes();
+                String name = entry.getName();
+                if ("data.component".equals(name)) {
+                    dataBytes = content;
+                } else if ("track.component".equals(name)) {
+                    trackBytes = content;
+                } else if ("schematic.component".equals(name)) {
+                    schematicBytes = content;
+                }
+                zipStream.closeEntry();
+            }
+        }
+
+        if (dataBytes == null || trackBytes == null) {
+            throw new IOException("Arquivo .trackexchange inválido: componentes obrigatórios não encontrados.");
+        }
+        return new TrackExchangeBytes(dataBytes, trackBytes, schematicBytes);
+    }
+
+    private static final class TrackExchangeBytes {
+        final byte[] dataBytes;
+        final byte[] trackBytes;
+        final byte[] schematicBytes;
+
+        TrackExchangeBytes(byte[] dataBytes, byte[] trackBytes, byte[] schematicBytes) {
+            this.dataBytes = dataBytes;
+            this.trackBytes = trackBytes;
+            this.schematicBytes = schematicBytes;
+        }
     }
 
     public List<String> listFiles() {

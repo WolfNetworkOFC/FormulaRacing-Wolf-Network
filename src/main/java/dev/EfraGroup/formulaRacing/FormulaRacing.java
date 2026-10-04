@@ -856,6 +856,9 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                     this.trackExchangeManager
                 )
             );
+            this.commandManager.registerCommand(
+                new TrackExchangeCommand(this.trackExchangeManager, this.dm)
+            );
             this.commandManager.registerCommand(new PartyCommand(this));
             this.commandManager.registerCommand(
                 new DuelCommand(this, dm, ttd, ttda, packetSender)
