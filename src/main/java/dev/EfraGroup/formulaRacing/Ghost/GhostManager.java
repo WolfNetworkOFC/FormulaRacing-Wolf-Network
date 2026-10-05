@@ -10,6 +10,7 @@ import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
 import java.io.File;
@@ -84,9 +85,9 @@ public class GhostManager {
 
         FRTask task = SchedulerHelper.runTaskTimerAtEntity(plugin, player, () -> {
             if (!player.isOnline() || !activeRecordings.containsKey(uuid)) return;
-            Location loc = player.getLocation();
+            Location loc = resolveRecordLocation(player);
             if (loc != null && loc.getWorld() != null) {
-                frames.add(new GhostFrame(loc.getX(), loc.getY(), loc.getZ()));
+                frames.add(new GhostFrame(loc.getX(), loc.getY(), loc.getZ(), loc.getYaw()));
             }
         }, 0L, RECORD_INTERVAL_TICKS);
 
@@ -94,6 +95,26 @@ public class GhostManager {
 
         plugin.getDebugManager().logTimeTrialSystem(
                 "[GHOST-REC] Recording started for " + player.getName());
+    }
+
+    /**
+     * Location recorded for a ghost frame: the boat when the player is driving one,
+     * otherwise the player. Recording the boat keeps the line on the same reference
+     * the player races against, since the hull slides out from under the driver on drifts.
+     *
+     * <p>Falls back to the player when the vehicle cannot be read (not yet spawned, or
+     * the lookup crosses a region thread on Folia).
+     */
+    private Location resolveRecordLocation(Player player) {
+        if (!player.isInsideVehicle()) {
+            return player.getLocation();
+        }
+        Entity vehicle = player.getVehicle();
+        if (!(vehicle instanceof org.bukkit.entity.Boat)) {
+            return player.getLocation();
+        }
+        Location boatLoc = vehicle.getLocation();
+        return boatLoc != null ? boatLoc : player.getLocation();
     }
 
     public List<GhostFrame> stopRecording(Player player) {
@@ -430,6 +451,8 @@ public class GhostManager {
 
             GhostFrame frame = frames.get(frameIndex);
             Location targetLoc = new Location(world, frame.getX(), frame.getY() + 0.5, frame.getZ());
+            // Face the recorded heading so the trail reads as a driving line, not just dots.
+            targetLoc.setYaw(frame.getYaw());
 
             // Schedule armor stand + particle on the correct region thread
             SchedulerHelper.runTaskAt(plugin, targetLoc, () -> {

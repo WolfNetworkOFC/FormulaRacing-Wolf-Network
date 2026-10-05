@@ -948,7 +948,6 @@ public class RaceCheckpointListener implements Listener {
                             ? event.getAnnouncements()
                             : this.plugin.getEventAnnouncements();
                     announcements.broadcastHeatComplete(heat);
-                    this.plugin.getRaceEventManager().tryDeleteEventForHeat(heat);
                 },
                 100L
             );

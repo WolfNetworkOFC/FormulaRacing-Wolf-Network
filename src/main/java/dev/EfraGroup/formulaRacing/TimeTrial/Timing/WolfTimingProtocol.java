@@ -20,8 +20,20 @@ public final class WolfTimingProtocol {
     public static final String REPORT = "tt_v1_report";
     public static final String RESULT = "tt_v1_result";
     public static final String DISARM = "tt_v1_disarm";
+    public static final String TRACK = "tt_v1_track";
 
     private WolfTimingProtocol() {}
+
+    /**
+     * Announces which track the client is being timed on. The geometry payload only carries
+     * the world name, so this is how the client learns the track id it needs to key its local
+     * personal-best cache and to label a lap it is about to upload.
+     */
+    public static String track(String trackName) {
+        JsonObject json = base();
+        json.addProperty("track", trackName == null ? "" : trackName);
+        return json.toString();
+    }
 
     public static String hello(int maxDeltaMillis, int maxRttMillis) {
         JsonObject json = base();
@@ -47,7 +59,8 @@ public final class WolfTimingProtocol {
         UUID runId,
         String worldName,
         List<DatabaseManager.RegionData> startRegions,
-        List<DatabaseManager.RegionData> endRegions
+        List<DatabaseManager.RegionData> endRegions,
+        List<DatabaseManager.RegionData> guardRegions
     ) {
         JsonObject json = base();
         json.addProperty("runId", runId.toString());
@@ -69,6 +82,17 @@ public final class WolfTimingProtocol {
             for (DatabaseManager.RegionData region : endRegions) {
                 if (region != null) {
                     regions.add(region("end-" + index++, region));
+                }
+            }
+        }
+        // LAGSTART/LAGEND are sent with role "guard". They are not timing boundaries: the
+        // server is the one that decides whether a finish is coherent, and the client only
+        // uses them to keep the HUD honest about what is coming.
+        if (guardRegions != null) {
+            int index = 0;
+            for (DatabaseManager.RegionData region : guardRegions) {
+                if (region != null) {
+                    regions.add(region("guard-" + index++, region));
                 }
             }
         }
@@ -140,7 +164,13 @@ public final class WolfTimingProtocol {
         DatabaseManager.RegionData region
     ) {
         JsonObject json = new JsonObject();
-        json.addProperty("role", role.startsWith("start") ? "START" : "END");
+        // "guard" is a non-timing region: the server validates the crossing, the client only
+        // draws it. Older clients ignore unknown roles, so this stays additive.
+        if (role.startsWith("guard")) {
+            json.addProperty("role", "GUARD");
+        } else {
+            json.addProperty("role", role.startsWith("start") ? "START" : "END");
+        }
         json.addProperty("id", role);
         json.addProperty("shape", region.isPoly() ? "POLY" : "AABB");
         json.addProperty("minX", Math.min(region.getMinX(), region.getMaxX()));

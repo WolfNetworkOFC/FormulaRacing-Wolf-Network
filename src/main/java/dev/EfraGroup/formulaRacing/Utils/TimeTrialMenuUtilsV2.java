@@ -5,6 +5,7 @@ import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.PacketSender;
+import dev.EfraGroup.formulaRacing.TimeTrial.Timing.OfficialTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -698,10 +699,66 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                 this.api.spawnBoatAt(player, loc, false, false, false);
                 this.plugin.getHotbarController().giveTimeTrialHotbar(player);
                 this.discardStoredInventory(uuid);
+                this.startTrackGhosts(player, trackName);
             } else {
                 this.restoreAfterFailedSelection(player, session);
             }
         });
+    }
+
+    /**
+     * Mirrors the ghost setup done by {@code TimeTrialCommand.startTrack}: start recording
+     * the new lap, replay the personal best on the server (visible without the mod), and hand
+     * the same frames to WolfMOD so it can draw a translucent boat + rider.
+ */
+    private void startTrackGhosts(Player player, String trackName) {
+        var wolfMod = this.plugin.getWolfMod();
+        var ghostManager = this.plugin.getGhostManager();
+
+        if (ghostManager != null) {
+            ghostManager.startRecording(player);
+            if (wolfMod != null) {
+                wolfMod.sendGhostClear(player);
+            }
+            // loadGhostAsync resolves asynchronously, so everything that needs the frames
+            // lives in the callback. A second call would just re-read the cache.
+            ghostManager.loadGhostAsync(
+                    player.getUniqueId(), trackName, frames -> {
+                        if (!player.isOnline()) {
+                            return;
+                        }
+                        if (frames == null || frames.isEmpty()) {
+                            return;
+                        }
+                        ghostManager.startReplay(player, frames);
+                        if (wolfMod != null && frames.size() >= 2) {
+                            OfficialTime best = this.mysql.getPlayerBestOfficialTime(
+                                    player.getUniqueId(), trackName);
+                            wolfMod.sendPersonalBest(
+                                    player, trackName, frames,
+                                    best == null ? 0L : best.getOfficialMillis());
+                            wolfMod.sendGhostStart(player);
+                        }
+                    });
+        }
+
+        if (this.plugin.getMedalManager() != null) {
+            this.plugin.getMedalManager().startMedalReplayIfBetter(player, trackName);
+        }
+
+        if (wolfMod != null && ghostManager == null) {
+            // No server-side ghost to reuse; fall back to the AI ideal line so mod users
+            // still get something to race against on this track.
+            wolfMod.sendGhostClear(player);
+            var aiManager = this.plugin.getAIRacingLineManager();
+            if (aiManager != null && aiManager.hasRacingLine(trackName)) {
+                var line = aiManager.getRacingLine(trackName);
+                if (line != null && line.isUsable()) {
+                    wolfMod.sendTrackLine(player, trackName, line);
+                    wolfMod.sendGhostStart(player);
+                }
+            }
+        }
     }
 
     /**
@@ -771,9 +828,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
     }
 
     private String formatTime(double time) {
-        int minutes = (int) (time / 60.0);
-        double seconds = time % 60.0;
-        return String.format("%d:%06.3f", minutes, seconds);
+        return TimeFormatter.formatTime(time);
     }
 
     private static class PlayerMenuSession {

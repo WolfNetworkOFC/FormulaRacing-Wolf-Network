@@ -981,22 +981,6 @@ public class RaceEventManager {
         return true;
     }
 
-    public void tryDeleteEventForHeat(Heats heat) {
-        // Não deleta evento quando todos DNF - apenas log
-        Rounds round = heat.getRound();
-        if (round == null) return;
-        Events event = round.getEvent();
-        if (event == null) return;
-        if (heat.getDrivers().isEmpty()) return;
-        boolean allDnf = heat.getDrivers().values().stream()
-            .allMatch(Driver::isDnf);
-        if (allDnf) {
-            this.plugin.getDebugManager().logRaceSystem(
-                "All drivers DNF in heat " + heat.getId() + " - event NOT deleted (only via /event delete)"
-            );
-        }
-    }
-
     private void cleanupEventInMemory(Events event) {
         event.getEventCountdown().stop();
 

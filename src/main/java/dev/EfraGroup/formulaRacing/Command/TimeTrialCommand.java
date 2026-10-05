@@ -14,6 +14,7 @@ import dev.EfraGroup.formulaRacing.Utils.TimeTrialTeleportMessage;
 import dev.EfraGroup.formulaRacing.PacketSender;
     import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
     import dev.EfraGroup.formulaRacing.AI.AIRacingLineManager;
+    import dev.EfraGroup.formulaRacing.TimeTrial.Timing.OfficialTime;
     import dev.EfraGroup.formulaRacing.Heat.HeatState;
     import dev.EfraGroup.formulaRacing.Heat.Heats;
     import dev.EfraGroup.formulaRacing.Heat.Lap;
@@ -202,19 +203,40 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                              if (this.plugin.getMedalManager() != null) {
                                  this.plugin.getMedalManager().startMedalReplayIfBetter(player, trackNameWS);
                              }
-                             // --- WolfMOD: Send track racing line to client ---
+                             // --- WolfMOD: send the player's own PB so the mod can render a
+                             // translucent boat + rider. Falls back to the AI ideal line only
+                             // when this player has no recorded lap on the track yet. ---
                              var wolfMod = this.plugin.getWolfMod();
                              if (wolfMod != null) {
                                  SchedulerHelper.runTaskFor(this.plugin, player, () -> {
                                      wolfMod.sendGhostClear(player);
-                                     AIRacingLineManager aiManager = this.plugin.getAIRacingLineManager();
-                                     if (aiManager != null && aiManager.hasRacingLine(trackNameWS)) {
-                                         var line = aiManager.getRacingLine(trackNameWS);
-                                         if (line != null && line.isUsable()) {
-                                             wolfMod.sendTrackLine(player, trackNameWS, line);
-                                             wolfMod.sendGhostStart(player);
-                                         }
-                                     }
+                                     // loadGhostAsync completes asynchronously, so the fallback
+                                     // lives inside the callback — a flag checked right after the
+                                     // call would always read false.
+                                     this.plugin.getGhostManager().loadGhostAsync(
+                                             player.getUniqueId(), trackNameWS, frames -> {
+                                                 if (!player.isOnline()) {
+                                                     return;
+                                                 }
+                                                 if (frames != null && frames.size() >= 2) {
+                                                     OfficialTime best = this.plugin.getDatabaseManager()
+                                                             .getPlayerBestOfficialTime(
+                                                                     player.getUniqueId(), trackNameWS);
+                                                     wolfMod.sendPersonalBest(
+                                                             player, trackNameWS, frames,
+                                                             best == null ? 0L : best.getOfficialMillis());
+                                                     wolfMod.sendGhostStart(player);
+                                                     return;
+                                                 }
+                                                 AIRacingLineManager aiManager = this.plugin.getAIRacingLineManager();
+                                                 if (aiManager != null && aiManager.hasRacingLine(trackNameWS)) {
+                                                     var line = aiManager.getRacingLine(trackNameWS);
+                                                     if (line != null && line.isUsable()) {
+                                                         wolfMod.sendTrackLine(player, trackNameWS, line);
+                                                         wolfMod.sendGhostStart(player);
+                                                     }
+                                                 }
+                                             });
                                  });
                              }
                          }

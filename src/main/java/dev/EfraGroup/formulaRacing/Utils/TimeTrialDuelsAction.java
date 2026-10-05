@@ -312,9 +312,8 @@ private void startGlobalUpdateTask() {
      }
 
      public String formatTime(double seconds) {
-         long totalMillis = (long)(seconds * 1000.0);
-         return String.format("%02d:%02d.%03d", totalMillis / 60000L, totalMillis % 60000L / 1000L, totalMillis % 1000L);
-     }
+             return TimeFormatter.formatTime(seconds);
+         }
 
      private void spawnLeaderParticles(Player player) {
          player.getWorld().spawnParticle(Particle.DUST, player.getLocation().add(0.0, 0.1, 0.0), 1, (Object)new Particle.DustOptions(Color.AQUA, 1.0f));
@@ -354,13 +353,11 @@ private void startGlobalUpdateTask() {
          }
 
          public String getFormattedTime() {
-             long elapsed = this.getCurrentTimeMillis();
-             return String.format("%02d:%02d.%03d", elapsed / 60000L % 60L, elapsed / 1000L % 60L, elapsed % 1000L);
+             return TimeFormatter.formatTime(this.getCurrentTimeMillis() / 1000.0);
          }
 
          public String getFormattedLapTime() {
-             long elapsed = (long)(this.getCurrentLapTime() * 1000.0);
-             return String.format("%02d:%02d.%03d", elapsed / 60000L % 60L, elapsed / 1000L % 60L, elapsed % 1000L);
+             return TimeFormatter.formatTime(this.getCurrentLapTime());
          }
 
          public int getDuelId() {

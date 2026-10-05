@@ -4,6 +4,7 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.PacketSender;
 import dev.EfraGroup.formulaRacing.RegionBox;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
+import dev.EfraGroup.formulaRacing.Controllers.TrackIntegrationManager;
 import dev.EfraGroup.formulaRacing.Duels.TimeTrialDuels;
 import dev.EfraGroup.formulaRacing.Event.Events;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
@@ -337,6 +338,12 @@ public class RegionListener implements Listener {
                                 } else {
                                     this.reportIfStandingInStartLine(player, current, worldRegions);
                                 }
+
+                                // LAGSTART/LAGEND are polled on their own pass rather than
+                                // competing for the single START/END result above. They sit on
+                                // the finish line by design, so sharing that lookup would let
+                                // one of the three shadow the others.
+                                this.checkLagRegionCrossings(player, previous, current, worldRegions, previousNanos, currentNanos);
 
                             // Checkpoints and duels logic
                             String activeTrack = this.timerUtils.getActiveTrack(player);
@@ -840,6 +847,24 @@ public class RegionListener implements Listener {
                     int checkpoints = data.getCheckpointsReached();
                     int totalCheckpoints = this.database.getCheckpointCount(regionTrackWS);
                     if (checkpoints >= totalCheckpoints) {
+                        if (this.rejectIncoherentFinish(player, regionTrackWS)) {
+                            this.timerUtils.stopTimer(player, regionTrackWS);
+                            this.timeTrialController.endSession(player);
+                            if (this.timingService != null) {
+                                this.timingService.abort(uuid, true);
+                            }
+                            if (shouldLoop) {
+                                this.startSoloTimer(
+                                    player,
+                                    regionTrackDisplayName,
+                                    regionTrackWS,
+                                    type,
+                                    System.currentTimeMillis(),
+                                    crossingNanos
+                                );
+                            }
+                            return;
+                        }
                         this.finishSoloTimeTrial(
                             player,
                             regionTrackDisplayName,
@@ -1256,6 +1281,112 @@ public class RegionListener implements Listener {
         }
         return region.getTrackName() != null
                 && region.getTrackName().replaceAll("\\s+", "").equalsIgnoreCase(normalizedTrack);
+    }
+
+    /**
+     * Rejects a solo finish whose LAGSTART/LAGEND evidence does not hold.
+     *
+     * <p>Mirrors what the heat path already does in {@link #handleRaceLapCrossing}: when a track
+     * declares either region, the player must have crossed it. LAGSTART/LAGEND flank the finish
+     * line, so together they prove the player physically travelled across it instead of being
+     * teleported onto it or arriving there on a dropped server tick.
+     *
+     * <p>Tracks without either region always pass — this adds no requirement to them.
+     *
+     * @return true when the finish must be discarded
+     */
+    private boolean rejectIncoherentFinish(Player player, String trackNameWS) {
+        TrackIntegrationManager trackManager = this.plugin.getTrackIntegrationManager();
+        if (trackManager == null) {
+            return false;
+        }
+        boolean hasLagStart = trackManager.hasLagStartRegion(trackNameWS);
+        boolean hasLagEnd = trackManager.hasLagEndRegion(trackNameWS);
+        if (!hasLagStart && !hasLagEnd) {
+            return false;
+        }
+        TimeTrialSession session = this.timeTrialController.getSession(player);
+        if (session == null) {
+            return false;
+        }
+        if (hasLagStart && !session.hasPassedLagStart()) {
+            this.plugin.getDebugManager().logTimeTrialSystem(
+                    "[LAG] " + player.getName() + " tentou fechar volta sem passar LAGSTART");
+            this.plugin.sendMessage(player, "race_checkpoint_missed", new String[]{"{expected}", "LAGSTART"});
+            return true;
+        }
+        if (hasLagEnd && !session.hasPassedLagEnd()) {
+            this.plugin.getDebugManager().logTimeTrialSystem(
+                    "[LAG] " + player.getName() + " tentou fechar volta sem passar LAGEND");
+            this.plugin.sendMessage(player, "race_checkpoint_missed", new String[]{"{expected}", "LAGEND"});
+            return true;
+        }
+        if (session.lagRegionsShareInstant()) {
+            this.plugin.getDebugManager().logTimeTrialSystem(
+                    "[LAG] " + player.getName() + " cruzou LAGSTART e LAGEND no mesmo instante");
+            this.plugin.sendMessage(player, "race_checkpoint_missed", new String[]{"{expected}", "LAGSTART"});
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Polls LAGSTART/LAGEND crossings independently of the START/END lookup.
+     *
+     * <p>These regions flank the finish line, so they overlap START and END by design. Folding
+     * them into {@link #getRegionAtLine} would return only one of the three on a given tick and
+     * silently drop the others, so they get their own swept test here.
+     *
+     * <p>Marking happens on the session rather than firing the full region pipeline: the only
+     * effect is proving the player physically crossed the line, and running the solo/heat
+     * dispatch again here would re-trigger lap logic.
+     */
+    private void checkLagRegionCrossings(
+            Player player,
+            Location previous,
+            Location current,
+            List<DatabaseManager.RegionData> worldRegions,
+            long previousNanos,
+            long currentNanos
+    ) {
+        TimeTrialSession session = this.timeTrialController.getSession(player);
+        if (session == null) {
+            return;
+        }
+        // Same normalisation resolveIntendedTrack applies, so the LAG regions are matched
+        // against the running session's track on the same footing as START/END.
+        String normalizedTrack = session.getTrackName() == null
+                ? null
+                : session.getTrackName().replaceAll("\\s+", "").toLowerCase();
+        if (normalizedTrack == null) {
+            return;
+        }
+        for (DatabaseManager.RegionData region : worldRegions) {
+            String type = region.getType().toUpperCase();
+            boolean isLagStart = type.equals("LAGSTART");
+            if (!isLagStart && !type.equals("LAGEND")) {
+                continue;
+            }
+            if (!matchesNormalizedTrack(region, normalizedTrack)) {
+                continue;
+            }
+            if (isLagStart ? session.hasPassedLagStart() : session.hasPassedLagEnd()) {
+                continue;
+            }
+            if (!RegionMathUtils.intersectsRegion(previous, current, region)) {
+                continue;
+            }
+            double fraction = RegionMathUtils.calculateRegionEntryProportion(previous, current, region);
+            long crossingNanos = interpolateNanos(previousNanos, currentNanos, fraction);
+            if (isLagStart) {
+                session.markLagStart(crossingNanos);
+            } else {
+                session.markLagEnd(crossingNanos);
+            }
+            this.plugin.getDebugManager().logTimeTrialSystem(
+                    "[LAG] " + player.getName() + " cruzou " + type
+                            + " em " + session.getTrackName());
+        }
     }
 
     private void handleRaceLapCrossing(Player player, Driver driver, Heats heat, Location from, Location to, DatabaseManager.RegionData regionData) {

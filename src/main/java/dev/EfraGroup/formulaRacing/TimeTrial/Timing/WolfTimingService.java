@@ -1,10 +1,14 @@
 package dev.EfraGroup.formulaRacing.TimeTrial.Timing;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.Ghost.GhostFrame;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -15,6 +19,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.bukkit.entity.Player;
 
 public final class WolfTimingService {
+
+    /**
+     * Ceiling on frames accepted from a client upload. Matches the cap the client applies when
+     * thinning, so a legitimate lap passes and a malformed one cannot exhaust memory.
+     */
+    private static final int MAX_GHOST_UPLOAD_FRAMES = 2000;
 
     private final FormulaRacing plugin;
     private final Map<UUID, ClientState> clients = new ConcurrentHashMap<>();
@@ -72,6 +82,12 @@ public final class WolfTimingService {
             ignored -> new ClientState()
         );
         state.requestedTrack = normalizedTrack;
+        // Tell the client which track it is on: the geometry payload only carries the world
+        // name, and the client needs the track id to key its local personal-best cache.
+        this.plugin.getWolfMod().sendConfig(
+                player,
+                WolfTimingProtocol.TRACK,
+                WolfTimingProtocol.track(normalizedTrack));
         SoloTimingAttempt attempt = this.getAttempt(player.getUniqueId());
         if (attempt == null || !normalizedTrack.equalsIgnoreCase(attempt.getTrackName())) {
             this.armForTrack(player, normalizedTrack);
@@ -279,6 +295,49 @@ public final class WolfTimingService {
         }
     }
 
+    /**
+     * Accepts a lap the client recorded itself, reassembled from its binary chunks.
+     *
+     * <p>Each frame is {@code [tick, x, y, z, yaw]}.
+     *
+     * <p>It is only ever a fallback: the server keeps its own recording as the canonical one
+     * and only stores this when the server-side ghost is missing or too short to replay — for
+     * instance when a lap ended outside the recording window, or the player arrived on a new
+     * machine with no local copy. The client's time is never trusted; {@link OfficialTime}
+     * remains the sole authority on lap time.
+     */
+    public void handleGhostUploadFrames(Player player, String trackName, List<double[]> frames) {
+        if (this.plugin.getGhostManager() == null || player == null || trackName == null) {
+            return;
+        }
+        if (frames == null || frames.size() < 2 || frames.size() > MAX_GHOST_UPLOAD_FRAMES) {
+            return;
+        }
+        List<GhostFrame> recorded = new ArrayList<>(frames.size());
+        for (double[] frame : frames) {
+            if (frame == null || frame.length < 5) {
+                continue;
+            }
+            recorded.add(new GhostFrame(frame[1], frame[2], frame[3], (float) frame[4]));
+        }
+        if (recorded.size() < 2) {
+            return;
+        }
+        List<GhostFrame> upload = Collections.unmodifiableList(recorded);
+        SchedulerHelper.runAsync(this.plugin, () ->
+                this.plugin.getGhostManager().loadGhostAsync(
+                        player.getUniqueId(),
+                        trackName,
+                        existing -> {
+                            // Only fill a gap; never overwrite a usable server-side recording.
+                            if (existing != null && existing.size() >= 2) {
+                                return;
+                            }
+                            this.plugin.getGhostManager().saveGhostAsync(
+                                    player.getUniqueId(), trackName, upload);
+                        }));
+    }
+
     private void handleCapabilities(Player player, JsonObject json) {
         if (
             !hasCapability(json, "TT_CLIENT_REPORT_V1")
@@ -453,6 +512,13 @@ public final class WolfTimingService {
                 .getTrackRegionsByType(attempt.getTrackName(), "START");
             List<DatabaseManager.RegionData> endRegions = this.plugin.getTrackIntegrationManager()
                 .getTrackRegionsByType(attempt.getTrackName(), "END");
+            // Guard regions (LAGSTART/LAGEND) let the client show the finish approach the
+            // way the server will actually judge it. Empty for most tracks.
+            List<DatabaseManager.RegionData> guardRegions = new java.util.ArrayList<>();
+            guardRegions.addAll(this.plugin.getTrackIntegrationManager()
+                    .getTrackRegionsByType(attempt.getTrackName(), "LAGSTART"));
+            guardRegions.addAll(this.plugin.getTrackIntegrationManager()
+                    .getTrackRegionsByType(attempt.getTrackName(), "LAGEND"));
             SchedulerHelper.runTaskFor(this.plugin, player, () -> {
                 SoloTimingAttempt current = this.getAttempt(player.getUniqueId());
                 if (
@@ -469,7 +535,8 @@ public final class WolfTimingService {
                         runId,
                         startRegions.isEmpty() ? null : startRegions.get(0).getWorld(),
                         startRegions,
-                        endRegions
+                        endRegions,
+                        guardRegions
                     )
                 );
             });

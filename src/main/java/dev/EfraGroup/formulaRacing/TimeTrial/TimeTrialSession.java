@@ -14,6 +14,11 @@ public class TimeTrialSession {
     private final UUID runId;
     private final List<Double> checkpointTimes;
     private boolean valid = true;
+    /** LAGSTART/LAGEND crossings, used to prove the player physically crossed the line. */
+    private boolean passedLagStart;
+    private boolean passedLagEnd;
+    private long lagStartNanos;
+    private long lagEndNanos;
 
     public TimeTrialSession(UUID playerUUID, String trackName) {
         this.playerUUID = playerUUID;
@@ -87,5 +92,37 @@ public class TimeTrialSession {
 
     public boolean isValid() {
         return this.valid;
+    }
+
+    /**
+     * Records a LAGSTART crossing. The instant is kept, not just the flag: a same-instant
+     * pair of LAGSTART/LAGEND means the player never actually moved between them.
+     */
+    public void markLagStart(long crossingNanos) {
+        this.passedLagStart = true;
+        this.lagStartNanos = crossingNanos;
+    }
+
+    public void markLagEnd(long crossingNanos) {
+        this.passedLagEnd = true;
+        this.lagEndNanos = crossingNanos;
+    }
+
+    public boolean hasPassedLagStart() {
+        return this.passedLagStart;
+    }
+
+    public boolean hasPassedLagEnd() {
+        return this.passedLagEnd;
+    }
+
+    /**
+     * True when both regions were stamped at the same instant, which cannot happen at
+     * boat speed across distinct blocks. That is the teleport / not-really-moved case.
+     * Returns false when only one was reached, since a missing region is already
+     * handled by the presence checks.
+     */
+    public boolean lagRegionsShareInstant() {
+        return this.passedLagStart && this.passedLagEnd && this.lagStartNanos == this.lagEndNanos;
     }
 }

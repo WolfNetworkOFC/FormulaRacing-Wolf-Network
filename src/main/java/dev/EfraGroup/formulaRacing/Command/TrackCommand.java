@@ -4,6 +4,7 @@ import dev.EfraGroup.formulaRacing.Command.Help.CommandHelpService;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Utils.SenderUtils;
+import dev.EfraGroup.formulaRacing.Utils.TimeFormatter;
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.CatchUnknown;
 import co.aikar.commands.annotation.CommandAlias;
@@ -30,10 +31,7 @@ public class TrackCommand extends BaseCommand {
     }
 
     private String formatTime(double timeInSeconds) {
-        long minutes = (long) (timeInSeconds / 60.0);
-        long seconds = (long) (timeInSeconds % 60.0);
-        long millis = (long) ((timeInSeconds - Math.floor(timeInSeconds)) * 1000.0);
-        return String.format("%d:%02d.%03d", minutes, seconds, millis);
+        return TimeFormatter.formatTime(timeInSeconds);
     }
 
     /** Player's language when available, default language for the console. */

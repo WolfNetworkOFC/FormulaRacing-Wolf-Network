@@ -199,7 +199,8 @@ public class MedalManager {
                         frames.add(new GhostFrame(
                                 p.get("x").getAsDouble(),
                                 p.get("y").getAsDouble(),
-                                p.get("z").getAsDouble()));
+                                p.get("z").getAsDouble(),
+                                p.has("yaw") ? p.get("yaw").getAsFloat() : 0.0F));
                     }
                     if (!frames.isEmpty()) {
                         lines.put(medal, new MedalLine(medal, time, frames));
@@ -379,6 +380,7 @@ public class MedalManager {
                         p.addProperty("x", f.getX());
                         p.addProperty("y", f.getY());
                         p.addProperty("z", f.getZ());
+                        p.addProperty("yaw", f.getYaw());
                         path.add(p);
                     }
                     entry.add("ghost_path", path);
