@@ -13,6 +13,7 @@ import dev.EfraGroup.formulaRacing.Heat.PitStopRegion;
 import dev.EfraGroup.formulaRacing.Medals.MedalManager;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
+import dev.EfraGroup.formulaRacing.Utils.ItemComponentParser;
 import dev.EfraGroup.formulaRacing.Utils.TitleHelper;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
@@ -1208,6 +1209,17 @@ public class TrackEditorCommand extends BaseCommand {
 
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
+            // Validates the bracket syntax against the item itself: rejects props the
+            // item does not support (e.g. stone[level=2]) and components the server
+            // refuses (e.g. bee_nest[minecraft:bees=]) BEFORE persisting, so a bad
+            // icon never becomes the track's saved state.
+            ItemStack preview;
+            try {
+                preview = ItemComponentParser.build(iconMat, amount, iconMeta, null, null);
+            } catch (ItemComponentParser.ParseException e) {
+                player.sendMessage("§c" + e.getMessage());
+                return;
+            }
             if (this.mysql.setTrackIcon(trackName, iconMat.name(), amount, iconMeta)) {
                 String msg = "§a✅ Track icon updated to §e" + iconMat.name();
                 if (iconMeta != null) msg += "[" + iconMeta + "]";

@@ -91,7 +91,10 @@ shadowJar {
     relocate 'org.bstats', 'dev.efragroup.libs.bstats'
     relocate 'org.shanerx.mojang', 'dev.efragroup.libs.mojangapi'
     relocate 'org.json.simple', 'dev.efragroup.libs.jsonsimple'
-    relocate 'com.google.gson', 'dev.efragroup.libs.gson'
+    // gson is NOT relocated: Paper ships its own copy, and UnsafeValues
+    // .deserializeItemFromJson(JsonObject) — used to build track icons with the
+    // same component syntax as /give — takes the unrelocated type. Relocating it
+    // made that call throw NoSuchMethodError at runtime.
     relocate 'org.apache.http', 'dev.efragroup.libs.apachehttp'
     relocate 'org.apache.commons.codec', 'dev.efragroup.libs.commonscodec'
     relocate 'com.mashape.unirest', 'dev.efragroup.libs.unirest'

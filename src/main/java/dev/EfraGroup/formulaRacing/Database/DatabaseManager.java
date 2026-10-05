@@ -4,6 +4,7 @@ import dev.EfraGroup.formulaRacing.FileManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.GimmickConfig;
 import dev.EfraGroup.formulaRacing.Utils.DiscordUtils;
+import dev.EfraGroup.formulaRacing.Utils.ItemComponentParser;
 import dev.EfraGroup.formulaRacing.Utils.MinecraftVersion;
 import dev.EfraGroup.formulaRacing.Utils.TimerUtils;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
@@ -6745,6 +6746,16 @@ public class DatabaseManager {
          * block state resets item deviations on 1.20.5+, so the name/lore must be set
          * after it — doing everything in one pass avoids losing the level on a later
          * getItemMeta()/setItemMeta() round-trip.
+         *
+         * <p>Brackets are parsed with the same syntax vanilla {@code /give} accepts
+         * (see {@link ItemComponentParser}), so any data component or block state
+         * property the item supports works here.
+         *
+         * <p>A stored meta that the server no longer accepts (icon configured before
+         * an update, or a component that changed) degrades to the plain material
+         * instead of propagating an exception: one broken track must not take down
+         * the whole menu. {@code /te icon} rejects bad input up front, so this only
+         * covers data that was already saved.
          */
         public ItemStack toItemStack(String displayName, java.util.List<String> lore) {
             Material mat;
@@ -6753,55 +6764,26 @@ public class DatabaseManager {
             } catch (Exception e) {
                 mat = Material.PAPER;
             }
-            ItemStack item = new ItemStack(mat, Math.max(1, amount));
-            ItemMeta itemMeta = item.getItemMeta();
-            if (itemMeta == null) {
-                return item;
-            }
-            if (meta != null && !meta.isEmpty()) {
-                applyMeta(itemMeta, mat, meta);
-            }
-            if (displayName != null) {
-                itemMeta.setDisplayName(displayName);
-            }
-            if (lore != null) {
-                itemMeta.setLore(lore);
-            }
-            item.setItemMeta(itemMeta);
-            return item;
-        }
-
-        /**
-         * Applies comma-separated key=value meta props to the item meta.
-         * Supported: level=N (LIGHT), custom_model_data=N / cmd=N.
-         */
-        private static void applyMeta(ItemMeta itemMeta, Material type, String meta) {
-            for (String prop : meta.split(",")) {
-                prop = prop.trim();
-                int eq = prop.indexOf('=');
-                if (eq <= 0) continue;
-                String key = prop.substring(0, eq).trim().toLowerCase();
-                String value = prop.substring(eq + 1).trim();
-                try {
-                    switch (key) {
-                        case "level" -> {
-                            if (type == Material.LIGHT && itemMeta instanceof BlockStateMeta blockMeta) {
-                                org.bukkit.block.BlockState blockState = blockMeta.getBlockState();
-                                org.bukkit.block.data.BlockData data = blockState.getBlockData();
-                                if (!(data instanceof org.bukkit.block.data.type.Light)) {
-                                    data = Material.LIGHT.createBlockData();
-                                }
-                                if (data instanceof org.bukkit.block.data.type.Light light) {
-                                    light.setLevel(Math.max(0, Math.min(15, Integer.parseInt(value))));
-                                    blockState.setBlockData(light);
-                                    blockMeta.setBlockState(blockState);
-                                }
-                            }
+            try {
+                return ItemComponentParser.build(mat, amount, meta, displayName, lore);
+            } catch (ItemComponentParser.ParseException | LinkageError e) {
+                // LinkageError covers NoSuchMethodError from a mismatched Gson/API
+                // signature: catching it here keeps one bad icon from taking down the
+                // whole menu (an Error would otherwise escape and break the task).
+                ItemStack fallback = new ItemStack(mat, Math.max(1, amount));
+                if (displayName != null || lore != null) {
+                    ItemMeta fallbackMeta = fallback.getItemMeta();
+                    if (fallbackMeta != null) {
+                        if (displayName != null) {
+                            fallbackMeta.setDisplayName(displayName);
                         }
-                        case "custom_model_data", "cmd" -> itemMeta.setCustomModelData(Integer.parseInt(value));
-                        default -> { /* ignore unknown props */ }
+                        if (lore != null) {
+                            fallbackMeta.setLore(lore);
+                        }
+                        fallback.setItemMeta(fallbackMeta);
                     }
-                } catch (NumberFormatException ignored) {}
+                }
+                return fallback;
             }
         }
     }
