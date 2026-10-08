@@ -113,6 +113,8 @@ public class TrackExchangeManager {
         public String owner;
         public long dateCreated;
         public String guiItem;
+        public Integer guiItemAmount;
+        public String guiItemMeta;
         public double weight;
         public String trackType;
         public int boatUtilsMode;
@@ -206,7 +208,10 @@ public class TrackExchangeManager {
         TrackExchangeData data = new TrackExchangeData();
         data.owner = creatorUUID != null ? creatorUUID : player.getUniqueId().toString();
         data.dateCreated = System.currentTimeMillis();
-        data.guiItem = "BIRCH_BOAT";
+        DatabaseManager.TrackIconData iconData = db.getTrackIconData(finalTrackNameWS);
+        data.guiItem = iconData.getMaterialName();
+        data.guiItemAmount = iconData.getAmount();
+        data.guiItemMeta = iconData.getMeta();
         data.weight = 0;
         data.trackType = "RACE";
         data.boatUtilsMode = 0;
@@ -501,12 +506,14 @@ public class TrackExchangeManager {
                 db.setTrackTags(trackNameWS, tagValues);
             }
 
-            // Persist the GUI icon stored in the file (falls back to the export default)
+            // Persist the GUI icon stored in the file: the material is
+            // addon-compatible, amount/meta are FormulaRacing extras
             String icon = "BIRCH_BOAT";
             if (finalData.guiItem != null && Material.matchMaterial(finalData.guiItem) != null) {
                 icon = finalData.guiItem;
             }
-            db.setTrackIcon(trackNameWS, icon);
+            int iconAmount = finalData.guiItemAmount != null ? finalData.guiItemAmount : 1;
+            db.setTrackIcon(trackNameWS, icon, iconAmount, finalData.guiItemMeta);
 
             // Import regions
             if (finalData.regions != null) {
