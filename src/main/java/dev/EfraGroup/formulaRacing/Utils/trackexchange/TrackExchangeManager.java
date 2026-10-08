@@ -21,6 +21,7 @@ import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.session.ClipboardHolder;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
+import dev.EfraGroup.formulaRacing.TrackLeaderboard;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Utils.WorldEditSelect;
@@ -53,7 +54,7 @@ public class TrackExchangeManager {
 
     public static final int TRACK_VERSION = 5;
 
-    private static final ClipboardFormat SCHEMATIC_FORMAT = BuiltInClipboardFormat.FAST_V3;
+    private static final ClipboardFormat SCHEMATIC_FORMAT = BuiltInClipboardFormat.SPONGE_V3_SCHEMATIC;
 
     private final FormulaRacing plugin;
     private final DatabaseManager db;
@@ -94,6 +95,7 @@ public class TrackExchangeManager {
     public static class TrackExchangeLocation {
         public int index;
         public String type;
+        public String board;
         public SimpleLocation location;
         public Double minX, minY, minZ;
         public Double maxX, maxY, maxZ;
@@ -283,6 +285,26 @@ public class TrackExchangeManager {
                     data.locations.add(loc);
                 }
             }
+        }
+
+        // Read leaderboard hologram locations (java + bedrock boards)
+        Location javaHolo = db.getHologramLocation(finalTrackNameWS, "java");
+        if (javaHolo != null) {
+            TrackExchangeLocation holoLoc = new TrackExchangeLocation();
+            holoLoc.index = -1;
+            holoLoc.type = "LEADERBOARD";
+            holoLoc.board = "java";
+            holoLoc.location = new SimpleLocation(javaHolo);
+            data.locations.add(holoLoc);
+        }
+        Location bedrockHolo = db.getHologramLocation(finalTrackNameWS, "bedrock");
+        if (bedrockHolo != null) {
+            TrackExchangeLocation holoLoc = new TrackExchangeLocation();
+            holoLoc.index = -2;
+            holoLoc.type = "LEADERBOARD";
+            holoLoc.board = "bedrock";
+            holoLoc.location = new SimpleLocation(bedrockHolo);
+            data.locations.add(holoLoc);
         }
 
         // Add creator as contributor
@@ -547,6 +569,29 @@ public class TrackExchangeManager {
                         } catch (SQLException e) {
                             debugFinal.logDatabaseOperation("§c[TrackExchange] Erro ao importar checkpoint: " + e.getMessage());
                         }
+                    } else if ("LEADERBOARD".equalsIgnoreCase(loc.type) && loc.location != null) {
+                        // Recreate the leaderboard hologram (java or bedrock board)
+                        String board = "bedrock".equalsIgnoreCase(loc.board) ? "bedrock" : "java";
+                        World holoWorld = targetWorld;
+                        String holoWorldName = loc.location.world;
+                        if (holoWorldName != null) {
+                            World w = org.bukkit.Bukkit.getWorld(holoWorldName);
+                            if (w != null) holoWorld = w;
+                        }
+                        Location holoLoc = new Location(holoWorld,
+                            loc.location.x, loc.location.y, loc.location.z, loc.location.yaw, loc.location.pitch);
+                        if (validCoords(holoLoc.getX(), holoLoc.getY(), holoLoc.getZ())) {
+                            TrackLeaderboard leaderboard = plugin.getOrCreateLeaderboard(finalTrackNameFinal, holoLoc);
+                            leaderboard.setLocation(holoLoc, board);
+                            if ("bedrock".equals(board)) {
+                                leaderboard.updateBedrockLeaderboard();
+                            } else {
+                                leaderboard.updateJavaLeaderboard();
+                            }
+                            debugFinal.logDatabaseOperation("§6[TrackExchange] Leaderboard " + board + " recriado para '" + finalTrackNameFinal + "'.");
+                        } else {
+                            debugFinal.logDatabaseOperation("§e[TrackExchange] Leaderboard " + board + " ignorado: coordenadas inválidas.");
+                        }
                     }
                 }
             }
@@ -614,6 +659,9 @@ public class TrackExchangeManager {
             }
             SchedulerHelper.runTask(plugin, () -> {
                 db.deleteTrack(trackName);
+                // deleteTrack cascades the fr_holograms row; this also removes
+                // the in-memory board and its hologram entities.
+                plugin.removeTrackLeaderboard(trackName);
                 plugin.getDebugManager().logDatabaseOperation("§6[TrackExchange] Undo: pista '" + trackName + "' removida.");
                 player.sendMessage("§aPista '" + trackName + "' removida (undo).");
             });

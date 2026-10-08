@@ -41,8 +41,8 @@ dependencies {
     compileOnly 'me.filoghost.holographicdisplays:holographicdisplays-api:3.0.0'
 
     // ---- Lombok ----
-    compileOnly 'org.projectlombok:lombok:1.18.40'
-    annotationProcessor 'org.projectlombok:lombok:1.18.40'
+    compileOnly 'org.projectlombok:lombok:1.18.48'
+    annotationProcessor 'org.projectlombok:lombok:1.18.48'
 
     // ---- Shaded into the final JAR (same set as maven-shade) ----
     implementation 'co.aikar:acf-paper:0.5.1-SNAPSHOT'

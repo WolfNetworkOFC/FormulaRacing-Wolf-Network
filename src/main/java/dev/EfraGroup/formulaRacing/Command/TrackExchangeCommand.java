@@ -14,8 +14,6 @@ import dev.EfraGroup.formulaRacing.Utils.trackexchange.TrackExchangeManager;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import java.util.Optional;
-
 @CommandAlias("trackexchange|tex|tx")
 @Description("TrackExchange commands")
 public class TrackExchangeCommand extends BaseCommand {
@@ -66,7 +64,7 @@ public class TrackExchangeCommand extends BaseCommand {
 
     @Subcommand("undo")
     public void onUndo(Player player) {
-        Optional<Runnable> action = trackExchange.popAction(player.getUniqueId());
+        java.util.Optional<Runnable> action = trackExchange.popAction(player.getUniqueId());
         if (action.isEmpty()) {
             throw new ConditionFailedException("You have nothing to undo.");
         }
