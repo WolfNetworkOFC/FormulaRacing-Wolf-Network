@@ -62,6 +62,9 @@ public class TrackExchangeManager {
     private final File exportDir;
     private final Map<UUID, Stack<Runnable>> playerActions = new ConcurrentHashMap<>();
 
+    // Mirrors the official TrackExchange addon JSON layout so .trackexchange
+    // files are interchangeable between FormulaRacing and TimingSystem.
+    // Extra fields (world, board, checkpoint bounds) are ignored by the addon.
     public static class SimpleLocation {
         public double x, y, z;
         public float yaw, pitch;
@@ -77,45 +80,50 @@ public class TrackExchangeManager {
             this.pitch = loc.getPitch();
             this.world = loc.getWorld().getName();
         }
-
-        public Location toBukkitLocation(World w) {
-            return new Location(w, x, y, z, yaw, pitch);
-        }
     }
 
     public static class TrackExchangeRegion {
         public int index;
         public String type;
         public String shape;
-        public double minX, minY, minZ;
-        public double maxX, maxY, maxZ;
-        public List<double[]> points;
+        public SimpleLocation spawn;
+        public SimpleLocation minP;
+        public SimpleLocation maxP;
+        public List<String> points;
     }
 
     public static class TrackExchangeLocation {
         public int index;
         public String type;
-        public String board;
         public SimpleLocation location;
+        public String board;
         public Double minX, minY, minZ;
         public Double maxX, maxY, maxZ;
     }
 
+    public static class TrackExchangeTag {
+        public String value;
+    }
+
+    public static class TrackExchangeOption {
+        public int id;
+    }
+
     public static class TrackExchangeData {
         public String owner;
-        public SimpleLocation spawn;
-        public SimpleLocation origin;
-        public String worldName;
-        public List<TrackExchangeRegion> regions;
-        public List<TrackExchangeLocation> locations;
-        public List<String> tags;
-        public List<Integer> options;
+        public long dateCreated;
         public String guiItem;
-        public int weight;
+        public double weight;
         public String trackType;
         public int boatUtilsMode;
-        public long dateCreated;
+        public SimpleLocation spawn;
+        public SimpleLocation origin;
         public List<String> contributors;
+        public List<TrackExchangeRegion> regions;
+        public List<TrackExchangeLocation> locations;
+        public List<TrackExchangeTag> tags;
+        public List<TrackExchangeOption> options;
+        public String worldName;
     }
 
     public TrackExchangeManager(FormulaRacing plugin, DatabaseManager db) {
@@ -194,9 +202,14 @@ public class TrackExchangeManager {
         String finalTrackNameWS = trackNameWS;
         String finalDisplayName = displayName;
 
-        // Build TrackExchangeData
+        // Build TrackExchangeData (addon-compatible layout)
         TrackExchangeData data = new TrackExchangeData();
         data.owner = creatorUUID != null ? creatorUUID : player.getUniqueId().toString();
+        data.dateCreated = System.currentTimeMillis();
+        data.guiItem = "BIRCH_BOAT";
+        data.weight = 0;
+        data.trackType = "RACE";
+        data.boatUtilsMode = 0;
         data.spawn = new SimpleLocation();
         data.spawn.x = spawnX;
         data.spawn.y = spawnY;
@@ -206,16 +219,19 @@ public class TrackExchangeManager {
         data.spawn.world = worldName;
         data.origin = new SimpleLocation(player.getLocation());
         data.worldName = worldName;
+        data.contributors = new ArrayList<>();
+        if (creatorUUID != null && !creatorUUID.isEmpty()) {
+            data.contributors.add(creatorUUID);
+        }
         data.regions = new ArrayList<>();
         data.locations = new ArrayList<>();
-        data.tags = db.getTrackTags(finalTrackNameWS);
+        data.tags = new ArrayList<>();
+        for (String tagValue : db.getTrackTags(finalTrackNameWS)) {
+            TrackExchangeTag tag = new TrackExchangeTag();
+            tag.value = tagValue;
+            data.tags.add(tag);
+        }
         data.options = new ArrayList<>();
-        data.guiItem = "BIRCH_BOAT";
-        data.weight = 0;
-        data.trackType = "RACE";
-        data.boatUtilsMode = 0;
-        data.dateCreated = System.currentTimeMillis();
-        data.contributors = new ArrayList<>();
 
         // Read regions from fr_regions
         String regionSql = "SELECT regionType, regionShape, worldName, min_x, min_y, min_z, max_x, max_y, max_z, points " +
@@ -231,24 +247,23 @@ public class TrackExchangeManager {
                     r.type = rs.getString("regionType");
                     String shape = rs.getString("regionShape");
                     r.shape = shape != null ? shape : "AABB";
-                    r.minX = rs.getDouble("min_x");
-                    r.minY = rs.getDouble("min_y");
-                    r.minZ = rs.getDouble("min_z");
-                    r.maxX = rs.getDouble("max_x");
-                    r.maxY = rs.getDouble("max_y");
-                    r.maxZ = rs.getDouble("max_z");
+                    // FormulaRacing has no region spawn: left null (the addon omits it too)
+                    r.minP = new SimpleLocation();
+                    r.minP.x = rs.getDouble("min_x");
+                    r.minP.y = rs.getDouble("min_y");
+                    r.minP.z = rs.getDouble("min_z");
+                    r.maxP = new SimpleLocation();
+                    r.maxP.x = rs.getDouble("max_x");
+                    r.maxP.y = rs.getDouble("max_y");
+                    r.maxP.z = rs.getDouble("max_z");
 
                     String pointsStr = rs.getString("points");
                     if (pointsStr != null && !pointsStr.isEmpty()) {
                         r.points = new ArrayList<>();
-                        String[] pairs = pointsStr.split(";");
-                        for (String pair : pairs) {
+                        for (String pair : pointsStr.split(";")) {
                             String[] coords = pair.split(",");
                             if (coords.length >= 2) {
-                                r.points.add(new double[]{
-                                    Double.parseDouble(coords[0]),
-                                    Double.parseDouble(coords[1])
-                                });
+                                r.points.add(coords[0] + " " + coords[1]);
                             }
                         }
                     }
@@ -305,18 +320,6 @@ public class TrackExchangeManager {
             holoLoc.board = "bedrock";
             holoLoc.location = new SimpleLocation(bedrockHolo);
             data.locations.add(holoLoc);
-        }
-
-        // Add creator as contributor
-        String creatorNameSql = "SELECT creatorName FROM fr_tracks WHERE LOWER(trackNameWS) = LOWER(?)";
-        try (Connection conn = db.getOrConnect();
-             PreparedStatement ps = conn.prepareStatement(creatorNameSql)) {
-            ps.setString(1, finalTrackNameWS);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next() && rs.getString("creatorName") != null) {
-                    data.contributors.add(rs.getString("creatorName"));
-                }
-            }
         }
 
         // Build JSON
@@ -431,32 +434,37 @@ public class TrackExchangeManager {
             clipboardOffset = BlockVector3.at(offObj.get("x").getAsDouble(), offObj.get("y").getAsDouble(), offObj.get("z").getAsDouble());
         }
 
-        TrackExchangeData data = gson.fromJson(trackComponentStr, TrackExchangeData.class);
+        TrackExchangeData data;
+        try {
+            JsonObject trackObj = JsonParser.parseString(trackComponentStr).getAsJsonObject();
+            data = gson.fromJson(normalizeLegacyTrackJson(trackObj), TrackExchangeData.class);
+        } catch (Exception e) {
+            throw new IOException("Arquivo .trackexchange inválido: track.component não é JSON válido.");
+        }
         if (data.spawn == null) {
             throw new IOException("Dados da pista inválidos: spawn não encontrado.");
         }
 
         String finalTrackName = (newName != null && !newName.isEmpty()) ? newName : importFile.getName().replace(".trackexchange", "");
 
-        // Get existing world or use the one from the file
+        // Like the official addon, the whole track lands in the player's
+        // world, translated by (player position - file origin), so the
+        // geometry and the schematic stay aligned wherever the player stands.
+        final World targetWorld = player.getWorld();
         String spawnWorldName = data.spawn.world;
-        final World targetWorld;
-        boolean worldFallback;
-        if (spawnWorldName != null) {
-            World w = org.bukkit.Bukkit.getWorld(spawnWorldName);
-            if (w != null) {
-                targetWorld = w;
-                worldFallback = false;
-            } else {
-                targetWorld = player.getWorld();
-                worldFallback = true;
-            }
-        } else {
-            targetWorld = player.getWorld();
-            worldFallback = true;
-        }
+        final boolean worldMismatch = spawnWorldName != null && !spawnWorldName.equalsIgnoreCase(targetWorld.getName());
 
-        final Location spawnLocation = new Location(targetWorld, data.spawn.x, data.spawn.y, data.spawn.z, data.spawn.yaw, data.spawn.pitch);
+        double shiftX = 0, shiftY = 0, shiftZ = 0;
+        if (data.origin != null) {
+            Location playerLoc = player.getLocation();
+            shiftX = playerLoc.getX() - data.origin.x;
+            shiftY = playerLoc.getY() - data.origin.y;
+            shiftZ = playerLoc.getZ() - data.origin.z;
+        }
+        final double dx = shiftX, dy = shiftY, dz = shiftZ;
+
+        final Location spawnLocation = new Location(targetWorld,
+            data.spawn.x + dx, data.spawn.y + dy, data.spawn.z + dz, data.spawn.yaw, data.spawn.pitch);
         final TrackExchangeData finalData = data;
         final byte[] finalSchematic = schematicBytes;
         final ClipboardFormat finalFormat = schematicFormat;
@@ -465,15 +473,15 @@ public class TrackExchangeManager {
         final DebugManager debugFinal = debug;
 
         // Create track in database
-        final boolean worldFallbackFinal = worldFallback;
+        final boolean worldMismatchFinal = worldMismatch;
         SchedulerHelper.runTask(plugin, () -> {
             if (db.isTrackExists(finalTrackNameFinal)) {
                 player.sendMessage("§cJá existe uma pista chamada '" + finalTrackNameFinal + "'. Importe com outro nome: /trackedit import <arquivo> <novoNome>");
                 return;
             }
 
-            if (worldFallbackFinal) {
-                player.sendMessage("§eAviso: o mundo '" + spawnWorldName + "' do arquivo não está carregado. Usando seu mundo atual (" + targetWorld.getName() + ").");
+            if (worldMismatchFinal) {
+                player.sendMessage("§eAviso: o mundo '" + spawnWorldName + "' do arquivo é diferente do seu mundo atual. Pista colada em " + targetWorld.getName() + ".");
             }
 
             boolean created = db.createTrack(finalTrackNameFinal, spawnLocation, player.getName(), player.getUniqueId().toString());
@@ -484,7 +492,13 @@ public class TrackExchangeManager {
 
             String trackNameWS = finalTrackNameFinal.replaceAll("\\s+", "").toLowerCase();
             if (finalData.tags != null) {
-                db.setTrackTags(trackNameWS, finalData.tags);
+                List<String> tagValues = new ArrayList<>();
+                for (TrackExchangeTag t : finalData.tags) {
+                    if (t != null && t.value != null && !t.value.isEmpty()) {
+                        tagValues.add(t.value);
+                    }
+                }
+                db.setTrackTags(trackNameWS, tagValues);
             }
 
             // Persist the GUI icon stored in the file (falls back to the export default)
@@ -498,20 +512,33 @@ public class TrackExchangeManager {
             if (finalData.regions != null) {
                 for (TrackExchangeRegion r : finalData.regions) {
                     if (r.shape == null) r.shape = "AABB";
-                    if (!validCoords(r.minX, r.minY, r.minZ, r.maxX, r.maxY, r.maxZ)) {
+                    if (r.minP == null || r.maxP == null
+                        || !validCoords(r.minP.x, r.minP.y, r.minP.z, r.maxP.x, r.maxP.y, r.maxP.z)) {
                         debugFinal.logDatabaseOperation("§e[TrackExchange] Região #" + r.index + " ignorada: coordenadas inválidas.");
                         continue;
                     }
 
-                    Location min = new Location(targetWorld, r.minX, r.minY, r.minZ);
-                    Location max = new Location(targetWorld, r.maxX, r.maxY, r.maxZ);
+                    Location min = new Location(targetWorld, r.minP.x + dx, r.minP.y + dy, r.minP.z + dz);
+                    Location max = new Location(targetWorld, r.maxP.x + dx, r.maxP.y + dy, r.maxP.z + dz);
 
                     if ("POLY".equalsIgnoreCase(r.shape) && r.points != null && !r.points.isEmpty()) {
                         List<Location> polyPoints = new ArrayList<>();
-                        for (double[] pt : r.points) {
-                            polyPoints.add(new Location(targetWorld, pt[0], r.minY, pt[1]));
+                        for (String pt : r.points) {
+                            String[] parts = pt.trim().split("\\s+");
+                            if (parts.length < 2) continue;
+                            try {
+                                double px = Double.parseDouble(parts[0]) + dx;
+                                double pz = Double.parseDouble(parts[1]) + dz;
+                                polyPoints.add(new Location(targetWorld, px, min.getY(), pz));
+                            } catch (NumberFormatException e) {
+                                debugFinal.logDatabaseOperation("§e[TrackExchange] Região #" + r.index + ": ponto POLY inválido '" + pt + "'.");
+                            }
                         }
-                        db.saveRegion(trackNameWS, min, max, r.type, "POLY", polyPoints);
+                        if (!polyPoints.isEmpty()) {
+                            db.saveRegion(trackNameWS, min, max, r.type, "POLY", polyPoints);
+                        } else {
+                            db.saveRegion(trackNameWS, min, max, r.type);
+                        }
                     } else {
                         db.saveRegion(trackNameWS, min, max, r.type);
                     }
@@ -522,16 +549,9 @@ public class TrackExchangeManager {
             if (finalData.locations != null) {
                 for (TrackExchangeLocation loc : finalData.locations) {
                     if ("CHECKPOINT".equalsIgnoreCase(loc.type) && loc.location != null) {
-                        World cpWorld = targetWorld;
-                        String cpWorldName = loc.location.world;
-                        if (cpWorldName != null) {
-                            World w = org.bukkit.Bukkit.getWorld(cpWorldName);
-                            if (w != null) cpWorld = w;
-                        }
-
-                        double cx = loc.location.x;
-                        double cy = loc.location.y;
-                        double cz = loc.location.z;
+                        double cx = loc.location.x + dx;
+                        double cy = loc.location.y + dy;
+                        double cz = loc.location.z + dz;
 
                         // Files with real bounds keep the original checkpoint size;
                         // older files only store the center and fall back to a 3x3x3 box
@@ -540,13 +560,13 @@ public class TrackExchangeManager {
                         if (loc.minX != null && loc.minY != null && loc.minZ != null
                             && loc.maxX != null && loc.maxY != null && loc.maxZ != null
                             && validCoords(loc.minX, loc.minY, loc.minZ, loc.maxX, loc.maxY, loc.maxZ)) {
-                            cpMin = new Location(cpWorld,
-                                Math.min(loc.minX, loc.maxX), Math.min(loc.minY, loc.maxY), Math.min(loc.minZ, loc.maxZ));
-                            cpMax = new Location(cpWorld,
-                                Math.max(loc.minX, loc.maxX), Math.max(loc.minY, loc.maxY), Math.max(loc.minZ, loc.maxZ));
+                            cpMin = new Location(targetWorld,
+                                Math.min(loc.minX, loc.maxX) + dx, Math.min(loc.minY, loc.maxY) + dy, Math.min(loc.minZ, loc.maxZ) + dz);
+                            cpMax = new Location(targetWorld,
+                                Math.max(loc.minX, loc.maxX) + dx, Math.max(loc.minY, loc.maxY) + dy, Math.max(loc.minZ, loc.maxZ) + dz);
                         } else if (validCoords(cx, cy, cz)) {
-                            cpMin = new Location(cpWorld, cx - 1, cy - 1, cz - 1);
-                            cpMax = new Location(cpWorld, cx + 1, cy + 1, cz + 1);
+                            cpMin = new Location(targetWorld, cx - 1, cy - 1, cz - 1);
+                            cpMax = new Location(targetWorld, cx + 1, cy + 1, cz + 1);
                         } else {
                             debugFinal.logDatabaseOperation("§e[TrackExchange] Checkpoint #" + loc.index + " ignorado: coordenadas inválidas.");
                             continue;
@@ -557,7 +577,7 @@ public class TrackExchangeManager {
                             try (PreparedStatement ps = conn.prepareStatement(insertCp)) {
                                 ps.setInt(1, loc.index);
                                 ps.setString(2, trackNameWS);
-                                ps.setString(3, cpWorld.getName());
+                                ps.setString(3, targetWorld.getName());
                                 ps.setDouble(4, Math.min(cpMin.getX(), cpMax.getX()));
                                 ps.setDouble(5, Math.min(cpMin.getY(), cpMax.getY()));
                                 ps.setDouble(6, Math.min(cpMin.getZ(), cpMax.getZ()));
@@ -572,14 +592,9 @@ public class TrackExchangeManager {
                     } else if ("LEADERBOARD".equalsIgnoreCase(loc.type) && loc.location != null) {
                         // Recreate the leaderboard hologram (java or bedrock board)
                         String board = "bedrock".equalsIgnoreCase(loc.board) ? "bedrock" : "java";
-                        World holoWorld = targetWorld;
-                        String holoWorldName = loc.location.world;
-                        if (holoWorldName != null) {
-                            World w = org.bukkit.Bukkit.getWorld(holoWorldName);
-                            if (w != null) holoWorld = w;
-                        }
-                        Location holoLoc = new Location(holoWorld,
-                            loc.location.x, loc.location.y, loc.location.z, loc.location.yaw, loc.location.pitch);
+                        Location holoLoc = new Location(targetWorld,
+                            loc.location.x + dx, loc.location.y + dy, loc.location.z + dz,
+                            loc.location.yaw, loc.location.pitch);
                         if (validCoords(holoLoc.getX(), holoLoc.getY(), holoLoc.getZ())) {
                             TrackLeaderboard leaderboard = plugin.getOrCreateLeaderboard(finalTrackNameFinal, holoLoc);
                             leaderboard.setLocation(holoLoc, board);
@@ -682,6 +697,81 @@ public class TrackExchangeManager {
             if (Double.isNaN(c) || Double.isInfinite(c)) return false;
         }
         return true;
+    }
+
+    /**
+     * Rewrites .trackexchange files written by older FormulaRacing builds
+     * (flat region coordinates, plain tag/option arrays) into the
+     * addon-compatible layout before deserialization.
+     */
+    private static JsonObject normalizeLegacyTrackJson(JsonObject trackObj) {
+        JsonElement regionsEl = trackObj.get("regions");
+        if (regionsEl != null && regionsEl.isJsonArray()) {
+            for (JsonElement el : regionsEl.getAsJsonArray()) {
+                if (!el.isJsonObject()) continue;
+                JsonObject r = el.getAsJsonObject();
+                if (r.has("minP")) continue;
+                if (r.has("minX") && r.has("maxX")) {
+                    r.add("minP", pointFromFlat(r, "minX", "minY", "minZ"));
+                    r.add("maxP", pointFromFlat(r, "maxX", "maxY", "maxZ"));
+                    r.remove("minX");
+                    r.remove("minY");
+                    r.remove("minZ");
+                    r.remove("maxX");
+                    r.remove("maxY");
+                    r.remove("maxZ");
+                }
+                JsonElement pts = r.get("points");
+                if (pts != null && pts.isJsonArray()) {
+                    JsonArray arr = pts.getAsJsonArray();
+                    if (arr.size() > 0 && arr.get(0).isJsonArray()) {
+                        JsonArray converted = new JsonArray();
+                        for (JsonElement pair : arr) {
+                            if (pair.isJsonArray() && pair.getAsJsonArray().size() >= 2) {
+                                converted.add(pair.getAsJsonArray().get(0).getAsDouble()
+                                    + " " + pair.getAsJsonArray().get(1).getAsDouble());
+                            }
+                        }
+                        r.add("points", converted);
+                    }
+                }
+            }
+        }
+        JsonElement tagsEl = trackObj.get("tags");
+        if (tagsEl != null && tagsEl.isJsonArray()) {
+            JsonArray arr = tagsEl.getAsJsonArray();
+            if (arr.size() > 0 && arr.get(0).isJsonPrimitive()) {
+                JsonArray converted = new JsonArray();
+                for (JsonElement t : arr) {
+                    JsonObject tag = new JsonObject();
+                    tag.addProperty("value", t.getAsString());
+                    converted.add(tag);
+                }
+                trackObj.add("tags", converted);
+            }
+        }
+        JsonElement optsEl = trackObj.get("options");
+        if (optsEl != null && optsEl.isJsonArray()) {
+            JsonArray arr = optsEl.getAsJsonArray();
+            if (arr.size() > 0 && arr.get(0).isJsonPrimitive() && arr.get(0).getAsJsonPrimitive().isNumber()) {
+                JsonArray converted = new JsonArray();
+                for (JsonElement o : arr) {
+                    JsonObject opt = new JsonObject();
+                    opt.addProperty("id", o.getAsInt());
+                    converted.add(opt);
+                }
+                trackObj.add("options", converted);
+            }
+        }
+        return trackObj;
+    }
+
+    private static JsonObject pointFromFlat(JsonObject r, String xKey, String yKey, String zKey) {
+        JsonObject p = new JsonObject();
+        p.addProperty("x", r.get(xKey).getAsDouble());
+        p.addProperty("y", r.get(yKey).getAsDouble());
+        p.addProperty("z", r.get(zKey).getAsDouble());
+        return p;
     }
 
     private static byte[] compressBytes(byte[] dataBytes, byte[] trackBytes, byte[] schematicBytes) throws IOException {
