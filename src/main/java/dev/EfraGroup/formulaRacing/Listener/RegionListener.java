@@ -1379,14 +1379,97 @@ public class RegionListener implements Listener {
             double fraction = RegionMathUtils.calculateRegionEntryProportion(previous, current, region);
             long crossingNanos = interpolateNanos(previousNanos, currentNanos, fraction);
             if (isLagStart) {
+                // Crossing LAGSTART at the exact instant the timer started means the
+                // player was already on it when the run began — a teleport onto the
+                // line. Sub-tick comparison keeps this precise without false-flagging
+                // a LAGSTART drawn a few blocks after START.
+                if (crossingNanos == session.getStartNanos()) {
+                    this.resetLagViolation(player, session.getTrackName(), "LAGSTART");
+                    return;
+                }
                 session.markLagStart(crossingNanos);
             } else {
+                // Reaching the finish-line guard without the start-line guard is an
+                // order violation: the boat cannot have skipped the approach.
+                if (!session.hasPassedLagStart()) {
+                    this.resetLagViolation(player, session.getTrackName(), "LAGEND");
+                    return;
+                }
                 session.markLagEnd(crossingNanos);
+                // Both guards at the same instant is the teleport-skip case: no boat
+                // travels between two distinct regions in zero time.
+                if (session.lagRegionsShareInstant()) {
+                    this.resetLagViolation(player, session.getTrackName(), "LAGEND");
+                    return;
+                }
             }
             this.plugin.getDebugManager().logTimeTrialSystem(
                     "[LAG] " + player.getName() + " cruzou " + type
                             + " em " + session.getTrackName());
         }
+    }
+
+    /**
+     * Kills a time trial the moment a LAG guard is crossed incoherently, instead of
+     * waiting for the finish line to reject it.
+     *
+     * <p>Mirrors FrostHex's {@code playerResetMap()} on a LAG failure and the solo RESET
+     * path here: the timer stops, the session ends, the timing attempt is aborted, ghost
+     * recording is cancelled, and the player is sent back to the track spawn with a fresh
+     * boat.
+     *
+     * <p>This runs on the player thread already ({@code checkPlayerRegions} is dispatched
+     * through {@code runTaskFor}), so the cleanup is done synchronously. That matters: a
+     * START/END finish for this same tick was already deferred to the next tick by
+     * {@code handleRegion}, so killing the session here means that deferred finish finds
+     * no timer and cannot land the time. Only the teleport is deferred, for the same
+     * one-tick reason the RESET region does.
+     */
+    private void resetLagViolation(Player player, String trackWS, String regionType) {
+        UUID uuid = player.getUniqueId();
+        this.plugin.getDebugManager().logTimeTrialSystem(
+                "[LAG] " + player.getName() + " violacao em " + regionType + " — reset imediato");
+        this.plugin.sendMessage(player, "race_checkpoint_missed", new String[]{"{expected}", regionType});
+        player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0F, 1.0F);
+
+        this.timerUtils.stopTimer(player, trackWS);
+        this.timeTrialController.endSession(player);
+        if (this.timingService != null) {
+            this.timingService.abort(uuid, true);
+        }
+        if (this.plugin.getGhostManager() != null) {
+            this.plugin.getGhostManager().cancelRecording(player);
+            this.plugin.getGhostManager().stopReplay(player);
+        }
+        this.teleportToTrackSpawn(player, trackWS);
+    }
+
+    /** Sends the player back to the track spawn with a fresh boat, as the RESET region does. */
+    private void teleportToTrackSpawn(Player player, String trackWS) {
+        TrackIntegrationManager trackManager = this.plugin.getTrackIntegrationManager();
+        Location targetLoc = trackManager == null ? null : trackManager.getTrackSpawn(trackWS);
+        if (targetLoc == null) {
+            return;
+        }
+        this.plugin.getAPI().recoverPlayerBoatState(player);
+        SchedulerHelper.runTaskLater(this.plugin, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            // Boat is spawned only after the teleport completes and at the destination,
+            // otherwise the player mounts it inside the reset region and the teleport
+            // fails (player inside vehicle) and loops.
+            SchedulerHelper.teleportAsync(player, targetLoc).thenAccept(success -> {
+                if (Boolean.TRUE.equals(success) && player.isOnline()) {
+                    player.playSound(targetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
+                    this.plugin.getAPI().spawnBoatAt(player, targetLoc, false, false, false);
+                    // The new boat loses the OpenBoatUtils track config, so reapply it.
+                    if (this.plugin.getPacketSender() != null) {
+                        this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, trackWS);
+                    }
+                }
+            });
+        }, 1L);
     }
 
     private void handleRaceLapCrossing(Player player, Driver driver, Heats heat, Location from, Location to, DatabaseManager.RegionData regionData) {
