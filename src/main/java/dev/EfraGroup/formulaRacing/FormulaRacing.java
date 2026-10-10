@@ -30,6 +30,7 @@ import dev.EfraGroup.formulaRacing.Gui.Framework.GuiListener;
 import dev.EfraGroup.formulaRacing.Gui.Framework.GuiManager;
 import dev.EfraGroup.formulaRacing.Gui.ReadyCheckManager;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
+import dev.EfraGroup.formulaRacing.Heat.HeatCodes;
 import dev.EfraGroup.formulaRacing.Heat.Logic.DrsManager;
 import dev.EfraGroup.formulaRacing.Heat.Logic.ERSManager;
 import dev.EfraGroup.formulaRacing.Heat.Logic.PTPManager;
@@ -1777,22 +1778,11 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                 Events event = null;
                 Rounds round = null;
                 String heatArg = null;
-                if (arg1.toUpperCase().matches("R\\d+(?:SQ|S|P|Q|F|E|H)\\d+")) {
-                    this.getLogger().info(
-                        "[HEAT RESOLVER DEBUG] Tentando resolver código de heat: " +
-                            arg1
-                    );
+                if (HeatCodes.parse(arg1).isPresent()) {
                     if (c.getPlayer() != null) {
                         event = (Events) this.dm.getPlayerSelectedEvent(
                             c.getPlayer().getUniqueId()
                         ).orElse(null);
-                        Logger var10000 = this.getLogger();
-                        String var10001 =
-                            event != null ? event.getDisplayName() : "null";
-                        var10000.info(
-                            "[HEAT RESOLVER DEBUG] Evento selecionado do jogador: " +
-                                var10001
-                        );
                     }
 
                     if (event == null) {
@@ -1801,65 +1791,13 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                             .filter(Events::isActive)
                             .findFirst()
                             .orElse(null);
-                        Logger var24 = this.getLogger();
-                        String var26 =
-                            event != null ? event.getDisplayName() : "null";
-                        var24.info(
-                            "[HEAT RESOLVER DEBUG] Evento ativo global: " +
-                                var26
-                        );
                     }
 
                     if (event != null) {
-                        this.getLogger().info(
-                            "[HEAT RESOLVER DEBUG] Iterando por " +
-                                event
-                                    .getSchedule()
-                                    .getRoundsCollection()
-                                    .size() +
-                                " rounds"
-                        );
-
-                        for (Rounds r : event
-                            .getSchedule()
-                            .getRoundsCollection()) {
-                            Logger var25 = this.getLogger();
-                            int var27 = r.getRoundIndex();
-                            var25.info(
-                                "[HEAT RESOLVER DEBUG] Verificando round " +
-                                    var27 +
-                                    " (" +
-                                    String.valueOf(r.getType()) +
-                                    ") com " +
-                                    r.getHeats().size() +
-                                    " heats"
-                            );
-
-                            for (Heats h : r.getHeats().values()) {
-                                String heatName = h.getName();
-                                this.getLogger().info(
-                                    "[HEAT RESOLVER DEBUG]   Heat: " +
-                                        heatName +
-                                        " vs " +
-                                        arg1
-                                );
-                                if (heatName.equalsIgnoreCase(arg1)) {
-                                    this.getLogger().info(
-                                        "[HEAT RESOLVER DEBUG] ✓ Match encontrado!"
-                                    );
-                                    return h;
-                                }
-                            }
+                        Heats resolved = HeatCodes.resolve(event, arg1).orElse(null);
+                        if (resolved != null) {
+                            return resolved;
                         }
-
-                        this.getLogger().info(
-                            "[HEAT RESOLVER DEBUG] Nenhum heat encontrado com código " +
-                                arg1
-                        );
-                    } else {
-                        this.getLogger().info(
-                            "[HEAT RESOLVER DEBUG] Nenhum evento encontrado"
-                        );
                     }
                 }
 

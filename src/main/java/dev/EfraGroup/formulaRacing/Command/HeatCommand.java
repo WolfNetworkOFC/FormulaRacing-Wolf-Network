@@ -17,6 +17,7 @@ import dev.EfraGroup.formulaRacing.Heat.GimmickConfig;
 import dev.EfraGroup.formulaRacing.Heat.GimmickException;
 import dev.EfraGroup.formulaRacing.Heat.GimmickManager;
 import dev.EfraGroup.formulaRacing.Heat.GimmickSchedule;
+import dev.EfraGroup.formulaRacing.Heat.HeatCodes;
 import dev.EfraGroup.formulaRacing.Heat.HeatConfig;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
@@ -142,43 +143,7 @@ public class HeatCommand extends BaseCommand {
     }
 
     private Integer resolveHeatIdFromCode(String code, Events event) {
-        if (event == null) {
-            return null;
-        } else if (!code.matches("(?i)R\\d+(?:SQ|S|P|Q|F|E|H)\\d+")) {
-            return null;
-        } else {
-            try {
-                String upper = code.toUpperCase();
-                int roundEnd = 1;
-                while (roundEnd < upper.length() && Character.isDigit(upper.charAt(roundEnd))) {
-                    roundEnd++;
-                }
-                int roundIdx = Integer.parseInt(upper.substring(1, roundEnd)) - 1;
-                String remaining = upper.substring(roundEnd);
-                String[] typeCodes = {"SQ", "S", "P", "Q", "F", "E", "H"};
-                String foundType = null;
-                for (String tc : typeCodes) {
-                    if (remaining.startsWith(tc)) {
-                        foundType = tc;
-                        break;
-                    }
-                }
-                if (foundType == null) return null;
-                int heatNum = Integer.parseInt(remaining.substring(foundType.length()));
-                List<Rounds> roundsList = event
-                    .getEventSchedule()
-                    .getRoundsList();
-                if (roundIdx >= 0 && roundIdx < roundsList.size()) {
-                    Rounds round = (Rounds) roundsList.get(roundIdx);
-                    Heats heat = (Heats) round.getHeats().get(heatNum);
-                    if (heat != null) {
-                        return heat.getId();
-                    }
-                }
-            } catch (Exception var11) {}
-
-            return null;
-        }
+        return HeatCodes.resolve(event, code).map(Heats::getId).orElse(null);
     }
 
     @Subcommand("select")
@@ -1877,39 +1842,14 @@ public class HeatCommand extends BaseCommand {
         String source
     ) {
         // Tenta formato R1Q1, R1F1, R1SQ1, etc.
-        if (source.toUpperCase().matches("R\\d+(?:SQ|S|P|Q|F|E|H)\\d+")) {
-            try {
-                String upper = source.toUpperCase();
-                int roundEnd = 1;
-                while (roundEnd < upper.length() && Character.isDigit(upper.charAt(roundEnd))) {
-                    roundEnd++;
-                }
-                int roundIdx = Integer.parseInt(upper.substring(1, roundEnd)) - 1;
-                String remaining = upper.substring(roundEnd);
-                String[] typeCodes = {"SQ", "S", "P", "Q", "F", "E", "H"};
-                String foundType = null;
-                for (String tc : typeCodes) {
-                    if (remaining.startsWith(tc)) {
-                        foundType = tc;
-                        break;
-                    }
-                }
-                if (foundType == null) return null;
-                int heatIdx = Integer.parseInt(remaining.substring(foundType.length())) - 1;
-
-                Events event = (targetHeat.getRound() != null)
-                    ? targetHeat.getRound().getEvent()
-                    : null;
-                if (event != null) {
-                    Rounds round = event
-                        .getEventSchedule()
-                        .getRounds()
-                        .get(roundIdx);
-                    if (round != null) {
-                        return round.getHeats().get(heatIdx);
-                    }
-                }
-            } catch (Exception ignored) {}
+        if (HeatCodes.parse(source).isPresent()) {
+            Events event = (targetHeat != null && targetHeat.getRound() != null)
+                ? targetHeat.getRound().getEvent()
+                : null;
+            Heats resolved = HeatCodes.resolve(event, source).orElse(null);
+            if (resolved != null) {
+                return resolved;
+            }
         }
 
         // Tenta por ID numérico direto
