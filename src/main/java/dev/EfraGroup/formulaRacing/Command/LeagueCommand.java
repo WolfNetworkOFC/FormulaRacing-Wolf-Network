@@ -14,7 +14,9 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.League.League;
 import dev.EfraGroup.formulaRacing.League.LeagueCalendarEntry;
 import dev.EfraGroup.formulaRacing.League.LeagueCategory;
+import dev.EfraGroup.formulaRacing.League.LeagueDriver;
 import dev.EfraGroup.formulaRacing.League.LeagueStanding;
+import dev.EfraGroup.formulaRacing.League.LeagueTeam;
 import dev.EfraGroup.formulaRacing.League.LeagueTeamStanding;
 import dev.EfraGroup.formulaRacing.League.TeamConfig;
 import dev.EfraGroup.formulaRacing.League.TeamMode;
@@ -215,12 +217,34 @@ public class LeagueCommand extends BaseCommand {
 
     @Subcommand("standings")
     @CommandCompletion("drivers|teams @leagues")
-    public void onStandings(CommandSender sender, @Optional String type, @Optional String leagueName) {
+    public void onStandings(CommandSender sender, @Optional String type,
+                            @Optional String leagueName, @Optional String toggle) {
+        if (leagueName != null && (leagueName.equalsIgnoreCase("true") || leagueName.equalsIgnoreCase("false"))) {
+            toggle = leagueName;
+            leagueName = null;
+        }
         League league = leagueName == null
             ? this.selectedLeague(sender).orElse(null)
             : leagueManager.getLeagueByName(leagueName).orElse(null);
         if (league == null) {
             plugin.sendMessage(sender, "league_none_selected");
+            return;
+        }
+
+        if (toggle != null && (toggle.equalsIgnoreCase("true") || toggle.equalsIgnoreCase("false"))
+            && type != null && (type.equalsIgnoreCase("drivers") || type.equalsIgnoreCase("teams"))
+            && sender.hasPermission("formularacing.event.admin")) {
+            boolean enabled = Boolean.parseBoolean(toggle);
+            try {
+                leagueManager.setStandingsEnabled(
+                    league,
+                    type.equalsIgnoreCase("drivers") ? enabled : league.isDriverStandingsEnabled(),
+                    type.equalsIgnoreCase("teams") ? enabled : league.isTeamStandingsEnabled()
+                );
+                plugin.sendMessage(sender, "league_recalculated", "{league}", league.getName());
+            } catch (SQLException e) {
+                plugin.sendMessage(sender, "league_link_error");
+            }
             return;
         }
 
@@ -247,7 +271,10 @@ public class LeagueCommand extends BaseCommand {
         List<LeagueStanding> standings = leagueManager.getDriverStandings(league);
         for (int i = 0; i < standings.size(); i++) {
             LeagueStanding row = standings.get(i);
-            String name = Bukkit.getOfflinePlayer(row.getPlayerUUID()).getName();
+            String name = row.getPlayerName();
+            if (name == null || name.isBlank()) {
+                name = Bukkit.getOfflinePlayer(row.getPlayerUUID()).getName();
+            }
             if (name == null) {
                 name = row.getPlayerUUID().toString();
             }
@@ -561,7 +588,8 @@ public class LeagueCommand extends BaseCommand {
         plugin.sendMessage(sender, "league_breakdown_header", "{league}", league.getName());
         List<LeagueStanding> standings = leagueManager.getDriverStandings(league);
         for (LeagueStanding row : standings) {
-            String name = Bukkit.getOfflinePlayer(row.getPlayerUUID()).getName();
+            String name = row.getPlayerName();
+            if (name == null || name.isBlank()) name = Bukkit.getOfflinePlayer(row.getPlayerUUID()).getName();
             if (name == null) name = row.getPlayerUUID().toString();
             plugin.sendMessage(sender, "league_breakdown_row",
                 "{player}", name, "{points}", String.valueOf(row.getPoints()));
@@ -617,6 +645,319 @@ public class LeagueCommand extends BaseCommand {
         plugin.sendMessage(sender, "league_points_transferred",
             "{from}", fromName, "{to}", toName, "{amount}", String.valueOf(amount),
             "{league}", league.getName());
+    }
+
+    private String driverName(UUID uuid) {
+        if (uuid == null) {
+            return "?";
+        }
+        String name = Bukkit.getOfflinePlayer(uuid).getName();
+        return (name == null || name.isBlank()) ? uuid.toString() : name;
+    }
+
+    @Subcommand("team list")
+    @CommandCompletion("@leagues")
+    public void onTeamList(CommandSender sender, @Optional String leagueName) {
+        League league = leagueName == null
+            ? this.selectedLeague(sender).orElse(null)
+            : leagueManager.getLeagueByName(leagueName).orElse(null);
+        if (league == null) {
+            plugin.sendMessage(sender, "league_none_selected");
+            return;
+        }
+        for (LeagueTeam team : league.getTeams().values()) {
+            StringBuilder members = new StringBuilder();
+            for (UUID main : team.getMainDrivers()) {
+                members.append(" [MAIN] ").append(this.driverName(main));
+            }
+            for (UUID reserve : team.getReserveDrivers()) {
+                members.append(" [RES] ").append(this.driverName(reserve));
+            }
+            for (UUID priority : team.getPriorityDrivers()) {
+                members.append(" [P").append(team.getPriority(priority)).append("] ").append(this.driverName(priority));
+            }
+            sender.sendMessage("§6" + team.getName()
+                + " §7(id: " + team.getId()
+                + (team.getOwner() != null ? ", owner: " + this.driverName(team.getOwner()) : "")
+                + ")" + members);
+        }
+    }
+
+    @Subcommand("team invite")
+    @CommandCompletion("@leagues @nothing @players")
+    public void onTeamInvite(CommandSender sender, String teamName, String playerName) {
+        League league = this.selectedLeague(sender).orElse(null);
+        if (league == null) {
+            plugin.sendMessage(sender, "league_none_selected");
+            return;
+        }
+        Integer teamId = leagueManager.findTeamId(league, teamName);
+        if (teamId == null) {
+            sender.sendMessage("§cTime não encontrado: " + teamName);
+            return;
+        }
+        OfflinePlayer target = Bukkit.getOfflinePlayer(playerName);
+        if (target.getUniqueId() == null) {
+            plugin.sendMessage(sender, "player_not_found");
+            return;
+        }
+        LeagueTeam team = league.getTeams().get(teamId);
+        Player inviter = SenderUtils.player(sender);
+        if (inviter != null && team.getOwner() != null && !team.isOwner(inviter.getUniqueId())
+            && !sender.hasPermission("formularacing.event.admin")) {
+            sender.sendMessage("§cApenas o dono do time pode convidar jogadores.");
+            return;
+        }
+        leagueManager.inviteDriver(league, teamId, target.getUniqueId(), inviter == null ? null : inviter.getUniqueId());
+        sender.sendMessage("§aConvite enviado para §e" + playerName + " §a(o time §e" + team.getName() + "§a).");
+    }
+
+    @Subcommand("team accept")
+    public void onTeamAccept(CommandSender sender) {
+        Player player = SenderUtils.player(sender);
+        if (player == null) {
+            sender.sendMessage("§cApenas jogadores podem aceitar convites.");
+            return;
+        }
+        LeagueManager.PendingInvite invite = leagueManager.peekInvite(player.getUniqueId());
+        if (invite == null) {
+            sender.sendMessage("§cVocê não tem convites pendentes.");
+            return;
+        }
+        League league = leagueManager.getLeagueById(invite.leagueId()).orElse(null);
+        if (league == null) {
+            leagueManager.pollInvite(player.getUniqueId());
+            sender.sendMessage("§cA liga desse convite não existe mais.");
+            return;
+        }
+        try {
+            if (!leagueManager.acceptInvite(player.getUniqueId())) {
+                sender.sendMessage("§cNão foi possível aceitar o convite (time cheio?).");
+                return;
+            }
+            sender.sendMessage("§aVocê entrou no time §e" + league.getTeams().get(invite.teamId()).getName() + "§a.");
+        } catch (SQLException e) {
+            plugin.sendMessage(sender, "league_driver_add_error", "{player}", player.getName());
+        }
+    }
+
+    @Subcommand("team decline")
+    public void onTeamDecline(CommandSender sender) {
+        Player player = SenderUtils.player(sender);
+        if (player == null) {
+            sender.sendMessage("§cApenas jogadores podem recusar convites.");
+            return;
+        }
+        if (leagueManager.pollInvite(player.getUniqueId()) == null) {
+            sender.sendMessage("§cVocê não tem convites pendentes.");
+            return;
+        }
+        sender.sendMessage("§aConvite recusado.");
+    }
+
+    @Subcommand("team kick")
+    @CommandPermission("formularacing.event.admin")
+    @CommandCompletion("@leagues @players")
+    public void onTeamKick(CommandSender sender, String leagueName, String playerName) {
+        League league = requireLeague(sender, leagueName);
+        if (league == null) return;
+        OfflinePlayer target = Bukkit.getOfflinePlayer(playerName);
+        if (target.getUniqueId() == null) {
+            plugin.sendMessage(sender, "player_not_found");
+            return;
+        }
+        try {
+            if (!leagueManager.removeDriver(league, target.getUniqueId())) {
+                sender.sendMessage("§cJogador não encontrado nesta liga.");
+                return;
+            }
+            sender.sendMessage("§e" + playerName + " §eremovido da liga §e" + league.getName() + "§r.");
+        } catch (SQLException e) {
+            plugin.sendMessage(sender, "league_driver_add_error", "{player}", playerName);
+        }
+    }
+
+    @Subcommand("team promote")
+    @CommandPermission("formularacing.event.admin")
+    @CommandCompletion("@leagues @players")
+    public void onTeamPromote(CommandSender sender, String leagueName, String playerName) {
+        League league = requireLeague(sender, leagueName);
+        if (league == null) return;
+        OfflinePlayer target = Bukkit.getOfflinePlayer(playerName);
+        if (target.getUniqueId() == null) {
+            plugin.sendMessage(sender, "player_not_found");
+            return;
+        }
+        try {
+            if (!leagueManager.promoteDriver(league, target.getUniqueId())) {
+                sender.sendMessage("§cNão foi possível promover (não é reserva ou time cheio).");
+                return;
+            }
+            sender.sendMessage("§e" + playerName + " §apromovido a main.");
+        } catch (SQLException e) {
+            plugin.sendMessage(sender, "league_driver_add_error", "{player}", playerName);
+        }
+    }
+
+    @Subcommand("team demote")
+    @CommandPermission("formularacing.event.admin")
+    @CommandCompletion("@leagues @players")
+    public void onTeamDemote(CommandSender sender, String leagueName, String playerName) {
+        League league = requireLeague(sender, leagueName);
+        if (league == null) return;
+        OfflinePlayer target = Bukkit.getOfflinePlayer(playerName);
+        if (target.getUniqueId() == null) {
+            plugin.sendMessage(sender, "player_not_found");
+            return;
+        }
+        try {
+            if (!leagueManager.demoteDriver(league, target.getUniqueId())) {
+                sender.sendMessage("§cNão foi possível rebaixar (não é main ou time cheio).");
+                return;
+            }
+            sender.sendMessage("§e" + playerName + " §erebaixado a reserva.");
+        } catch (SQLException e) {
+            plugin.sendMessage(sender, "league_driver_add_error", "{player}", playerName);
+        }
+    }
+
+    @Subcommand("team setowner")
+    @CommandPermission("formularacing.event.admin")
+    @CommandCompletion("@leagues @nothing @players")
+    public void onTeamSetOwner(CommandSender sender, String leagueName, String teamName, String playerName) {
+        League league = requireLeague(sender, leagueName);
+        if (league == null) return;
+        Integer teamId = leagueManager.findTeamId(league, teamName);
+        if (teamId == null) {
+            sender.sendMessage("§cTime não encontrado: " + teamName);
+            return;
+        }
+        OfflinePlayer target = Bukkit.getOfflinePlayer(playerName);
+        if (target.getUniqueId() == null) {
+            plugin.sendMessage(sender, "player_not_found");
+            return;
+        }
+        try {
+            leagueManager.setTeamOwner(league, teamId, target.getUniqueId());
+            sender.sendMessage("§aDono do time §e" + teamName + " §aagora é §e" + playerName + "§a.");
+        } catch (SQLException e) {
+            plugin.sendMessage(sender, "league_link_error");
+        }
+    }
+
+    @Subcommand("team leave")
+    public void onTeamLeave(CommandSender sender) {
+        Player player = SenderUtils.player(sender);
+        if (player == null) {
+            sender.sendMessage("§cApenas jogadores podem sair do time.");
+            return;
+        }
+        League league = this.selectedLeague(sender).orElse(null);
+        if (league == null) {
+            plugin.sendMessage(sender, "league_none_selected");
+            return;
+        }
+        LeagueDriver driver = league.getDrivers().get(player.getUniqueId());
+        if (driver == null || driver.getTeamId() == null) {
+            sender.sendMessage("§cVocê não está em nenhum time.");
+            return;
+        }
+        LeagueTeam team = league.getTeams().get(driver.getTeamId());
+        if (team != null && team.isOwner(player.getUniqueId()) && team.getMembers().size() > 1) {
+            sender.sendMessage("§cTransfira a propriedade do time antes de sair.");
+            return;
+        }
+        try {
+            leagueManager.removeDriver(league, player.getUniqueId());
+            sender.sendMessage("§cVocê saiu do time.");
+        } catch (SQLException e) {
+            plugin.sendMessage(sender, "league_driver_add_error", "{player}", player.getName());
+        }
+    }
+
+    @Subcommand("setmain")
+    @CommandPermission("formularacing.event.admin")
+    @CommandCompletion("@leagues @players @nothing")
+    public void onSetMain(CommandSender sender, String leagueName, String playerName) {
+        League league = requireLeague(sender, leagueName);
+        if (league == null) return;
+        OfflinePlayer target = Bukkit.getOfflinePlayer(playerName);
+        if (target.getUniqueId() == null) {
+            plugin.sendMessage(sender, "player_not_found");
+            return;
+        }
+        try {
+            if (!leagueManager.promoteDriver(league, target.getUniqueId())) {
+                sender.sendMessage("§cNão foi possível definir como main (limite do time atingido?).");
+                return;
+            }
+            sender.sendMessage("§e" + playerName + " §aagora é main.");
+        } catch (SQLException e) {
+            plugin.sendMessage(sender, "league_driver_add_error", "{player}", playerName);
+        }
+    }
+
+    @Subcommand("setreserve")
+    @CommandPermission("formularacing.event.admin")
+    @CommandCompletion("@leagues @players @nothing")
+    public void onSetReserve(CommandSender sender, String leagueName, String playerName) {
+        League league = requireLeague(sender, leagueName);
+        if (league == null) return;
+        OfflinePlayer target = Bukkit.getOfflinePlayer(playerName);
+        if (target.getUniqueId() == null) {
+            plugin.sendMessage(sender, "player_not_found");
+            return;
+        }
+        try {
+            if (!leagueManager.demoteDriver(league, target.getUniqueId())) {
+                sender.sendMessage("§cNão foi possível definir como reserva (limite do time atingido?).");
+                return;
+            }
+            sender.sendMessage("§e" + playerName + " §aagora é reserva.");
+        } catch (SQLException e) {
+            plugin.sendMessage(sender, "league_driver_add_error", "{player}", playerName);
+        }
+    }
+
+    @Subcommand("setpriority")
+    @CommandPermission("formularacing.event.admin")
+    @CommandCompletion("@leagues @players @nothing @nothing")
+    public void onSetPriority(CommandSender sender, String leagueName, String playerName, Integer priority) {
+        League league = requireLeague(sender, leagueName);
+        if (league == null) return;
+        OfflinePlayer target = Bukkit.getOfflinePlayer(playerName);
+        if (target.getUniqueId() == null) {
+            plugin.sendMessage(sender, "player_not_found");
+            return;
+        }
+        try {
+            if (!leagueManager.setDriverPriority(league, target.getUniqueId(), priority)) {
+                sender.sendMessage("§cJogador não está em um time.");
+                return;
+            }
+            sender.sendMessage("§e" + playerName + " §aagora tem prioridade §e" + priority + "§a.");
+        } catch (SQLException e) {
+            plugin.sendMessage(sender, "league_driver_add_error", "{player}", playerName);
+        }
+    }
+
+    @Subcommand("export")
+    @CommandPermission("formularacing.event.admin")
+    @CommandCompletion("@leagues")
+    public void onExport(CommandSender sender, @Optional String leagueName) {
+        League league = leagueName == null
+            ? this.selectedLeague(sender).orElse(null)
+            : leagueManager.getLeagueByName(leagueName).orElse(null);
+        if (league == null) {
+            plugin.sendMessage(sender, "league_none_selected");
+            return;
+        }
+        java.io.File file = leagueManager.exportCsv(league);
+        if (file == null) {
+            sender.sendMessage("§cErro ao exportar CSV.");
+            return;
+        }
+        sender.sendMessage("§aCSV exportado para §e" + file.getName() + "§a.");
     }
 
     /** Player's selected league, or empty for the console. */

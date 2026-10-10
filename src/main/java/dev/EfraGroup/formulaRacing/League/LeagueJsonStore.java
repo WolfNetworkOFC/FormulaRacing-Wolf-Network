@@ -126,14 +126,143 @@ public class LeagueJsonStore {
     }
 
     public synchronized LeagueDriver addDriver(League league, UUID playerUUID, Integer teamId) throws SQLException {
+        return this.addDriver(league, playerUUID, teamId, LeagueDriver.Role.MAIN);
+    }
+
+    public synchronized LeagueDriver addDriver(
+        League league,
+        UUID playerUUID,
+        Integer teamId,
+        LeagueDriver.Role role
+    ) throws SQLException {
         int nextId = 1;
         for (LeagueDriver driver : league.getDrivers().values()) {
             nextId = Math.max(nextId, driver.getId() + 1);
         }
-        LeagueDriver driver = new LeagueDriver(nextId, league.getId(), playerUUID, teamId);
+        String driverName = resolvePlayerName(playerUUID);
+        LeagueDriver driver = new LeagueDriver(nextId, league.getId(), playerUUID, driverName, teamId);
+        driver.setRole(role == null ? LeagueDriver.Role.MAIN : role);
         league.getDrivers().put(playerUUID, driver);
+        if (teamId != null) {
+            LeagueTeam team = league.getTeams().get(teamId);
+            if (team != null) {
+                if (driver.getRole() == LeagueDriver.Role.RESERVE) {
+                    team.addReserveDriver(playerUUID);
+                } else if (driver.getRole() == LeagueDriver.Role.PRIORITY) {
+                    team.addPriorityDriver(playerUUID, team.getPriorityDrivers().size() + 1);
+                } else {
+                    team.addMainDriver(playerUUID);
+                }
+            }
+        }
         this.saveLeague(league);
         return driver;
+    }
+
+    public synchronized void removeDriver(League league, UUID playerUUID) throws SQLException {
+        LeagueDriver driver = league.getDrivers().remove(playerUUID);
+        if (driver != null && driver.getTeamId() != null) {
+            LeagueTeam team = league.getTeams().get(driver.getTeamId());
+            if (team != null) {
+                team.removeMember(playerUUID);
+            }
+        }
+        List<LeagueEventResult> stored = this.resultsByLeague.get(league.getId());
+        if (stored != null) {
+            stored.removeIf(result -> playerUUID.equals(result.playerUUID));
+        }
+        this.saveLeague(league);
+        this.recalculateStandings(league);
+    }
+
+    public synchronized void setDriverRole(League league, UUID playerUUID, LeagueDriver.Role role)
+        throws SQLException {
+        LeagueDriver driver = league.getDrivers().get(playerUUID);
+        if (driver == null) {
+            return;
+        }
+        driver.setRole(role);
+        if (driver.getTeamId() != null) {
+            LeagueTeam team = league.getTeams().get(driver.getTeamId());
+            if (team != null) {
+                if (role == LeagueDriver.Role.RESERVE) {
+                    team.addReserveDriver(playerUUID);
+                } else if (role == LeagueDriver.Role.PRIORITY) {
+                    team.addPriorityDriver(playerUUID, team.getPriorityDrivers().size() + 1);
+                } else {
+                    team.addMainDriver(playerUUID);
+                }
+            }
+        }
+        this.saveLeague(league);
+        this.recalculateStandings(league);
+    }
+
+    public synchronized void setDriverPriority(League league, UUID playerUUID, int priority)
+        throws SQLException {
+        LeagueDriver driver = league.getDrivers().get(playerUUID);
+        if (driver == null || driver.getTeamId() == null) {
+            return;
+        }
+        LeagueTeam team = league.getTeams().get(driver.getTeamId());
+        if (team == null) {
+            return;
+        }
+        team.addPriorityDriver(playerUUID, priority);
+        driver.setRole(LeagueDriver.Role.PRIORITY);
+        this.saveLeague(league);
+        this.recalculateStandings(league);
+    }
+
+    public synchronized void setTeamOwner(League league, int teamId, UUID ownerUUID)
+        throws SQLException {
+        LeagueTeam team = league.getTeams().get(teamId);
+        if (team == null) {
+            return;
+        }
+        team.setOwner(ownerUUID);
+        this.saveLeague(league);
+    }
+
+    public synchronized void removeTeam(League league, int teamId) throws SQLException {
+        LeagueTeam team = league.getTeams().remove(teamId);
+        if (team != null) {
+            for (LeagueDriver driver : league.getDrivers().values()) {
+                if (teamId == driver.getTeamId()) {
+                    driver.setTeamId(null);
+                }
+            }
+        }
+        this.saveLeague(league);
+        this.recalculateStandings(league);
+    }
+
+    public synchronized void setTeamConfig(
+        League league,
+        int teamId,
+        Integer maxMains,
+        Integer maxReserves,
+        Integer countedScorers
+    ) throws SQLException {
+        LeagueTeam team = league.getTeams().get(teamId);
+        if (team == null) {
+            return;
+        }
+        if (maxMains != null) team.setMaxMains(maxMains);
+        if (maxReserves != null) team.setMaxReserves(maxReserves);
+        if (countedScorers != null) team.setCountedScorers(countedScorers);
+        this.saveLeague(league);
+    }
+
+    public synchronized void setStandingsEnabled(
+        League league,
+        boolean driverStandings,
+        boolean teamStandings
+    ) throws SQLException {
+        league.setDriverStandingsEnabled(driverStandings);
+        league.setTeamStandingsEnabled(teamStandings);
+        this.saveLeague(league);
+        this.recalculateStandings(league);
     }
 
     public synchronized void linkEvent(League league, int eventId, int roundNumber) throws SQLException {
@@ -208,12 +337,24 @@ public class LeagueJsonStore {
         for (int index = 0; index < results.size(); index++) {
             Driver driver = results.get(index);
             LeagueDriver leagueDriver = league.getDrivers().get(driver.getUuid());
-            Integer teamId = leagueDriver == null ? null : leagueDriver.getTeamId();
+            if (leagueDriver == null) {
+                leagueDriver = new LeagueDriver(
+                    nextDriverId(league),
+                    league.getId(),
+                    driver.getUuid(),
+                    resolvePlayerName(driver.getUuid()),
+                    null
+                );
+                league.getDrivers().put(driver.getUuid(), leagueDriver);
+                this.saveLeague(league);
+            }
+            Integer teamId = leagueDriver.getTeamId();
             stored.add(new LeagueEventResult(
                 eventId,
                 categoryKey,
                 index + 1,
                 driver.getUuid(),
+                resolvePlayerName(driver.getUuid()),
                 teamId,
                 this.computePoints(league, categoryKey, index + 1, results.size()),
                 pinnedHeatId
@@ -235,6 +376,14 @@ public class LeagueJsonStore {
         return ScoringRegistry.get(system).pointsForPosition(position, driverCount);
     }
 
+    private int nextDriverId(League league) {
+        int nextId = 1;
+        for (LeagueDriver driver : league.getDrivers().values()) {
+            nextId = Math.max(nextId, driver.getId() + 1);
+        }
+        return nextId;
+    }
+
     public synchronized void recalculateStandings(League league) throws SQLException {
         Map<UUID, List<StandingsUpdater.DriverEventResult>> driverResults = new LinkedHashMap<>();
         Map<UUID, Integer> driverTeams = new LinkedHashMap<>();
@@ -247,6 +396,8 @@ public class LeagueJsonStore {
                 .add(new StandingsUpdater.DriverEventResult(
                     String.valueOf(result.eventId),
                     result.categoryName,
+                    result.position,
+                    result.playerUUID,
                     result.points
                 ));
             if (result.teamId != null) {
@@ -264,44 +415,51 @@ public class LeagueJsonStore {
         Map<UUID, Integer> adjustments = this.adjustmentsByLeague.getOrDefault(league.getId(), Map.of());
 
         List<LeagueStanding> driverStandings = new ArrayList<>();
-        for (Map.Entry<UUID, Integer> entry : calculation.driverPoints.entrySet()) {
-            UUID uuid = entry.getKey();
-            driverStandings.add(new LeagueStanding(
-                uuid,
-                Math.max(0, entry.getValue() + adjustments.getOrDefault(uuid, 0)),
-                wins.getOrDefault(uuid, 0),
-                podiums.getOrDefault(uuid, 0),
-                eventsByDriver.getOrDefault(uuid, 0)
-            ));
-        }
-        for (Map.Entry<UUID, Integer> adjustment : adjustments.entrySet()) {
-            if (driverStandings.stream().noneMatch(standing -> standing.getPlayerUUID().equals(adjustment.getKey()))) {
+        if (league.isDriverStandingsEnabled()) {
+            for (Map.Entry<UUID, Integer> entry : calculation.driverPoints().entrySet()) {
+                UUID uuid = entry.getKey();
+                String resolvedName = resolvePlayerName(uuid);
                 driverStandings.add(new LeagueStanding(
-                    adjustment.getKey(),
-                    Math.max(0, adjustment.getValue()),
-                    0,
-                    0,
-                    0
+                    uuid,
+                    resolvedName,
+                    Math.max(0, entry.getValue() + adjustments.getOrDefault(uuid, 0)),
+                    wins.getOrDefault(uuid, 0),
+                    podiums.getOrDefault(uuid, 0),
+                    eventsByDriver.getOrDefault(uuid, 0)
                 ));
             }
-        }
-        driverStandings.sort(Comparator
-            .comparingInt(LeagueStanding::getPoints).reversed()
-            .thenComparing(Comparator.comparingInt(LeagueStanding::getWins).reversed())
-            .thenComparing(Comparator.comparingInt(LeagueStanding::getPodiums).reversed()));
-
-        Map<Integer, String> teamNames = new LinkedHashMap<>();
-        for (LeagueTeam team : league.getTeams().values()) {
-            teamNames.put(team.getId(), team.getName());
-        }
-        List<LeagueTeamStanding> teamStandings = new ArrayList<>();
-        for (Map.Entry<Integer, Integer> entry : calculation.teamPoints.entrySet()) {
-            String teamName = teamNames.get(entry.getKey());
-            if (teamName != null) {
-                teamStandings.add(new LeagueTeamStanding(entry.getKey(), teamName, entry.getValue(), 0, 0));
+            for (Map.Entry<UUID, Integer> adjustment : adjustments.entrySet()) {
+                if (driverStandings.stream().noneMatch(standing -> standing.getPlayerUUID().equals(adjustment.getKey()))) {
+                    driverStandings.add(new LeagueStanding(
+                        adjustment.getKey(),
+                        resolvePlayerName(adjustment.getKey()),
+                        Math.max(0, adjustment.getValue()),
+                        0,
+                        0,
+                        0
+                    ));
+                }
             }
+            driverStandings.sort(Comparator
+                .comparingInt(LeagueStanding::getPoints).reversed()
+                .thenComparing(Comparator.comparingInt(LeagueStanding::getWins).reversed())
+                .thenComparing(Comparator.comparingInt(LeagueStanding::getPodiums).reversed()));
         }
-        teamStandings.sort(Comparator.comparingInt(LeagueTeamStanding::getPoints).reversed());
+
+        List<LeagueTeamStanding> teamStandings = new ArrayList<>();
+        if (league.isTeamStandingsEnabled()) {
+            Map<Integer, String> teamNames = new LinkedHashMap<>();
+            for (LeagueTeam team : league.getTeams().values()) {
+                teamNames.put(team.getId(), team.getName());
+            }
+            for (Map.Entry<Integer, Integer> entry : calculation.teamPoints().entrySet()) {
+                String teamName = teamNames.get(entry.getKey());
+                if (teamName != null) {
+                    teamStandings.add(new LeagueTeamStanding(entry.getKey(), teamName, entry.getValue(), 0, 0));
+                }
+            }
+            teamStandings.sort(Comparator.comparingInt(LeagueTeamStanding::getPoints).reversed());
+        }
 
         this.driverStandingsByLeague.put(league.getId(), driverStandings);
         this.teamStandingsByLeague.put(league.getId(), teamStandings);
@@ -338,11 +496,31 @@ public class LeagueJsonStore {
     }
 
     public synchronized List<LeagueStanding> loadDriverStandings(int leagueId) {
-        return new ArrayList<>(this.driverStandingsByLeague.getOrDefault(leagueId, List.of()));
+        List<LeagueStanding> standings = new ArrayList<>(this.driverStandingsByLeague.getOrDefault(leagueId, List.of()));
+        for (LeagueStanding standing : standings) {
+            if (standing.getPlayerName() == null || standing.getPlayerName().isBlank()) {
+                standing.setPlayerName(resolvePlayerName(standing.getPlayerUUID()));
+            }
+        }
+        return standings;
     }
 
     public synchronized List<LeagueTeamStanding> loadTeamStandings(int leagueId) {
         return new ArrayList<>(this.teamStandingsByLeague.getOrDefault(leagueId, List.of()));
+    }
+
+    private static String resolvePlayerName(UUID uuid) {
+        if (uuid == null) {
+            return null;
+        }
+        try {
+            org.bukkit.OfflinePlayer offline = org.bukkit.Bukkit.getOfflinePlayer(uuid);
+            if (offline != null && offline.getName() != null && !offline.getName().isBlank()) {
+                return offline.getName();
+            }
+        } catch (Exception ignored) {
+        }
+        return uuid.toString();
     }
 
     public synchronized void deleteLeague(League league) throws SQLException {
@@ -433,6 +611,9 @@ public class LeagueJsonStore {
                 league.getTeams().put(team.getId(), team);
             }
             for (LeagueDriver driver : this.drivers) {
+                if (driver.getPlayerName() == null || driver.getPlayerName().isBlank()) {
+                    driver.setPlayerName(LeagueJsonStore.resolvePlayerName(driver.getPlayerUUID()));
+                }
                 league.getDrivers().put(driver.getPlayerUUID(), driver);
             }
             for (LeagueCategory category : this.categories) {
@@ -450,6 +631,7 @@ public class LeagueJsonStore {
         private String categoryName;
         private int position;
         private UUID playerUUID;
+        private String playerName;
         private Integer teamId;
         private int points;
         private Integer heatId;
@@ -461,6 +643,7 @@ public class LeagueJsonStore {
             String categoryName,
             int position,
             UUID playerUUID,
+            String playerName,
             Integer teamId,
             int points,
             Integer heatId
@@ -469,6 +652,7 @@ public class LeagueJsonStore {
             this.categoryName = categoryName;
             this.position = position;
             this.playerUUID = playerUUID;
+            this.playerName = playerName;
             this.teamId = teamId;
             this.points = points;
             this.heatId = heatId;

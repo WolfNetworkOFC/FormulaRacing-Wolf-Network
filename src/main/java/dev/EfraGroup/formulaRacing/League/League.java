@@ -22,6 +22,8 @@ public class League {
     private int mulliganCount = 0;
     private final Map<String, LeagueCategory> categories = new LinkedHashMap<>();
     private final Map<Integer, LeagueCalendarEntry> calendar = new LinkedHashMap<>();
+    private boolean driverStandingsEnabled = true;
+    private boolean teamStandingsEnabled = true;
 
     public League(int id, UUID creatorUUID, String name, LeagueStatus status) {
         this.id = id;
@@ -118,5 +120,21 @@ public class League {
 
     public Map<Integer, LeagueCalendarEntry> getCalendar() {
         return calendar;
+    }
+
+    public boolean isDriverStandingsEnabled() {
+        return driverStandingsEnabled;
+    }
+
+    public void setDriverStandingsEnabled(boolean driverStandingsEnabled) {
+        this.driverStandingsEnabled = driverStandingsEnabled;
+    }
+
+    public boolean isTeamStandingsEnabled() {
+        return teamStandingsEnabled;
+    }
+
+    public void setTeamStandingsEnabled(boolean teamStandingsEnabled) {
+        this.teamStandingsEnabled = teamStandingsEnabled;
     }
 }

@@ -288,6 +288,33 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
         return this.leagueManager;
     }
 
+    private void registerDynamicLeagueCommands() {
+        try {
+            Object server = this.getServer();
+            java.lang.reflect.Method method = server.getClass().getMethod("getCommandMap");
+            org.bukkit.command.CommandMap commandMap =
+                (org.bukkit.command.CommandMap) method.invoke(server);
+            int registered = 0;
+            for (dev.EfraGroup.formulaRacing.League.League league : this.leagueManager.getAllLeagues()) {
+                String commandName = dev.EfraGroup.formulaRacing.Command.LeagueNameCommand.sanitize(league.getName());
+                if (this.getCommand(commandName) != null) {
+                    continue;
+                }
+                commandMap.register(commandName, new dev.EfraGroup.formulaRacing.Command.LeagueNameCommand(this, league));
+                registered++;
+            }
+            if (registered > 0) {
+                this.getLogger().info(
+                    "[FormulaRacing] Registrados " + registered + " comando(s) de liga dinâmico(s)."
+                );
+            }
+        } catch (Exception exception) {
+            this.getLogger().warning(
+                "[FormulaRacing] Falha ao registrar comandos de liga: " + exception.getMessage()
+            );
+        }
+    }
+
     public dev.EfraGroup.formulaRacing.League.Hologram.LeagueHologramService getLeagueHologramService() {
         if (this.leagueHologramService == null) {
             this.leagueHologramService = new dev.EfraGroup.formulaRacing.League.Hologram.LeagueHologramService(this);
@@ -430,6 +457,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.aiRacingLineManager = new AIRacingLineManager(this);
             this.aiRacingLineManager.initialize();
             this.leagueManager = new LeagueManager(this);
+            this.registerDynamicLeagueCommands();
             this.apiManager = new ApiManager(this);
             this.apiManager.init();
             this.gimmickManager = new GimmickManager(this);
@@ -2057,6 +2085,23 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                     "cherry_chest_boat",
                     "bamboo_chest_raft"
                 )
+        );
+        this.commandManager.getCommandCompletions().registerCompletion(
+            "leagues",
+            c -> {
+                if (this.leagueManager == null) return List.of();
+                return this.leagueManager.getAllLeagues()
+                    .stream()
+                    .map(league -> league.getName())
+                    .toList();
+            }
+        );
+        this.commandManager.getCommandCompletions().registerAsyncCompletion(
+            "players",
+            c -> Bukkit.getOnlinePlayers()
+                .stream()
+                .map(Player::getName)
+                .toList()
         );
         this.commandManager.getCommandCompletions().registerCompletion(
             "event",
