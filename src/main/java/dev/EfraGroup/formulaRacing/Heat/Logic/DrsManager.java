@@ -31,9 +31,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>The previous implementation compared a driver against whoever sat one
  * position ahead and granted permission on a gap window. This one works on
- * <em>passing times through the detection region</em>, which is what makes the
- * DRS chaining rule possible: being right behind a car that itself was granted
- * DRS keeps the next one eligible.</p>
+ * <em>passing times through the detection region</em>: anyone crossing the
+ * same region within {@code max-delta} of another driver is eligible, with
+ * no minimum gap.</p>
  *
  * <ul>
  *   <li>{@code detect} — records the instant the driver crossed the region.
@@ -59,8 +59,6 @@ public class DrsManager {
     private static final Map<UUID, Long> drsEnabledPlayers = new ConcurrentHashMap<>();
     /** regionId -> driver uuid -> instant they crossed the detect region. */
     private static final Map<Integer, Map<UUID, Long>> drsDetectRegionPasses = new ConcurrentHashMap<>();
-    /** regionId -> driver uuid -> instant they were granted DRS in that region. */
-    private static final Map<Integer, Map<UUID, Long>> drsEnabledInRegion = new ConcurrentHashMap<>();
     /** Players with the boost currently applied, mapped to their close-out task. */
     private static final Map<UUID, Long> activeDrsPlayers = new ConcurrentHashMap<>();
     /** Forward acceleration to restore when the boost ends. */
@@ -77,10 +75,6 @@ public class DrsManager {
     // ------------------------------------------------------------------
     // Configuration
     // ------------------------------------------------------------------
-
-    private int getDrsMinDelta() {
-        return this.plugin.getConfig().getInt("drs.min-delta", 650);
-    }
 
     private int getDrsMaxDelta() {
         return this.plugin.getConfig().getInt("drs.max-delta", 1150);
@@ -143,6 +137,7 @@ public class DrsManager {
         driver.setDrsActive(true);
         driver.setDrsPermission(false);
         disableDrs(player.getUniqueId());
+        activeDrsPlayers.put(player.getUniqueId(), System.currentTimeMillis());
 
         if (driver.getDrsBossBar() != null) {
             FRTheme theme = FRThemeResolver.resolveTheme(player);
@@ -210,10 +205,9 @@ public class DrsManager {
     /**
      * Called when a driver crosses a {@code detect} region.
      *
-     * <p>Grants DRS when another driver crossed the same region between
-     * {@code min-delta} and {@code max-delta} milliseconds ago. Chaining: if the
-     * gap is smaller than {@code min-delta} but that other driver was itself
-     * granted DRS within {@code max-delta}, this driver is eligible too.</p>
+     * <p>Grants DRS when another driver crossed the same region up to
+     * {@code max-delta} milliseconds ago. There is no minimum gap: any car
+     * ahead inside the window — even glued to the bumper — grants it.</p>
      */
     public void playerPassedDrsDetect(Player player, Driver driver, int regionId) {
         long now = System.currentTimeMillis();
@@ -221,10 +215,7 @@ public class DrsManager {
 
         Map<UUID, Long> regionPasses =
             drsDetectRegionPasses.computeIfAbsent(regionId, k -> new ConcurrentHashMap<>());
-        Map<UUID, Long> enabledTimes =
-            drsEnabledInRegion.computeIfAbsent(regionId, k -> new ConcurrentHashMap<>());
 
-        int minDelta = getDrsMinDelta();
         int maxDelta = getDrsMaxDelta();
 
         boolean shouldEnableDrs = false;
@@ -237,17 +228,9 @@ public class DrsManager {
             }
             long diff = now - entry.getValue();
 
-            if (diff >= minDelta && diff <= maxDelta) {
+            if (diff >= 0 && diff <= maxDelta) {
                 shouldEnableDrs = true;
                 closestDiff = Math.min(closestDiff, diff);
-            } else if (diff > 0 && diff < minDelta) {
-                // Chaining: the car in front is inside min-delta but was itself
-                // granted DRS recently, so we chain onto its eligibility.
-                Long otherEnabledAt = enabledTimes.get(otherId);
-                if (otherEnabledAt != null && (now - otherEnabledAt) <= maxDelta) {
-                    shouldEnableDrs = true;
-                    closestDiff = Math.min(closestDiff, diff);
-                }
             }
         }
 
@@ -255,7 +238,6 @@ public class DrsManager {
 
         if (shouldEnableDrs && !driver.isDrsActive()) {
             enableDrs(playerId);
-            enabledTimes.put(playerId, now);
             driver.setDrsPermission(true);
 
             if (driver.getDrsBossBar() == null) {
@@ -309,14 +291,11 @@ public class DrsManager {
         // never blocks on an entity thread.
         SchedulerHelper.runAsyncTimer(this.plugin, () -> cleanupOldDetections(), 100L, 100L);
 
-        SchedulerHelper.runTask(this.plugin, () -> {
-            for (Driver driver : heat.getDrivers().values()) {
-                Player player = Bukkit.getPlayer(driver.getUuid());
-                if (player != null && player.isOnline()) {
-                    createBarForDriver(driver, player);
-                }
-            }
-        });
+        // NOTE: a bossbar NÃO é criada aqui para todos os pilotos. Ela nasce
+        // sob demanda em playerPassedDrsDetect (ao cruzar o detect com gap
+        // válido), fica branca com permissão, verde no boost e é destruída
+        // no end / fim do heat. Criar aqui fazia a barra aparecer já na
+        // largada para todo mundo, mesmo sem permissão de DRS.
 
         SchedulerHelper.runTaskTimer(heat.getPlugin(), (scheduledTask) -> {
             if (!taskRunning) {
@@ -384,10 +363,20 @@ public class DrsManager {
                                     }
                                 }
                                 case "end" -> {
-                                    if (inside && finalDriver.isDrsActive()) {
-                                        stopDrsBoost(freshPlayer, finalDriver, heat);
+                                    if (inside && (finalDriver.isDrsActive() || finalDriver.hasDrsPermission())) {
                                         FRTheme theme = FRThemeResolver.resolveTheme(freshPlayer);
-                                        sendThemedMessage(freshPlayer, theme, "&c[DRS] Wing Closed.");
+                                        if (finalDriver.isDrsActive()) {
+                                            stopDrsBoost(freshPlayer, finalDriver, heat);
+                                            sendThemedMessage(freshPlayer, theme, "&c[DRS] Wing Closed.");
+                                        } else {
+                                            // Permissão concedida no detect mas nunca consumida:
+                                            // revoga ao cruzar o finish, senão ela sobrevive
+                                            // por voltas e ativa num startdrs muito depois.
+                                            finalDriver.setDrsPermission(false);
+                                            disableDrs(freshPlayer.getUniqueId());
+                                            destroyBossBar(finalDriver);
+                                            sendThemedMessage(freshPlayer, theme, "&7[DRS] Permission expired.");
+                                        }
                                     }
                                 }
                                 default -> {
@@ -426,9 +415,6 @@ public class DrsManager {
         for (Map<UUID, Long> passes : drsDetectRegionPasses.values()) {
             passes.remove(playerId);
         }
-        for (Map<UUID, Long> enabled : drsEnabledInRegion.values()) {
-            enabled.remove(playerId);
-        }
     }
 
     /**
@@ -440,9 +426,6 @@ public class DrsManager {
 
         for (Map<UUID, Long> passes : drsDetectRegionPasses.values()) {
             passes.entrySet().removeIf(e -> e.getValue() < cutoff);
-        }
-        for (Map<UUID, Long> enabled : drsEnabledInRegion.values()) {
-            enabled.entrySet().removeIf(e -> e.getValue() < cutoff);
         }
     }
 
