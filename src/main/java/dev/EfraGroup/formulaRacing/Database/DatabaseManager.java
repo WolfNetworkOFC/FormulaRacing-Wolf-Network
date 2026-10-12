@@ -5636,64 +5636,46 @@ public class DatabaseManager {
             try {
                 conn.setAutoCommit(false);
 
-                double prevTime = Double.MAX_VALUE;
-                String sqlCheck =
-                    "SELECT bestTime FROM fr_player_times WHERE LOWER(trackNameWS) = LOWER(?) AND player_uuid = ? AND checkpointsReached = ? AND finished = FALSE ORDER BY bestTime ASC LIMIT 1";
+                // Sempre salva a parcial, mesmo sem ser recorde na contagem.
+                Integer generatedId = null;
 
-                try (PreparedStatement ps = conn.prepareStatement(sqlCheck)) {
+                // Determines the platform via Floodgate (falls back to name prefix)
+                String platform = resolvePlatform(playerUUID, playerName);
+
+                String insertSql =
+                        "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, plataforma) VALUES (?, ?, ?, ?, ?, FALSE, ?)";
+
+                try (
+                        PreparedStatement ps = conn.prepareStatement(
+                                insertSql,
+                                Statement.RETURN_GENERATED_KEYS
+                        )
+                ) {
                     ps.setString(1, trackNameWS);
                     ps.setString(2, playerUUID.toString());
-                    ps.setInt(3, lastCheckpoint);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (rs.next()) prevTime = rs.getDouble("bestTime");
+                    ps.setString(3, playerName);
+                    ps.setDouble(4, roundedTime);
+                    ps.setInt(5, lastCheckpoint);
+                    ps.setString(6, platform); // salva a plataforma
+                    ps.executeUpdate();
+
+                    try (ResultSet keys = ps.getGeneratedKeys()) {
+                        if (keys.next()) generatedId = keys.getInt(1);
                     }
                 }
-
-                if (roundedTime < prevTime) {
-                    Integer generatedId = null;
-
-                    // Determines the platform via Floodgate (falls back to name prefix)
-                    String platform = resolvePlatform(playerUUID, playerName);
-
-                    String insertSql =
-                            "INSERT INTO fr_player_times (trackNameWS, player_uuid, player_name, bestTime, checkpointsReached, finished, plataforma) VALUES (?, ?, ?, ?, ?, FALSE, ?)";
-
-                    try (
-                            PreparedStatement ps = conn.prepareStatement(
-                                    insertSql,
-                                    Statement.RETURN_GENERATED_KEYS
-                            )
-                    ) {
-                        ps.setString(1, trackNameWS);
-                        ps.setString(2, playerUUID.toString());
-                        ps.setString(3, playerName);
-                        ps.setDouble(4, roundedTime);
-                        ps.setInt(5, lastCheckpoint);
-                        ps.setString(6, platform); // salva a plataforma
-                        ps.executeUpdate();
-
-                        try (ResultSet keys = ps.getGeneratedKeys()) {
-                            if (keys.next()) generatedId = keys.getInt(1);
-                        }
-                    }
-
-
 
                 if (generatedId != null) {
-                        saveCheckpointTimes(
-                            conn,
-                            playerUUID,
-                            trackNameWS,
-                            generatedId,
-                            roundedTime,
-                            lastCheckpoint,
-                            false
-                        );
-                    }
-                    conn.commit();
-                } else {
-                    conn.rollback();
+                    saveCheckpointTimes(
+                        conn,
+                        playerUUID,
+                        trackNameWS,
+                        generatedId,
+                        roundedTime,
+                        lastCheckpoint,
+                        false
+                    );
                 }
+                conn.commit();
             } catch (SQLException e) {
                 if (conn != null) conn.rollback();
                 throw e;
