@@ -103,9 +103,8 @@ public final class ItemComponentParser {
     ) {
         Map<String, Object> props = parseProps(content);
         ItemStack item = new ItemStack(material, Math.max(1, amount));
-        if (props.isEmpty()) {
-            return item;
-        }
+        // NOTE: no early return on empty props — a plain icon (no bracket content)
+        // must still get its displayName/lore applied at the end of this method.
 
         // Bare props (level=2, facing=north) are block state properties; namespaced
         // ones (minecraft:item_model=...) are data components. The two are applied by
