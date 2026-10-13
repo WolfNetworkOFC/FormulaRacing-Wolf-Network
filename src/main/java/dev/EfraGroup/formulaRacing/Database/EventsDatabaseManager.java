@@ -532,6 +532,30 @@ public class EventsDatabaseManager {
         }
     }
 
+    /**
+     * Lenient enum parse for DB values: trims, tries exact match, then
+     * case-insensitive match, else returns the fallback with a warning.
+     * Old rows may hold lowercase values (e.g. collisionMode 'disabled'),
+     * which would otherwise crash event loading at startup.
+     */
+    private static <E extends Enum<E>> E parseEnumLenient(Class<E> type, String raw, E fallback) {
+        if (raw != null) {
+            String v = raw.trim();
+            try {
+                return Enum.valueOf(type, v);
+            } catch (IllegalArgumentException ignored) {
+            }
+            for (E c : type.getEnumConstants()) {
+                if (c.name().equalsIgnoreCase(v)) {
+                    return c;
+                }
+            }
+            Bukkit.getLogger().warning("[FormulaRacing] Unknown " + type.getSimpleName()
+                + " value '" + raw + "' in DB, using fallback " + fallback);
+        }
+        return fallback;
+    }
+
     public Events loadEvent(int eventId) {
         Map<Integer, Events> eventMap = new HashMap<>();
         Map<Integer, Rounds> roundMap = new HashMap<>();
@@ -592,9 +616,10 @@ public class EventsDatabaseManager {
             for (Map<String, Object> data : roundsData) {
                 int roundId = (Integer) data.get("id");
                 int roundIndex = (Integer) data.get("roundIndex");
-                RoundType roundType = RoundType.valueOf(
-                    (String) data.get("type")
-                );
+                RoundType roundType = parseEnumLenient(RoundType.class, (String) data.get("type"), null);
+                if (roundType == null) {
+                    continue;
+                }
                 Rounds round = this.instantiateRound(
                     this.plugin,
                     roundId,
@@ -603,7 +628,7 @@ public class EventsDatabaseManager {
                     roundType
                 );
                 round.setEventId((Integer) data.get("eventId"));
-                round.setStateForLoad(RoundState.valueOf((String) data.get("state")));
+                round.setStateForLoad(parseEnumLenient(RoundState.class, (String) data.get("state"), RoundState.FINISHED));
                 round.setEvent(event);
                 roundMap.put(roundId, round);
                 event.getEventSchedule().getRounds().put(roundIndex, round);
@@ -636,7 +661,7 @@ public class EventsDatabaseManager {
                             );
                             heat.setRoundId(hroundId);
                             heat.setHeatStateForLoad(
-                                HeatState.valueOf(rs.getString("state"))
+                                parseEnumLenient(HeatState.class, rs.getString("state"), HeatState.FINISHED)
                             );
                             long startTimeValue = rs.getLong("startTime");
                             long endTimeValue = rs.getLong("endTime");
@@ -674,8 +699,10 @@ public class EventsDatabaseManager {
 
                             try {
                                 heat.setCollisionMode(
-                                    CollisionMode.valueOf(
-                                        rs.getString("colisao")
+                                    parseEnumLenient(
+                                        CollisionMode.class,
+                                        rs.getString("colisao"),
+                                        CollisionMode.DISABLED
                                     )
                                 );
                             } catch (SQLException ignored) {
@@ -824,7 +851,7 @@ public class EventsDatabaseManager {
                 );
                 event.setUuid(UUID.randomUUID());
                 event.setTrackNameWS((String) data.get("trackNameWS"));
-                event.setStateDirect(EventState.valueOf((String) data.get("state")));
+                event.setStateDirect(parseEnumLenient(EventState.class, (String) data.get("state"), EventState.FINISHED));
                 event.setOpenSign((Integer) data.get("openSign") == 1);
                 long creationTimeSec = (Long) data.get("creationTime");
                 if (creationTimeSec > 0L) {
@@ -880,9 +907,10 @@ public class EventsDatabaseManager {
                 int roundId = (Integer) data.get("id");
                 int eventId = (Integer) data.get("eventId");
                 int roundIndex = (Integer) data.get("roundIndex");
-                RoundType roundType = RoundType.valueOf(
-                    (String) data.get("type")
-                );
+                RoundType roundType = parseEnumLenient(RoundType.class, (String) data.get("type"), null);
+                if (roundType == null) {
+                    continue;
+                }
                 Rounds round = this.instantiateRound(
                     this.plugin,
                     roundId,
@@ -891,7 +919,7 @@ public class EventsDatabaseManager {
                     roundType
                 );
                 round.setEventId(eventId);
-                round.setStateForLoad(RoundState.valueOf((String) data.get("state")));
+                round.setStateForLoad(parseEnumLenient(RoundState.class, (String) data.get("state"), RoundState.FINISHED));
                 roundMap.put(roundId, round);
                 Events event = (Events) eventMap.get(eventId);
                 if (event != null) {
@@ -927,7 +955,7 @@ public class EventsDatabaseManager {
                             );
                             heat.setRoundId(hroundId);
                             heat.setHeatStateForLoad(
-                                HeatState.valueOf(rs.getString("state"))
+                                parseEnumLenient(HeatState.class, rs.getString("state"), HeatState.FINISHED)
                             );
                             long startTimeValue = rs.getLong("startTime");
                             long endTimeValue = rs.getLong("endTime");
@@ -965,8 +993,10 @@ public class EventsDatabaseManager {
 
                             try {
                                 heat.setCollisionMode(
-                                    CollisionMode.valueOf(
-                                        rs.getString("colisao")
+                                    parseEnumLenient(
+                                        CollisionMode.class,
+                                        rs.getString("colisao"),
+                                        CollisionMode.DISABLED
                                     )
                                 );
                             } catch (SQLException ignored) {
@@ -1058,7 +1088,7 @@ public class EventsDatabaseManager {
         );
         event.setUuid(UUID.randomUUID());
         event.setTrackNameWS(trackNameWS);
-        event.setStateDirect(EventState.valueOf(stateStr));
+        event.setStateDirect(parseEnumLenient(EventState.class, stateStr, EventState.FINISHED));
         event.setOpenSign(openSignInt == 1);
         long creationTimeSec = rs.getLong("creationTime");
         if (creationTimeSec > 0L) {
@@ -1541,7 +1571,9 @@ public class EventsDatabaseManager {
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     Rounds round = this.buildRoundFromResultSet(rs);
-                    rounds.add(round);
+                    if (round != null) {
+                        rounds.add(round);
+                    }
                 }
             }
         } catch (SQLException e) {
@@ -1557,7 +1589,10 @@ public class EventsDatabaseManager {
         int roundId = rs.getInt("id");
         int eventId = rs.getInt("eventId");
         int roundIndex = rs.getInt("roundIndex");
-        RoundType roundType = RoundType.valueOf(rs.getString("type"));
+        RoundType roundType = parseEnumLenient(RoundType.class, rs.getString("type"), null);
+        if (roundType == null) {
+            return null;
+        }
         Rounds round = this.instantiateRound(
             this.plugin,
             roundId,
@@ -1566,7 +1601,7 @@ public class EventsDatabaseManager {
             roundType
         );
         round.setEventId(eventId);
-        round.setStateForLoad(RoundState.valueOf(rs.getString("state")));
+        round.setStateForLoad(parseEnumLenient(RoundState.class, rs.getString("state"), RoundState.FINISHED));
 
         for (Heats heat : this.loadHeatsByRoundId(round.getId())) {
             heat.setRound(round);
@@ -1803,7 +1838,7 @@ public class EventsDatabaseManager {
         int heatNumber = rs.getInt("heatNumber");
         Heats heat = new Heats(this.plugin, heatId, (Rounds) null, heatNumber);
         heat.setRoundId(roundId);
-        heat.setHeatStateForLoad(HeatState.valueOf(rs.getString("state")));
+        heat.setHeatStateForLoad(parseEnumLenient(HeatState.class, rs.getString("state"), HeatState.FINISHED));
         long startTimestamp = rs.getLong("startTime");
         if (startTimestamp > 0L) {
             heat.setStartTime(Instant.ofEpochSecond(startTimestamp));
@@ -1830,7 +1865,11 @@ public class EventsDatabaseManager {
 
         try {
             heat.setCollisionMode(
-                CollisionMode.valueOf(rs.getString("colisao"))
+                parseEnumLenient(
+                    CollisionMode.class,
+                    rs.getString("colisao"),
+                    CollisionMode.DISABLED
+                )
             );
         } catch (SQLException ignored) {
             heat.setCollisionMode(CollisionMode.DISABLED);
