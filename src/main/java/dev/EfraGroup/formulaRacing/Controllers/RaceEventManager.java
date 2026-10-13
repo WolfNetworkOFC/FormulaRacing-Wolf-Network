@@ -52,7 +52,7 @@ public class RaceEventManager {
         this.plugin.getDebugManager().logRaceSystem(
             "§eLoaded " +
                 events.size() +
-                " active events from database"
+                " events from database (SETUP/RUNNING/FINISHED)"
         );
 
         for (Events event : events) {

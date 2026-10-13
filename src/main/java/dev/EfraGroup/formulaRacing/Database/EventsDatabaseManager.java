@@ -782,12 +782,13 @@ public class EventsDatabaseManager {
 
         try {
             String eventSql =
-                "SELECT * FROM fr_events WHERE state IN (?, ?) AND (isRemoved = 0 OR isRemoved IS NULL)";
+                "SELECT * FROM fr_events WHERE state IN (?, ?, ?) AND (isRemoved = 0 OR isRemoved IS NULL)";
             Connection conn = this.databaseManager.getOrConnect();
 
             try (PreparedStatement stmt = conn.prepareStatement(eventSql)) {
                 stmt.setString(1, EventState.SETUP.name());
                 stmt.setString(2, EventState.RUNNING.name());
+                stmt.setString(3, EventState.FINISHED.name());
 
                 try (ResultSet rs = stmt.executeQuery()) {
                     while (rs.next()) {
