@@ -1,5 +1,5 @@
 name: FormulaRacing
-version: 0.2
+version: "3.0"
 main: dev.EfraGroup.formulaRacing.FormulaRacing
 api-version: 1.21
 folia-supported: true
@@ -132,9 +132,16 @@ commands:
     aliases: [opponent]
     permission: formularacing.admin
   togglerods:
-    description: Alterna a visibilidade dos ratos de lightning
-    usage: /togglerods [toggle|t|global|admin|status]
+    description: Toggles lightning rod visibility
+    usage: /togglerods [global]
+    permission: ibrutils.togglerods
 permissions:
+  ibrutils.togglerods:
+    description: Allows using /togglerods
+    default: true
+  ibrutils.togglerods.global:
+    description: Allows toggling lightning rod visibility globally
+    default: op
   formularacing.admin:
     description: Permissao para comandos administrativos do FormulaRacing
     default: op

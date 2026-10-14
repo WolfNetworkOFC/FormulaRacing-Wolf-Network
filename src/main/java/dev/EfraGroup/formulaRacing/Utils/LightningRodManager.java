@@ -4,17 +4,18 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-public final class LightningRodManager {
+public class LightningRodManager {
 
     private static boolean lightningRodsEnabled = true;
+
     private static final Map<UUID, Boolean> playerToggles = new HashMap<>();
 
     public static boolean isLightningRodsEnabled() {
         return lightningRodsEnabled;
     }
 
-    public static void setLightningRodsEnabled(boolean enabled) {
-        lightningRodsEnabled = enabled;
+    public static void setLightningRodsEnabled(boolean lightningRodsEnabled) {
+        LightningRodManager.lightningRodsEnabled = lightningRodsEnabled;
     }
 
     public static boolean isPlayerToggleEnabled(UUID playerId) {

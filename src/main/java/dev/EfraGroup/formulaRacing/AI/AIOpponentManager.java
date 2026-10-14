@@ -586,7 +586,10 @@ public class AIOpponentManager {
                     // Block reads (safe-Y search) are only legal here, on the region
                     // thread that owns this chunk — never on the global scheduler.
                     Location safeSpawn = findSafeSpawnLocation(finalSpawn);
-                    Boat boat = (Boat) safeSpawn.getWorld().spawnEntity(safeSpawn, EntityType.OAK_BOAT);
+                    // Spawn via the NMS handler so the boat is a CollisionlessBoat
+                    // and the collision rule is enforced by canCollideWith() — matching
+                    // player boats (Heats/GridManager spawn with collidable = collisionMode != DISABLED).
+                    Boat boat = NMSHandlerImpl.spawnStaticBoat(safeSpawn, heatCollisionMode != CollisionMode.DISABLED);
                     boat.customName(Component.text(displayName));
                     boat.setCustomNameVisible(true);
                     boat.setInvulnerable(true);
@@ -594,10 +597,6 @@ public class AIOpponentManager {
                     boat.setPersistent(false);
                     boat.setSilent(true);
                     boat.setRotation(safeSpawn.getYaw(), safeSpawn.getPitch());
-                    // Match the same server-side collision rule used for player boats
-                    // (Heats/GridManager spawn player boats with collidable = collisionMode != DISABLED).
-                    // This keeps AI boats colliding with players when the heat has collisions enabled.
-                    NMSHandlerImpl.setCollidable(boat, heatCollisionMode != CollisionMode.DISABLED);
                     boatUuid = boat.getUniqueId();
                     lastKnownLocation = boat.getLocation().clone();
 

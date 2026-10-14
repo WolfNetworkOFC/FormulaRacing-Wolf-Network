@@ -683,6 +683,17 @@ public class Heats {
     }
 
     public boolean startCountdown(int seconds) {
+        if (this.heatState != HeatState.LOADED) {
+            this.plugin.getDebugManager().logRaceSystem(
+                "Heat " +
+                    this.id +
+                    " (" +
+                    this.getName() +
+                    ") must be LOADED to start! Current state: " +
+                    String.valueOf(this.heatState)
+            );
+            return false;
+        }
         Optional<Rounds> blockingRound = this.getPreviousUnfinishedRound();
         if (blockingRound.isPresent()) {
             this.plugin.getDebugManager().logRaceSystem(
@@ -693,10 +704,6 @@ public class Heats {
         if (this.round != null) {
             if (this.round.getRoundState() == RoundState.SETUP) {
                 this.round.setRoundState(RoundState.RUNNING);
-            }
-            Events ev = this.round.getEvent();
-            if (ev != null && ev.getState() == EventState.SETUP) {
-                ev.ensureRunning(this.round);
             }
         }
         DebugManager var10000 = this.plugin.getDebugManager();

@@ -832,6 +832,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             new dev.EfraGroup.formulaRacing.Listener.GimmickListener(this),
             this
         );
+        Bukkit.getPluginManager().registerEvents(
+            new dev.EfraGroup.formulaRacing.Listener.BoatKiller(this),
+            this
+        );
     }
 
     private void registerPlaceholders() {

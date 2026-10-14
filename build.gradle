@@ -3,8 +3,10 @@ plugins {
     id 'com.gradleup.shadow' version '9.6.1'
 }
 
+import org.gradle.api.file.DuplicatesStrategy
+
 group = 'dev.EfraGroup'
-version = '2.0'
+version = '3.0'
 
 // Java 25 — target Folia API 26.2
 java {
@@ -67,6 +69,16 @@ dependencies {
     testCompileOnly 'io.papermc.paper:paper-api:26.2.build.121-stable'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.0'
+
+    // ---- NMS (boat collisions) ----
+    // Collisionless boat subclasses (net.minecraft.*) compile against the
+    // remapped CraftBukkit server jar produced by BuildTools --remapped, plus
+    // its bundled runtime libraries (extracted from the bootstrap jar into
+    // libs/nms-libs/). Compile-time only — the server provides all of this at
+    // runtime. Drop spigot-server-26.2.jar at libs/ and the runtime jars at
+    // libs/nms-libs/ before building.
+    compileOnly files('libs/spigot-server-26.2.jar')
+    compileOnly fileTree(dir: 'libs/nms-libs', include: ['*.jar'])
 }
 
 test {
@@ -78,11 +90,20 @@ tasks.withType(JavaCompile).configureEach {
     options.release = 25
 }
 
-// Replica do maven-shade: finalName = formularacing-0.2.jar
+// Replica do maven-shade: finalName = formularacing-3.0.jar
 shadowJar {
     archiveBaseName = 'formularacing'
     archiveVersion = project.version.toString()
     archiveClassifier = ''
+
+    // Permite que o KotlinModuleMetadataTransformer receba todas as
+    // duplicatas de META-INF/*.kotlin_module em vez de descarta-las
+    // silenciosamente (elimina o aviso do Shadow no build).
+    // Escopo restrito a esses arquivos para nao inundar o log com
+    // duplicatas inofensivas (LICENSE, hamcrest, etc.).
+    filesMatching('META-INF/*.kotlin_module') {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
 
     relocate 'co.aikar.commands', 'dev.efragroup.libs.acf'
     relocate 'co.aikar.locales', 'dev.efragroup.libs.locales'

@@ -1263,29 +1263,48 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("load")
-    @CommandCompletion("@heat")
+    @CommandCompletion("@heat 5 lights|normal")
     @CommandPermission("formularacing.event.admin")
-    @Description("Carrega um heat (prepara para largada)")
-    public void onLoad(CommandSender sender, Heats heat) {
+    @Description("Carrega um heat e inicia a contagem regressiva")
+    public void onLoad(
+        CommandSender sender,
+        Heats heat,
+        @Default("5") Integer seconds,
+        @co.aikar.commands.annotation.Optional String mode
+    ) {
         heat = this.resolveHeat(sender, heat);
         if (heat == null) {
             sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
                     "✗ Nenhum heat selecionado ou ativo!"
             );
+            return;
+        }
+        Optional<Rounds> blockingRound = heat.getPreviousUnfinishedRound();
+        if (blockingRound.isPresent()) {
+            sender.sendMessage(
+                String.valueOf(ChatColor.RED) +
+                    "✗ Não é possível carregar o heat " +
+                    heat.getName() +
+                    ": o round R" +
+                    blockingRound.get().getRoundIndex() +
+                    " ainda não foi finalizado!"
+            );
+            return;
+        }
+        if (heat.loadHeat(sender)) {
+            String var10001 = String.valueOf(ChatColor.GREEN);
+            sender.sendMessage(
+                var10001 + "✓ Heat " + heat.getName() + " carregado!"
+            );
+            this.displaySortedDrivers(sender, heat);
+            // Carregou: encadeia o início (mesmas validações do /heat start).
+            this.onStart(sender, heat, seconds, mode);
         } else {
-            if (heat.loadHeat(sender)) {
-                String var10001 = String.valueOf(ChatColor.GREEN);
-                sender.sendMessage(
-                    var10001 + "✓ Heat " + heat.getName() + " carregado!"
-                );
-                this.displaySortedDrivers(sender, heat);
-            } else {
-                sender.sendMessage(
-                    String.valueOf(ChatColor.RED) +
-                        "✗ Falha ao carregar o heat (veja o motivo acima)."
-                );
-            }
+            sender.sendMessage(
+                String.valueOf(ChatColor.RED) +
+                    "✗ Falha ao carregar o heat (veja o motivo acima)."
+            );
         }
     }
 
@@ -1433,6 +1452,18 @@ public class HeatCommand extends BaseCommand {
             );
             return;
         }
+        if (heat.getHeatState() != HeatState.LOADED) {
+            sender.sendMessage(
+                String.valueOf(ChatColor.RED) +
+                    "✗ O heat " +
+                    heat.getName() +
+                    " precisa estar carregado antes de iniciar! " +
+                    "Use /heat load " +
+                    heat.getName() +
+                    " primeiro."
+            );
+            return;
+        }
         if (mode != null && mode.equalsIgnoreCase("force")) {
             // "/heat start <heat> <s> force" cai aqui quando o ACF resolve nesta
             // sobrecarga — mesmo comportamento do onStartForce.
@@ -1537,6 +1568,16 @@ public class HeatCommand extends BaseCommand {
                             " (FORÇADO): o round R" +
                             blockingRound.get().getRoundIndex() +
                             " ainda não foi finalizado!"
+                    );
+                } else if (heat.getHeatState() != HeatState.LOADED) {
+                    sender.sendMessage(
+                        String.valueOf(ChatColor.RED) +
+                            "✗ O heat " +
+                            heat.getName() +
+                            " precisa estar carregado antes de iniciar! " +
+                            "Use /heat load " +
+                            heat.getName() +
+                            " primeiro."
                     );
                 } else if (heat.startCountdown(seconds)) {
                     this.plugin.getReadyCheckManager().stopReadyCheck(

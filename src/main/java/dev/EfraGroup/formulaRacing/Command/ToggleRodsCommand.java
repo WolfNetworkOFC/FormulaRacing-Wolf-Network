@@ -2,12 +2,12 @@ package dev.EfraGroup.formulaRacing.Command;
 
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.CommandAlias;
-import co.aikar.commands.annotation.CommandPermission;
+import co.aikar.commands.annotation.Default;
 import co.aikar.commands.annotation.Description;
-import co.aikar.commands.annotation.Subcommand;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Utils.LightningRodManager;
-import org.bukkit.ChatColor;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -20,43 +20,35 @@ public class ToggleRodsCommand extends BaseCommand {
         this.plugin = plugin;
     }
 
-    @Subcommand("toggle|t")
-    @CommandPermission("formularacing.spectator")
-    @Description("Alterna a visibilidade dos ratos de lightning")
-    public void onToggle(Player player) {
+    @Default
+    @Description("Alterna a visibilidade dos lightning rods")
+    public void onToggle(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("ibrutils.togglerods")) {
+            sender.sendMessage(Component.text("You do not have permission to use this command.").color(TextColor.color(0xFF5555)));
+            return;
+        }
+
+        // Global toggle (admin only)
+        if (args.length > 0 && args[0].equalsIgnoreCase("global")) {
+            if (!sender.hasPermission("ibrutils.togglerods.global")) {
+                sender.sendMessage(Component.text("You do not have permission to toggle global rod visibility.").color(TextColor.color(0xFF5555)));
+                return;
+            }
+
+            LightningRodManager.setLightningRodsEnabled(!LightningRodManager.isLightningRodsEnabled());
+            sender.sendMessage(Component.text("Global lightning rods are now " + (LightningRodManager.isLightningRodsEnabled() ? "enabled" : "disabled") + ".").color(TextColor.color(0x55FF55)));
+            plugin.getLogger().info("[LightningRod] Global visibility toggled by " + sender.getName());
+            return;
+        }
+
+        // Personal toggle
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can toggle their personal rod visibility.").color(TextColor.color(0xFF5555)));
+            return;
+        }
+
         boolean currentToggle = LightningRodManager.isPlayerToggleEnabled(player.getUniqueId());
         LightningRodManager.setPlayerToggle(player.getUniqueId(), !currentToggle);
-        
-        String status = LightningRodManager.isPlayerToggleEnabled(player.getUniqueId()) ? "ativada" : "desativada";
-        player.sendMessage(
-            ChatColor.YELLOW + "[LightningRod] Sua visibilidade de rato foi " + status
-        );
-    }
-
-    @Subcommand("global|admin")
-    @CommandPermission("formularacing.admin")
-    @Description("Alterna a visibilidade global de ratos (admin)")
-    public void onGlobalToggle(CommandSender sender) {
-        boolean currentState = LightningRodManager.isLightningRodsEnabled();
-        LightningRodManager.setLightningRodsEnabled(!currentState);
-        
-        String status = LightningRodManager.isLightningRodsEnabled() ? "ativada" : "desativada";
-        sender.sendMessage(
-            ChatColor.YELLOW + "[LightningRod] Visibilidade global de ratos foi " + status
-        );
-        
-        plugin.getLogger().info("[LightningRod] Global visibility " + status + " by " + sender.getName());
-    }
-
-    @Subcommand("status")
-    @CommandPermission("formularacing.spectator")
-    @Description("Mostra o status atual dos ratos")
-    public void onStatus(Player player) {
-        boolean globalEnabled = LightningRodManager.isLightningRodsEnabled();
-        boolean personalToggle = LightningRodManager.isPlayerToggleEnabled(player.getUniqueId());
-        
-        player.sendMessage(ChatColor.YELLOW + "[LightningRod] Status:");
-        player.sendMessage("  Global: " + (globalEnabled ? "§aativado" : "§cdesativado"));
-        player.sendMessage("  Pessoal: " + (personalToggle ? "§aativado" : "§cdesativado"));
+        player.sendMessage(Component.text("Your lightning rod visibility is now " + (!currentToggle ? "enabled" : "disabled") + ".").color(TextColor.color(0x55FF55)));
     }
 }

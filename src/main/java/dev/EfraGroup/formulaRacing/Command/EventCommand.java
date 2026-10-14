@@ -61,11 +61,23 @@ public class EventCommand extends BaseCommand {
     }
 
     @Subcommand("list|ls")
-    @Description("Lista todos os eventos ativos")
-    public void onList(CommandSender sender) {
-        List<Events> activeEvents = this.eventManager.getAllEvents()
+    @Description("Lista eventos (por padrão em setup/running). Flags: -finished, -event <nome>, -track <pista>")
+    public void onList(CommandSender sender, String[] args) {
+        ListFilter filter = ListFilter.parse(args);
+
+        List<Events> events = this.eventManager.getAllEvents()
             .stream()
-            .filter(Events::isActive)
+            .filter(e -> filter.includeFinished
+                ? e.getState() == EventState.SETUP
+                    || e.getState() == EventState.RUNNING
+                    || e.getState() == EventState.FINISHED
+                : e.isActive())
+            .filter(e -> filter.eventName == null
+                || (e.getDisplayName() != null
+                    && e.getDisplayName().toLowerCase().contains(filter.eventName.toLowerCase())))
+            .filter(e -> filter.trackName == null
+                || (e.getTrackNameWS() != null
+                    && e.getTrackNameWS().equalsIgnoreCase(filter.trackName)))
             .sorted(Comparator.comparingLong(Events::getDate))
             .toList();
 
@@ -73,17 +85,22 @@ public class EventCommand extends BaseCommand {
         sender.sendMessage("§8§m                              §r §6§lEVENTOS §8§m                              ");
         sender.sendMessage("");
 
-        if (activeEvents.isEmpty()) {
-            sender.sendMessage("  §7Nenhum evento ativo no momento.");
-            sender.sendMessage("  §8Crie um evento com §f/event create <nome>");
+        if (events.isEmpty()) {
+            sender.sendMessage("  §7Nenhum evento encontrado com esses filtros.");
+            if (filter.hasAnyFilter()) {
+                sender.sendMessage("  §8Filtros: " + filter.describe());
+            }
             sender.sendMessage("");
             return;
         }
 
-        sender.sendMessage("  §8Total: §f" + activeEvents.size() + " §8evento" + (activeEvents.size() > 1 ? "s" : ""));
+        sender.sendMessage("  §8Total: §f" + events.size() + " §8evento" + (events.size() > 1 ? "s" : ""));
+        if (filter.hasAnyFilter()) {
+            sender.sendMessage("  §8Filtros: §7" + filter.describe());
+        }
         sender.sendMessage("");
 
-        for (Events event : activeEvents) {
+        for (Events event : events) {
             String creatorName = event.getCreatorName();
             String dateStr = ApiUtilities.formatDate(event.getDate());
             String stateName = event.getState().name();
@@ -111,6 +128,11 @@ public class EventCommand extends BaseCommand {
             // Estado
             message.addExtra(new TextComponent(" " + stateColor + "[" + stateName + "]"));
 
+            // Pista (se houver)
+            if (event.getTrackNameWS() != null && !event.getTrackNameWS().isEmpty()) {
+                message.addExtra(new TextComponent(" §8| §b" + event.getTrackNameWS()));
+            }
+
             // Data e criador
             message.addExtra(new TextComponent(" §8| §7" + dateStr));
             message.addExtra(new TextComponent(" §8por §f" + creatorName));
@@ -120,6 +142,63 @@ public class EventCommand extends BaseCommand {
 
         sender.sendMessage("");
         sender.sendMessage("§8§m                                                                     ");
+    }
+
+    /** Parsed filter flags for {@code /event list}. */
+    private static final class ListFilter {
+        private boolean includeFinished;
+        private String eventName;
+        private String trackName;
+
+        static ListFilter parse(String[] args) {
+            ListFilter f = new ListFilter();
+            if (args == null) {
+                return f;
+            }
+            for (int i = 0; i < args.length; i++) {
+                String a = args[i];
+                if (a == null) {
+                    continue;
+                }
+                switch (a.toLowerCase()) {
+                    case "-finished", "--finished", "-fin", "--fin" -> f.includeFinished = true;
+                    case "-event", "--event" -> {
+                        if (i + 1 < args.length) {
+                            f.eventName = args[++i];
+                        }
+                    }
+                    case "-track", "--track", "-pista", "--pista" -> {
+                        if (i + 1 < args.length) {
+                            f.trackName = args[++i];
+                        }
+                    }
+                    default -> {
+                        // Ignora tokens desconhecidos para não quebrar o comando.
+                    }
+                }
+            }
+            return f;
+        }
+
+        boolean hasAnyFilter() {
+            return this.includeFinished || this.eventName != null || this.trackName != null;
+        }
+
+        String describe() {
+            StringBuilder sb = new StringBuilder();
+            if (this.eventName != null) {
+                sb.append("evento contém '").append(this.eventName).append("'");
+            }
+            if (this.trackName != null) {
+                if (sb.length() > 0) sb.append(", ");
+                sb.append("pista = '").append(this.trackName).append("'");
+            }
+            if (this.includeFinished) {
+                if (sb.length() > 0) sb.append(", ");
+                sb.append("inclui finalizados");
+            }
+            return sb.toString();
+        }
     }
 
     @Subcommand("select")

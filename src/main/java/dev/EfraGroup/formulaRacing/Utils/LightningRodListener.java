@@ -36,7 +36,7 @@ public class LightningRodListener implements Listener {
     private FRTask processRodsTask;
 
     private static final Transformation FLIPPED_ROD = new Transformation(
-        new Vector3f(0, 0.625F, 0),
+        new Vector3f(0, 0.375F, 0),
         new Quaternionf(new AxisAngle4f((float) Math.PI, 1, 0, 0)),
         new Vector3f(0.75F, 0.75F, 0.75F),
         new Quaternionf()
@@ -56,7 +56,8 @@ public class LightningRodListener implements Listener {
     private void processRods() {
         tickCounter++;
         boolean rodsEnabled = LightningRodManager.isLightningRodsEnabled();
-        boolean shouldDebug = tickCounter % DEBUG_INTERVAL == 0;
+        //boolean shouldDebug = tickCounter % DEBUG_INTERVAL == 0;
+        boolean shouldDebug = false; // Uncomment above and comment this line to enable debug logging every 5 seconds
 
         if (!rodsEnabled) {
             if (shouldDebug) {
@@ -171,7 +172,6 @@ public class LightningRodListener implements Listener {
                 int rodRegionX = rod.getLocation().getBlockX() >> 9;
                 int rodRegionZ = rod.getLocation().getBlockZ() >> 9;
                 for (Player viewer : Bukkit.getOnlinePlayers()) {
-                    if (viewer.equals(rodOwner)) continue;
                     boolean canSee = canViewerSeeRod(viewer, rodOwner);
                     SchedulerHelper.runTaskFor(plugin, viewer, () -> {
                         if (!viewer.isOnline()) return;
