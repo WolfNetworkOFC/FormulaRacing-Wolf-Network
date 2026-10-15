@@ -27,6 +27,47 @@ public class FileManager {
         }
 
         this.config = YamlConfiguration.loadConfiguration(this.configFile);
+        this.ensureSpawnDefaults();
+    }
+
+    /**
+     * Garante que a seção "spawn" (usada pelo /spawn) exista no config.yml.
+     * Servidores que já tinham config.yml de versões antigas não recebem a
+     * seção nova via saveResource — sem isso o /spawn diria "não configurado".
+     */
+    private void ensureSpawnDefaults() {
+        if (this.config.isSet("spawn.world")) {
+            return;
+        }
+        String worldName = "world";
+        double x = 0.5;
+        double y = 64.0;
+        double z = 0.5;
+        try {
+            if (!org.bukkit.Bukkit.getWorlds().isEmpty()) {
+                org.bukkit.World w = org.bukkit.Bukkit.getWorlds().get(0);
+                worldName = w.getName();
+                org.bukkit.Location s = w.getSpawnLocation();
+                x = s.getX();
+                y = s.getY();
+                z = s.getZ();
+            }
+        } catch (Exception ignored) {
+        }
+        this.config.set("spawn.world", worldName);
+        this.config.set("spawn.x", x);
+        this.config.set("spawn.y", y);
+        this.config.set("spawn.z", z);
+        this.config.set("spawn.yaw", 0.0);
+        this.config.set("spawn.pitch", 0.0);
+        try {
+            this.config.save(this.configFile);
+        } catch (IOException e) {
+            // debugManager ainda pode ser nulo aqui (FileManager é criado antes dele)
+            this.plugin.getLogger().warning("[FormulaRacing] Não foi possível salvar a seção 'spawn' no config.yml: " + e.getMessage());
+            return;
+        }
+        this.plugin.getLogger().info("[FormulaRacing] Seção 'spawn' criada no config.yml (ajuste com /spawn set).");
     }
 
     public FileConfiguration getConfig() {

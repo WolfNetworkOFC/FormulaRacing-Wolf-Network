@@ -62,6 +62,10 @@ commands:
   resetcp:
     description: Volta para o último checkpoint da corrida.
     usage: /resetcp
+  spawn:
+    description: Teleporta para o spawn (remove o barco antes).
+    usage: /spawn
+    aliases: [frspawn, lobby]
   timetrialrandom:
     description: Entra em uma timetrial aleatória.
     usage: /timetrialrandom

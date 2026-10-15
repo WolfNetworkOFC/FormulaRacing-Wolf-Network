@@ -1,4 +1,17 @@
 # =========================================================#
+#                         SPAWN                           #
+# =========================================================#
+# Local usado pelo comando /spawn (deleta o barco e teleporta).
+# Pode ser definido in-game com /spawn set (permissão formularacing.admin).
+spawn:
+  world: "world"
+  x: 0.5
+  y: 64.0
+  z: 0.5
+  yaw: 0.0
+  pitch: 0.0
+
+# =========================================================#
 #                         CUSTOM                           #
 # =========================================================#
 

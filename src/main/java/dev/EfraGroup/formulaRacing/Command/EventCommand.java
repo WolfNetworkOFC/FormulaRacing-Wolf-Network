@@ -1176,193 +1176,71 @@ public class EventCommand extends BaseCommand {
                 String.valueOf(ChatColor.GRAY) + "   (Nenhum round configurado)"
             );
         } else {
+            String eventStructureColor = String.valueOf(ChatColor.GREEN);
+            TextComponent eventStructure = new TextComponent(eventStructureColor + String.valueOf(ChatColor.BOLD));
+            eventStructure.addExtra("EVENT STRUCTURE: " + rounds.size() + " rounds");
+            sender.spigot().sendMessage(eventStructure);
             for (Rounds round : rounds) {
-                String roundName = "R" + round.getRoundNumber();
-                boolean isCurrent = (Boolean) event
-                    .getSchedule()
-                    .getCurrentRound()
-                    .map(r -> r.getId() == round.getId())
-                    .orElse(false);
-                TextComponent line = new TextComponent(
-                    isCurrent
-                        ? String.valueOf(ChatColor.YELLOW) + "  ➤ "
-                        : "    "
-                );
-                TextComponent nameComp = new TextComponent(
-                    round.getDisplayName()
-                );
-                nameComp.setColor(isCurrent ? ChatColor.AQUA : ChatColor.GRAY);
-                line.addExtra(nameComp);
-                line.addExtra(
-                    new TextComponent(
-                        String.valueOf(ChatColor.DARK_GRAY) + " - "
-                    )
-                );
-                var10003 = String.valueOf(ChatColor.WHITE);
-                line.addExtra(
-                    new TextComponent(var10003 + round.getState().name())
-                );
-                line.addExtra(new TextComponent("   "));
-                line.addExtra(
-                    ClickableMessageUtil.getButton(
-                        "Info",
-                        ChatColor.BLUE,
-                        "/round info " + round.getId(),
-                        "Ver detalhes",
-                        Action.RUN_COMMAND
-                    )
-                );
-                sender.spigot().sendMessage(line);
-                if (isAdmin) {
-                    for (Heats heat : round.getHeats().values()) {
-                        var10002 = String.valueOf(ChatColor.GRAY);
-                        TextComponent heatLine = new TextComponent(
-                            var10002 + "    ↳ " + heat.getName()
-                        );
-                        int var10000 = round.getRoundIndex();
-                        String heatRef;
-                        if (round.getType() == RoundType.QUALIFICATION) {
-                            heatRef = "R" + var10000 + "Q" + heat.getHeatNumber();
-                        } else if (round.getType() == RoundType.SPRINT_QUALIFICATION) {
-                            heatRef = "R" + var10000 + "SQ" + heat.getHeatNumber();
-                        } else if (round.getType() == RoundType.SPRINT_RACE) {
-                            heatRef = "R" + var10000 + "S" + heat.getHeatNumber();
-                        } else {
-                            heatRef = "R" + var10000 + "F" + heat.getHeatNumber();
-                        }
-                        heatLine.addExtra(new TextComponent("  "));
-                        TextComponent loadBtn = new TextComponent("[L]");
-                        loadBtn.setColor(ChatColor.YELLOW);
-                        loadBtn.setHoverEvent(
-                            new HoverEvent(
-                                net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
-                                new Content[] {
-                                    new Text("§eCarregar Heat (Grid)"),
-                                }
-                            )
-                        );
-                        loadBtn.setClickEvent(
-                            new ClickEvent(
-                                Action.RUN_COMMAND,
-                                "/heat load " + heatRef
-                            )
-                        );
-                        heatLine.addExtra(loadBtn);
-                        heatLine.addExtra(new TextComponent(" "));
-                        TextComponent startHeatBtn = new TextComponent("[▶]");
-                        startHeatBtn.setColor(ChatColor.GREEN);
-                        startHeatBtn.setHoverEvent(
-                            new HoverEvent(
-                                net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
-                                new Content[] { new Text("§aIniciar Corrida") }
-                            )
-                        );
-                        startHeatBtn.setClickEvent(
-                            new ClickEvent(
-                                Action.RUN_COMMAND,
-                                "/heat start " + heatRef
-                            )
-                        );
-                        heatLine.addExtra(startHeatBtn);
-                        heatLine.addExtra(new TextComponent(" "));
-                        TextComponent infoHeatBtn = new TextComponent("[>>]");
-                        infoHeatBtn.setColor(ChatColor.GOLD);
-                        infoHeatBtn.setHoverEvent(
-                            new HoverEvent(
-                                net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
-                                new Content[] {
-                                    new Text("§6Ver Resultados/Análise"),
-                                }
-                            )
-                        );
-                        infoHeatBtn.setClickEvent(
-                            new ClickEvent(
-                                Action.RUN_COMMAND,
-                                "/heat info " + heatRef
-                            )
-                        );
-                        heatLine.addExtra(infoHeatBtn);
-                        heatLine.addExtra(new TextComponent(" "));
-                        TextComponent removeHeatBtn = new TextComponent("[X]");
-                        removeHeatBtn.setColor(ChatColor.DARK_RED);
-                        removeHeatBtn.setHoverEvent(
-                            new HoverEvent(
-                                net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
-                                new Content[] { new Text("§4Remover Heat") }
-                            )
-                        );
-                        removeHeatBtn.setClickEvent(
-                            new ClickEvent(
-                                Action.RUN_COMMAND,
-                                "/heat remove " + heatRef
-                            )
-                        );
-                        heatLine.addExtra(removeHeatBtn);
-                        sender.spigot().sendMessage(heatLine);
-                    }
+                int roundNumber = round.getRoundNumber();
+                String roundTypeLabel = this.roundTypeLabel(round.getType());
+                String roundTitle = "Round " + roundNumber + " \u2013 " + roundTypeLabel;
+                TextComponent roundLine = new TextComponent("");
+                roundLine.addExtra("|");
+                roundLine.addExtra(" ");
+                TextComponent roundTitlePart = new TextComponent(roundTitle);
+                roundTitlePart.setColor(ChatColor.GREEN);
+                roundTitlePart.setBold(false);
+                roundLine.addExtra(roundTitlePart);
+                roundLine.addExtra(":");
+                sender.spigot().sendMessage(roundLine);
+                for (Heats heat : round.getHeats().values()) {
+                    String heatRef = this.heatRef(round, heat);
+                TextComponent heatLine = new TextComponent("");
+                    heatLine.addExtra("  ");
+                    TextComponent heatRefComp = new TextComponent(heatRef);
+                    heatRefComp.setColor(ChatColor.GRAY);
+                    heatRefComp.setItalic(true);
+                    heatLine.addExtra(heatRefComp);
+
+                    sender.spigot().sendMessage(heatLine);
                 }
             }
         }
-
-        if (isAdmin) {
-            sender.sendMessage("");
-            TextComponent actions = new TextComponent("  AÇÕES: ");
-            actions.setColor(ChatColor.GOLD);
-            actions.setBold(true);
-            TextComponent addRoundBtn = new TextComponent("[+ Round]");
-            addRoundBtn.setColor(ChatColor.GREEN);
-            addRoundBtn.setHoverEvent(
-                new HoverEvent(
-                    net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
-                    new Content[] { new Text("§aAdicionar novo round") }
-                )
-            );
-            addRoundBtn.setClickEvent(
-                new ClickEvent(Action.SUGGEST_COMMAND, "/round create ")
-            );
-            actions.addExtra(addRoundBtn);
-            actions.addExtra(new TextComponent("  "));
-            TextComponent broadcastBtn = new TextComponent("[Broadcast]");
-            broadcastBtn.setColor(ChatColor.YELLOW);
-            broadcastBtn.setHoverEvent(
-                new HoverEvent(
-                    net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
-                    new Content[] { new Text("§eAnunciar inscrições") }
-                )
-            );
-            broadcastBtn.setClickEvent(
-                new ClickEvent(
-                    Action.RUN_COMMAND,
-                    "/event broadcast clicktosign " + event.getDisplayName()
-                )
-            );
-            actions.addExtra(broadcastBtn);
-            actions.addExtra(new TextComponent("  "));
-            TextComponent deleteBtn = new TextComponent("[Excluir Evento]");
-            deleteBtn.setColor(ChatColor.RED);
-            deleteBtn.setHoverEvent(
-                new HoverEvent(
-                    net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
-                    new Content[] {
-                        new Text("§cRemover este evento permanentemente"),
-                    }
-                )
-            );
-            deleteBtn.setClickEvent(
-                new ClickEvent(
-                    Action.RUN_COMMAND,
-                    "/event delete " + event.getDisplayName()
-                )
-            );
-            actions.addExtra(deleteBtn);
-            sender.spigot().sendMessage(actions);
-        }
-
-        String var10001 = String.valueOf(ChatColor.GOLD);
+        String footerColor = String.valueOf(ChatColor.GOLD);
         sender.sendMessage(
-            var10001 +
+            footerColor +
                 String.valueOf(ChatColor.BOLD) +
                 "═══════════════════════════════"
         );
+    }
+
+
+    private String roundTypeLabel(RoundType type) {
+        if (type == RoundType.QUALIFICATION) {
+            return "Qualification";
+        }
+        if (type == RoundType.SPRINT_QUALIFICATION) {
+            return "Sprint Qualification";
+        }
+        if (type == RoundType.SPRINT_RACE) {
+            return "Sprint Race";
+        }
+        return "Practice";
+    }
+
+
+    private String heatRef(Rounds round, Heats heat) {
+        int roundIndex = round.getRoundIndex();
+        int heatNumber = heat.getHeatNumber();
+        if (round.getType() == RoundType.QUALIFICATION) {
+            return "R" + roundIndex + "Q" + heatNumber;
+        }
+        if (round.getType() == RoundType.SPRINT_QUALIFICATION) {
+            return "R" + roundIndex + "SQ" + heatNumber;
+        }
+        if (round.getType() == RoundType.SPRINT_RACE) {
+            return "R" + roundIndex + "S" + heatNumber;
+        }
+        return "R" + roundIndex + "P" + heatNumber;
     }
 }

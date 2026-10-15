@@ -1,0 +1,24 @@
+feat(timetrial): prova de LAG por instante, ghosts com yaw e refino do menu
+
+Ghosts gravam agora o yaw do barco, alem de x/y/z. O jogador corre
+contra o casco, nao contra o piloto: em drift o barco desliza e o piloto
+fica fora do eixo, entao a referencia anterior deixava o ghost
+visivelmente deslocado da trajetoria que ele deveria representar. O yaw
+e opcional no JSON, entao ghosts gravados antes do campo continuam
+desserializando (Gson deixa 0 quando o campo nao existe).
+
+TimeTrialSession guarda o instante de cada cruzamento de LAGSTART e
+LAGEND, nao so os flags. Dois cruzamentos com o mesmo timestamp nao
+acontecem a velocidade de barco entre blocos distintos, entao
+lagRegionsShareInstant() distingue teleport de movimento real. Os flags
+so enabled sozinhos nao diziam nada sobre quando.
+
+O menu de timetrial e o time trial ganham placeholders, ordenacao e
+campos adicionais, e o WolfMod ganha o protocolo de timing estendido.
+
+RaceCheckpointListener deixa de chamar tryDeleteEventForHeat ao terminar
+a heat: a limpeza do evento agora e feita pelo RaceEventManager.
+
+Validacao: gradlew.bat build, BUILD SUCCESSFUL.
+
+Co-Authored-By: CommandCodeBot <noreply@commandcode.ai>

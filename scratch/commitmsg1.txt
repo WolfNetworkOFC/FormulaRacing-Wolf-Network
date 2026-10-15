@@ -1,0 +1,39 @@
+feat(icon): suporta qualquer component e block state no icone da pista
+
+O /te icon so aceitava "level=N" em LIGHT e "custom_model_data=N", e
+ignorava silenciosamente qualquer outra prop (o switch tinha um default
+vazio). Isso tambem quebrava: props invalidas eram aceitas e persistidas,
+e o icone do menu saia sempre com level 15, independente do que tivesse
+sido configurado.
+
+O parser novo (ItemComponentParser) aceita a mesma gramatica de colchetes
+do /give, separando os dois mecanismos:
+
+- Props sem namespace (level, facing, half, waterlogged) sao block state.
+  Vao por BlockDataMeta#setBlockData, num unico editMeta. BlockStateMeta
+  nao serve: desde 1.20.5 ele reseta as data deviations do item, e o level
+  voltava ao padrao no tooltip do cliente.
+- Props com namespace (minecraft:item_model, minecraft:profile, ...) sao
+  data components. Vao por UnsafeValues#modifyItemStack, que e o mesmo
+  parser de argumentos que o /give usa.
+
+Props que o item nao suporta sao rejeitadas com mensagem clara
+(stone[level=2] falha, light[level=2] passa) porque o setter e procurado
+no tipo do bloco e so existe se o bloco tiver a propriedade.
+
+gson deixa de ser relocado no shadow jar. Paper usa a propria copia, e
+relocar quebrava a assinatura de UnsafeValues com NoSuchMethodError — o
+que derrubava o menu inteiro, ja que Error nao e capturado por
+catch (Exception). Vale notar que sete classes do plugin usam gson
+diretamente (ApiManager, GhostManager, MedalManager, LeagueJsonStore,
+WolfTimingService, DiscordUtils, trackexchange), entao a copia do servidor e
+a do plugin agora sao a mesma.
+
+TrackIconData degrada para o material puro se um icone salvo no banco
+deixar de ser aceito, e tambem captura LinkageError: um icone quebrado
+nao pode derrubar o menu de timetrial inteiro.
+
+Validacao: gradlew.bat build, BUILD SUCCESSFUL. Os 13 casos do
+ItemComponentParserTest cobrem o parsing SNBT sem precisar de servidor.
+
+Co-Authored-By: CommandCodeBot <noreply@commandcode.ai>

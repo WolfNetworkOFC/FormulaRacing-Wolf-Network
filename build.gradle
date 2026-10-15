@@ -8,7 +8,7 @@ import org.gradle.api.file.DuplicatesStrategy
 group = 'dev.EfraGroup'
 version = '3.0'
 
-// Java 25 — target Folia API 26.2
+// Java 25 — target Folia API 26.3
 java {
     sourceCompatibility = JavaVersion.VERSION_25
     targetCompatibility = JavaVersion.VERSION_25
@@ -31,7 +31,7 @@ repositories {
 
 dependencies {
     // ---- Provided (available on the server / plugin runtime) ----
-    compileOnly 'io.papermc.paper:paper-api:26.2.build.121-stable'
+    compileOnly 'io.papermc.paper:paper-api:26.3.build.193-stable'
     compileOnly 'com.github.NEZNAMY:TAB-API:6.0.0'
     compileOnly 'com.sk89q.worldedit:worldedit-bukkit:7.3.0'
     compileOnly 'com.github.decentsoftware-eu:decentholograms:2.9.6'
@@ -66,7 +66,7 @@ dependencies {
     runtimeOnly 'net.megavex:scoreboard-library-implementation:2.8.2'
 
     // ---- Tests ----
-    testCompileOnly 'io.papermc.paper:paper-api:26.2.build.121-stable'
+    testCompileOnly 'io.papermc.paper:paper-api:26.3.build.193-stable'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.0'
 
@@ -75,9 +75,13 @@ dependencies {
     // remapped CraftBukkit server jar produced by BuildTools --remapped, plus
     // its bundled runtime libraries (extracted from the bootstrap jar into
     // libs/nms-libs/). Compile-time only — the server provides all of this at
-    // runtime. Drop spigot-server-26.2.jar at libs/ and the runtime jars at
+    // runtime. Drop spigot-server-26.3.jar at libs/ and the runtime jars at
     // libs/nms-libs/ before building.
-    compileOnly files('libs/spigot-server-26.2.jar')
+    // WARNING: do NOT put spigot-api-*.jar in libs/nms-libs! File deps come
+    // first on the compile classpath, and Spigot's org.bukkit (no Paper/Folia
+    // methods) would shadow paper-api and break compilation with dozens of
+    // "cannot find symbol" errors (getScheduler, teleportAsync, ...).
+    compileOnly files('libs/spigot-server-26.3.jar')
     compileOnly fileTree(dir: 'libs/nms-libs', include: ['*.jar'])
 }
 

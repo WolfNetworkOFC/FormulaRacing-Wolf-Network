@@ -1,0 +1,318 @@
+Compiled from "MixinExtensionApiImpl.java"
+public abstract class net.fabricmc.loom.extension.MixinExtensionApiImpl implements net.fabricmc.loom.api.MixinExtensionAPI {
+  protected final org.gradle.api.Project project;
+
+  protected final org.gradle.api.provider.Property<java.lang.Boolean> useMixinAp;
+
+  private final org.gradle.api.provider.Property<java.lang.String> refmapTargetNamespace;
+
+  private final org.gradle.api.provider.MapProperty<java.lang.String, java.lang.String> messages;
+
+  private final org.gradle.api.provider.Property<java.lang.Boolean> showMessageTypes;
+
+  public net.fabricmc.loom.extension.MixinExtensionApiImpl(org.gradle.api.Project);
+    Code:
+       0: aload_0
+       1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+       4: aload_0
+       5: aload_1
+       6: invokestatic  #7                  // Method java/util/Objects.requireNonNull:(Ljava/lang/Object;)Ljava/lang/Object;
+       9: checkcast     #13                 // class org/gradle/api/Project
+      12: putfield      #15                 // Field project:Lorg/gradle/api/Project;
+      15: aload_0
+      16: aload_1
+      17: invokeinterface #21,  1           // InterfaceMethod org/gradle/api/Project.getObjects:()Lorg/gradle/api/model/ObjectFactory;
+      22: ldc           #25                 // class java/lang/Boolean
+      24: invokeinterface #27,  2           // InterfaceMethod org/gradle/api/model/ObjectFactory.property:(Ljava/lang/Class;)Lorg/gradle/api/provider/Property;
+      29: aload_1
+      30: aload_1
+      31: invokedynamic #33,  0             // InvokeDynamic #0:call:(Lorg/gradle/api/Project;)Ljava/util/concurrent/Callable;
+      36: invokeinterface #37,  2           // InterfaceMethod org/gradle/api/Project.provider:(Ljava/util/concurrent/Callable;)Lorg/gradle/api/provider/Provider;
+      41: invokeinterface #41,  2           // InterfaceMethod org/gradle/api/provider/Property.convention:(Lorg/gradle/api/provider/Provider;)Lorg/gradle/api/provider/Property;
+      46: putfield      #47                 // Field useMixinAp:Lorg/gradle/api/provider/Property;
+      49: aload_0
+      50: aload_1
+      51: invokeinterface #21,  1           // InterfaceMethod org/gradle/api/Project.getObjects:()Lorg/gradle/api/model/ObjectFactory;
+      56: ldc           #51                 // class java/lang/String
+      58: invokeinterface #27,  2           // InterfaceMethod org/gradle/api/model/ObjectFactory.property:(Ljava/lang/Class;)Lorg/gradle/api/provider/Property;
+      63: aload_1
+      64: aload_1
+      65: invokedynamic #53,  0             // InvokeDynamic #1:call:(Lorg/gradle/api/Project;)Ljava/util/concurrent/Callable;
+      70: invokeinterface #37,  2           // InterfaceMethod org/gradle/api/Project.provider:(Ljava/util/concurrent/Callable;)Lorg/gradle/api/provider/Provider;
+      75: invokeinterface #41,  2           // InterfaceMethod org/gradle/api/provider/Property.convention:(Lorg/gradle/api/provider/Provider;)Lorg/gradle/api/provider/Property;
+      80: putfield      #54                 // Field refmapTargetNamespace:Lorg/gradle/api/provider/Property;
+      83: aload_0
+      84: getfield      #54                 // Field refmapTargetNamespace:Lorg/gradle/api/provider/Property;
+      87: invokeinterface #57,  1           // InterfaceMethod org/gradle/api/provider/Property.finalizeValueOnRead:()V
+      92: aload_0
+      93: aload_1
+      94: invokeinterface #21,  1           // InterfaceMethod org/gradle/api/Project.getObjects:()Lorg/gradle/api/model/ObjectFactory;
+      99: ldc           #51                 // class java/lang/String
+     101: ldc           #51                 // class java/lang/String
+     103: invokeinterface #60,  3           // InterfaceMethod org/gradle/api/model/ObjectFactory.mapProperty:(Ljava/lang/Class;Ljava/lang/Class;)Lorg/gradle/api/provider/MapProperty;
+     108: putfield      #64                 // Field messages:Lorg/gradle/api/provider/MapProperty;
+     111: aload_0
+     112: getfield      #64                 // Field messages:Lorg/gradle/api/provider/MapProperty;
+     115: invokeinterface #68,  1           // InterfaceMethod org/gradle/api/provider/MapProperty.finalizeValueOnRead:()V
+     120: aload_0
+     121: aload_1
+     122: invokeinterface #21,  1           // InterfaceMethod org/gradle/api/Project.getObjects:()Lorg/gradle/api/model/ObjectFactory;
+     127: ldc           #25                 // class java/lang/Boolean
+     129: invokeinterface #27,  2           // InterfaceMethod org/gradle/api/model/ObjectFactory.property:(Ljava/lang/Class;)Lorg/gradle/api/provider/Property;
+     134: putfield      #71                 // Field showMessageTypes:Lorg/gradle/api/provider/Property;
+     137: aload_0
+     138: getfield      #71                 // Field showMessageTypes:Lorg/gradle/api/provider/Property;
+     141: iconst_0
+     142: invokestatic  #74                 // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+     145: invokeinterface #78,  2           // InterfaceMethod org/gradle/api/provider/Property.convention:(Ljava/lang/Object;)Lorg/gradle/api/provider/Property;
+     150: invokeinterface #57,  1           // InterfaceMethod org/gradle/api/provider/Property.finalizeValueOnRead:()V
+     155: return
+
+  protected final org.gradle.api.tasks.util.PatternSet add0(org.gradle.api.tasks.SourceSet, java.lang.String);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: aload_0
+       3: getfield      #15                 // Field project:Lorg/gradle/api/Project;
+       6: aload_2
+       7: invokedynamic #81,  0             // InvokeDynamic #2:call:(Ljava/lang/String;)Ljava/util/concurrent/Callable;
+      12: invokeinterface #37,  2           // InterfaceMethod org/gradle/api/Project.provider:(Ljava/util/concurrent/Callable;)Lorg/gradle/api/provider/Provider;
+      17: invokevirtual #84                 // Method add0:(Lorg/gradle/api/tasks/SourceSet;Lorg/gradle/api/provider/Provider;)Lorg/gradle/api/tasks/util/PatternSet;
+      20: areturn
+
+  protected abstract org.gradle.api.tasks.util.PatternSet add0(org.gradle.api.tasks.SourceSet, org.gradle.api.provider.Provider<java.lang.String>);
+
+  public org.gradle.api.provider.Property<java.lang.Boolean> getUseLegacyMixinAp();
+    Code:
+       0: aload_0
+       1: getfield      #47                 // Field useMixinAp:Lorg/gradle/api/provider/Property;
+       4: areturn
+
+  protected void checkMixinApEnabled();
+    Code:
+       0: aload_0
+       1: getfield      #15                 // Field project:Lorg/gradle/api/Project;
+       4: invokestatic  #88                 // InterfaceMethod net/fabricmc/loom/LoomGradleExtension.get:(Lorg/gradle/api/Project;)Lnet/fabricmc/loom/LoomGradleExtension;
+       7: invokeinterface #94,  1           // InterfaceMethod net/fabricmc/loom/LoomGradleExtension.isForge:()Z
+      12: ifeq          16
+      15: return
+      16: aload_0
+      17: invokevirtual #98                 // Method getUseLegacyMixinAp:()Lorg/gradle/api/provider/Property;
+      20: invokeinterface #102,  1          // InterfaceMethod org/gradle/api/provider/Property.get:()Ljava/lang/Object;
+      25: checkcast     #25                 // class java/lang/Boolean
+      28: invokevirtual #105                // Method java/lang/Boolean.booleanValue:()Z
+      31: ifne          44
+      34: new           #108                // class java/lang/IllegalStateException
+      37: dup
+      38: ldc           #110                // String You need to set useLegacyMixinAp = true to configure Mixin annotation processor.
+      40: invokespecial #112                // Method java/lang/IllegalStateException."<init>":(Ljava/lang/String;)V
+      43: athrow
+      44: return
+
+  public org.gradle.api.provider.Property<java.lang.String> getRefmapTargetNamespace();
+    Code:
+       0: aload_0
+       1: invokevirtual #115                // Method checkMixinApEnabled:()V
+       4: aload_0
+       5: getfield      #54                 // Field refmapTargetNamespace:Lorg/gradle/api/provider/Property;
+       8: areturn
+
+  public void add(org.gradle.api.tasks.SourceSet, java.lang.String, org.gradle.api.Action<org.gradle.api.tasks.util.PatternSet>);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: aload_2
+       3: invokevirtual #118                // Method add0:(Lorg/gradle/api/tasks/SourceSet;Ljava/lang/String;)Lorg/gradle/api/tasks/util/PatternSet;
+       6: astore        4
+       8: aload_3
+       9: aload         4
+      11: invokeinterface #121,  2          // InterfaceMethod org/gradle/api/Action.execute:(Ljava/lang/Object;)V
+      16: return
+
+  public void add(org.gradle.api.tasks.SourceSet, java.lang.String);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: aload_2
+       3: invokedynamic #127,  0            // InvokeDynamic #3:execute:()Lorg/gradle/api/Action;
+       8: invokevirtual #130                // Method add:(Lorg/gradle/api/tasks/SourceSet;Ljava/lang/String;Lorg/gradle/api/Action;)V
+      11: return
+
+  public void add(java.lang.String, java.lang.String, org.gradle.api.Action<org.gradle.api.tasks.util.PatternSet>);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: aload_0
+       3: getfield      #15                 // Field project:Lorg/gradle/api/Project;
+       6: aload_2
+       7: invokedynamic #134,  0            // InvokeDynamic #4:call:(Ljava/lang/String;)Ljava/util/concurrent/Callable;
+      12: invokeinterface #37,  2           // InterfaceMethod org/gradle/api/Project.provider:(Ljava/util/concurrent/Callable;)Lorg/gradle/api/provider/Provider;
+      17: aload_3
+      18: invokevirtual #135                // Method add:(Ljava/lang/String;Lorg/gradle/api/provider/Provider;Lorg/gradle/api/Action;)V
+      21: return
+
+  public void add(java.lang.String, org.gradle.api.provider.Provider<java.lang.String>, org.gradle.api.Action<org.gradle.api.tasks.util.PatternSet>);
+    Code:
+       0: aload_0
+       1: aload_0
+       2: aload_1
+       3: invokevirtual #138                // Method resolveSourceSet:(Ljava/lang/String;)Lorg/gradle/api/tasks/SourceSet;
+       6: aload_2
+       7: aload_3
+       8: invokevirtual #142                // Method add:(Lorg/gradle/api/tasks/SourceSet;Lorg/gradle/api/provider/Provider;Lorg/gradle/api/Action;)V
+      11: return
+
+  public void add(org.gradle.api.tasks.SourceSet, org.gradle.api.provider.Provider<java.lang.String>, org.gradle.api.Action<org.gradle.api.tasks.util.PatternSet>);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: aload_2
+       3: invokevirtual #84                 // Method add0:(Lorg/gradle/api/tasks/SourceSet;Lorg/gradle/api/provider/Provider;)Lorg/gradle/api/tasks/util/PatternSet;
+       6: astore        4
+       8: aload_3
+       9: aload         4
+      11: invokeinterface #121,  2          // InterfaceMethod org/gradle/api/Action.execute:(Ljava/lang/Object;)V
+      16: return
+
+  public void add(java.lang.String, java.lang.String);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: aload_2
+       3: invokedynamic #145,  0            // InvokeDynamic #5:execute:()Lorg/gradle/api/Action;
+       8: invokevirtual #146                // Method add:(Ljava/lang/String;Ljava/lang/String;Lorg/gradle/api/Action;)V
+      11: return
+
+  public void add(org.gradle.api.tasks.SourceSet, org.gradle.api.Action<org.gradle.api.tasks.util.PatternSet>);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: aload_0
+       3: invokevirtual #149                // Method getDefaultRefmapName:()Lorg/gradle/api/provider/Property;
+       6: aload_2
+       7: invokevirtual #142                // Method add:(Lorg/gradle/api/tasks/SourceSet;Lorg/gradle/api/provider/Provider;Lorg/gradle/api/Action;)V
+      10: return
+
+  public void add(org.gradle.api.tasks.SourceSet);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokedynamic #152,  0            // InvokeDynamic #6:execute:()Lorg/gradle/api/Action;
+       7: invokevirtual #153                // Method add:(Lorg/gradle/api/tasks/SourceSet;Lorg/gradle/api/Action;)V
+      10: return
+
+  public void add(java.lang.String, org.gradle.api.Action<org.gradle.api.tasks.util.PatternSet>);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: aload_0
+       3: invokevirtual #149                // Method getDefaultRefmapName:()Lorg/gradle/api/provider/Property;
+       6: aload_2
+       7: invokevirtual #135                // Method add:(Ljava/lang/String;Lorg/gradle/api/provider/Provider;Lorg/gradle/api/Action;)V
+      10: return
+
+  public void add(java.lang.String);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: invokedynamic #156,  0            // InvokeDynamic #7:execute:()Lorg/gradle/api/Action;
+       7: invokevirtual #157                // Method add:(Ljava/lang/String;Lorg/gradle/api/Action;)V
+      10: return
+
+  public org.gradle.api.provider.MapProperty<java.lang.String, java.lang.String> getMessages();
+    Code:
+       0: aload_0
+       1: getfield      #64                 // Field messages:Lorg/gradle/api/provider/MapProperty;
+       4: areturn
+
+  public org.gradle.api.provider.Property<java.lang.Boolean> getShowMessageTypes();
+    Code:
+       0: aload_0
+       1: getfield      #71                 // Field showMessageTypes:Lorg/gradle/api/provider/Property;
+       4: areturn
+
+  public void messages(org.gradle.api.Action<org.gradle.api.provider.MapProperty<java.lang.String, java.lang.String>>);
+    Code:
+       0: aload_1
+       1: aload_0
+       2: getfield      #64                 // Field messages:Lorg/gradle/api/provider/MapProperty;
+       5: invokeinterface #121,  2          // InterfaceMethod org/gradle/api/Action.execute:(Ljava/lang/Object;)V
+      10: return
+
+  private org.gradle.api.tasks.SourceSet resolveSourceSet(java.lang.String);
+    Code:
+       0: aload_0
+       1: getfield      #15                 // Field project:Lorg/gradle/api/Project;
+       4: invokeinterface #160,  1          // InterfaceMethod org/gradle/api/Project.getExtensions:()Lorg/gradle/api/plugins/ExtensionContainer;
+       9: ldc           #164                // class org/gradle/api/plugins/JavaPluginExtension
+      11: invokeinterface #166,  2          // InterfaceMethod org/gradle/api/plugins/ExtensionContainer.getByType:(Ljava/lang/Class;)Ljava/lang/Object;
+      16: checkcast     #164                // class org/gradle/api/plugins/JavaPluginExtension
+      19: invokeinterface #172,  1          // InterfaceMethod org/gradle/api/plugins/JavaPluginExtension.getSourceSets:()Lorg/gradle/api/tasks/SourceSetContainer;
+      24: aload_1
+      25: invokeinterface #176,  2          // InterfaceMethod org/gradle/api/tasks/SourceSetContainer.findByName:(Ljava/lang/String;)Ljava/lang/Object;
+      30: checkcast     #182                // class org/gradle/api/tasks/SourceSet
+      33: astore_2
+      34: aload_2
+      35: ifnonnull     52
+      38: new           #184                // class org/gradle/api/InvalidUserDataException
+      41: dup
+      42: aload_1
+      43: invokedynamic #186,  0            // InvokeDynamic #8:makeConcatWithConstants:(Ljava/lang/String;)Ljava/lang/String;
+      48: invokespecial #190                // Method org/gradle/api/InvalidUserDataException."<init>":(Ljava/lang/String;)V
+      51: athrow
+      52: aload_2
+      53: areturn
+
+  private static void lambda$add$7(org.gradle.api.tasks.util.PatternSet);
+    Code:
+       0: return
+
+  private static void lambda$add$6(org.gradle.api.tasks.util.PatternSet);
+    Code:
+       0: return
+
+  private static void lambda$add$5(org.gradle.api.tasks.util.PatternSet);
+    Code:
+       0: return
+
+  private static java.lang.String lambda$add$4(java.lang.String) throws java.lang.Exception;
+    Code:
+       0: aload_0
+       1: areturn
+
+  private static void lambda$add$3(org.gradle.api.tasks.util.PatternSet);
+    Code:
+       0: return
+
+  private static java.lang.String lambda$add0$2(java.lang.String) throws java.lang.Exception;
+    Code:
+       0: aload_0
+       1: areturn
+
+  private static java.lang.String lambda$new$1(org.gradle.api.Project) throws java.lang.Exception;
+    Code:
+       0: aload_0
+       1: invokestatic  #191                // Method net/fabricmc/loom/build/IntermediaryNamespaces.runtimeIntermediary:(Lorg/gradle/api/Project;)Ljava/lang/String;
+       4: areturn
+
+  private static java.lang.Boolean lambda$new$0(org.gradle.api.Project) throws java.lang.Exception;
+    Code:
+       0: aload_0
+       1: invokestatic  #88                 // InterfaceMethod net/fabricmc/loom/LoomGradleExtension.get:(Lorg/gradle/api/Project;)Lnet/fabricmc/loom/LoomGradleExtension;
+       4: invokeinterface #197,  1          // InterfaceMethod net/fabricmc/loom/LoomGradleExtension.isNeoForge:()Z
+       9: ifne          43
+      12: aload_0
+      13: invokestatic  #88                 // InterfaceMethod net/fabricmc/loom/LoomGradleExtension.get:(Lorg/gradle/api/Project;)Lnet/fabricmc/loom/LoomGradleExtension;
+      16: invokeinterface #94,  1           // InterfaceMethod net/fabricmc/loom/LoomGradleExtension.isForge:()Z
+      21: ifeq          39
+      24: aload_0
+      25: invokestatic  #88                 // InterfaceMethod net/fabricmc/loom/LoomGradleExtension.get:(Lorg/gradle/api/Project;)Lnet/fabricmc/loom/LoomGradleExtension;
+      28: invokeinterface #200,  1          // InterfaceMethod net/fabricmc/loom/LoomGradleExtension.getForgeProvider:()Lnet/fabricmc/loom/configuration/providers/forge/ForgeProvider;
+      33: invokevirtual #204                // Method net/fabricmc/loom/configuration/providers/forge/ForgeProvider.usesMojangAtRuntime:()Z
+      36: ifne          43
+      39: iconst_1
+      40: goto          44
+      43: iconst_0
+      44: invokestatic  #74                 // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+      47: areturn
+}

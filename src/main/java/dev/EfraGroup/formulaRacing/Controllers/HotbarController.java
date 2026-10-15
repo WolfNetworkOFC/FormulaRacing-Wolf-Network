@@ -162,11 +162,11 @@ public class HotbarController {
                             player.performCommand("event leave");
                             break;
                         case "spawn":
-                            // Delete the player's boat BEFORE teleporting so it doesn't get
-                            // orphaned at the track when the external /spawn moves them.
-                            // The SpawnBoatCleanupListener handles hotbar restore + state cleanup.
-                            this.plugin.getAPI().removePlayerBoat(player.getUniqueId());
-                            player.performCommand("spawn");
+                            // Usa o /spawn interno do FormulaRacing (config.yml).
+                            // "frspawn" é o alias exclusivo nosso — "spawn" puro pode
+                            // cair no comando de outro plugin (Essentials etc).
+                            // O SpawnCommand já deleta o barco e limpa o estado.
+                            player.performCommand("frspawn");
                             break;
                         case "settings":
                             (new SettingsMenu(this.plugin, player)).show(player);

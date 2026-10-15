@@ -10,10 +10,11 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
 /**
- * Ensures a player's boat is removed before they are teleported to spawn.
- * The /spawn command is handled by an external plugin, so we intercept it here and
- * delete the boat first — otherwise it gets orphaned at the track.
- * Also restores the default hotbar after teleport to spawn.
+ * Ensures a player's boat is removed before they are teleported to spawn
+ * and restores the default hotbar afterwards.
+ * Intercepts /spawn (que pode ser de plugin externo), /frspawn e /lobby
+ * (comando interno do FormulaRacing) — a limpeza é idempotente, então rodar
+ * junto com o SpawnCommand não causa problema.
  */
 public class SpawnBoatCleanupListener implements Listener {
     private final FormulaRacing plugin;
@@ -31,7 +32,7 @@ public class SpawnBoatCleanupListener implements Listener {
             return;
         }
         String command = message.toLowerCase().split(" ")[0];
-        if (command.equals("/spawn")) {
+        if (command.equals("/spawn") || command.equals("/frspawn") || command.equals("/lobby")) {
             Player player = event.getPlayer();
             UUID uuid = player.getUniqueId();
             this.plugin.getAPI().removePlayerBoat(uuid);
