@@ -30,7 +30,17 @@ public class HologramManager {
     private static final NamespacedKey HOLO_TAG = new NamespacedKey("formularacing", "hologram");
 
     private static String resolvePAPI(String text) {
-        return PlaceholderAPI.setPlaceholders(null, text);
+        if (text == null) {
+            return null;
+        }
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
+            return text;
+        }
+        try {
+            return PlaceholderAPI.setPlaceholders(null, text);
+        } catch (Throwable t) {
+            return text;
+        }
     }
 
     public HologramManager(JavaPlugin plugin) {

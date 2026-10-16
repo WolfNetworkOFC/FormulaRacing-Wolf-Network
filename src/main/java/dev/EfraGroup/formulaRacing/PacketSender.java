@@ -1,5 +1,6 @@
 package dev.EfraGroup.formulaRacing;
 
+import dev.EfraGroup.formulaRacing.BoatUtils.OpenBoatUtilsVersion;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import java.util.logging.Level;
@@ -9,6 +10,7 @@ import org.bukkit.entity.Player;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class PacketSender {
@@ -19,7 +21,39 @@ public class PacketSender {
         this.db = db;
     }
 
+    private final ThreadLocal<List<byte[]>> compoundSegments = new ThreadLocal<>();
+
+    private byte[] buildSetting(short packetId, Object... values) throws IOException {
+        ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(byteStream);
+
+        out.writeShort(packetId); // ID do pacote
+
+        for (Object value : values) {
+            if (value instanceof Boolean b) out.writeBoolean(b);
+            else if (value instanceof Float f) out.writeFloat(f);
+            else if (value instanceof Double d) out.writeDouble(d);
+            else if (value instanceof Integer i) out.writeInt(i);
+            else if (value instanceof Short s) out.writeShort(s);
+            else if (value instanceof Byte b) out.writeByte(b);
+            else if (value instanceof String str) writeStringUtf8(out, str);
+        }
+
+        return byteStream.toByteArray();
+    }
+
     public void sendBoatSetting(Player player, int packetId, Object... values) {
+        List<byte[]> segs = compoundSegments.get();
+        if (segs != null) {
+            try {
+                segs.add(buildSetting((short) packetId, values));
+            } catch (IOException e) {
+                Bukkit.getLogger().severe("[FormulaRacing] Falha ao serializar pacote OpenBoatUtils (compound): " + e.getMessage());
+                e.printStackTrace();
+            }
+            return;
+        }
+
         try {
             ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
             DataOutputStream out = new DataOutputStream(byteStream);
@@ -42,6 +76,24 @@ public class PacketSender {
             Bukkit.getLogger().severe("[FormulaRacing] Falha ao enviar pacote OpenBoatUtils: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private void writeStringUtf8(DataOutputStream out, String stringValue) throws IOException {
+        byte[] bytes = stringValue.getBytes(StandardCharsets.UTF_8);
+        int length = bytes.length;
+        final int SEGMENT_BITS = 0x7F;
+        final int CONTINUE_BIT = 0x80;
+
+        while (true) {
+            if ((length & ~SEGMENT_BITS) == 0) {
+                out.writeByte(length);
+                break;
+            }
+            out.writeByte((length & SEGMENT_BITS) | CONTINUE_BIT);
+            length >>>= 7;
+        }
+
+        out.write(bytes);
     }
 
     private void writeString(DataOutputStream out, String stringValue) throws IOException {
@@ -67,6 +119,13 @@ public class PacketSender {
             return; // não tem boatutils nessa pista
         }
 
+        // COMPOUND (id 33) só existe a partir da versão 20 do mod (0.5.1b+).
+        // Clientes mais antigos não conhecem esse id; nesse caso enviamos pacote a pacote.
+        boolean useCompound = OpenBoatUtilsVersion.hasMinVersion(player.getUniqueId(), 20);
+        if (useCompound) {
+            compoundSegments.set(new ArrayList<>());
+        }
+        try {
         // sempre reseta para vanilla antes de aplicar, pra não acumular settings de pistas anteriores
         sendBoatSetting(player, (short) 0);
 
@@ -355,6 +414,27 @@ public class PacketSender {
             float value = Float.parseFloat(pieces[1]);
             String blocks = pieces.length > 2 ? pieces[2] : "";
             sendBoatSetting(player, (short)26, settingId, value, blocks);
+        }
+        } finally {
+            if (useCompound) {
+                List<byte[]> segs = compoundSegments.get();
+                compoundSegments.remove();
+                if (segs != null && !segs.isEmpty()) {
+                    try {
+                        ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+                        DataOutputStream out = new DataOutputStream(byteStream);
+                        out.writeShort(33); // COMPOUND
+                        out.writeInt(segs.size());
+                        for (byte[] seg : segs) {
+                            out.write(seg);
+                        }
+                        player.sendPluginMessage(FormulaRacing.getInstance(), "openboatutils:settings", byteStream.toByteArray());
+                    } catch (IOException e) {
+                        Bukkit.getLogger().severe("[FormulaRacing] Falha ao enviar pacote OpenBoatUtils (compound): " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                }
+            }
         }
     }
 
