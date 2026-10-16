@@ -1188,6 +1188,23 @@ public class Heats {
                     "Heat " + this.id + " finished (roundId=" + this.round.getId() + ") — no auto-advance; next heat awaits manual start."
                 );
                 this.round.onHeatFinished();
+
+                // QuickRace (/race create and /voterace): when the single FINAL
+                // round/heat ends, finish the round and event automatically.
+                Events event = this.round.getEvent();
+                if (event != null && event.getDisplayName() != null
+                        && event.getDisplayName().startsWith("QuickRace_")) {
+                    boolean allHeatsFinished = this.round.getHeats().values().stream()
+                            .allMatch(h -> h.getHeatState() == HeatState.FINISHED);
+                    boolean isLastRound = this.round.getRoundIndex() >= event.getEventSchedule().getRoundCount();
+                    if (allHeatsFinished && isLastRound
+                            && this.round.getRoundState() != RoundState.FINISHED) {
+                        this.round.finishRound();
+                    }
+                    if (this.round.getRoundState() == RoundState.FINISHED) {
+                        event.finish();
+                    }
+                }
             }
             if (teleportToSpawn) {
                 Location targetLoc =
