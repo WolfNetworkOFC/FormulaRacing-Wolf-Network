@@ -182,6 +182,7 @@ public class QualifyingSession implements SessionLogic {
             driver.setState(DriverState.LAPRESET);
             Location spawn = heat.getPlugin().getDatabaseManager().getTrackSpawn(heat.getTrackNameWS());
             if (spawn != null && player != null) {
+                heat.getPlugin().getAPI().recoverPlayerBoatState(player);
                 SchedulerHelper.teleportAsync(player, spawn).thenAccept(success -> {
                     SchedulerHelper.runTask(heat.getPlugin(), () -> {
                         if (player.isOnline()) {
@@ -239,6 +240,8 @@ public class QualifyingSession implements SessionLogic {
 
             Location spawn = heat.getPlugin().getDatabaseManager().getTrackSpawn(heat.getTrackNameWS());
             if (spawn != null && player != null) {
+                // Folia: leave the boat (and delete it) before teleporting.
+                heat.getPlugin().getAPI().recoverPlayerBoatState(player);
                 SchedulerHelper.teleportAsync(player, spawn).thenAccept(success -> {
                     SchedulerHelper.runTask(heat.getPlugin(), () -> {
                         if (player.isOnline()) {
