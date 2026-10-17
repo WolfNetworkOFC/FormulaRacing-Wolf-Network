@@ -8,7 +8,7 @@ Documento comparando o plugin **TimingSystem** (FrostHexABG/Makkuusen) com o **F
 |---------|:------------:|:-------------:|
 | Tipo de plugin | Bukkit/Paper (Java 21) | Paper/Folia (Java 25) |
 | Foco principal | Time trials (barco/elytra/parkour) + eventos | Corridas estilo F1 completas (barcos) |
-| Tipos de pista | Boat, Elytra, Parkour | Boat (com blocos parkour como superfície) |
+| Tipos de pista | Boat, Elytra, Parkour (fora do escopo) | Boat (com blocos parkour como superfície) |
 | Idiomas | ~? (lang/) | 32 |
 | Banco de dados | SQLite/MySQL/MariaDB | SQLite/MySQL/MariaDB (HikariCP) |
 | REST API | Add-on separado | Embutida (Spark Java) |
@@ -17,32 +17,23 @@ Documento comparando o plugin **TimingSystem** (FrostHexABG/Makkuusen) com o **F
 
 ## ✅ O que o TimingSystem tem e o FormulaRacing NÃO tem
 
-### 1. Time Trials de Elytra
-- TimingSystem suporta pistas do tipo `ELYTRA` (asas descartáveis dadas ao jogador, proteção de elytra).
-- FormulaRacing é focado apenas em barcos; não há modo de time trial com elytra.
-- **Arquivos relevantes (TimingSystem):** `track/Track.java` (`isElytraTrack`, `TrackType.ELYTRA`), `ApiUtilities.giveElytra`, `TSListener.onPlayerMoveEventRemoveElytra`.
-
-### 2. Time Trials de Parkour (a pé)
-- TimingSystem suporta pistas do tipo `PARKOUR` (jogador correndo a pé, checkpoints).
-- FormulaRacing tem blocos "parkour" apenas como superfície de pistas de barco, não time trials a pé.
-- **Arquivos relevantes (TimingSystem):** `Track.TrackType.PARKOUR`.
-
-### 3. Integração com BlueMap
+### 1. Integração com BlueMap
 - TimingSystem tem o add-on `TimingSystemBlueMap` que adiciona localizações de pistas ao BlueMap.
 - FormulaRacing não possui integração com BlueMap.
 - **Possível port:** criar módulo similar usando a API do BlueMap.
 
-### 4. No-Boat-Collisions como add-on separado
+### 2. No-Boat-Collisions como add-on separado
 - TimingSystem distribui `TimingSystemNoBoatCollisions` como plugin separado.
 - FormulaRacing já possui modos de colisão (`CollisionMode`: HIGH/LOW/DISABLED) embutidos, então é equivalente/mais completo.
 
-### 5. Faixa de servidor / FAWE
+### 3. Faixa de servidor / FAWE
 - TimingSystem exige FastAsyncWorldEdit (FAWE) para criação de pistas.
 - FormulaRacing usa WorldEdit padrão. (Diferença de dependência, não feature.)
 
-### 6. Tipos de pista (TrackType)
+### 4. Tipos de pista (TrackType)
 - TimingSystem: `BOAT`, `ELYTRA`, `PARKOUR`.
 - FormulaRacing: apenas barcos (com variações de superfície/blocos).
+- Nota: time trials de elytra/parkour não fazem parte do escopo do FormulaRacing; apenas barcos são suportados.
 
 ## 🔄 Equivalências (TimingSystem tem, FormulaRacing também tem, de forma equivalente ou melhor)
 
@@ -97,10 +88,8 @@ Documento comparando o plugin **TimingSystem** (FrostHexABG/Makkuusen) com o **F
 
 ## 🎯 Gaps prioritários a portar do TimingSystem para o FormulaRacing
 
-1. **Elytra time trials** — adicionar `TrackType.ELYTRA` e lógica de dar/remover elytra (maior gap de gameplay).
-2. **Parkour time trials (a pé)** — modo de time trial sem barco.
-3. **Integração BlueMap** — portar `TimingSystemBlueMap` como módulo opcional.
-4. **TrackType enum** — introduzir conceito de tipo de pista (BOAT/ELYTRA/PARKOUR) no FormulaRacing.
+1. **Integração BlueMap** — portar `TimingSystemBlueMap` como módulo opcional.
+2. (Demais features do TimingSystem já têm equivalente ou são superiores no FormulaRacing.)
 
 ## 📝 Notas
 
