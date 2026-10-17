@@ -1108,6 +1108,11 @@ public class Heats {
     }
 
     public void finishHeat(boolean teleportToSpawn) {
+        // DRS: stop this heat's polling loop and restore/clear its state
+        // (active boost, arming, boss bars) right away.
+        if (this.plugin.getDRS() != null) {
+            this.plugin.getDRS().stopDrsTask(this);
+        }
         if (
             this.heatState != HeatState.RACING &&
             this.heatState != HeatState.PRACTICE &&

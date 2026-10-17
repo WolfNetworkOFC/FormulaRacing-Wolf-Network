@@ -56,6 +56,38 @@ public class TrackCommand extends BaseCommand {
         this.onDefault(sender);
     }
 
+    @Subcommand("info")
+    @CommandCompletion("@tracks")
+    @Description("Mostra informacoes de uma pista")
+    public void onInfo(CommandSender sender, String trackName) {
+        if (!this.dbManager.isTrackExists(trackName)) {
+            sender.sendMessage("§cPista '" + trackName + "' nao encontrada.");
+            return;
+        }
+        String trackNameWS = trackName.replaceAll("\\s+", "").toLowerCase();
+        String owner = this.dbManager.getTrackOwner(trackNameWS);
+        sender.sendMessage("§6§l========== Track Info ==========");
+        sender.sendMessage("§e Name: §f" + trackName);
+        sender.sendMessage("§e Owner: §f" + (owner != null ? owner : "N/A"));
+        List<String> tags = this.dbManager.getTrackTags(trackNameWS);
+        if (!tags.isEmpty()) {
+            sender.sendMessage("§e Tags: §f" + String.join("§e, §f", tags));
+        }
+        List<String> contribs = this.dbManager.getTrackContributors(trackNameWS);
+        if (!contribs.isEmpty()) {
+            StringBuilder cb = new StringBuilder("§e Contributors: §f");
+            boolean first = true;
+            for (String uuid : contribs) {
+                if (!first) cb.append("§e, §f");
+                first = false;
+                org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(java.util.UUID.fromString(uuid));
+                cb.append(op.getName() != null ? op.getName() : uuid);
+            }
+            sender.sendMessage(cb.toString());
+        }
+        sender.sendMessage("§6§l================================");
+    }
+
     @Subcommand("times")
     @CommandCompletion("@tracks @nothing")
     @Description("Mostra os tempos de uma pista")

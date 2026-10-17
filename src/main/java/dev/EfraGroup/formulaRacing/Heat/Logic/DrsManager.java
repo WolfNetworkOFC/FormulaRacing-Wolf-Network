@@ -8,6 +8,7 @@ import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRTheme;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeResolver;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * DRS (Drag Reduction System) rebuilt on the TimingSystem (FrostHex) model.
@@ -64,7 +66,16 @@ public class DrsManager {
     /** Forward acceleration to restore when the boost ends. */
     private static final Map<UUID, Float> preDrsForwardAccel = new ConcurrentHashMap<>();
 
-    private volatile boolean taskRunning = false;
+    /**
+     * Heat IDs whose polling loop is alive. Per heat on purpose: this manager is a
+     * plugin-wide singleton, so the old shared boolean let one heat ending cancel
+     * every other heat still racing with DRS (parallel heats/grids).
+     */
+    private final Map<Integer, Boolean> activeDrsLoops = new ConcurrentHashMap<>();
+    /** Main polling task per heat, so a single heat can be stopped deterministically. */
+    private final Map<Integer, FRTask> drsLoopTasks = new ConcurrentHashMap<>();
+    /** One stale-detection cleanup timer for the whole manager. */
+    private final AtomicBoolean cleanupTimerStarted = new AtomicBoolean(false);
 
     public DrsManager(RaceSession rs, FormulaRacing plugin, PacketSender ps) {
         this.rs = rs;
@@ -122,6 +133,9 @@ public class DrsManager {
         if (player == null || !player.isOnline() || this.ps == null) {
             return;
         }
+        // Block only when the boost is already applied: permission-armed players
+        // (drsEnabledPlayers) are precisely the ones consuming it right here, so
+        // they must NOT be treated as "active".
         if (isDrsActive(player.getUniqueId())) {
             return;
         }
@@ -264,8 +278,9 @@ public class DrsManager {
         return drsEnabledPlayers.containsKey(playerId);
     }
 
+    /** Whether the DRS forward-acceleration boost is currently applied to this player. */
     public boolean isDrsActive(UUID playerId) {
-        return activeDrsPlayers.containsKey(playerId) || drsEnabledPlayers.containsKey(playerId);
+        return activeDrsPlayers.containsKey(playerId);
     }
 
     // ------------------------------------------------------------------
@@ -283,13 +298,22 @@ public class DrsManager {
             return;
         }
 
-        taskRunning = true;
+        // Per-heat bookkeeping (restart-safe: a heat starting twice must not
+        // leave two loops polling it).
+        FRTask previousTask = this.drsLoopTasks.remove(heat.getId());
+        if (previousTask != null) {
+            previousTask.cancel();
+        }
+        this.activeDrsLoops.put(heat.getId(), Boolean.TRUE);
 
         // Prune stale crossings periodically: a driver who fell out of the
         // heat, or a long event running many heats, would otherwise keep the
         // per-region maps growing forever. Runs off the global region so it
-        // never blocks on an entity thread.
-        SchedulerHelper.runAsyncTimer(this.plugin, () -> cleanupOldDetections(), 100L, 100L);
+        // never blocks on an entity thread. One timer for the whole manager —
+        // this used to be scheduled once per heat start, forever, uncancelled.
+        if (this.cleanupTimerStarted.compareAndSet(false, true)) {
+            SchedulerHelper.runAsyncTimer(this.plugin, this::cleanupOldDetections, 100L, 100L);
+        }
 
         // NOTE: a bossbar NÃO é criada aqui para todos os pilotos. Ela nasce
         // sob demanda em playerPassedDrsDetect (ao cruzar o detect com gap
@@ -297,28 +321,14 @@ public class DrsManager {
         // no end / fim do heat. Criar aqui fazia a barra aparecer já na
         // largada para todo mundo, mesmo sem permissão de DRS.
 
-        SchedulerHelper.runTaskTimer(heat.getPlugin(), (scheduledTask) -> {
-            if (!taskRunning) {
+        FRTask loopTask = SchedulerHelper.runTaskTimer(heat.getPlugin(), (scheduledTask) -> {
+            if (!this.activeDrsLoops.containsKey(heat.getId())) {
                 scheduledTask.cancel();
                 return;
             }
 
             if (heat.getHeatState() != HeatState.RACING || !heat.isDrsEnabled()) {
-                SchedulerHelper.runTask(this.plugin, () -> {
-                    for (Driver d : heat.getDrivers().values()) {
-                        Player online = Bukkit.getPlayer(d.getUuid());
-                        if (online != null && online.isOnline()) {
-                            // A heat that ends mid-boost must not strand the
-                            // player at the boosted acceleration.
-                            if (d.isDrsActive()) {
-                                stopDrsBoost(online, d, heat);
-                            } else {
-                                destroyBossBar(d);
-                            }
-                        }
-                    }
-                });
-                taskRunning = false;
+                this.retireHeat(heat);
                 scheduledTask.cancel();
                 return;
             }
@@ -387,22 +397,50 @@ public class DrsManager {
                 }
             }
         }, 0L, 2L);
+        this.drsLoopTasks.put(heat.getId(), loopTask);
     }
 
     /**
      * Stops the loop, restores any live boost and clears the boss bars.
+     * Called when a heat shuts down (Heats#finishHeat); idempotent, so a loop
+     * noticing the state change on its own is handled the same way.
      */
     public void stopDrsTask(Heats heat) {
-        taskRunning = false;
+        if (heat != null) {
+            this.retireHeat(heat);
+        }
+    }
+
+    /**
+     * Tears down the polling loop and clears all DRS state owned by one heat
+     * (active boost, arming/permissions, boss bars). The player-facing cleanup
+     * runs on the next main-thread pass and calling this more than once is safe.
+     */
+    private void retireHeat(Heats heat) {
+        boolean wasRunning = this.activeDrsLoops.remove(heat.getId()) != null;
+        FRTask task = this.drsLoopTasks.remove(heat.getId());
+        if (task != null) {
+            task.cancel();
+        }
+        if (!wasRunning && task == null) {
+            return;
+        }
+
         SchedulerHelper.runTask(this.plugin, () -> {
-            if (heat != null && heat.getDrivers() != null) {
-                for (Driver d : heat.getDrivers().values()) {
-                    Player online = Bukkit.getPlayer(d.getUuid());
-                    if (online != null && online.isOnline() && d.isDrsActive()) {
-                        stopDrsBoost(online, d, heat);
-                    }
+            if (heat.getDrivers() == null) {
+                return;
+            }
+            for (Driver d : heat.getDrivers().values()) {
+                Player online = Bukkit.getPlayer(d.getUuid());
+                if (online != null && online.isOnline() && d.isDrsActive()) {
+                    // A heat that ends mid-boost must not strand the player at
+                    // the boosted acceleration.
+                    stopDrsBoost(online, d, heat);
+                } else {
                     destroyBossBar(d);
                 }
+                // Arming/permissions must not leak into the player's next heat.
+                cleanupPlayer(d.getUuid());
             }
         });
     }
