@@ -1196,6 +1196,9 @@ public class RegionListener implements Listener {
             }
 
             this.timerUtils.stopTimer(player, regionTrackWS);
+            if (this.plugin.getScoreboardTimeTrialUtils() != null) {
+                this.plugin.getScoreboardTimeTrialUtils().recordFinish(player, officialTime.getOfficialMillis());
+            }
             this.timeTrialController.endSession(player);
             if (shouldLoop) {
                 this.startSoloTimer(
@@ -1206,6 +1209,8 @@ public class RegionListener implements Listener {
                     System.currentTimeMillis(),
                     System.nanoTime()
                 );
+            } else if (this.plugin.getScoreboardTimeTrialUtils() != null) {
+                this.plugin.getScoreboardTimeTrialUtils().clearSession(player);
             }
         });
     }

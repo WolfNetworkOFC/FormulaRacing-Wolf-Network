@@ -33,7 +33,37 @@ public class ScoreboardTimeTrialUtils {
         new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> enabledCache = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastEnabledCheck = new ConcurrentHashMap<>();
-    private final Map<UUID, Boolean> compactCache = new ConcurrentHashMap<>();
+    private final Map<UUID, List<Long>> sessionFinishes = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> sessionAttempts = new ConcurrentHashMap<>();
+
+    public void recordAttempt(Player player) {
+        if (player == null) return;
+        this.sessionAttempts.merge(player.getUniqueId(), 1, Integer::sum);
+        this.sessionFinishes.putIfAbsent(player.getUniqueId(), new ArrayList<>());
+    }
+
+    public void recordFinish(Player player, long timeMillis) {
+        if (player == null) return;
+        this.sessionFinishes
+            .computeIfAbsent(player.getUniqueId(), k -> new ArrayList<>())
+            .add(timeMillis);
+    }
+
+    public void clearSession(Player player) {
+        if (player == null) return;
+        this.sessionFinishes.remove(player.getUniqueId());
+        this.sessionAttempts.remove(player.getUniqueId());
+    }
+
+    public List<Long> getSessionFinishes(Player player) {
+        if (player == null) return new ArrayList<>();
+        return new ArrayList<>(this.sessionFinishes.getOrDefault(player.getUniqueId(), new ArrayList<>()));
+    }
+
+    public int getSessionAttempts(Player player) {
+        if (player == null) return 0;
+        return this.sessionAttempts.getOrDefault(player.getUniqueId(), 0);
+    }
     private final Map<UUID, Long> lastCompactCheck = new ConcurrentHashMap<>();
     private static final long SETTINGS_TTL = 5000L;
 
@@ -72,10 +102,15 @@ public class ScoreboardTimeTrialUtils {
         String trackName,
         String ownerName
     ) {
+        String lastTrack = this.playerTracks.get(player.getUniqueId());
+        if (lastTrack == null || !lastTrack.equalsIgnoreCase(trackName)) {
+            this.clearSession(player);
+        }
         this.playerTracks.put(player.getUniqueId(), trackName);
         if (ownerName != null) {
             this.playerTrackOwners.put(player.getUniqueId(), ownerName);
         }
+        this.recordAttempt(player);
         this.show(player, trackName);
     }
 
@@ -173,55 +208,39 @@ public class ScoreboardTimeTrialUtils {
     }
 
     private void updateBoard(Player player, String trackName) {
-        List<DatabaseManager.TrackRecord> allRecords;
-        CachedLeaderboard cached = this.leaderboardCache.get(trackName);
-
-        if (cached == null || cached.isExpired(10000L)) {
-            allRecords = this.mysql.getTopTimes(trackName);
-            if (allRecords == null) {
-                allRecords = new ArrayList<>();
-            }
-            // Ordering must mirror getTopTimes() exactly, otherwise the position shown
-            // next to a player disagrees with getPlayerRank(). Note checkpointsReached
-            // ranks UNFINISHED runs only — the SQL guards it with
-            // "CASE WHEN finished = 0", so applying it to finished runs (as the previous
-            // comparator did) scrambled the board into non-ascending times. official_ticks
-            // is the primary key; getTime() alone is only the display_millis fallback.
-            allRecords.sort(ScoreboardTimeTrialUtils::compareBoardRecords);
-            this.leaderboardCache.put(
-                trackName,
-                new CachedLeaderboard(allRecords)
-            );
-        } else {
-            allRecords = cached.records;
-        }
-
-        int myPos = -1;
-        for (int i = 0; i < allRecords.size(); i++) {
-            if (allRecords.get(i).getPlayerName().equals(player.getName())) {
-                myPos = i;
-                break;
-            }
-        }
-
         TranslationUtil tu = FormulaRacing.getInstance().getTranslationUtil();
         this.adapter.updateTitle(
             player,
             this.boldTitle(tu.getTranslated(player, "scoreboard_tt_title"))
         );
-        // Compact mode (/settings compact) shrinks the board horizontally.
-        boolean compact = this.isCompactMode(player);
-        String footer = "§ewolfnetwork.com.br";
+
+        List<Long> finishes = this.getSessionFinishes(player);
+        int attempts = this.getSessionAttempts(player);
+        if (attempts == 0) {
+            attempts = finishes.size();
+        }
+
+        long totalFinishes = finishes.size();
+        long totalTime = 0L;
+        long bestTime = -1L;
+        long slowestTime = -1L;
+        for (long t : finishes) {
+            totalTime += t;
+            if (bestTime == -1L || t < bestTime) bestTime = t;
+            if (slowestTime == -1L || t > slowestTime) slowestTime = t;
+        }
+        long averageTime = (totalFinishes > 0) ? (totalTime / totalFinishes) : -1L;
+        long percentage = (attempts > 0) ? (totalFinishes * 100 / attempts) : 0L;
+
+        java.awt.Color color = null;
+        String finishColor = "§c";
+        if (percentage > 67) finishColor = "§a";
+        else if (percentage > 33) finishColor = "§e";
 
         List<String> lines = new ArrayList<>();
         lines.add(
             "§f§l" +
-                tu.getTranslated(
-                    player,
-                    "scoreboard_tt_track",
-                    "{track}",
-                    trackName
-                )
+                tu.getTranslated(player, "scoreboard_tt_track", "{track}", trackName)
         );
 
         String creator = this.playerTrackOwners.getOrDefault(
@@ -234,86 +253,41 @@ public class ScoreboardTimeTrialUtils {
                 this.trackOwnerCache.put(trackName, creator);
             }
         }
-
         if (creator != null) {
-            lines.add(
-                "§f§l" +
-                    tu.getTranslated(
-                        player,
-                        "scoreboard_tt_by",
-                        "{creator}",
-                        creator
-                    )
-            );
+            lines.add("§f§l" + tu.getTranslated(player, "scoreboard_tt_by", "{creator}", creator));
         }
 
         lines.add("");
-        lines.add(this.boldTitle("§e" + tu.getTranslated(player, "scoreboard_tt_leaderboard")));
+        lines.add("§e" + "Finishes: " + finishColor + totalFinishes + "/" + attempts + " (" + percentage + "%)");
+        lines.add("§e" + "Average: " + (averageTime != -1L ? formatMs(averageTime) : "(-)"));
+        lines.add("§a" + "Best: " + (bestTime != -1L ? formatMs(bestTime) : "(-)"));
 
-        // Track board positions by index into allRecords instead of by record object:
-        // allRecords.indexOf(tr) resolved by identity (TrackRecord has no equals)
-        // and was O(n^2) across the rows rendered every second per viewer.
-        List<Integer> neighborIndexes = new ArrayList<>();
-        DatabaseManager.TrackRecord firstPlace = null;
-        boolean includeSeparator = false;
-        int footerLines = 3;
-        int availableForEntries = Math.max(
-            3,
-            MAX_LINES - lines.size() - footerLines
-        );
-
-        if (myPos == -1 || myPos < 5) {
-            int limit = Math.min(allRecords.size(), availableForEntries);
-            for (int i = 0; i < limit; i++) {
-                neighborIndexes.add(i);
+        lines.add("");
+        int count = finishes.size();
+        int limit = Math.max(0, count - 10);
+        if (count != 0) {
+            for (int i = count; i > limit; i--) {
+                long time = finishes.get(i - 1);
+                String lineColor = "§7";
+                if (time == bestTime) lineColor = "§a";
+                else if (time == slowestTime) lineColor = "§c";
+                lines.add("§f" + i + ". " + lineColor + formatMs(time));
             }
-        } else {
-            boolean canShowLeaderAndStillCenter = availableForEntries >= 7;
-            int neighborsLimit = availableForEntries;
-            int minIndex = 0;
-            if (canShowLeaderAndStillCenter) {
-                firstPlace = allRecords.get(0);
-                includeSeparator = true;
-                neighborsLimit -= 2;
-                minIndex = 1;
-            }
-            int start = Math.max(minIndex, myPos - neighborsLimit / 2);
-            int end = Math.min(
-                allRecords.size() - 1,
-                start + neighborsLimit - 1
-            );
-            start = Math.max(minIndex, end - neighborsLimit + 1);
-            for (int i = start; i <= end; i++) {
-                if (canShowLeaderAndStillCenter && i == 0) {
-                    continue;
-                }
-                neighborIndexes.add(i);
-            }
-        }
-
-        if (firstPlace != null) {
-            lines.add(
-                formatRecordLine(firstPlace, 1, player.getName(), player, compact)
-            );
-        }
-        if (includeSeparator) {
-            lines.add("");
-        }
-        for (int index : neighborIndexes) {
-            lines.add(
-                formatRecordLine(
-                    allRecords.get(index),
-                    index + 1,
-                    player.getName(),
-                    player,
-                    compact
-                )
-            );
         }
 
         lines.add("");
-        lines.add(footer);
+        lines.add("§ewolfnetwork.com.br");
         this.adapter.updateLines(player, lines);
+    }
+
+    private static String formatMs(long ms) {
+        long minutes = ms / 60000L;
+        long seconds = (ms % 60000L) / 1000L;
+        long millis = ms % 1000L;
+        if (minutes > 0) {
+            return String.format("%02d:%02d.%03d", minutes, seconds, millis);
+        }
+        return String.format("%02d.%03d", seconds, millis);
     }
 
     /**

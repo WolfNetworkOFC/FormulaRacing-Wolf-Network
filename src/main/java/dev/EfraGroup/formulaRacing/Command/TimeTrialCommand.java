@@ -280,6 +280,9 @@ import dev.EfraGroup.formulaRacing.PacketSender;
         public void onCancel(Player player) {
             this.timerUtils.stopTimer(player);
             this.timeTrialController.endSession(player);
+            if (this.plugin.getScoreboardTimeTrialUtils() != null) {
+                this.plugin.getScoreboardTimeTrialUtils().clearSession(player);
+            }
             if (this.plugin.getWolfTimingService() != null) {
                 this.plugin.getWolfTimingService().abort(player.getUniqueId(), true);
             }
