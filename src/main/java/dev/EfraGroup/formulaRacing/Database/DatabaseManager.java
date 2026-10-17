@@ -352,10 +352,12 @@ public class DatabaseManager {
                     worldName TEXT, icon_name TEXT, open INTEGER DEFAULT 0,
                     TAGS TEXT DEFAULT '',
                     DIFFICULTY TEXT DEFAULT '',
+                    gridsPerRow INTEGER DEFAULT 0,
                     minVersion TEXT DEFAULT NULL
                 )"""
             );
             ensureTrackMinVersionColumn(connection);
+            ensureTrackGridsPerRowColumn(connection);
 
             stmt.executeUpdate(
                 """
@@ -420,7 +422,7 @@ public class DatabaseManager {
                 "CREATE TABLE IF NOT EXISTS fr_rounds (id INTEGER PRIMARY KEY AUTOINCREMENT, eventId INTEGER NOT NULL, roundIndex INTEGER NOT NULL DEFAULT 1, type TEXT DEFAULT NULL, state TEXT NOT NULL)"
             );
             stmt.executeUpdate(
-                "CREATE TABLE IF NOT EXISTS fr_heats (id INTEGER PRIMARY KEY AUTOINCREMENT, roundId INTEGER NOT NULL, heatNumber INTEGER NOT NULL, state TEXT NOT NULL, startTime INTEGER DEFAULT NULL, endTime INTEGER DEFAULT NULL, fastestLapUUID TEXT, totalLaps INTEGER DEFAULT NULL, totalPitstops INTEGER DEFAULT NULL, timeLimit INTEGER DEFAULT NULL, startDelay INTEGER DEFAULT NULL, maxDrivers INTEGER DEFAULT NULL, lonely INTEGER DEFAULT NULL, canReset INTEGER DEFAULT NULL, lapReset INTEGER DEFAULT NULL, colisao TEXT DEFAULT 'DISABLED', drs INTEGER DEFAULT 0, driverswap INTEGER DEFAULT 0, drsdowntime REAL DEFAULT 0.0, drsdownpower REAL DEFAULT 0.0, reversegrid INTEGER DEFAULT 0, ghostingdelta REAL DEFAULT 0.0, pushtopass INTEGER DEFAULT 0, pushtopasspower REAL DEFAULT 0.0, realistc INTEGER DEFAULT 0, eliminationInterval INTEGER DEFAULT 30, minimumDrivers INTEGER DEFAULT 2)"
+                "CREATE TABLE IF NOT EXISTS fr_heats (id INTEGER PRIMARY KEY AUTOINCREMENT, roundId INTEGER NOT NULL, heatNumber INTEGER NOT NULL, state TEXT NOT NULL, startTime INTEGER DEFAULT NULL, endTime INTEGER DEFAULT NULL, fastestLapUUID TEXT, totalLaps INTEGER DEFAULT NULL, totalPitstops INTEGER DEFAULT NULL, timeLimit INTEGER DEFAULT NULL, startDelay INTEGER DEFAULT NULL, maxDrivers INTEGER DEFAULT NULL, lonely INTEGER DEFAULT NULL, canReset INTEGER DEFAULT NULL, lapReset INTEGER DEFAULT NULL, colisao TEXT DEFAULT 'DISABLED', drs INTEGER DEFAULT 0, driverswap INTEGER DEFAULT 0, drsdowntime REAL DEFAULT 0.0, drsdownpower REAL DEFAULT 0.0, reversegrid INTEGER DEFAULT 0, ghostingdelta REAL DEFAULT 0.0, pushtopass INTEGER DEFAULT 0, pushtopasspower REAL DEFAULT 0.0, realistc INTEGER DEFAULT 0, eliminationInterval INTEGER DEFAULT 30, minimumDrivers INTEGER DEFAULT 2, rowStartDelay INTEGER DEFAULT 0, finalRaceTimeout INTEGER DEFAULT 120)"
             );
             // Idempotent ALTER TABLE columns for existing databases
             String[] heatAlterColumns = {
@@ -436,6 +438,8 @@ public class DatabaseManager {
                 "ALTER TABLE fr_heats ADD COLUMN realistc INTEGER DEFAULT 0",
                 "ALTER TABLE fr_heats ADD COLUMN eliminationInterval INTEGER DEFAULT 30",
                 "ALTER TABLE fr_heats ADD COLUMN minimumDrivers INTEGER DEFAULT 2",
+                "ALTER TABLE fr_heats ADD COLUMN rowStartDelay INTEGER DEFAULT 0",
+                "ALTER TABLE fr_heats ADD COLUMN finalRaceTimeout INTEGER DEFAULT 120",
             };
             for (String alterSql : heatAlterColumns) {
                 try {
@@ -967,6 +971,7 @@ public class DatabaseManager {
            return;
        }
        ensureTrackMinVersionColumn(conn);
+       ensureTrackGridsPerRowColumn(conn);
        this.trackSchemaReady = true;
    }
 
@@ -3841,6 +3846,57 @@ public class DatabaseManager {
             handleSqlError(e);
         }
         return null;
+    }
+
+    private void ensureTrackGridsPerRowColumn(Connection conn) throws SQLException {
+        try (
+            PreparedStatement ps = conn.prepareStatement("PRAGMA table_info(fr_tracks)");
+            ResultSet rs = ps.executeQuery()
+        ) {
+            while (rs.next()) {
+                if ("gridsPerRow".equalsIgnoreCase(rs.getString("name"))) {
+                    return;
+                }
+            }
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE fr_tracks ADD COLUMN gridsPerRow INTEGER DEFAULT 0");
+        }
+    }
+
+    public synchronized boolean setTrackGridsPerRow(String trackName, int gridsPerRow) {
+        String sql = "UPDATE fr_tracks SET gridsPerRow = ? WHERE LOWER(trackNameWS) = LOWER(?)";
+        try {
+            Connection conn = getOrConnect();
+            ensureTrackGridsPerRowColumn(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, Math.max(0, gridsPerRow));
+                ps.setString(2, trackName.replaceAll("\\s+", ""));
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
+    }
+
+    public synchronized int getTrackGridsPerRow(String trackName) {
+        String sql = "SELECT gridsPerRow FROM fr_tracks WHERE LOWER(trackNameWS) = LOWER(?) LIMIT 1";
+        try {
+            Connection conn = getOrConnect();
+            ensureTrackGridsPerRowColumn(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackName.replaceAll("\\s+", ""));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt("gridsPerRow");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+        return 0;
     }
 
     private void ensureTrackDifficultyColumn(Connection conn) throws SQLException {

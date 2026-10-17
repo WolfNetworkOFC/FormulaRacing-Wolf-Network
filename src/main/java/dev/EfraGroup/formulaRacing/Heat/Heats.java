@@ -102,6 +102,11 @@ public class Heats {
     private int minimumDrivers = 2;
     private boolean elimination = false;
     private int finalRaceTimeoutSeconds = 120;
+    /**
+     * Row-based start delay (ms): each grid row launches this long after the previous
+     * one when the track defines gridsPerRow (parity with TimingSystem). 0 = off.
+     */
+    private int rowStartDelayMs = 0;
 
     public Heats(FormulaRacing plugin, int id, Rounds round, int heatNumber) {
         this.plugin = plugin;
@@ -199,6 +204,7 @@ public class Heats {
                 this.realistc,
                 this.eliminationIntervalSeconds,
                 this.minimumDrivers,
+                this.rowStartDelayMs,
                 this.finalRaceTimeoutSeconds
             );
         this.configDirty = false;
@@ -311,6 +317,15 @@ public class Heats {
 
     public void setFinalRaceTimeoutSeconds(int seconds) {
         this.finalRaceTimeoutSeconds = Math.max(10, seconds);
+        this.markConfigDirty();
+    }
+
+    public int getRowStartDelayMs() {
+        return this.rowStartDelayMs;
+    }
+
+    public void setRowStartDelayMs(int milliseconds) {
+        this.rowStartDelayMs = Math.max(0, Math.min(10000, milliseconds));
         this.markConfigDirty();
     }
 
@@ -774,6 +789,7 @@ public class Heats {
                         this.realistc,
                         this.eliminationIntervalSeconds,
                         this.minimumDrivers,
+                        this.rowStartDelayMs,
                         this.finalRaceTimeoutSeconds
                     );
                 this.configDirty = false;

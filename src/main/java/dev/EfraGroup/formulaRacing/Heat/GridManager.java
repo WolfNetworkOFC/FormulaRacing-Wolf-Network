@@ -177,16 +177,36 @@ public class GridManager {
     }
 
     public void unfreezePlayers() {
+        // Row-based start delay (parity with TimingSystem's row start delay): when the
+        // track defines gridsPerRow and the heat defines a rowStartDelay, each grid row
+        // launches that many ms after the previous one — spreading the boat physics
+        // burst at lights out. Without those settings every driver releases at once,
+        // exactly as before.
+        int gridsPerRow = 0;
+        int rowStartDelayMs = Math.max(0, this.heat.getRowStartDelayMs());
+        if (rowStartDelayMs > 0) {
+            gridsPerRow = Math.max(0, this.plugin.getTrackIntegrationManager().getGridsPerRow(this.heat.getTrackNameWS()));
+        }
+
         for(UUID playerUUID : this.frozenPlayers) {
             long penaltyTicks = this.jumpStartPenalties.getOrDefault(playerUUID, 0L);
-            if (penaltyTicks > 0L) {
-                // Jump starter: stay anchored while the rest of the grid launches.
+            long rowDelayTicks = 0L;
+            if (gridsPerRow > 0) {
+                Driver driver = this.heat.getDrivers().get(playerUUID);
+                int gridSlot = driver != null ? Math.max(0, driver.getStartPosition() - 1) : 0;
+                rowDelayTicks = ((long) (gridSlot / gridsPerRow)) * rowStartDelayMs / 50L;
+            }
+
+            long releaseTicks = rowDelayTicks + penaltyTicks;
+            if (releaseTicks > 0L) {
+                // Later grid row and/or jump-start penalty: stay anchored while the
+                // earlier rows launch.
                 SchedulerHelper.runTaskLater(this.plugin, () -> {
-                    Player penalized = this.plugin.getServer().getPlayer(playerUUID);
-                    if (penalized != null && penalized.isOnline()) {
-                        this.plugin.getAPI().releaseBoat(penalized);
+                    Player delayed = this.plugin.getServer().getPlayer(playerUUID);
+                    if (delayed != null && delayed.isOnline()) {
+                        this.plugin.getAPI().releaseBoat(delayed);
                     }
-                }, penaltyTicks);
+                }, releaseTicks);
             } else {
                 Player player = this.plugin.getServer().getPlayer(playerUUID);
                 if (player != null && player.isOnline()) {

@@ -1232,6 +1232,34 @@ public class HeatCommand extends BaseCommand {
         }
     }
 
+    @Subcommand("set rowstartdelay")
+    @CommandCompletion("@heat 0 50 100 200 500")
+    @CommandPermission("formularacing.admin")
+    @Description("Atraso de largada por linha do grid em ms (0 = desativado)")
+    public void onSetRowStartDelay(CommandSender sender, Heats heat, @Default("0") Integer milliseconds) {
+        heat = this.resolveHeat(sender, heat);
+        if (heat == null) {
+            sender.sendMessage(ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!");
+            return;
+        }
+
+        int value = Math.max(0, Math.min(10000, milliseconds));
+        heat.setRowStartDelayMs(value);
+        this.eventManager.getDatabaseManager().heatSet(
+            heat.getId(),
+            "rowStartDelay",
+            String.valueOf(value)
+        );
+
+        if (value > 0) {
+            sender.sendMessage("§a[Config] Atraso de largada por linha do heat §f" + heat.getId() + "§a: §f" + value + "ms");
+            sender.sendMessage("§7  Cada linha do grid larga esse tempo depois da anterior.");
+            sender.sendMessage("§7  Defina as linhas da pista com: §f/trackedit gridsperrow <n>");
+        } else {
+            sender.sendMessage("§a[Config] Atraso de largada por linha §fDESATIVADO §ano heat §f" + heat.getId());
+        }
+    }
+
     @Subcommand("gui")
     @CommandCompletion("@heat")
     @CommandPermission("formularacing.admin")

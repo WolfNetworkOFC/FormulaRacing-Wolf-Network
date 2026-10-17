@@ -1261,6 +1261,32 @@ public class TrackEditorCommand extends BaseCommand {
         }
     }
 
+    @Subcommand("gridsperrow")
+    @Description("Sets how many grid slots make up one grid row (used by the row start delay at lights out)")
+    @CommandCompletion("@nothing @tracks")
+    public void onTrackGridsPerRow(Player player, String gridsPerRowArg, @Optional String trackNameArg) {
+        String trackName = this.getExistingTargetTrack(player, trackNameArg);
+        if (trackName == null) {
+            return;
+        }
+
+        int gridsPerRow;
+        try {
+            gridsPerRow = Math.max(0, Integer.parseInt(gridsPerRowArg.trim()));
+        } catch (NumberFormatException e) {
+            player.sendMessage("§cInvalid value! Use a number (e.g. 2). 0 disables the row start delay.");
+            return;
+        }
+
+        if (this.mysql.setTrackGridsPerRow(trackName, gridsPerRow)) {
+            player.sendMessage(gridsPerRow > 0
+                    ? "§aGrids per row for track '" + trackName + "' set to " + gridsPerRow + "."
+                    : "§aRow-based start delay disabled for track '" + trackName + "' (grids per row = 0).");
+        } else {
+            player.sendMessage("§cCould not set the grids per row for track '" + trackName + "'.");
+        }
+    }
+
     @Subcommand("pitstop")
     @Description("Pit Stop settings")
     @CommandCompletion("addentry|addexit|remove|info|edit|list|check @tracks")

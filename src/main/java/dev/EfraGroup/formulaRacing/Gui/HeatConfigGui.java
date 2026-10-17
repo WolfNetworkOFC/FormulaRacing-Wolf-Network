@@ -101,6 +101,9 @@ public class HeatConfigGui extends BaseGui {
         this.addAdjustable(32, Material.ARMOR_STAND, "Max Pilotos", this.heat.getMaxDrivers() != null ? this.heat.getMaxDrivers() : 0,
                 0, 64, 1, "§7Máximo de pilotos (0 = usar grids da pista).",
                 v -> this.heat.setMaxDrivers(v.intValue() == 0 ? null : v.intValue()));
+        this.addAdjustable(33, Material.LEVER, "Row Start Delay (ms)", this.heat.getRowStartDelayMs(),
+                0, 5000, 50, "§7Atraso entre linhas do grid na largada (0 = off). Precisa de gridsPerRow na pista (/trackedit gridsperrow).",
+                v -> this.heat.setRowStartDelayMs(v.intValue()));
 
         // --- Row 4: powers ---
         this.addAdjustable(37, Material.GOLD_NUGGET, "P2P Power", this.heat.getpushtopasspower(),

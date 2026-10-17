@@ -159,6 +159,17 @@ public class TrackIntegrationManager {
         this.noResetOnFutureCheckpointTracks.put(trackNameWS, value);
     }
 
+    /**
+     * How many grid slots make up one grid row on this track (0 = disabled). Used by the
+     * row-based start delay when the grid is released at lights out.
+     */
+    public int getGridsPerRow(String trackNameWS) {
+        if (trackNameWS == null || trackNameWS.isEmpty()) {
+            return 0;
+        }
+        return this.databaseManager.getTrackGridsPerRow(trackNameWS);
+    }
+
     public int getGridPositionCount(String trackNameWS) {
         return this.getTrackGridLocations(trackNameWS).size();
     }

@@ -507,7 +507,7 @@ public class EventsDatabaseManager {
     public void heatSet(int heatId, String column, String value) {
         if (
             !column.matches(
-                "timeLimit|collisionMode|startDelay|totalLaps|totalPitstops|maxDrivers|lonely"
+                "timeLimit|collisionMode|startDelay|totalLaps|totalPitstops|maxDrivers|lonely|rowStartDelay"
             )
         ) {
             this.plugin.getDebugManager().logDatabaseOperation(
@@ -696,6 +696,9 @@ public class EventsDatabaseManager {
                             );
                             heat.setLonely(rs.getInt("lonely") == 1);
                             heat.setCanReset(rs.getInt("canReset") == 1);
+                            try {
+                                heat.setRowStartDelayMs(rs.getInt("rowStartDelay"));
+                            } catch (SQLException ignored) {}
 
                             try {
                                 heat.setCollisionMode(
@@ -990,6 +993,9 @@ public class EventsDatabaseManager {
                             );
                             heat.setLonely(rs.getInt("lonely") == 1);
                             heat.setCanReset(rs.getInt("canReset") == 1);
+                            try {
+                                heat.setRowStartDelayMs(rs.getInt("rowStartDelay"));
+                            } catch (SQLException ignored) {}
 
                             try {
                                 heat.setCollisionMode(
@@ -1749,13 +1755,15 @@ public class EventsDatabaseManager {
         boolean realistic,
         int eliminationIntervalSeconds,
         int minimumDrivers,
+        int rowStartDelayMs,
         int finalRaceTimeoutSeconds
     ) {
         String sql =
             "UPDATE fr_heats SET totalLaps = ?, totalPitstops = ?, timeLimit = ?, startDelay = ?, " +
             "maxDrivers = ?, lonely = ?, canReset = ?, lapReset = ?, colisao = ?, drs = ?, " +
             "driverswap = ?, drsdowntime = ?, drsdownpower = ?, reversegrid = ?, ghostingdelta = ?, " +
-            "pushtopass = ?, pushtopasspower = ?, realistc = ?, eliminationInterval = ?, minimumDrivers = ?, finalRaceTimeout = ? WHERE id = ?";
+            "pushtopass = ?, pushtopasspower = ?, realistc = ?, eliminationInterval = ?, minimumDrivers = ?, " +
+            "rowStartDelay = ?, finalRaceTimeout = ? WHERE id = ?";
         this.executeAsync(sql, "updateHeatFullConfig", stmt -> {
             try {
                 if (totalLaps != null) {
@@ -1798,8 +1806,9 @@ public class EventsDatabaseManager {
                 stmt.setInt(18, realistic ? 1 : 0);
                 stmt.setInt(19, eliminationIntervalSeconds);
                 stmt.setInt(20, minimumDrivers);
-                stmt.setInt(21, finalRaceTimeoutSeconds);
-                stmt.setInt(22, heatId);
+                stmt.setInt(21, rowStartDelayMs);
+                stmt.setInt(22, finalRaceTimeoutSeconds);
+                stmt.setInt(23, heatId);
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
@@ -1862,6 +1871,9 @@ public class EventsDatabaseManager {
         heat.setMaxDrivers(rs.wasNull() ? null : maxDrivers);
         heat.setLonely(rs.getInt("lonely") == 1);
         heat.setCanReset(rs.getInt("canReset") == 1);
+        try {
+            heat.setRowStartDelayMs(rs.getInt("rowStartDelay"));
+        } catch (SQLException ignored) {}
 
         try {
             heat.setCollisionMode(
