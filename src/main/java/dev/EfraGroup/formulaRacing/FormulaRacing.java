@@ -1584,7 +1584,8 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
      */
     public void applyTrackGameTime(Player player, String trackName) {
         if (player == null || trackName == null) return;
-        long gameTime = this.dm.getTrackGameTime(trackName);
+        String normalized = trackName.replaceAll("\\s+", "");
+        long gameTime = this.dm.getTrackGameTime(normalized);
         if (gameTime >= 0) {
             player.setPlayerTime(gameTime, false);
         } else {
@@ -1656,6 +1657,12 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
         if (this.timeTrialController != null) {
             this.timeTrialController.endSession(uuid);
+        }
+
+        // Reset custom track game time on quit
+        this.resetTrackGameTime(player);
+        if (this.getScoreboardTimeTrialUtils() != null) {
+            this.getScoreboardTimeTrialUtils().clearSession(player);
         }
 
         if (this.timerUtils != null) {

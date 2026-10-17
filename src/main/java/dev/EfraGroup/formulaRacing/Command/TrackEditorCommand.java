@@ -1198,11 +1198,14 @@ public class TrackEditorCommand extends BaseCommand {
     @Description("Sets the track time (Ticks)")
     @CommandCompletion("@nothing @tracks")
     public void onTime(Player player, long ticks, @Optional String trackNameArg) {
+        if (ticks < 0 || ticks > 24000) {
+            player.sendMessage("§c❌ Invalid ticks value. Use a value between 0 and 24000 (or /te time reset).");
+            return;
+        }
         String trackName = this.getTargetTrack(player, trackNameArg);
         if (trackName != null) {
             boolean saved = this.mysql.setTrackGameTime(trackName, ticks);
             if (saved) {
-                // Preview the time change for the admin
                 player.setPlayerTime(ticks, false);
                 this.plugin.sendMessage(player, "te_time_ticks", new String[]{"{track}", trackName, "{ticks}", String.valueOf(ticks)});
             } else {
