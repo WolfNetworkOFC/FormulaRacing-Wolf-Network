@@ -1195,11 +1195,30 @@ public class TrackEditorCommand extends BaseCommand {
     }
 
     @Subcommand("time")
-    @Description("Sets the track time (Ticks)")
-    @CommandCompletion("@nothing @tracks")
-    public void onTime(Player player, long ticks, @Optional String trackNameArg) {
+    @Description("Sets the track time (Ticks or name: day, noon, morning, night, midnight, sunrise, sunset, afternoon)")
+    @CommandCompletion("@trackTime @tracks")
+    public void onTime(Player player, String timeArg, @Optional String trackNameArg) {
+        long ticks;
+        String key = timeArg.trim().toLowerCase();
+        switch (key) {
+            case "day" -> ticks = 1000L;
+            case "noon" -> ticks = 6000L;
+            case "afternoon" -> ticks = 9000L;
+            case "sunset" -> ticks = 12000L;
+            case "night" -> ticks = 13000L;
+            case "midnight" -> ticks = 18000L;
+            case "sunrise", "morning" -> ticks = 23000L;
+            default -> {
+                try {
+                    ticks = Long.parseLong(timeArg.trim());
+                } catch (NumberFormatException e) {
+                    player.sendMessage("§c❌ Invalid time. Use a number (0-24000) or one of: day, noon, afternoon, sunset, night, midnight, sunrise, morning.");
+                    return;
+                }
+            }
+        }
         if (ticks < 0 || ticks > 24000) {
-            player.sendMessage("§c❌ Invalid ticks value. Use a value between 0 and 24000 (or /te time reset).");
+            player.sendMessage("§c❌ Invalid ticks value. Use a value between 0 and 24000.");
             return;
         }
         String trackName = this.getTargetTrack(player, trackNameArg);
@@ -1207,7 +1226,7 @@ public class TrackEditorCommand extends BaseCommand {
             boolean saved = this.mysql.setTrackGameTime(trackName, ticks);
             if (saved) {
                 player.setPlayerTime(ticks, false);
-                this.plugin.sendMessage(player, "te_time_ticks", new String[]{"{track}", trackName, "{ticks}", String.valueOf(ticks)});
+                this.plugin.sendMessage(player, "te_time_ticks", new String[]{"{track}", trackName, "{ticks}", String.valueOf(ticks) + " (" + timeArg + ")"});
             } else {
                 player.sendMessage("§c❌ Error saving game time for track §e" + trackName);
             }

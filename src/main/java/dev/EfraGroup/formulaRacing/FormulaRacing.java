@@ -1906,6 +1906,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
                     .toList()
         );
         this.commandManager.getCommandCompletions().registerCompletion(
+            "trackTime",
+            c -> List.of("day", "noon", "afternoon", "sunset", "night", "midnight", "sunrise", "morning")
+        );
+        this.commandManager.getCommandCompletions().registerCompletion(
             "gimmicks",
             c -> this.getGimmickManager().getAllGimmickNames()
         );
