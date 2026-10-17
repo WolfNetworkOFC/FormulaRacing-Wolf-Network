@@ -698,6 +698,9 @@ public class EventsDatabaseManager {
                             heat.setLonely(rs.getInt("lonely") == 1);
                             heat.setCanReset(rs.getInt("canReset") == 1);
                             try {
+                                heat.setLapReset(rs.getInt("lapReset") == 1);
+                            } catch (SQLException ignored) {}
+                            try {
                                 heat.setRowStartDelayMs(rs.getInt("rowStartDelay"));
                             } catch (SQLException ignored) {}
 
@@ -1003,6 +1006,9 @@ public class EventsDatabaseManager {
                             );
                             heat.setLonely(rs.getInt("lonely") == 1);
                             heat.setCanReset(rs.getInt("canReset") == 1);
+                            try {
+                                heat.setLapReset(rs.getInt("lapReset") == 1);
+                            } catch (SQLException ignored) {}
                             try {
                                 heat.setRowStartDelayMs(rs.getInt("rowStartDelay"));
                             } catch (SQLException ignored) {}
@@ -1725,6 +1731,18 @@ public class EventsDatabaseManager {
         this.executeAsync(sql, "updateHeatLonely", stmt -> {
             try {
                 stmt.setInt(1, lonely ? 1 : 0);
+                stmt.setInt(2, heatId);
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    public void updateHeatLapReset(int heatId, boolean lapReset) {
+        String sql = "UPDATE fr_heats SET lapReset = ? WHERE id = ?";
+        this.executeAsync(sql, "updateHeatLapReset", stmt -> {
+            try {
+                stmt.setInt(1, lapReset ? 1 : 0);
                 stmt.setInt(2, heatId);
             } catch (SQLException e) {
                 throw new RuntimeException(e);

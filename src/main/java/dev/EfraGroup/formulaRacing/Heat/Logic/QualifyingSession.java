@@ -4,6 +4,7 @@ import dev.EfraGroup.formulaRacing.Event.Driver.DriverNewLapEvent;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Listener.RaceCheckpointListener;
+import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Participant.DriverState;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.RegionBox;

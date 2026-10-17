@@ -1187,7 +1187,7 @@ public class RaceEventManager {
                                         maxDrivers,
                                         srcHeat.isLonely(),
                                         srcHeat.isCanReset(),
-                                        false,
+                                        srcHeat.isLapReset(),
                                         srcHeat.isDrsEnabled(),
                                         srcHeat.getDriverSwap(),
                                         srcHeat.getCollisionMode().name(),
@@ -1221,6 +1221,7 @@ public class RaceEventManager {
                                         newHeat.setMaxDrivers(srcHeat.getMaxDrivers());
                                         newHeat.setCanReset(srcHeat.isCanReset());
                                         newHeat.setLonely(srcHeat.isLonely());
+                                        newHeat.setLapReset(srcHeat.isLapReset());
                                         newHeat.setCollisionMode(srcHeat.getCollisionMode());
                                         newHeat.setDrsEnabled(srcHeat.isDrsEnabled());
                                         newHeat.setDriverSwap(srcHeat.getDriverSwap());
@@ -1259,7 +1260,7 @@ public class RaceEventManager {
                                             srcHeat.getMaxDrivers(),
                                             srcHeat.isLonely(),
                                             srcHeat.isCanReset(),
-                                            false,
+                                            srcHeat.isLapReset(),
                                             srcHeat.getCollisionMode(),
                                             srcHeat.isDrsEnabled(),
                                             srcHeat.getDriverSwap(),

@@ -1149,6 +1149,28 @@ public class HeatCommand extends BaseCommand {
         );
     }
 
+    @Subcommand("set lapreset")
+    @CommandCompletion("@heat true|false")
+    @CommandPermission("formularacing.admin")
+    @Description("Lap reset na qualificacao: ao completar a volta o piloto volta ao spawn e segue dando voltas (volta continua)")
+    public void onSetLapReset(CommandSender sender, Heats heat, boolean lapReset) {
+        heat = this.resolveHeat(sender, heat);
+        if (heat == null) {
+            sender.sendMessage(
+                ChatColor.RED + "✗ Nenhum heat selecionado ou ativo!"
+            );
+            return;
+        }
+
+        heat.setLapReset(lapReset);
+        sender.sendMessage(
+            "§a[Config] Lap Reset definido para: §f" +
+                (lapReset ? "ATIVADO" : "DESATIVADO") +
+                " §ano heat §f" +
+                heat.getId()
+        );
+    }
+
     @Subcommand("set timed")
     @CommandCompletion("@heat true|false")
     @CommandPermission("formularacing.admin")

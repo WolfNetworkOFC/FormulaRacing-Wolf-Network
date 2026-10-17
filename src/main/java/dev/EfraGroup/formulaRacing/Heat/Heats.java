@@ -71,6 +71,7 @@ public class Heats {
     private Integer maxDrivers = null; // null = limite é a quantidade de grids
     private CollisionMode collisionMode;
     private boolean canReset;
+    private boolean lapReset;
     private boolean lonely;
     private String trackNameWS;
     private GridManager gridManager;
@@ -125,6 +126,7 @@ public class Heats {
         this.maxDrivers = 1000;
         this.collisionMode = CollisionMode.HIGH;
         this.canReset = true;
+        this.lapReset = false;
         this.lonely = false;
         this.trackNameWS = "";
         this.drsEnabled = false;
@@ -192,7 +194,7 @@ public class Heats {
                 this.maxDrivers,
                 this.lonely,
                 this.canReset,
-                true,
+                this.lapReset,
                 this.collisionMode,
                 this.drsEnabled,
                 this.driverswap,
@@ -793,7 +795,7 @@ public class Heats {
                         this.maxDrivers,
                         this.lonely,
                         this.canReset,
-                        true,
+                        this.lapReset,
                         this.collisionMode,
                         this.drsEnabled,
                         this.driverswap,
@@ -2484,6 +2486,26 @@ public class Heats {
 
     public void setCanReset(boolean canReset) {
         this.canReset = canReset;
+    }
+
+    public boolean isLapReset() {
+        return this.lapReset;
+    }
+
+    public void setLapReset(boolean lapReset) {
+        if (this.lapReset == lapReset) {
+            return;
+        }
+        this.lapReset = lapReset;
+        if (
+            this.plugin != null &&
+            this.id > 0 &&
+            this.plugin.getRaceEventManager() != null
+        ) {
+            this.plugin.getRaceEventManager()
+                .getDatabaseManager()
+                .updateHeatLapReset(this.id, lapReset);
+        }
     }
 
     public boolean isLonely() {
