@@ -1694,14 +1694,17 @@ public class ApiManager {
         if (!dashboardDir.exists()) {
             dashboardDir.mkdirs();
             plugin.getLogger().info("Created dashboard folder: " + dashboardDir.getAbsolutePath());
-
-            // Copy dashboard files from JAR
-            copyResourceFromJar("/dashboard/index.html", new File(dashboardDir, "index.html"));
-            copyResourceFromJar("/dashboard/css/dashboard.css", new File(dashboardDir, "css/dashboard.css"));
-            copyResourceFromJar("/dashboard/js/dashboard.js", new File(dashboardDir, "js/dashboard.js"));
-            copyResourceFromJar("/dashboard/INSTALL.md", new File(dashboardDir, "INSTALL.md"));
-            copyResourceFromJar("/dashboard/CONFIG_EXAMPLES.md", new File(dashboardDir, "CONFIG_EXAMPLES.md"));
         }
+
+        // Ensure all bundled dashboard files exist (copy missing ones, never overwrite)
+        copyResourceFromJar("/dashboard/index.html", new File(dashboardDir, "index.html"));
+        copyResourceFromJar("/dashboard/live-map.html", new File(dashboardDir, "live-map.html"));
+        copyResourceFromJar("/dashboard/css/dashboard.css", new File(dashboardDir, "css/dashboard.css"));
+        copyResourceFromJar("/dashboard/css/live-map.css", new File(dashboardDir, "css/live-map.css"));
+        copyResourceFromJar("/dashboard/js/dashboard.js", new File(dashboardDir, "js/dashboard.js"));
+        copyResourceFromJar("/dashboard/js/live-map.js", new File(dashboardDir, "js/live-map.js"));
+        copyResourceFromJar("/dashboard/INSTALL.md", new File(dashboardDir, "INSTALL.md"));
+        copyResourceFromJar("/dashboard/CONFIG_EXAMPLES.md", new File(dashboardDir, "CONFIG_EXAMPLES.md"));
 
         // Create api_config.yml from the bundled resource if it doesn't exist
         File apiConfigFile = new File(dataFolder, "api_config.yml");
@@ -1800,6 +1803,9 @@ public class ApiManager {
     }
 
     private void copyResourceFromJar(String resourcePath, File targetFile) {
+        if (targetFile.exists()) {
+            return;
+        }
         try {
             targetFile.getParentFile().mkdirs();
             try (var inputStream = getClass().getResourceAsStream(resourcePath)) {
