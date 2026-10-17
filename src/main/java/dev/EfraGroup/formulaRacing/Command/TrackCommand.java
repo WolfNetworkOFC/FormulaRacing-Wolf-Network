@@ -1,6 +1,6 @@
 package dev.EfraGroup.formulaRacing.Command;
 
-import dev.EfraGroup.formulaRacing.Command.Help.CommandHelpService;
+import dev.EfraGroup.formulaRacing.Command.TimeTrialCommand;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.Utils.SenderUtils;
@@ -86,6 +86,16 @@ public class TrackCommand extends BaseCommand {
             sender.sendMessage(cb.toString());
         }
         sender.sendMessage("§6§l================================");
+    }
+
+    @Subcommand("session")
+    @CommandCompletion("@tracks")
+    @Description("Inicia uma sessao de Time Trial em uma pista (atalho para /timetrial solo)")
+    public void onSession(Player player, @Optional String trackName) {
+        String[] args = (trackName == null || trackName.trim().isEmpty())
+            ? new String[]{}
+            : new String[]{trackName};
+        new TimeTrialCommand(this.plugin).onSolo(player, args);
     }
 
     @Subcommand("times")
