@@ -1046,7 +1046,8 @@ public class HeatCommand extends BaseCommand {
             "§a[Config] Tempo de DRS definido para: §f" +
                 seconds +
                 "s §ano heat §f" +
-                heat.getId()
+                heat.getId() +
+                " §7(0 = usa o padrão do config)"
         );
     }
 
