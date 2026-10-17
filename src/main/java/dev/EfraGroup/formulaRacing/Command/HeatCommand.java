@@ -2863,6 +2863,20 @@ public class HeatCommand extends BaseCommand {
                     ChatColor.RED +
                     "✗ Alteração persistida, mas falhou sincronização de runtime. Recarregue o heat e tente novamente."
                 );
+            case NOT_ONLINE:
+                return (
+                    ChatColor.RED +
+                    "✗ Piloto " +
+                    targetName +
+                    " precisa estar online para entrar em quali em andamento."
+                );
+            case SESSION_ENDED:
+                return (
+                    ChatColor.RED +
+                    "✗ A sessão de quali do heat " +
+                    heat.getName() +
+                    " já encerrou — não dá mais para adicionar pilotos."
+                );
             default:
                 return ChatColor.RED + "✗ Falha ao executar operação no heat.";
         }

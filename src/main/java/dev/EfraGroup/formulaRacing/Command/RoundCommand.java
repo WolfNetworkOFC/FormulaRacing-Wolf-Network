@@ -938,6 +938,8 @@ public class RoundCommand extends BaseCommand {
             case PERSISTENCE_ERROR -> "erro de persistência";
             case SYNC_ERROR -> "erro de sincronização";
             case INVALID_POSITION -> "posição inválida";
+            case NOT_ONLINE -> "piloto precisa estar online";
+            case SESSION_ENDED -> "sessão de quali encerrada";
             default -> "falha desconhecida";
         };
     }
