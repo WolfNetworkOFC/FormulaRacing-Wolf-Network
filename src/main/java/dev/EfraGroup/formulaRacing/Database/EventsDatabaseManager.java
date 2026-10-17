@@ -507,7 +507,7 @@ public class EventsDatabaseManager {
     public void heatSet(int heatId, String column, String value) {
         if (
             !column.matches(
-                "timeLimit|collisionMode|startDelay|totalLaps|totalPitstops|maxDrivers|lonely|rowStartDelay"
+                "timeLimit|colisao|startDelay|totalLaps|totalPitstops|maxDrivers|lonely|rowStartDelay|eliminationInterval|minimumDrivers"
             )
         ) {
             this.plugin.getDebugManager().logDatabaseOperation(

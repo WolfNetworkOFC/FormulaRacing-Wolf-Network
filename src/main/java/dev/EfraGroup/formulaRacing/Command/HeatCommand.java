@@ -1712,9 +1712,18 @@ public class HeatCommand extends BaseCommand {
                 heat.setCollisionMode(collisionMode);
                 this.eventManager.getDatabaseManager().heatSet(
                     heat.getId(),
-                    "collisionMode",
+                    "colisao",
                     collisionMode.name()
                 );
+                // The boat's collision flag is frozen when the boat spawns: reapply the
+                // new mode to every driver already on the grid/track so the change
+                // takes effect immediately (and not only after a re-load).
+                for (Driver driver : heat.getDrivers().values()) {
+                    Player online = Bukkit.getPlayer(driver.getUuid());
+                    if (online != null && online.isOnline()) {
+                        heat.applyCollisionModeToPlayer(online);
+                    }
+                }
                 String var10001 = String.valueOf(ChatColor.GREEN);
                 sender.sendMessage(
                     var10001 +

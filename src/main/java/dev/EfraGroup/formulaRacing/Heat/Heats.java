@@ -342,6 +342,20 @@ public class Heats {
     }
 
     public void applyCollisionModeToPlayer(Player player) {
+        // Server-side: o flag de colisão do barco (entidade NMS CollisionlessBoat) é
+        // definido no spawn e depois fica congelado — nada mais o altera. Reafirma
+        // o flag aqui (chamado no começo de cada sessão, no late join e ao trocar o
+        // modo de colisão) para que um barco spawnado com collidable=false (reset de
+        // região/checkpoint) ou um modo alterado depois do load não deixem o piloto
+        // como fantasma na corrida. Para clientes Bedrock (sem o mod OBU) esse flag
+        // é o único que decide a colisão, então é ele que precisa estar certo.
+        org.bukkit.entity.Entity vehicle = player.getVehicle();
+        if (vehicle instanceof org.bukkit.entity.Boat) {
+            dev.EfraGroup.formulaRacing.Collisionless.NMSHandlerImpl.setCollidable(
+                vehicle,
+                this.collisionMode != CollisionMode.DISABLED
+            );
+        }
         if (this.plugin.getPacketSender() != null) {
             short modeValue;
             switch (this.collisionMode) {

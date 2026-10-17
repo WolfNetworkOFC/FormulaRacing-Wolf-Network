@@ -647,7 +647,17 @@ public class RegionListener implements Listener {
                                 SchedulerHelper.teleportAsync(finalPlayer, finalTargetLoc).thenAccept(success -> {
                                     if (Boolean.TRUE.equals(success) && finalPlayer.isOnline()) {
                                         finalPlayer.playSound(finalTargetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
-                                        this.plugin.getAPI().spawnBoatAt(finalPlayer, finalTargetLoc, false, false, false);
+                                        // Respawn do reset: mantém o modo de colisão do heat ativo
+                                        // (HIGH/LOW) para o piloto não virar fantasma no meio da corrida.
+                                        this.plugin.getAPI().spawnBoatAt(
+                                            finalPlayer,
+                                            finalTargetLoc,
+                                            false,
+                                            false,
+                                            false,
+                                            this.plugin.getRaceEventManager() != null &&
+                                                this.plugin.getRaceEventManager().isBoatCollidableForPlayer(finalPlayer.getUniqueId())
+                                        );
                                         // O barco novo nasce com física vanilla: o mod OpenBoatUtils
                                         // perde a configuração da pista quando a entidade do barco
                                         // troca. Reenvia a config da pista (mesmo efeito do /tt e
@@ -1462,7 +1472,16 @@ public class RegionListener implements Listener {
             SchedulerHelper.teleportAsync(player, targetLoc).thenAccept(success -> {
                 if (Boolean.TRUE.equals(success) && player.isOnline()) {
                     player.playSound(targetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
-                    this.plugin.getAPI().spawnBoatAt(player, targetLoc, false, false, false);
+                    // TT/aberto spawna sem colisão; corrida mantém o modo do heat ativo.
+                    this.plugin.getAPI().spawnBoatAt(
+                        player,
+                        targetLoc,
+                        false,
+                        false,
+                        false,
+                        this.plugin.getRaceEventManager() != null &&
+                            this.plugin.getRaceEventManager().isBoatCollidableForPlayer(player.getUniqueId())
+                    );
                     // The new boat loses the OpenBoatUtils track config, so reapply it.
                     if (this.plugin.getPacketSender() != null) {
                         this.plugin.getPacketSender().applyBoatUtilsToPlayer(player, trackWS);

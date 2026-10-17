@@ -420,7 +420,17 @@ public class RaceCheckpointListener implements Listener {
                 SchedulerHelper.teleportAsync(finalPlayer, finalTargetLoc).thenAccept(success -> {
                     if (Boolean.TRUE.equals(success) && finalPlayer.isOnline()) {
                         finalPlayer.playSound(finalTargetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.0F);
-                        this.plugin.getAPI().spawnBoatAt(finalPlayer, finalTargetLoc, false, false, false);
+                        // Checkpoint perdido: mantém o modo de colisão do heat ativo para o
+                        // piloto não continuar a corrida como fantasma (sem colisão).
+                        this.plugin.getAPI().spawnBoatAt(
+                            finalPlayer,
+                            finalTargetLoc,
+                            false,
+                            false,
+                            false,
+                            this.plugin.getRaceEventManager() != null &&
+                                this.plugin.getRaceEventManager().isBoatCollidableForPlayer(finalPlayer.getUniqueId())
+                        );
                     }
                 });
             }

@@ -790,6 +790,19 @@ public class RaceEventManager {
         return Optional.empty();
     }
 
+    /**
+     * Whether the player's currently raced heat wants server-side boat collision.
+     * Used by the reset/checkpoint respawn paths: a driver put back on the track
+     * mid-race must keep the heat's collision mode instead of always getting a
+     * collisionless (ghost) boat. Players with no active heat keep the previous
+     * "collisionless" behavior.
+     */
+    public boolean isBoatCollidableForPlayer(UUID playerUUID) {
+        return this.getPlayerActiveHeat(playerUUID)
+            .map(heat -> heat.getCollisionMode() != CollisionMode.DISABLED)
+            .orElse(false);
+    }
+
     public boolean addPlayerToEvent(UUID playerUUID, int eventId) {
         Events event = (Events) this.activeEvents.get(eventId);
         if (event == null) {
