@@ -1,6 +1,0 @@
--proc:none
--Xmaxerrs
-500000
--d
-/tmp/opencode/syntaxout
-@/tmp/opencode/srclist.txt
