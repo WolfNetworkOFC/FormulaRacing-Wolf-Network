@@ -423,7 +423,7 @@ public class DatabaseManager {
                 "CREATE TABLE IF NOT EXISTS fr_rounds (id INTEGER PRIMARY KEY AUTOINCREMENT, eventId INTEGER NOT NULL, roundIndex INTEGER NOT NULL DEFAULT 1, type TEXT DEFAULT NULL, state TEXT NOT NULL)"
             );
             stmt.executeUpdate(
-                "CREATE TABLE IF NOT EXISTS fr_heats (id INTEGER PRIMARY KEY AUTOINCREMENT, roundId INTEGER NOT NULL, heatNumber INTEGER NOT NULL, state TEXT NOT NULL, startTime INTEGER DEFAULT NULL, endTime INTEGER DEFAULT NULL, fastestLapUUID TEXT, totalLaps INTEGER DEFAULT NULL, totalPitstops INTEGER DEFAULT NULL, timeLimit INTEGER DEFAULT NULL, startDelay INTEGER DEFAULT NULL, maxDrivers INTEGER DEFAULT NULL, lonely INTEGER DEFAULT NULL, canReset INTEGER DEFAULT NULL, lapReset INTEGER DEFAULT NULL, colisao TEXT DEFAULT 'DISABLED', drs INTEGER DEFAULT 0, driverswap INTEGER DEFAULT 0, drsdowntime REAL DEFAULT 0.0, drsdownpower REAL DEFAULT 0.0, reversegrid INTEGER DEFAULT 0, ghostingdelta REAL DEFAULT 0.0, pushtopass INTEGER DEFAULT 0, pushtopasspower REAL DEFAULT 0.0, realistc INTEGER DEFAULT 0, eliminationInterval INTEGER DEFAULT 30, minimumDrivers INTEGER DEFAULT 2, rowStartDelay INTEGER DEFAULT 0, finalRaceTimeout INTEGER DEFAULT 120)"
+                "CREATE TABLE IF NOT EXISTS fr_heats (id INTEGER PRIMARY KEY AUTOINCREMENT, roundId INTEGER NOT NULL, heatNumber INTEGER NOT NULL, state TEXT NOT NULL, startTime INTEGER DEFAULT NULL, endTime INTEGER DEFAULT NULL, fastestLapUUID TEXT, totalLaps INTEGER DEFAULT NULL, totalPitstops INTEGER DEFAULT NULL, timeLimit INTEGER DEFAULT NULL, startDelay INTEGER DEFAULT NULL, maxDrivers INTEGER DEFAULT NULL, lonely INTEGER DEFAULT NULL, canReset INTEGER DEFAULT NULL, lapReset INTEGER DEFAULT NULL, colisao TEXT DEFAULT 'DISABLED', drs INTEGER DEFAULT 0, driverswap INTEGER DEFAULT 0, drsdowntime REAL DEFAULT 0.0, drsdownpower REAL DEFAULT 0.0, reversegrid INTEGER DEFAULT 0, ghostingdelta REAL DEFAULT 0.0, pushtopass INTEGER DEFAULT 0, pushtopasspower REAL DEFAULT 0.0, realistc INTEGER DEFAULT 0, eliminationInterval INTEGER DEFAULT 30, minimumDrivers INTEGER DEFAULT 2, rowStartDelay INTEGER DEFAULT 0, finalRaceTimeout INTEGER DEFAULT 120, ers INTEGER DEFAULT 0, heatconfig TEXT DEFAULT NULL)"
             );
             // Idempotent ALTER TABLE columns for existing databases
             String[] heatAlterColumns = {
@@ -441,6 +441,8 @@ public class DatabaseManager {
                 "ALTER TABLE fr_heats ADD COLUMN minimumDrivers INTEGER DEFAULT 2",
                 "ALTER TABLE fr_heats ADD COLUMN rowStartDelay INTEGER DEFAULT 0",
                 "ALTER TABLE fr_heats ADD COLUMN finalRaceTimeout INTEGER DEFAULT 120",
+                "ALTER TABLE fr_heats ADD COLUMN ers INTEGER DEFAULT 0",
+                "ALTER TABLE fr_heats ADD COLUMN heatconfig TEXT DEFAULT NULL",
             };
             for (String alterSql : heatAlterColumns) {
                 try {

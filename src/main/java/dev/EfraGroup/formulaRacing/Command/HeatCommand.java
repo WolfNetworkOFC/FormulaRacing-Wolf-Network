@@ -1052,9 +1052,9 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("set ers")
-    @CommandCompletion("@heat")
+    @CommandCompletion("@heat true|false")
     @CommandPermission("formularacing.admin")
-    public void onSetErs(CommandSender sender, Heats heat, boolean seconds) {
+    public void onSetErs(CommandSender sender, Heats heat, boolean enabled) {
         heat = this.resolveHeat(sender, heat);
         if (heat == null) {
             sender.sendMessage(
@@ -1063,11 +1063,11 @@ public class HeatCommand extends BaseCommand {
             return;
         }
 
-        heat.setErsEnabled(seconds);
+        heat.setErsEnabled(enabled);
         sender.sendMessage(
-                "§a[Config] Ers definido como §f" +
-                        seconds +
-                        "s §ano heat §f" +
+                "§a[Config] ERS " +
+                        (enabled ? "§2ATIVADO" : "§cDESATIVADO") +
+                        " §ano heat §f" +
                         heat.getId()
         );
     }

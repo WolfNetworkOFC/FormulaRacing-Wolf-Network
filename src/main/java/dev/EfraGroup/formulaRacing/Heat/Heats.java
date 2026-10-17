@@ -205,7 +205,9 @@ public class Heats {
                 this.eliminationIntervalSeconds,
                 this.minimumDrivers,
                 this.rowStartDelayMs,
-                this.finalRaceTimeoutSeconds
+                this.finalRaceTimeoutSeconds,
+                this.ErsEnabled,
+                this.heatConfig != null ? this.heatConfig.toJson() : null
             );
         this.configDirty = false;
     }
@@ -804,7 +806,9 @@ public class Heats {
                         this.eliminationIntervalSeconds,
                         this.minimumDrivers,
                         this.rowStartDelayMs,
-                        this.finalRaceTimeoutSeconds
+                        this.finalRaceTimeoutSeconds,
+                        this.ErsEnabled,
+                        this.heatConfig != null ? this.heatConfig.toJson() : null
                     );
                 this.configDirty = false;
             }
@@ -1454,12 +1458,12 @@ public class Heats {
             }
         }
 
-        // Reset the advanced config too: a heat that ran (or aborted) an
-        // endurance session must not keep lastLapTriggered=true — otherwise
-        // the next start would finish everyone (AI included) after two
-        // line crossings.
+        // Limpa apenas os flags de runtime do HeatConfig: um heat que rodou (ou
+        // abortou) uma sessão de endurance não pode manter lastLapTriggered=true,
+        // senão a próxima largada encerra todos (IA inclusive) em duas passagens.
+        // A config persistida (timed, fuel, ERS, F1 start, checkered flag...) é mantida.
         if (this.getHeatConfig() != null) {
-            this.getHeatConfig().reset();
+            this.getHeatConfig().resetRuntimeState();
         }
 
         // Remove rods from players
@@ -2342,6 +2346,7 @@ public class Heats {
 
     public void setErsEnabled(boolean a) {
         this.ErsEnabled = a;
+        this.markConfigDirty();
     }
 
     public Integer getTimeLimit() {
@@ -2688,12 +2693,16 @@ public class Heats {
     public HeatConfig getHeatConfig() {
         if (heatConfig == null) {
             heatConfig = new HeatConfig();
+            heatConfig.setDirtyCallback(this::markConfigDirty);
         }
         return heatConfig;
     }
 
     public void setHeatConfig(HeatConfig heatConfig) {
         this.heatConfig = heatConfig;
+        if (heatConfig != null) {
+            heatConfig.setDirtyCallback(this::markConfigDirty);
+        }
     }
 
     public void markPositionsDirty() {

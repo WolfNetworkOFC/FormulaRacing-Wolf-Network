@@ -5,6 +5,7 @@ import dev.EfraGroup.formulaRacing.Event.Events;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.Heat.CollisionMode;
+import dev.EfraGroup.formulaRacing.Heat.HeatConfig;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Heat.Lap;
@@ -752,6 +753,15 @@ public class EventsDatabaseManager {
                             try {
                                 heat.setrealistc(rs.getInt("realistc") == 1);
                             } catch (SQLException ignored) {}
+                            try {
+                                heat.setErsEnabled(rs.getInt("ers") == 1);
+                            } catch (SQLException ignored) {}
+                            try {
+                                HeatConfig cfgFromDb = HeatConfig.fromJson(rs.getString("heatconfig"));
+                                if (cfgFromDb != null) {
+                                    heat.setHeatConfig(cfgFromDb);
+                                }
+                            } catch (SQLException ignored) {}
 
                             Rounds round = (Rounds) roundMap.get(hroundId);
                             if (round != null) {
@@ -1048,6 +1058,15 @@ public class EventsDatabaseManager {
                             } catch (SQLException ignored) {}
                             try {
                                 heat.setrealistc(rs.getInt("realistc") == 1);
+                            } catch (SQLException ignored) {}
+                            try {
+                                heat.setErsEnabled(rs.getInt("ers") == 1);
+                            } catch (SQLException ignored) {}
+                            try {
+                                HeatConfig cfgFromDb = HeatConfig.fromJson(rs.getString("heatconfig"));
+                                if (cfgFromDb != null) {
+                                    heat.setHeatConfig(cfgFromDb);
+                                }
                             } catch (SQLException ignored) {}
 
                             Rounds round = (Rounds) roundMap.get(hroundId);
@@ -1756,14 +1775,16 @@ public class EventsDatabaseManager {
         int eliminationIntervalSeconds,
         int minimumDrivers,
         int rowStartDelayMs,
-        int finalRaceTimeoutSeconds
+        int finalRaceTimeoutSeconds,
+        boolean ersEnabled,
+        String heatConfigJson
     ) {
         String sql =
             "UPDATE fr_heats SET totalLaps = ?, totalPitstops = ?, timeLimit = ?, startDelay = ?, " +
             "maxDrivers = ?, lonely = ?, canReset = ?, lapReset = ?, colisao = ?, drs = ?, " +
             "driverswap = ?, drsdowntime = ?, drsdownpower = ?, reversegrid = ?, ghostingdelta = ?, " +
             "pushtopass = ?, pushtopasspower = ?, realistc = ?, eliminationInterval = ?, minimumDrivers = ?, " +
-            "rowStartDelay = ?, finalRaceTimeout = ? WHERE id = ?";
+            "rowStartDelay = ?, finalRaceTimeout = ?, ers = ?, heatconfig = ? WHERE id = ?";
         this.executeAsync(sql, "updateHeatFullConfig", stmt -> {
             try {
                 if (totalLaps != null) {
@@ -1808,7 +1829,13 @@ public class EventsDatabaseManager {
                 stmt.setInt(20, minimumDrivers);
                 stmt.setInt(21, rowStartDelayMs);
                 stmt.setInt(22, finalRaceTimeoutSeconds);
-                stmt.setInt(23, heatId);
+                stmt.setInt(23, ersEnabled ? 1 : 0);
+                if (heatConfigJson != null) {
+                    stmt.setString(24, heatConfigJson);
+                } else {
+                    stmt.setNull(24, java.sql.Types.VARCHAR);
+                }
+                stmt.setInt(25, heatId);
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
@@ -1912,6 +1939,15 @@ public class EventsDatabaseManager {
         } catch (SQLException ignored) {}
         try {
             heat.setrealistc(rs.getInt("realistc") == 1);
+        } catch (SQLException ignored) {}
+        try {
+            heat.setErsEnabled(rs.getInt("ers") == 1);
+        } catch (SQLException ignored) {}
+        try {
+            HeatConfig cfgFromDb = HeatConfig.fromJson(rs.getString("heatconfig"));
+            if (cfgFromDb != null) {
+                heat.setHeatConfig(cfgFromDb);
+            }
         } catch (SQLException ignored) {}
         try {
             heat.setEliminationIntervalSeconds(rs.getInt("eliminationInterval"));

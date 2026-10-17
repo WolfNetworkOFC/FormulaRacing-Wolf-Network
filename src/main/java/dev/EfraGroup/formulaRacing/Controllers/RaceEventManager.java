@@ -1246,6 +1246,7 @@ public class RaceEventManager {
                                         );
                                         newHeat.setErsEnabled(srcHeat.isErsEnabled());
                                         newHeat.setOnlyBedrock(srcHeat.isOnlyBedrock());
+                                        newHeat.setHeatConfig(srcHeat.getHeatConfig().copy());
                                         newHeat.setTrackNameWS(trackNameWS);
 
                                         // Persist full config (fields not in createHeat)
@@ -1272,7 +1273,9 @@ public class RaceEventManager {
                                             srcHeat.getEliminationIntervalSeconds(),
                                             srcHeat.getMinimumDrivers(),
                                             srcHeat.getRowStartDelayMs(),
-                                            srcHeat.getFinalRaceTimeoutSeconds()
+                                            srcHeat.getFinalRaceTimeoutSeconds(),
+                                            srcHeat.isErsEnabled(),
+                                            srcHeat.getHeatConfig().toJson()
                                         );
 
                                         return CompletableFuture.completedFuture(null);
