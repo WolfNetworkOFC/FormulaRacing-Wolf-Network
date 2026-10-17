@@ -122,6 +122,22 @@ public class LonelyController implements Listener {
         }
     }
 
+    /**
+     * Esconde/reexibe um par de pilotos a pedido do DeltaGhostingController
+     * (mesma mecânica do TimingSystem, Folia-safe: também altera o barco do
+     * piloto de trás).
+     */
+    public void applyDeltaGhost(Player leading, Player trailing, boolean hide) {
+        if (leading == null || trailing == null) {
+            return;
+        }
+        if (hide) {
+            this.hidePlayer(leading, trailing);
+        } else {
+            this.showPlayer(leading, trailing);
+        }
+    }
+
     public boolean isEmergencyMode() {
         return this.emergencyMode;
     }
@@ -292,6 +308,13 @@ public class LonelyController implements Listener {
                 continue;
             }
 
+            // Delta ghosting (mesma mecânica do TimingSystem): quem está à
+            // frente não enxerga quem está >= delta segundos atrás
+            if (scope.isDeltaGhosted(viewer.getUniqueId(), other.getUniqueId())) {
+                hidePlayer(viewer, other);
+                continue;
+            }
+
             boolean inScope = participants.contains(other.getUniqueId());
 
             // Personal lonely takes precedence: if the viewer has it enabled,
@@ -375,6 +398,12 @@ public class LonelyController implements Listener {
         // Active racers should not see finished drivers in the same heat
         Set<UUID> finishedParticipants = scope.getFinishedParticipants();
         if (scope.isActiveRacer(viewer.getUniqueId()) && finishedParticipants.contains(target.getUniqueId())) {
+            hidePlayer(viewer, target);
+            return;
+        }
+
+        // Delta ghosting (mesma mecânica do TimingSystem)
+        if (scope.isDeltaGhosted(viewer.getUniqueId(), target.getUniqueId())) {
             hidePlayer(viewer, target);
             return;
         }

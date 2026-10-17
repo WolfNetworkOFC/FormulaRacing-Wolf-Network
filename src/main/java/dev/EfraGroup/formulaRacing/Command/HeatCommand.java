@@ -21,6 +21,7 @@ import dev.EfraGroup.formulaRacing.Heat.HeatCodes;
 import dev.EfraGroup.formulaRacing.Heat.HeatConfig;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
+import dev.EfraGroup.formulaRacing.Loneliness.DeltaGhostingController;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
@@ -1127,6 +1128,19 @@ public class HeatCommand extends BaseCommand {
         }
 
         heat.setDeltaghosting(seconds);
+        if (seconds <= 0) {
+            // Desligou o delta ghosting: limpa os pares e força a
+            // reconciliação para reexibir quem estava oculto pelo delta.
+            DeltaGhostingController.clearDeltaGhosts(heat);
+            for (UUID uuid : heat.getDrivers().keySet()) {
+                Player player = Bukkit.getPlayer(uuid);
+                if (player != null && player.isOnline()) {
+                    this.plugin
+                        .getLonelyController()
+                        .updatePlayersVisibility(player);
+                }
+            }
+        }
         sender.sendMessage(
             "§a[Config] Delta Ghosting definido para: §f" +
                 seconds +

@@ -10,6 +10,7 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.Logic.PracticeSession;
 import dev.EfraGroup.formulaRacing.Heat.Logic.QualifyingSession;
 import dev.EfraGroup.formulaRacing.Heat.Logic.RaceSession;
+import dev.EfraGroup.formulaRacing.Loneliness.DeltaGhostingController;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.RegionBox;
 import dev.EfraGroup.formulaRacing.Round.RoundType;
@@ -1030,6 +1031,7 @@ public class Heats {
             ? this.round.getSessionLogic().passLap(this, driver)
             : (new RaceSession(this.plugin)).passLap(this, driver);
         if (result) {
+            DeltaGhostingController.checkDeltas(this.plugin, this, driver);
             this.handleEnduranceFinalLap(driver);
         }
         return result;
@@ -1057,6 +1059,7 @@ public class Heats {
                   region
               );
         if (result) {
+            DeltaGhostingController.checkDeltas(this.plugin, this, driver);
             this.handleEnduranceFinalLap(driver);
         }
         return result;
@@ -1112,6 +1115,9 @@ public class Heats {
     }
 
     public void finishHeat(boolean teleportToSpawn) {
+        // Delta ghosting: zera os pares registrados deste heat (os pilotos
+        // saem/ficam finished e a visibilidade é reconciliada em seguida).
+        DeltaGhostingController.clearDeltaGhosts(this);
         // DRS: stop this heat's polling loop and restore/clear its state
         // (active boost, arming, boss bars) right away.
         if (this.plugin.getDRS() != null) {
@@ -1379,6 +1385,8 @@ public class Heats {
     }
 
     public void resetHeat() {
+        // Delta ghosting: zera os pares registrados deste heat.
+        DeltaGhostingController.clearDeltaGhosts(this);
         // If it was running, force stop
         if (this.heatState != HeatState.SETUP &&
                 this.heatState != HeatState.FINISHED &&
@@ -1717,11 +1725,15 @@ public class Heats {
     }
 
     public boolean removeDriver(UUID uuid) {
+        Driver removedDriver = this.drivers.remove(uuid);
+        if (removedDriver != null) {
+            DeltaGhostingController.removeHeatDriver(removedDriver);
+        }
         this.plugin.getLonelyController().clearGhost(uuid);
         if (this.plugin != null && this.plugin.getDriverLookup() != null) {
             this.plugin.getDriverLookup().unregister(uuid);
         }
-        return this.drivers.remove(uuid) != null;
+        return removedDriver != null;
     }
 
     private int getFinalRaceGroup(Driver driver) {

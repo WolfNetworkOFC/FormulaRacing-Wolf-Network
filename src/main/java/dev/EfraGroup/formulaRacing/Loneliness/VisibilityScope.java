@@ -55,4 +55,14 @@ public interface VisibilityScope {
     default boolean isActiveRacer(UUID uuid) {
         return false;
     }
+
+    /**
+     * Delta ghosting (mesma mecânica do TimingSystem): true quando
+     * {@code trailing} está a uma diferença de tempo maior ou igual ao delta
+     * configurado atrás de {@code leading}, e por isso {@code leading} não
+     * deve enxergá-lo. Scopes que não são de corrida retornam false.
+     */
+    default boolean isDeltaGhosted(UUID leading, UUID trailing) {
+        return false;
+    }
 }

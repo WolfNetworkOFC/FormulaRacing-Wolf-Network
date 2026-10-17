@@ -10,6 +10,7 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Heat.Lap;
+import dev.EfraGroup.formulaRacing.Loneliness.DeltaGhostingController;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Participant.DriverLookup;
 import dev.EfraGroup.formulaRacing.Utils.CheckpointSkipRule;
@@ -312,6 +313,7 @@ public class RaceCheckpointListener implements Listener {
         Bukkit.getPluginManager().callEvent(event);
         this.updateDelta(driver, player);
         heat.updateLivePositions();
+        DeltaGhostingController.checkDeltas(this.plugin, heat, driver);
     }
 
     private void handleCheckpointSkipped(

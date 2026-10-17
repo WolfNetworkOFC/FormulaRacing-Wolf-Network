@@ -70,4 +70,18 @@ public final class HeatScope implements VisibilityScope {
         Driver driver = heat.getDriver(uuid);
         return driver != null && !driver.isFinished() && !driver.isDnf();
     }
+
+    @Override
+    public boolean isDeltaGhosted(UUID leading, UUID trailing) {
+        Driver leadingDriver = heat.getDriver(leading);
+        Driver trailingDriver = heat.getDriver(trailing);
+        if (leadingDriver == null || trailingDriver == null) {
+            return false;
+        }
+        return DeltaGhostingController.isDeltaGhosted(
+            heat,
+            leadingDriver,
+            trailingDriver
+        );
+    }
 }
