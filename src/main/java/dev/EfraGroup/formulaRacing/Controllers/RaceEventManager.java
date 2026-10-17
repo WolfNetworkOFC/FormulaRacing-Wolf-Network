@@ -1190,7 +1190,7 @@ public class RaceEventManager {
                                         false,
                                         srcHeat.isDrsEnabled(),
                                         srcHeat.getDriverSwap(),
-                                        srcHeat.getCollisionMode(),
+                                        srcHeat.getCollisionMode().name(),
                                         srcHeat.getDrsdowntime(),
                                         srcHeat.getDrsdownpower(),
                                         srcHeat.getreversegrid(),
@@ -1245,7 +1245,7 @@ public class RaceEventManager {
                                             srcHeat.getRowStartDelayMs()
                                         );
                                         newHeat.setErsEnabled(srcHeat.isErsEnabled());
-                                        newHeat.setOnlyBedrock(srcHeat.isOnlyBedrock());
+                                        newHeat.setOnlyBedrock(srcHeat.getOnlyBedrock());
                                         newHeat.setHeatConfig(srcHeat.getHeatConfig().copy());
                                         newHeat.setTrackNameWS(trackNameWS);
 

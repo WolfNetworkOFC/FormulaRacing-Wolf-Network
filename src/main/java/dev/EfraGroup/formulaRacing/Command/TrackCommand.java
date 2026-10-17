@@ -1,5 +1,6 @@
 package dev.EfraGroup.formulaRacing.Command;
 
+import dev.EfraGroup.formulaRacing.Command.Help.CommandHelpService;
 import dev.EfraGroup.formulaRacing.Command.TimeTrialCommand;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
@@ -12,6 +13,7 @@ import co.aikar.commands.annotation.CommandCompletion;
 import co.aikar.commands.annotation.CommandPermission;
 import co.aikar.commands.annotation.Default;
 import co.aikar.commands.annotation.Description;
+import co.aikar.commands.annotation.Optional;
 import co.aikar.commands.annotation.Subcommand;
 import java.util.Arrays;
 import java.util.List;
