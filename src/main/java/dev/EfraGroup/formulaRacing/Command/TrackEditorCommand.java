@@ -523,6 +523,105 @@ public class TrackEditorCommand extends BaseCommand {
         player.sendMessage("§eTags for track '" + trackName + "': §f" + String.join("§e, §f", tags));
     }
 
+    @Subcommand("contributors add")
+    @Description("Adds a contributor (player) to a track")
+    @CommandCompletion("@players @tracks")
+    public void onContributorsAdd(Player player, String playerName, @Optional String trackNameArg) {
+        String trackName = this.getExistingTargetTrack(player, trackNameArg);
+        if (trackName == null) {
+            return;
+        }
+
+        org.bukkit.OfflinePlayer offlinePlayer = org.bukkit.Bukkit.getPlayer(playerName);
+        if (offlinePlayer == null) {
+            offlinePlayer = org.bukkit.Bukkit.getOfflinePlayer(playerName);
+        }
+        String uuid = offlinePlayer.getUniqueId().toString();
+
+        if (this.mysql.getTrackContributors(trackName).stream()
+                .anyMatch(existing -> existing.equalsIgnoreCase(uuid))) {
+            player.sendMessage("§ePlayer '" + playerName + "' is already a contributor of track '" + trackName + "'.");
+            return;
+        }
+
+        if (this.mysql.addTrackContributor(trackName, uuid)) {
+            player.sendMessage("§aPlayer '" + playerName + "' added as contributor to track '" + trackName + "'.");
+        } else {
+            player.sendMessage("§cCould not add contributor to track '" + trackName + "'.");
+        }
+    }
+
+    @Subcommand("contributors remove")
+    @Description("Removes a contributor (player) from a track")
+    @CommandCompletion("@players @tracks")
+    public void onContributorsRemove(Player player, String playerName, @Optional String trackNameArg) {
+        String trackName = this.getExistingTargetTrack(player, trackNameArg);
+        if (trackName == null) {
+            return;
+        }
+
+        org.bukkit.OfflinePlayer offlinePlayer = org.bukkit.Bukkit.getPlayer(playerName);
+        if (offlinePlayer == null) {
+            offlinePlayer = org.bukkit.Bukkit.getOfflinePlayer(playerName);
+        }
+        String uuid = offlinePlayer.getUniqueId().toString();
+
+        if (!this.mysql.getTrackContributors(trackName).stream()
+                .anyMatch(existing -> existing.equalsIgnoreCase(uuid))) {
+            player.sendMessage("§ePlayer '" + playerName + "' is not a contributor of track '" + trackName + "'.");
+            return;
+        }
+
+        if (this.mysql.removeTrackContributor(trackName, uuid)) {
+            player.sendMessage("§aPlayer '" + playerName + "' removed as contributor from track '" + trackName + "'.");
+        } else {
+            player.sendMessage("§cCould not remove contributor from track '" + trackName + "'.");
+        }
+    }
+
+    @Subcommand("contributors list")
+    @Description("Lists the contributors of a track")
+    @CommandCompletion("@tracks")
+    public void onContributorsList(Player player, @Optional String trackNameArg) {
+        String trackName = this.getExistingTargetTrack(player, trackNameArg);
+        if (trackName == null) {
+            return;
+        }
+
+        List<String> contributors = this.mysql.getTrackContributors(trackName);
+        if (contributors.isEmpty()) {
+            player.sendMessage("§eTrack '" + trackName + "' has no contributors.");
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder("§eContributors for track '" + trackName + "': §f");
+        boolean first = true;
+        for (String uuid : contributors) {
+            if (!first) sb.append("§e, §f");
+            first = false;
+            org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(java.util.UUID.fromString(uuid));
+            String name = op.getName();
+            sb.append(name != null ? name : uuid);
+        }
+        player.sendMessage(sb.toString());
+    }
+
+    @Subcommand("contributors reset")
+    @Description("Removes all contributors from a track")
+    @CommandCompletion("@tracks")
+    public void onContributorsReset(Player player, @Optional String trackNameArg) {
+        String trackName = this.getExistingTargetTrack(player, trackNameArg);
+        if (trackName == null) {
+            return;
+        }
+
+        if (this.mysql.resetTrackContributors(trackName)) {
+            player.sendMessage("§aAll contributors removed from track '" + trackName + "'.");
+        } else {
+            player.sendMessage("§cCould not reset contributors for track '" + trackName + "'.");
+        }
+    }
+
     @Subcommand("difficulty")
     @Description("Sets the difficulty of a track")
     @CommandCompletion("@nothing @tracks")
@@ -894,6 +993,18 @@ public class TrackEditorCommand extends BaseCommand {
             player.sendMessage("§6§l========== Track Information ==========");
             player.sendMessage("§e Name: §f" + trackName);
             player.sendMessage("§e Normalized Name: §f" + trackNameWS);
+            List<String> contribs = this.mysql.getTrackContributors(trackName);
+            if (!contribs.isEmpty()) {
+                StringBuilder cb = new StringBuilder("§e Contributors: §f");
+                boolean first = true;
+                for (String uuid : contribs) {
+                    if (!first) cb.append("§e, §f");
+                    first = false;
+                    org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(java.util.UUID.fromString(uuid));
+                    cb.append(op.getName() != null ? op.getName() : uuid);
+                }
+                player.sendMessage(cb.toString());
+            }
             player.sendMessage("");
             List<DatabaseManager.RegionData> allRegions = this.mysql.getAllRegions();
             boolean foundStart = false;

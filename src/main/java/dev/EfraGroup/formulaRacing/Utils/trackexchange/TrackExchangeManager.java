@@ -224,10 +224,7 @@ public class TrackExchangeManager {
         data.spawn.world = worldName;
         data.origin = new SimpleLocation(player.getLocation());
         data.worldName = worldName;
-        data.contributors = new ArrayList<>();
-        if (creatorUUID != null && !creatorUUID.isEmpty()) {
-            data.contributors.add(creatorUUID);
-        }
+        data.contributors = new ArrayList<>(db.getTrackContributors(finalTrackNameWS));
         data.regions = new ArrayList<>();
         data.locations = new ArrayList<>();
         data.tags = new ArrayList<>();
@@ -504,6 +501,15 @@ public class TrackExchangeManager {
                     }
                 }
                 db.setTrackTags(trackNameWS, tagValues);
+            }
+
+            // Import contributors (UUIDs) from the file
+            if (finalData.contributors != null) {
+                for (String contributorUuid : finalData.contributors) {
+                    if (contributorUuid != null && !contributorUuid.trim().isEmpty()) {
+                        db.addTrackContributor(trackNameWS, contributorUuid.trim());
+                    }
+                }
             }
 
             // Persist the GUI icon stored in the file: the material is

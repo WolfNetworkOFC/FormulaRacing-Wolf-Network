@@ -353,7 +353,8 @@ public class DatabaseManager {
                     TAGS TEXT DEFAULT '',
                     DIFFICULTY TEXT DEFAULT '',
                     gridsPerRow INTEGER DEFAULT 0,
-                    minVersion TEXT DEFAULT NULL
+                    minVersion TEXT DEFAULT NULL,
+                    contributors TEXT DEFAULT ''
                 )"""
             );
             ensureTrackMinVersionColumn(connection);
@@ -892,6 +893,7 @@ public class DatabaseManager {
             } catch (SQLException ignored) {}
 
             ensureTrackTagsColumn(conn);
+            ensureTrackContributorsColumn(conn);
             ensureTrackDifficultyColumn(conn);
 
             // Adds icon_amount and icon_meta columns to fr_tracks
@@ -3681,6 +3683,22 @@ public class DatabaseManager {
         return tracks;
     }
 
+    private void ensureTrackContributorsColumn(Connection conn) throws SQLException {
+        try (
+            PreparedStatement ps = conn.prepareStatement("PRAGMA table_info(fr_tracks)");
+            ResultSet rs = ps.executeQuery()
+        ) {
+            while (rs.next()) {
+                if ("contributors".equalsIgnoreCase(rs.getString("name"))) {
+                    return;
+                }
+            }
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE fr_tracks ADD COLUMN contributors TEXT DEFAULT ''");
+        }
+    }
+
     private void ensureTrackTagsColumn(Connection conn) throws SQLException {
         try (
             PreparedStatement ps = conn.prepareStatement("PRAGMA table_info(fr_tracks)");
@@ -3791,6 +3809,75 @@ public class DatabaseManager {
 
     public synchronized boolean resetTrackTags(String trackName) {
         return setTrackTags(trackName, Collections.emptyList());
+    }
+
+    public synchronized List<String> getTrackContributors(String trackName) {
+        String sql = "SELECT contributors FROM fr_tracks WHERE LOWER(trackNameWS) = LOWER(?) LIMIT 1";
+        try {
+            Connection conn = getOrConnect();
+            ensureTrackContributorsColumn(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, trackName.replaceAll("\\s+", ""));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        return new ArrayList<>();
+                    }
+                    String stored = rs.getString("contributors");
+                    if (stored == null || stored.isBlank()) {
+                        return new ArrayList<>();
+                    }
+                    return new ArrayList<>(Arrays.stream(stored.split("\\R"))
+                            .map(String::trim)
+                            .filter(s -> !s.isEmpty())
+                            .toList());
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return new ArrayList<>();
+        }
+    }
+
+    public synchronized boolean setTrackContributors(String trackName, List<String> contributors) {
+        String sql = "UPDATE fr_tracks SET contributors = ? WHERE LOWER(trackNameWS) = LOWER(?)";
+        try {
+            Connection conn = getOrConnect();
+            ensureTrackContributorsColumn(conn);
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, String.join("\n", contributors));
+                ps.setString(2, trackName.replaceAll("\\s+", ""));
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+            return false;
+        }
+    }
+
+    public synchronized boolean addTrackContributor(String trackName, String uuid) {
+        List<String> contributors = getTrackContributors(trackName);
+        String normalized = uuid.trim();
+        if (normalized.isEmpty()) {
+            return false;
+        }
+        for (String existing : contributors) {
+            if (existing.equalsIgnoreCase(normalized)) {
+                return false;
+            }
+        }
+        contributors.add(normalized);
+        return setTrackContributors(trackName, contributors);
+    }
+
+    public synchronized boolean removeTrackContributor(String trackName, String uuid) {
+        List<String> contributors = getTrackContributors(trackName);
+        String normalized = uuid.trim();
+        boolean removed = contributors.removeIf(existing -> existing.equalsIgnoreCase(normalized));
+        return removed && setTrackContributors(trackName, contributors);
+    }
+
+    public synchronized boolean resetTrackContributors(String trackName) {
+        return setTrackContributors(trackName, Collections.emptyList());
     }
 
     private void ensureTrackMinVersionColumn(Connection conn) throws SQLException {
