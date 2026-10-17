@@ -461,6 +461,12 @@ public class Driver {
         this.lastProcessedCheckpointId = -1;
     }
 
+    public void clearCurrentLap() {
+        this.currentLap = null;
+        this.checkpointsReached = 0;
+        this.lastProcessedCheckpointId = -1;
+    }
+
     public void forceCompleteCheckpoints(int totalCheckpoints) {
         if (this.checkpointsReached < totalCheckpoints) {
             this.checkpointsReached = totalCheckpoints;

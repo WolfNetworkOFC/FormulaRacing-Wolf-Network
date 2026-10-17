@@ -5,11 +5,12 @@ public enum DriverState {
     LOADED,
     STARTING,
     RUNNING,
+    LAPRESET,
     FINISHED,
     DNF,
     DSQ;
 
     public boolean isRacing() {
-        return this == RUNNING || this == STARTING || this == FINISHED;
+        return this == RUNNING || this == STARTING || this == LAPRESET || this == FINISHED;
     }
 }

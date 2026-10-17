@@ -4,7 +4,8 @@ import dev.EfraGroup.formulaRacing.Event.Driver.DriverNewLapEvent;
 import dev.EfraGroup.formulaRacing.Heat.HeatState;
 import dev.EfraGroup.formulaRacing.Heat.Heats;
 import dev.EfraGroup.formulaRacing.Listener.RaceCheckpointListener;
-import dev.EfraGroup.formulaRacing.Participant.Driver;
+import dev.EfraGroup.formulaRacing.Participant.DriverState;
+import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import dev.EfraGroup.formulaRacing.RegionBox;
 import java.time.Instant;
 import org.bukkit.Bukkit;
@@ -168,6 +169,31 @@ public class QualifyingSession implements SessionLogic {
         if (!processCheckpoints(heat, driver, player, totalCheckpoints)) {
             return false;
         }
+        if (heat.isLapReset()) {
+            if (driver.getState() == DriverState.LAPRESET) {
+                return true;
+            }
+            driver.finishLap();
+            RaceCheckpointListener checkpointListener = heat.getPlugin().getRaceCheckpointListener();
+            if (checkpointListener != null) {
+                checkpointListener.handleLapCompleted(driver, heat, player);
+            }
+            driver.clearCurrentLap();
+            driver.setState(DriverState.LAPRESET);
+            Location spawn = heat.getPlugin().getDatabaseManager().getTrackSpawn(heat.getTrackNameWS());
+            if (spawn != null && player != null) {
+                SchedulerHelper.teleportAsync(player, spawn).thenAccept(success -> {
+                    SchedulerHelper.runTask(heat.getPlugin(), () -> {
+                        if (player.isOnline()) {
+                            driver.setState(DriverState.RUNNING);
+                        }
+                    });
+                });
+            } else {
+                driver.setState(DriverState.RUNNING);
+            }
+            return true;
+        }
         return completeLap(heat, driver, player);
     }
 
@@ -181,6 +207,9 @@ public class QualifyingSession implements SessionLogic {
         Player player = Bukkit.getPlayer(driver.getUuid());
         if (player == null) {
             return false;
+        }
+        if (driver.getState() == DriverState.LAPRESET) {
+            return true;
         }
         if (driver.getCurrentLap() == null) {
             driver.setStartTime(System.currentTimeMillis());
@@ -197,6 +226,32 @@ public class QualifyingSession implements SessionLogic {
         if (!processCheckpoints(heat, driver, player, totalCheckpoints)) {
             return false;
         }
+
+        // Lap reset: record the lap, teleport to spawn, start a new lap (continuous lapping)
+        if (heat.isLapReset()) {
+            driver.finishLap(from, to, region);
+            RaceCheckpointListener checkpointListener = heat.getPlugin().getRaceCheckpointListener();
+            if (checkpointListener != null) {
+                checkpointListener.handleLapCompleted(driver, heat, player);
+            }
+            driver.clearCurrentLap();
+            driver.setState(DriverState.LAPRESET);
+
+            Location spawn = heat.getPlugin().getDatabaseManager().getTrackSpawn(heat.getTrackNameWS());
+            if (spawn != null && player != null) {
+                SchedulerHelper.teleportAsync(player, spawn).thenAccept(success -> {
+                    SchedulerHelper.runTask(heat.getPlugin(), () -> {
+                        if (player.isOnline()) {
+                            driver.setState(DriverState.RUNNING);
+                        }
+                    });
+                });
+            } else {
+                driver.setState(DriverState.RUNNING);
+            }
+            return true;
+        }
+
         driver.finishLap(from, to, region);
         return completeLap(heat, driver, player);
     }
