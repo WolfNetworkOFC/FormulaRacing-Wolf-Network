@@ -129,7 +129,7 @@ public class Heats {
         this.drsEnabled = false;
         this.pushtopass = true;
         this.driverswap = false;
-        this.drsdowntime = 0.0F; // 0 = usa drs.duration do config
+        this.drsdowntime =  3.0F;
         this.drsdownpower = 0.052;
         this.realistc = false;
         this.pushtopasspower = 0.05;

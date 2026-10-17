@@ -135,25 +135,11 @@ public class RaceSession implements SessionLogic {
     }
 
     public boolean isInside(Location loc, Location min, Location max) {
-        if (loc == null || loc.getWorld() == null || min == null || max == null) {
+        if (min != null && max != null) {
+            return loc.getX() >= Math.min(min.getX(), max.getX()) && loc.getX() <= Math.max(min.getX(), max.getX()) && loc.getZ() >= Math.min(min.getZ(), max.getZ()) && loc.getZ() <= Math.max(min.getZ(), max.getZ());
+        } else {
             return false;
         }
-        // World matters: distant tracks/lobbies can share the same coordinates.
-        if (min.getWorld() != null && !min.getWorld().equals(loc.getWorld())) {
-            return false;
-        }
-        // Y is compared by block (inclusive), like RegionMathUtils#isInsideRegionBlocks:
-        // a boat floating slightly above a one-block-tall selection must still count,
-        // while a driver on an upper deck does not trigger a zone below.
-        double minBlockY = Math.min(min.getY(), max.getY());
-        double maxBlockY = Math.max(min.getY(), max.getY());
-        if (loc.getBlockY() < minBlockY || loc.getBlockY() > maxBlockY) {
-            return false;
-        }
-        return loc.getX() >= Math.min(min.getX(), max.getX())
-            && loc.getX() <= Math.max(min.getX(), max.getX())
-            && loc.getZ() >= Math.min(min.getZ(), max.getZ())
-            && loc.getZ() <= Math.max(min.getZ(), max.getZ());
     }
 
     private boolean completeLap(Heats heat, Driver driver, Player player, boolean precise) {

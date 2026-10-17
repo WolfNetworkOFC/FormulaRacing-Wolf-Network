@@ -24,7 +24,6 @@ import org.bukkit.entity.Player;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -48,11 +47,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p>Entries older than {@code maxDelta * 2} are pruned so a region map never
  * grows unbounded on a long event.</p>
- *
- * <p>In practice and qualifying there is no gap requirement: crossing a
- * {@code detect} region arms DRS immediately, since there is no car ahead to
- * compare against. Region checks also respect the region's world and block Y,
- * so stacked decks of the same track cannot cross-trigger.</p>
  */
 public class DrsManager {
     /** OpenBoatUtils SET_FORWARD_ACCELERATION. */
@@ -82,13 +76,6 @@ public class DrsManager {
     private final Map<Integer, FRTask> drsLoopTasks = new ConcurrentHashMap<>();
     /** One stale-detection cleanup timer for the whole manager. */
     private final AtomicBoolean cleanupTimerStarted = new AtomicBoolean(false);
-    /**
-     * regionId -> players currently inside. Entry/exit transitions fire the
-     * detect/drs/end logic once per pass (on entry) instead of every 2 ticks
-     * while the player stays inside — which used to refresh the recorded
-     * crossing time and distort the gap comparison.
-     */
-    private final Map<Integer, Set<UUID>> playersInside = new ConcurrentHashMap<>();
 
     public DrsManager(RaceSession rs, FormulaRacing plugin, PacketSender ps) {
         this.rs = rs;
@@ -139,9 +126,8 @@ public class DrsManager {
     // ------------------------------------------------------------------
 
     /**
-     * Applies the DRS forward acceleration and schedules its removal after the
-     * heat's own {@code drsdowntime} seconds, falling back to
-     * {@code drs.duration} when the heat does not set one.
+     * Applies the DRS forward acceleration and schedules its removal after
+     * {@code drs.duration} milliseconds.
      */
     public void applyDrsBoost(Player player, Heats heat, Driver driver) {
         if (player == null || !player.isOnline() || this.ps == null) {
@@ -181,14 +167,7 @@ public class DrsManager {
             this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId())));
         player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.6F, 2.0F);
 
-        // Duração por heat (/heat set drsdowntime <heat> <segundos>); 0 mantém
-        // o padrão do config (drs.duration).
-        int durationMs = getDrsDuration();
-        double heatSeconds = heat.getDrsdowntime();
-        if (heatSeconds > 0) {
-            durationMs = (int) Math.round(heatSeconds * 1000.0);
-        }
-        int ticks = Math.max(1, durationMs / 50);
+        int ticks = Math.max(1, getDrsDuration() / 50);
         SchedulerHelper.runTaskLater(this.plugin, () -> {
             Player online = Bukkit.getPlayer(player.getUniqueId());
             if (online != null && online.isOnline()) {
@@ -272,32 +251,19 @@ public class DrsManager {
         regionPasses.put(playerId, now);
 
         if (shouldEnableDrs && !driver.isDrsActive()) {
-            grantDrs(player, driver, closestDiff);
+            enableDrs(playerId);
+            driver.setDrsPermission(true);
+
+            if (driver.getDrsBossBar() == null) {
+                createBarForDriver(driver, player);
+            } else {
+                driver.getDrsBossBar().setColor(BarColor.WHITE);
+            }
+            player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5F, 2.0F);
+
+            FRTheme theme = FRThemeResolver.resolveTheme(player);
+            sendThemedMessage(player, theme, "&a[DRS] Available &7(gap &f" + closestDiff + "ms&7)");
         }
-    }
-
-    /**
-     * Arms DRS for a driver: permission flag, white bossbar, sound and message.
-     *
-     * @param gapMs gap against the closest car, or {@code null} when the grant
-     *              did not depend on another car (practice/qualifying).
-     */
-    private void grantDrs(Player player, Driver driver, Long gapMs) {
-        enableDrs(player.getUniqueId());
-        driver.setDrsPermission(true);
-
-        if (driver.getDrsBossBar() == null) {
-            createBarForDriver(driver, player);
-        } else {
-            driver.getDrsBossBar().setColor(BarColor.WHITE);
-        }
-        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5F, 2.0F);
-
-        FRTheme theme = FRThemeResolver.resolveTheme(player);
-        String rawMsg = gapMs != null
-            ? "&a[DRS] Available &7(gap &f" + gapMs + "ms&7)"
-            : "&a[DRS] Available";
-        sendThemedMessage(player, theme, rawMsg);
     }
 
     private void enableDrs(UUID playerId) {
@@ -320,18 +286,6 @@ public class DrsManager {
     // ------------------------------------------------------------------
     // Main loop
     // ------------------------------------------------------------------
-
-    /** Session states in which the DRS loop runs. */
-    private static boolean isDrsSessionState(HeatState state) {
-        return state == HeatState.RACING
-            || state == HeatState.QUALIFYING
-            || state == HeatState.PRACTICE;
-    }
-
-    /** Practice/qualifying: no car ahead required, DRS arms on every crossing. */
-    private static boolean isFreeDrsState(HeatState state) {
-        return state == HeatState.QUALIFYING || state == HeatState.PRACTICE;
-    }
 
     public void startDrsTask(final Heats heat) {
         final List<Heats.DrsRegion> regions =
@@ -373,9 +327,7 @@ public class DrsManager {
                 return;
             }
 
-            // DRS runs in races, practice and qualifying; any other state
-            // (FINISHED, SETUP, ...) retires this heat's loop.
-            if (!isDrsSessionState(heat.getHeatState()) || !heat.isDrsEnabled()) {
+            if (heat.getHeatState() != HeatState.RACING || !heat.isDrsEnabled()) {
                 this.retireHeat(heat);
                 scheduledTask.cancel();
                 return;
@@ -405,36 +357,15 @@ public class DrsManager {
                             String type = region.getType();
                             boolean inside = rs.isInside(loc, region.getMin(), region.getMax());
 
-                            Set<UUID> insidePlayers = this.playersInside.computeIfAbsent(
-                                region.getId(), k -> ConcurrentHashMap.newKeySet());
-                            boolean wasInside = insidePlayers.contains(finalDriver.getUuid());
-
-                            if (inside == wasInside) {
-                                continue;
-                            }
-                            if (inside) {
-                                insidePlayers.add(finalDriver.getUuid());
-                            } else {
-                                insidePlayers.remove(finalDriver.getUuid());
-                                continue;
-                            }
-
-                            // Entry event: the logic below fires once per pass.
                             switch (type) {
                                 case "detect" -> {
-                                    if (!finalDriver.hasDrsPermission()
+                                    if (inside && !finalDriver.hasDrsPermission()
                                             && !finalDriver.isDrsActive()) {
-                                        if (isFreeDrsState(heat.getHeatState())) {
-                                            // Treino/quali: arma ao cruzar, sem exigir
-                                            // outro carro dentro de drs.max-delta.
-                                            grantDrs(freshPlayer, finalDriver, null);
-                                        } else {
-                                            playerPassedDrsDetect(freshPlayer, finalDriver, region.getId());
-                                        }
+                                        playerPassedDrsDetect(freshPlayer, finalDriver, region.getId());
                                     }
                                 }
                                 case "drs" -> {
-                                    if (finalDriver.hasDrsPermission()
+                                    if (inside && finalDriver.hasDrsPermission()
                                             && !finalDriver.isDrsActive()) {
                                         applyDrsBoost(freshPlayer, heat, finalDriver);
                                         FRTheme theme = FRThemeResolver.resolveTheme(freshPlayer);
@@ -442,7 +373,7 @@ public class DrsManager {
                                     }
                                 }
                                 case "end" -> {
-                                    if (finalDriver.isDrsActive() || finalDriver.hasDrsPermission()) {
+                                    if (inside && (finalDriver.isDrsActive() || finalDriver.hasDrsPermission())) {
                                         FRTheme theme = FRThemeResolver.resolveTheme(freshPlayer);
                                         if (finalDriver.isDrsActive()) {
                                             stopDrsBoost(freshPlayer, finalDriver, heat);
@@ -522,9 +453,6 @@ public class DrsManager {
         for (Map<UUID, Long> passes : drsDetectRegionPasses.values()) {
             passes.remove(playerId);
         }
-        for (Set<UUID> inside : playersInside.values()) {
-            inside.remove(playerId);
-        }
     }
 
     /**
@@ -537,10 +465,6 @@ public class DrsManager {
         for (Map<UUID, Long> passes : drsDetectRegionPasses.values()) {
             passes.entrySet().removeIf(e -> e.getValue() < cutoff);
         }
-        // Empty inner maps would otherwise pin one entry per region id forever
-        // (regions of tracks already deleted included).
-        drsDetectRegionPasses.entrySet().removeIf(e -> e.getValue().isEmpty());
-        playersInside.entrySet().removeIf(e -> e.getValue().isEmpty());
     }
 
     // ------------------------------------------------------------------
