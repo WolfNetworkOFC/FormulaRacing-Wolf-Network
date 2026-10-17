@@ -542,22 +542,33 @@ public class Heats {
                             qualiGridPositions.size() + " posições para " + this.drivers.size() +
                             " pilotos — §c" + missingSlots + " piloto(s) ficaram FORA do grid§e.");
                     }
+                    List<Driver> qualiDrivers = new ArrayList<>();
+                    Map<UUID, Location> qualiSlots = new HashMap<>();
                     for (Driver driver : this.drivers.values()) {
                         Player player = Bukkit.getPlayer(driver.getUuid());
                         if (player != null && player.isOnline()) {
                             int gridIndex = driver.getStartPosition() - 1;
                             if (gridIndex >= 0 && gridIndex < qualiGridPositions.size()) {
-                                Location qualiLoc = qualiGridPositions.get(gridIndex);
-                                // NOTE: the old boat must be removed INSIDE spawnQualiDriver, before
-                                // the teleport. Scheduling recoverPlayerBoatState as a separate task
-                                // here races with the teleport and left drivers who were already in a
-                                // boat without a new one (see the race grid fix in GridManager).
-                                this.spawnQualiDriver(player, driver, qualiLoc);
+                                qualiDrivers.add(driver);
+                                qualiSlots.put(driver.getUuid(), qualiGridPositions.get(gridIndex));
                             } else if (player.isOnline()) {
                                 player.sendMessage("§cSem qualigrid para sua posição (" + driver.getStartPosition() + ").");
                             }
                         }
                     }
+                    // NOTE: the old boat must be removed INSIDE spawnQualiDriver, before
+                    // the teleport. Scheduling recoverPlayerBoatState as a separate task
+                    // here races with the teleport and left drivers who were already in a
+                    // boat without a new one (see the race grid fix in GridManager).
+                    // Placement runs in small per-tick batches to avoid a teleport/boat
+                    // spawn spike on large quali grids (parity with the race grid path).
+                    this.gridManager.placeDriversInBatches(qualiDrivers, driver -> {
+                        Player online = Bukkit.getPlayer(driver.getUuid());
+                        Location qualiLoc = qualiSlots.get(driver.getUuid());
+                        if (online != null && online.isOnline() && qualiLoc != null) {
+                            this.spawnQualiDriver(online, driver, qualiLoc);
+                        }
+                    });
                     this.plugin.getDebugManager().logRaceSystem(
                         "Drivers teleported to QUALIGRID for Qualifying."
                     );
@@ -767,6 +778,9 @@ public class Heats {
                     );
                 this.configDirty = false;
             }
+            // A large grid may still be placing a few drivers per tick — flush the queue
+            // so everybody is on the grid before the countdown starts.
+            this.gridManager.placeRemainingDriversNow();
             this.setHeatState(HeatState.STARTING);
             this.gridManager.freezePlayers();
             Runnable startAction = this::startRace;

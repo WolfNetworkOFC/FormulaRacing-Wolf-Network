@@ -4,16 +4,21 @@ import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Controllers.TrackIntegrationManager;
 import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
+import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.function.Consumer;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 
 public class GridManager {
+    /** How many drivers are teleported/spawned per tick when loading a grid in batches. */
+    private static final int DRIVERS_PER_TICK = 5;
     private final FormulaRacing plugin;
     private final Heats heat;
     private final List<Location> gridPositions;
@@ -22,6 +27,12 @@ public class GridManager {
     private final Set<UUID> frozenPlayers = ConcurrentHashMap.newKeySet();
     /** Jump-start penalties (F1 start): ticks a driver stays anchored after lights out. */
     private final java.util.Map<UUID, Long> jumpStartPenalties = new java.util.concurrent.ConcurrentHashMap<>();
+    // Grid loading is spread over several ticks (DRIVERS_PER_TICK per tick) instead of
+    // teleporting and spawning every boat in one tick, which spiked the server on large
+    // grids. Concurrent: enqueue and flush may run from async threads.
+    private final ConcurrentLinkedDeque<Driver> pendingPlacements = new ConcurrentLinkedDeque<>();
+    private volatile Consumer<Driver> pendingPlacementAction;
+    private volatile FRTask placementTask;
 
     public GridManager(FormulaRacing plugin, Heats heat) {
         this.plugin = plugin;
@@ -91,7 +102,10 @@ public class GridManager {
                 this.plugin.getDebugManager().logRaceSystem("No drivers to teleport in Heat " + this.heat.getId());
                 return 0;
             } else {
-                int teleported = 0;
+                // Validate and filter at queue time so the caller keeps its "nobody could
+                // be placed" signal (all offline / invalid grid slots), then hand the rest
+                // to the batched placer (a few drivers per tick, see placeDriversInBatches).
+                List<Driver> placeable = new ArrayList<>();
 
                 for(Driver driver : drivers) {
                     if (driver.getStartPosition() < 1) {
@@ -106,13 +120,7 @@ public class GridManager {
                     if (gridPosition >= 0 && gridPosition < this.gridPositions.size()) {
                         Player player = this.plugin.getServer().getPlayer(driver.getUuid());
                         if (player != null && player.isOnline()) {
-                            Location gridLoc = (Location)this.gridPositions.get(gridPosition);
-
-                            this.spawnBoatWithTrackConfig(player, gridLoc, driver);
-                            DebugManager var10000 = this.plugin.getDebugManager();
-                            String var10001 = player.getName();
-                            var10000.logRaceSystem("Driver " + var10001 + " teleported to P" + (gridPosition + 1));
-                            ++teleported;
+                            placeable.add(driver);
                         } else {
                             this.plugin.getDebugManager().logRaceSystem("Offline driver cannot be teleported: " + String.valueOf(driver.getUuid()));
                         }
@@ -123,10 +131,35 @@ public class GridManager {
                     }
                 }
 
-                this.plugin.getDebugManager().logRaceSystem("Teleported " + teleported + "/" + drivers.size() + " drivers to grid");
-                return teleported;
+                int queued = this.placeDriversInBatches(placeable, this::placeDriverOnGrid);
+                this.plugin.getDebugManager().logRaceSystem("Teleported " + queued + "/" + drivers.size() + " drivers to grid (batched at " + DRIVERS_PER_TICK + "/tick)");
+                return queued;
             }
         }
+    }
+
+    /**
+     * Places a single driver on the grid. Runs from the batched placement task — the
+     * player and the grid slot are re-checked here because both can change while the
+     * driver waits in the queue.
+     */
+    private void placeDriverOnGrid(Driver driver) {
+        Player player = this.plugin.getServer().getPlayer(driver.getUuid());
+        if (player == null || !player.isOnline()) {
+            this.plugin.getDebugManager().logRaceSystem("Offline driver cannot be teleported: " + String.valueOf(driver.getUuid()));
+            return;
+        }
+
+        int gridPosition = driver.getStartPosition() - 1;
+        if (gridPosition < 0 || gridPosition >= this.gridPositions.size()) {
+            this.plugin.getDebugManager().logRaceSystem(
+                "Invalid grid position for driver " + String.valueOf(driver.getUuid()) + ": P" + (gridPosition + 1) + " (index: " + gridPosition + ")");
+            return;
+        }
+
+        Location gridLoc = this.gridPositions.get(gridPosition);
+        this.spawnBoatWithTrackConfig(player, gridLoc, driver);
+        this.plugin.getDebugManager().logRaceSystem("Driver " + player.getName() + " teleported to P" + (gridPosition + 1));
     }
 
     public void freezePlayers() {
@@ -205,7 +238,72 @@ public class GridManager {
         return this.gridPositions.size();
     }
 
+    /**
+     * Places drivers on the grid a few per tick instead of teleporting and spawning every
+     * boat in a single tick — large grids used to spike the server when loaded (parity
+     * with TimingSystem's batched grid loading). The first batch runs immediately, the
+     * rest are spread by a one-tick timer. Returns how many drivers were queued.
+     */
+    public int placeDriversInBatches(List<Driver> drivers, Consumer<Driver> placement) {
+        this.cancelPendingPlacements();
+        this.pendingPlacementAction = placement;
+        this.pendingPlacements.addAll(drivers);
+        int queued = this.pendingPlacements.size();
+        this.placeNextBatch();
+        if (this.pendingPlacements.isEmpty()) {
+            return queued;
+        }
+        this.placementTask = SchedulerHelper.runTaskTimer(this.plugin, () -> {
+            this.placeNextBatch();
+            if (this.pendingPlacements.isEmpty()) {
+                this.cancelPendingPlacements();
+            }
+        }, 1L, 1L);
+        return queued;
+    }
+
+    private void placeNextBatch() {
+        Consumer<Driver> placement = this.pendingPlacementAction;
+        if (placement == null) {
+            this.pendingPlacements.clear();
+            return;
+        }
+        for (int i = 0; i < DRIVERS_PER_TICK; i++) {
+            Driver driver = this.pendingPlacements.poll();
+            if (driver == null) {
+                break;
+            }
+            placement.accept(driver);
+        }
+    }
+
+    /**
+     * Places every queued driver immediately and stops the batch timer. Used before a
+     * countdown starts so nobody is left without a boat when the lights go out.
+     */
+    public void placeRemainingDriversNow() {
+        Consumer<Driver> placement = this.pendingPlacementAction;
+        if (placement != null) {
+            Driver driver;
+            while ((driver = this.pendingPlacements.poll()) != null) {
+                placement.accept(driver);
+            }
+        }
+        this.cancelPendingPlacements();
+    }
+
+    /** Drops any pending placements and stops the batch timer (heat cleared/reset). */
+    public void cancelPendingPlacements() {
+        this.pendingPlacements.clear();
+        FRTask task = this.placementTask;
+        if (task != null) {
+            task.cancel();
+            this.placementTask = null;
+        }
+    }
+
     public void clear() {
+        this.cancelPendingPlacements();
         for(Driver driver : this.heat.getDrivers().values()) {
             Player player = this.plugin.getServer().getPlayer(driver.getUuid());
             if (player != null && player.isOnline()) {
