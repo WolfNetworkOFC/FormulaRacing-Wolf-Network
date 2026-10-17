@@ -1197,7 +1197,7 @@ public class RegionListener implements Listener {
 
             this.timerUtils.stopTimer(player, regionTrackWS);
             if (this.plugin.getScoreboardTimeTrialUtils() != null) {
-                this.plugin.getScoreboardTimeTrialUtils().recordFinish(player, officialTime.getOfficialMillis());
+                this.plugin.getScoreboardTimeTrialUtils().recordFinish(player, officialTime.displayMillis());
             }
             this.timeTrialController.endSession(player);
             if (shouldLoop) {

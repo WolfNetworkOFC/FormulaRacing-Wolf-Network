@@ -39,13 +39,13 @@ public class ScoreboardTimeTrialUtils {
     public void recordAttempt(Player player) {
         if (player == null) return;
         this.sessionAttempts.merge(player.getUniqueId(), 1, Integer::sum);
-        this.sessionFinishes.putIfAbsent(player.getUniqueId(), new ArrayList<>());
+        this.sessionFinishes.putIfAbsent(player.getUniqueId(), java.util.Collections.synchronizedList(new ArrayList<>()));
     }
 
     public void recordFinish(Player player, long timeMillis) {
         if (player == null) return;
         this.sessionFinishes
-            .computeIfAbsent(player.getUniqueId(), k -> new ArrayList<>())
+            .computeIfAbsent(player.getUniqueId(), k -> java.util.Collections.synchronizedList(new ArrayList<>()))
             .add(timeMillis);
     }
 
@@ -187,26 +187,6 @@ public class ScoreboardTimeTrialUtils {
         }
     }
 
-    /**
-     * Whether the viewer has compact mode on (/settings compact), cached with the
-     * same TTL as the enabled check — updateBoard runs every second per player.
-     */
-    private boolean isCompactMode(Player player) {
-        long now = System.currentTimeMillis();
-        Boolean cached = this.compactCache.get(player.getUniqueId());
-        if (
-            cached != null &&
-            now - this.lastCompactCheck.getOrDefault(player.getUniqueId(), 0L) <
-            SETTINGS_TTL
-        ) {
-            return cached;
-        }
-        boolean compact = this.mysql.getPlayerCompactMode(player.getUniqueId());
-        this.compactCache.put(player.getUniqueId(), compact);
-        this.lastCompactCheck.put(player.getUniqueId(), now);
-        return compact;
-    }
-
     private void updateBoard(Player player, String trackName) {
         TranslationUtil tu = FormulaRacing.getInstance().getTranslationUtil();
         this.adapter.updateTitle(
@@ -232,7 +212,6 @@ public class ScoreboardTimeTrialUtils {
         long averageTime = (totalFinishes > 0) ? (totalTime / totalFinishes) : -1L;
         long percentage = (attempts > 0) ? (totalFinishes * 100 / attempts) : 0L;
 
-        java.awt.Color color = null;
         String finishColor = "§c";
         if (percentage > 67) finishColor = "§a";
         else if (percentage > 33) finishColor = "§e";
