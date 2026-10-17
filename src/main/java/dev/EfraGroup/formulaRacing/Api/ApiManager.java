@@ -1703,8 +1703,6 @@ public class ApiManager {
         copyResourceFromJar("/dashboard/css/live-map.css", new File(dashboardDir, "css/live-map.css"));
         copyResourceFromJar("/dashboard/js/dashboard.js", new File(dashboardDir, "js/dashboard.js"));
         copyResourceFromJar("/dashboard/js/live-map.js", new File(dashboardDir, "js/live-map.js"));
-        copyResourceFromJar("/dashboard/INSTALL.md", new File(dashboardDir, "INSTALL.md"));
-        copyResourceFromJar("/dashboard/CONFIG_EXAMPLES.md", new File(dashboardDir, "CONFIG_EXAMPLES.md"));
 
         // Create api_config.yml from the bundled resource if it doesn't exist
         File apiConfigFile = new File(dataFolder, "api_config.yml");
