@@ -64,16 +64,16 @@ public class HeatDriverCommandService {
 
     private DriverMutationResult addDriverLocked(Heats heat, UUID targetUuid, String targetName, Integer requestedPosition) {
         HeatState heatState = heat.getHeatState();
-        boolean lateQualifyingJoin = heatState == HeatState.QUALIFYING;
+        boolean lateSessionJoin = heatState == HeatState.QUALIFYING || heatState == HeatState.PRACTICE;
 
-        if (!this.isEditable(heatState) && !lateQualifyingJoin) {
+        if (!this.isEditable(heatState) && !lateSessionJoin) {
             return DriverMutationResult.of(DriverMutationStatus.INVALID_HEAT_STATE);
         }
 
-        // Late joins into a qualifying session that is already running (parity with
-        // TimingSystem's mid-qualifying add): the driver has to be online and the
+        // Late joins into a qualifying or practice session that is already running (parity
+        // with TimingSystem's mid-qualifying add): the driver has to be online and the
         // session still has to have time left on the clock.
-        if (lateQualifyingJoin) {
+        if (lateSessionJoin) {
             if (heat.getTimeLimit() != null && heat.getTimeLimit() > 0 && heat.getSessionTimeRemaining() <= 0L) {
                 return DriverMutationResult.of(DriverMutationStatus.SESSION_ENDED);
             }
@@ -111,13 +111,13 @@ public class HeatDriverCommandService {
             return DriverMutationResult.of(DriverMutationStatus.PERSISTENCE_ERROR);
         }
 
-        if (lateQualifyingJoin) {
+        if (lateSessionJoin) {
             // A full sync would rebuild every Driver from the database and wipe the live
-            // qualifying state (laps, times, checkpoints) of the drivers already running.
-            if (!this.registerLateQualifyingDriver(heat, targetUuid, insertPosition)) {
+            // session state (laps, times, checkpoints) of the drivers already running.
+            if (!this.registerLateSessionDriver(heat, targetUuid, insertPosition)) {
                 return DriverMutationResult.of(DriverMutationStatus.SYNC_ERROR);
             }
-            // Heats#handleLateJoin takes over from here: a qualifying late join is sent to the
+            // Heats#handleLateJoin takes over from here: a late session join is sent to the
             // track spawn (with scoreboard/actionbar/hotbar and boat utils) instead of the grid.
             return DriverMutationResult.success(insertPosition, targetName);
         }
@@ -200,12 +200,12 @@ public class HeatDriverCommandService {
     }
 
     /**
-     * Registers a late join into a running qualifying session without rebuilding the whole heat:
-     * mirrors the position shift applied by addDriverToHeatWithShiftSync in memory and attaches
-     * only the new driver, preserving the live session state (laps, times, checkpoints) of
-     * everyone else.
+     * Registers a late join into a running qualifying or practice session without rebuilding the
+     * whole heat: mirrors the position shift applied by addDriverToHeatWithShiftSync in memory and
+     * attaches only the new driver, preserving the live session state (laps, times, checkpoints)
+     * of everyone else.
      */
-    private boolean registerLateQualifyingDriver(Heats heat, UUID targetUuid, int insertPosition) {
+    private boolean registerLateSessionDriver(Heats heat, UUID targetUuid, int insertPosition) {
         try {
             // Same predicate as the SQL shift: rows with position >= insertPosition move one up.
             for (Driver existing : heat.getDrivers().values()) {
@@ -231,7 +231,7 @@ public class HeatDriverCommandService {
             return true;
         } catch (Exception exception) {
             this.plugin.getDebugManager().logDatabaseOperation(
-                "[HeatDriverCommandService] Falha ao registrar late join da quali no heat " + heat.getId() + ": " + exception.getMessage()
+                "[HeatDriverCommandService] Falha ao registrar late join de sessão no heat " + heat.getId() + ": " + exception.getMessage()
             );
             return false;
         }

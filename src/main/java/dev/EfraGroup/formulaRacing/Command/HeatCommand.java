@@ -2905,12 +2905,12 @@ public class HeatCommand extends BaseCommand {
                     ChatColor.RED +
                     "✗ Piloto " +
                     targetName +
-                    " precisa estar online para entrar em quali em andamento."
+                    " precisa estar online para entrar em quali/treino em andamento."
                 );
             case SESSION_ENDED:
                 return (
                     ChatColor.RED +
-                    "✗ A sessão de quali do heat " +
+                    "✗ A sessão de quali/treino do heat " +
                     heat.getName() +
                     " já encerrou — não dá mais para adicionar pilotos."
                 );
