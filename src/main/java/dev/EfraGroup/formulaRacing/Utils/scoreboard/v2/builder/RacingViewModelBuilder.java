@@ -9,7 +9,7 @@ import java.util.List;
 public class RacingViewModelBuilder implements StateViewModelBuilder {
     @Override
     public boolean supports(HeatState state) {
-        return state == HeatState.RACING;
+        return state == HeatState.RACING || state == HeatState.STARTING;
     }
 
     @Override
