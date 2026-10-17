@@ -15,6 +15,7 @@ import dev.EfraGroup.formulaRacing.Utils.DebugManager;
 import dev.EfraGroup.formulaRacing.Utils.MinecraftVersion;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -1083,6 +1084,217 @@ public class RaceEventManager {
         });
     }
 
+    /**
+     * Clones an existing event (structure only: rounds + heats + heat config).
+     * Does NOT copy signups/drivers/results. Returns the new event.
+     */
+    public CompletableFuture<Events> cloneEvent(
+        Events source,
+        String newName,
+        UUID creatorUUID
+    ) {
+        if (source == null || newName == null || newName.trim().isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        String trackNameWS = source.getTrackNameWS();
+
+        return this.dbManager.createEvent(creatorUUID, newName, trackNameWS)
+            .thenCompose(eventId -> {
+                if (eventId == -1) {
+                    this.plugin.getDebugManager().logDatabaseOperation(
+                        "Failed to clone event: could not create event " + newName
+                    );
+                    return CompletableFuture.completedFuture(null);
+                }
+
+                final Events newEvent = new Events(
+                    this.plugin,
+                    this,
+                    eventId,
+                    creatorUUID,
+                    newName
+                );
+                newEvent.setTrackNameWS(trackNameWS);
+                if (source.isOpenSign() != newEvent.isOpenSign()) {
+                    newEvent.setOpenSign(source.isOpenSign());
+                    this.dbManager.updateEventOpenSign(eventId, source.isOpenSign());
+                }
+
+                List<Rounds> sourceRounds =
+                    source.getEventSchedule().getRoundsOrdered();
+
+                CompletableFuture<Void> roundChain =
+                    CompletableFuture.completedFuture(null);
+
+                for (Rounds srcRound : sourceRounds) {
+                    roundChain = roundChain.thenCompose(v ->
+                        this.dbManager.createRound(
+                            eventId,
+                            srcRound.getRoundIndex(),
+                            srcRound.getRoundType()
+                        ).thenCompose(roundId -> {
+                            if (roundId == -1) {
+                                this.plugin.getDebugManager().logDatabaseOperation(
+                                    "Failed to clone round R" +
+                                        srcRound.getRoundIndex()
+                                );
+                                return CompletableFuture.completedFuture(null);
+                            }
+
+                            Rounds newRound = newEvent
+                                .getEventSchedule()
+                                .createRound(
+                                    srcRound.getRoundIndex(),
+                                    srcRound.getRoundType()
+                                );
+                            newRound.setId(roundId);
+                            newRound.setEventId(eventId);
+
+                            List<Heats> srcHeats = srcRound.getHeats()
+                                .values()
+                                .stream()
+                                .sorted(Comparator.comparingInt(Heats::getHeatNumber))
+                                .toList();
+
+                            CompletableFuture<Void> heatChain =
+                                CompletableFuture.completedFuture(null);
+
+                            for (Heats srcHeat : srcHeats) {
+                                heatChain = heatChain.thenCompose(hv -> {
+                                    int totalLaps = srcHeat.getTotalLaps() == null
+                                        ? 0
+                                        : srcHeat.getTotalLaps();
+                                    int totalPits = srcHeat.getTotalPits() == null
+                                        ? 0
+                                        : srcHeat.getTotalPits();
+                                    int timeLimit = srcHeat.getTimeLimit() == null
+                                        ? 0
+                                        : srcHeat.getTimeLimit();
+                                    int startDelay = srcHeat.getStartDelay() == null
+                                        ? 0
+                                        : srcHeat.getStartDelay();
+                                    int maxDrivers = srcHeat.getMaxDrivers() == null
+                                        ? -1
+                                        : srcHeat.getMaxDrivers();
+
+                                    return this.dbManager.createHeat(
+                                        roundId,
+                                        srcHeat.getHeatNumber(),
+                                        totalLaps,
+                                        totalPits,
+                                        timeLimit,
+                                        startDelay,
+                                        maxDrivers,
+                                        srcHeat.isLonely(),
+                                        srcHeat.isCanReset(),
+                                        false,
+                                        srcHeat.isDrsEnabled(),
+                                        srcHeat.getDriverSwap(),
+                                        srcHeat.getCollisionMode(),
+                                        srcHeat.getDrsdowntime(),
+                                        srcHeat.getDrsdownpower(),
+                                        srcHeat.getreversegrid(),
+                                        srcHeat.getDeltaGhosting(),
+                                        srcHeat.isPushtopass(),
+                                        srcHeat.getpushtopasspower(),
+                                        srcHeat.getrealistc(),
+                                        srcHeat.getEliminationIntervalSeconds(),
+                                        srcHeat.getMinimumDrivers()
+                                    ).thenCompose(heatId -> {
+                                        if (heatId == -1) {
+                                            this.plugin.getDebugManager().logDatabaseOperation(
+                                                "Failed to clone heat H" +
+                                                    srcHeat.getHeatNumber()
+                                            );
+                                            return CompletableFuture.completedFuture(null);
+                                        }
+
+                                        Heats newHeat = newRound.createHeat(
+                                            srcHeat.getHeatNumber()
+                                        );
+                                        newHeat.setId(heatId);
+                                        newHeat.setRoundId(roundId);
+                                        newHeat.setTimeLimit(srcHeat.getTimeLimit());
+                                        newHeat.setTotalLaps(srcHeat.getTotalLaps());
+                                        newHeat.setTotalPits(srcHeat.getTotalPits());
+                                        newHeat.setStartDelay(srcHeat.getStartDelay());
+                                        newHeat.setMaxDrivers(srcHeat.getMaxDrivers());
+                                        newHeat.setCanReset(srcHeat.isCanReset());
+                                        newHeat.setLonely(srcHeat.isLonely());
+                                        newHeat.setCollisionMode(srcHeat.getCollisionMode());
+                                        newHeat.setDrsEnabled(srcHeat.isDrsEnabled());
+                                        newHeat.setDriverSwap(srcHeat.getDriverSwap());
+                                        newHeat.setDrsdowntime(srcHeat.getDrsdowntime());
+                                        newHeat.setDrsdownpower(srcHeat.getDrsdownpower());
+                                        newHeat.setreversegrid(srcHeat.getreversegrid());
+                                        newHeat.setDeltaghosting(srcHeat.getDeltaGhosting());
+                                        newHeat.setPushtopass(srcHeat.isPushtopass());
+                                        newHeat.setpushtopasspower(srcHeat.getpushtopasspower());
+                                        newHeat.setrealistc(srcHeat.getrealistc());
+                                        newHeat.setEliminationIntervalSeconds(
+                                            srcHeat.getEliminationIntervalSeconds()
+                                        );
+                                        newHeat.setMinimumDrivers(
+                                            srcHeat.getMinimumDrivers()
+                                        );
+                                        newHeat.setElimination(srcHeat.isElimination());
+                                        newHeat.setFinalRaceTimeoutSeconds(
+                                            srcHeat.getFinalRaceTimeoutSeconds()
+                                        );
+                                        newHeat.setRowStartDelayMs(
+                                            srcHeat.getRowStartDelayMs()
+                                        );
+                                        newHeat.setErsEnabled(srcHeat.isErsEnabled());
+                                        newHeat.setOnlyBedrock(srcHeat.isOnlyBedrock());
+                                        newHeat.setTrackNameWS(trackNameWS);
+
+                                        // Persist full config (fields not in createHeat)
+                                        this.dbManager.updateHeatFullConfig(
+                                            heatId,
+                                            srcHeat.getTotalLaps(),
+                                            srcHeat.getTotalPits(),
+                                            srcHeat.getTimeLimit(),
+                                            srcHeat.getStartDelay(),
+                                            srcHeat.getMaxDrivers(),
+                                            srcHeat.isLonely(),
+                                            srcHeat.isCanReset(),
+                                            false,
+                                            srcHeat.getCollisionMode(),
+                                            srcHeat.isDrsEnabled(),
+                                            srcHeat.getDriverSwap(),
+                                            srcHeat.getDrsdowntime(),
+                                            srcHeat.getDrsdownpower(),
+                                            srcHeat.getreversegrid(),
+                                            srcHeat.getDeltaGhosting(),
+                                            srcHeat.isPushtopass(),
+                                            srcHeat.getpushtopasspower(),
+                                            srcHeat.getrealistc(),
+                                            srcHeat.getEliminationIntervalSeconds(),
+                                            srcHeat.getMinimumDrivers(),
+                                            srcHeat.getRowStartDelayMs(),
+                                            srcHeat.getFinalRaceTimeoutSeconds()
+                                        );
+
+                                        return CompletableFuture.completedFuture(null);
+                                    });
+                                });
+                            }
+
+                            return heatChain;
+                        })
+                    );
+                }
+
+                return roundChain.thenApply(v -> {
+                    this.activeEvents.put(eventId, newEvent);
+                    this.eventsByName.put(newName.toLowerCase(), newEvent);
+                    this.plugin.getDebugManager().logRaceSystem(
+                        "Evento clonado: " + newName + " (ID=" + eventId + ")"
+                    );
+                    return newEvent;
+                });
+            });
+    }
     public CompletableFuture<Rounds> createRound(
         Events event,
         RoundType roundType,

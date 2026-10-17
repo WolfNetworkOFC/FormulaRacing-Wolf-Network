@@ -345,6 +345,46 @@ public class EventCommand extends BaseCommand {
         });
     }
 
+    @Subcommand("clone")
+    @CommandPermission("formularacing.event.admin")
+    @CommandCompletion("@event @nothing")
+    @Description("Clona a estrutura de um evento (rounds + heats + config)")
+    public void onClone(CommandSender sender, Events source, String newName) {
+        if (source == null) {
+            this.plugin.sendMessage(sender, "event_none_selected", new String[0]);
+            return;
+        }
+        if (newName == null || newName.trim().isEmpty()) {
+            this.plugin.sendMessage(sender, "event_create_error", new String[0]);
+            return;
+        }
+        String trimmed = newName.trim();
+        if (trimmed.equalsIgnoreCase("QuickRace") || trimmed.equalsIgnoreCase("RaceLobby")) {
+            this.plugin.sendMessage(sender, "event_create_error", new String[0]);
+            return;
+        }
+
+        this.eventManager.cloneEvent(source, trimmed, this.ownerUuid(sender))
+            .thenAccept(cloned -> {
+                SchedulerHelper.runTask(this.plugin, () -> {
+                    if (cloned != null) {
+                        this.plugin.sendMessage(
+                            sender,
+                            "event_created",
+                            new String[] { "{event}", trimmed }
+                        );
+                        this.selectEventForPlayer(sender, cloned, false);
+                    } else {
+                        this.plugin.sendMessage(
+                            sender,
+                            "event_create_error",
+                            new String[0]
+                        );
+                    }
+                });
+            });
+    }
+
     @Subcommand("delete|remove|del")
     @CommandCompletion("@event")
     @CommandPermission("formularacing.event.admin")
