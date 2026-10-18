@@ -354,13 +354,22 @@ public class Heats {
         // região/checkpoint) ou um modo alterado depois do load não deixem o piloto
         // como fantasma na corrida. Para clientes Bedrock (sem o mod OBU) esse flag
         // é o único que decide a colisão, então é ele que precisa estar certo.
-        org.bukkit.entity.Entity vehicle = player.getVehicle();
-        if (vehicle instanceof org.bukkit.entity.Boat) {
-            dev.EfraGroup.formulaRacing.Collisionless.NMSHandlerImpl.setCollidable(
-                vehicle,
-                this.collisionMode != CollisionMode.DISABLED
-            );
-        }
+        //
+        // Folia: resolver o handle NMS do barco (CraftBoat#getHandle) só pode rodar
+        // na thread dona da região da entidade. O start das sessões
+        // (RaceSession/PracticeSession/QualifyingSession) roda na thread global, então
+        // empurramos o flip para a thread da região do jogador — caso contrário o
+        // TickThread dispara "Accessing entity state off owning region's thread".
+        boolean collisionsEnabled = this.collisionMode != CollisionMode.DISABLED;
+        SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+            org.bukkit.entity.Entity vehicle = player.getVehicle();
+            if (vehicle instanceof org.bukkit.entity.Boat) {
+                dev.EfraGroup.formulaRacing.Collisionless.NMSHandlerImpl.setCollidable(
+                    vehicle,
+                    collisionsEnabled
+                );
+            }
+        });
         if (this.plugin.getPacketSender() != null) {
             short modeValue;
             switch (this.collisionMode) {
@@ -835,6 +844,19 @@ public class Heats {
             countdown.start();
             return true;
         }
+    }
+
+    /**
+     * Marca o evento deste heat como RUNNING sem iniciar a contagem do heat.
+     * Usado pelo /heat load: carregar deve iniciar o EVENTO, não a largada — a
+     * contagem fica para o /heat start.
+     */
+    public boolean startEvent() {
+        if (this.round == null) {
+            return false;
+        }
+        Events event = this.round.getEvent();
+        return event != null && event.ensureRunning(this.round);
     }
 
     public void startPractice() {

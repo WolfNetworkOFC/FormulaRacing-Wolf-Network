@@ -1328,15 +1328,10 @@ public class HeatCommand extends BaseCommand {
     }
 
     @Subcommand("load")
-    @CommandCompletion("@heat 5 lights|normal")
+    @CommandCompletion("@heat")
     @CommandPermission("formularacing.event.admin")
-    @Description("Carrega um heat e inicia a contagem regressiva")
-    public void onLoad(
-        CommandSender sender,
-        Heats heat,
-        @Default("5") Integer seconds,
-        @co.aikar.commands.annotation.Optional String mode
-    ) {
+    @Description("Carrega um heat e inicia o evento (a largada do heat fica para /heat start)")
+    public void onLoad(CommandSender sender, Heats heat) {
         heat = this.resolveHeat(sender, heat);
         if (heat == null) {
             sender.sendMessage(
@@ -1363,8 +1358,18 @@ public class HeatCommand extends BaseCommand {
                 var10001 + "✓ Heat " + heat.getName() + " carregado!"
             );
             this.displaySortedDrivers(sender, heat);
-            // Carregou: encadeia o início (mesmas validações do /heat start).
-            this.onStart(sender, heat, seconds, mode);
+            // Carregar inicia o EVENTO (fica RUNNING); a largada do heat continua
+            // separada no /heat start — o load não dispara mais a contagem.
+            if (heat.startEvent()) {
+                sender.sendMessage(
+                    String.valueOf(ChatColor.GREEN) + "✓ Evento iniciado!"
+                );
+            } else {
+                sender.sendMessage(
+                    String.valueOf(ChatColor.YELLOW) +
+                        "⚠ Evento não iniciado (já finalizado, sem pista ou heat fora de um evento)."
+                );
+            }
         } else {
             sender.sendMessage(
                 String.valueOf(ChatColor.RED) +
