@@ -63,6 +63,16 @@ public class SettingsMenu extends BaseGui {
             String stateStr = newState ? this.plugin.getTranslation("gui_settings_status_on", langCode, new String[0]) : this.plugin.getTranslation("gui_settings_status_off", langCode, new String[0]);
             p.sendMessage(this.plugin.getTranslation("gui_settings_compact_toggled", langCode, new String[]{"{state}", stateStr}));
         });
+        boolean actionBarProgress = this.dm.getPlayerActionBarProgress(player.getUniqueId());
+        String actionBarProgressName = this.plugin.getTranslation("gui_settings_actionbar_progress_name", langCode, new String[0]);
+        this.addToggle(10, Material.PAPER, actionBarProgressName, actionBarProgress, player, (event) -> {
+            Player p = (Player)event.getWhoClicked();
+            boolean newState = !this.dm.getPlayerActionBarProgress(p.getUniqueId());
+            this.dm.setPlayerActionBarProgress(p.getUniqueId(), newState);
+            this.setupContent(p);
+            String stateStr = newState ? this.plugin.getTranslation("gui_settings_status_on", langCode, new String[0]) : this.plugin.getTranslation("gui_settings_status_off", langCode, new String[0]);
+            p.sendMessage(this.plugin.getTranslation("gui_settings_actionbar_progress_toggled", langCode, new String[]{"{state}", stateStr}));
+        });
         this.addButton(14, Material.PAINTING, this.plugin.getTranslation("gui_settings_color_name", langCode, new String[0]), this.plugin.getTranslation("gui_settings_color_lore", langCode, new String[0]), (event) -> {
             Player p = (Player)event.getWhoClicked();
             p.playSound(p.getLocation(), Sound.UI_BUTTON_CLICK, 0.2F, 1.0F);

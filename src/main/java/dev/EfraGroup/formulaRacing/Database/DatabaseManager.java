@@ -53,6 +53,8 @@ public class DatabaseManager {
     private final Map<UUID, Boolean> ttEnabledCache = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> compactScoreboardCache =
         new ConcurrentHashMap<>();
+    private final Map<UUID, Boolean> actionBarProgressCache =
+        new ConcurrentHashMap<>();
     private final Map<UUID, String> playerColor1Cache =
         new ConcurrentHashMap<>();
     private final Map<UUID, String> playerColor2Cache =
@@ -646,6 +648,11 @@ public class DatabaseManager {
                     "ALTER TABLE fr_players ADD COLUMN selectedHeat INTEGER DEFAULT NULL;"
                 );
             } catch (SQLException ignored) {}
+            try {
+                stmt.execute(
+                    "ALTER TABLE fr_players ADD COLUMN actionBarProgress INTEGER DEFAULT 1;"
+                );
+            } catch (SQLException ignored) {}
 
             // Safe migration for the winner column
             try {
@@ -723,6 +730,7 @@ public class DatabaseManager {
                     announceCheckpoint INTEGER DEFAULT 1,
                     announceLap INTEGER DEFAULT 1,
                     compactScoreboard INTEGER DEFAULT 0,
+                    actionBarProgress INTEGER DEFAULT 1,
                     music INTEGER DEFAULT 1,
                     animation INTEGER DEFAULT 1,
                     horn INTEGER DEFAULT 1,
@@ -2504,9 +2512,9 @@ public class DatabaseManager {
         String sql = """
             INSERT INTO fr_players (
                 uuid, displayName, color1, color2, baseBoat, timetrial, timetrialScoreboard,
-                announceCheckpoint, announceLap, compactScoreboard, music,
+                announceCheckpoint, announceLap, compactScoreboard, actionBarProgress, music,
                 animation, horn, hat, boots, lastKnownTrackz, lonelyMode
-            ) VALUES (?, ?, '#7bf200', '#FFFFFF', 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, NULL, 0)
+            ) VALUES (?, ?, '#7bf200', '#FFFFFF', 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, NULL, 0)
             ON CONFLICT(uuid) DO UPDATE SET displayName = excluded.displayName
             """;
         try {
@@ -2650,6 +2658,87 @@ public class DatabaseManager {
             }
         } catch (SQLException e) {
             handleSqlError(e);
+        }
+    }
+
+    public synchronized boolean getPlayerActionBarProgress(UUID uuid) {
+        if (actionBarProgressCache.containsKey(uuid)) {
+            return actionBarProgressCache.get(uuid);
+        }
+
+        String sql = "SELECT actionBarProgress FROM fr_players WHERE uuid = ?";
+        boolean show = true;
+
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        show = rs.getInt("actionBarProgress") == 1;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            // If column doesn't exist, add it
+            if (e.getMessage() != null && (e.getMessage().contains("no such column") || e.getMessage().contains("actionBarProgress"))) {
+                try {
+                    Connection conn = getOrConnect();
+                    try (PreparedStatement ps = conn.prepareStatement("ALTER TABLE fr_players ADD COLUMN actionBarProgress INTEGER DEFAULT 1")) {
+                        ps.executeUpdate();
+                    }
+                    // retry
+                    try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                        ps.setString(1, uuid.toString());
+                        try (ResultSet rs = ps.executeQuery()) {
+                            if (rs.next()) {
+                                show = rs.getInt("actionBarProgress") == 1;
+                            }
+                        }
+                    }
+                } catch (SQLException ex) {
+                    handleSqlError(ex);
+                }
+            } else {
+                handleSqlError(e);
+            }
+        }
+
+        actionBarProgressCache.put(uuid, show);
+        return show;
+    }
+
+    public synchronized void setPlayerActionBarProgress(UUID uuid, boolean show) {
+        String sql =
+            "UPDATE fr_players SET actionBarProgress = ? WHERE uuid = ?";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, show ? 1 : 0);
+                ps.setString(2, uuid.toString());
+                ps.executeUpdate();
+                actionBarProgressCache.put(uuid, show);
+            }
+        } catch (SQLException e) {
+            // If column doesn't exist, add it and retry
+            if (e.getMessage() != null && (e.getMessage().contains("no such column") || e.getMessage().contains("actionBarProgress"))) {
+                try {
+                    Connection conn = getOrConnect();
+                    try (PreparedStatement ps = conn.prepareStatement("ALTER TABLE fr_players ADD COLUMN actionBarProgress INTEGER DEFAULT 1")) {
+                        ps.executeUpdate();
+                    }
+                    try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                        ps.setInt(1, show ? 1 : 0);
+                        ps.setString(2, uuid.toString());
+                        ps.executeUpdate();
+                        actionBarProgressCache.put(uuid, show);
+                    }
+                } catch (SQLException ex) {
+                    handleSqlError(ex);
+                }
+            } else {
+                handleSqlError(e);
+            }
         }
     }
 

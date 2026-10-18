@@ -390,7 +390,15 @@ public class RaceActionBarManager {
             totalProgress = (lapsCompleted + currentLapProgress) / (double) totalLaps;
             totalProgress = Math.max(0.0, Math.min(1.0, totalProgress));
         }
-        sb.append(" ").append(this.buildProgressBar(totalProgress, this.progressBarLength));
+        boolean showProgress = true;
+        try {
+            showProgress = this.plugin.getDatabaseManager().getPlayerActionBarProgress(viewer.getUniqueId());
+        } catch (Exception ignored) {
+            showProgress = true;
+        }
+        if (showProgress) {
+            sb.append(" ").append(this.buildProgressBar(totalProgress, this.progressBarLength));
+        }
 
         if (driver.getCurrentLap() != null) {
             long lapElapsed = System.currentTimeMillis() - driver.getCurrentLap().getStartTime();
