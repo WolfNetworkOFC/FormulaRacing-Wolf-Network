@@ -1340,6 +1340,20 @@ public class HeatCommand extends BaseCommand {
             );
             return;
         }
+        HeatState currentState = heat.getHeatState();
+        if (currentState == HeatState.RACING || currentState == HeatState.STARTING) {
+            sender.sendMessage(
+                String.valueOf(ChatColor.RED) +
+                    "✗ O heat " +
+                    heat.getName() +
+                    " já está em andamento (" +
+                    currentState.name() +
+                    ")! Use /heat reset " +
+                    heat.getName() +
+                    " antes de carregar novamente."
+            );
+            return;
+        }
         Optional<Rounds> blockingRound = heat.getPreviousUnfinishedRound();
         if (blockingRound.isPresent()) {
             sender.sendMessage(
@@ -1587,8 +1601,8 @@ public class HeatCommand extends BaseCommand {
                 false
             );
         } else {
-            // Sem argumento de modo = normal (padrão).
-            boolean f1Start = mode != null && mode.equalsIgnoreCase("lights");
+            // Padrão = lights (largada F1). "normal" = contagem 100% numerica.
+            boolean f1Start = mode == null || mode.equalsIgnoreCase("lights");
             heat.getHeatConfig().setF1StartEnabled(f1Start);
             if (heat.startCountdown(seconds)) {
                 sender.sendMessage(

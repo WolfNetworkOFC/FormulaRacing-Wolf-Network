@@ -23,6 +23,7 @@ public class RaceCountdown {
     /** Written by the global countdown task, read by region threads (flagJumpStart) — volatile. */
     private volatile boolean completed;
     private int maxLights;
+    private int totalSeconds;
     private static final int TICKS_PER_LIGHT = 20;
     private static final int LIGHTS_OUT_DELAY = 20;
     /** F1 start: random hold between 5th light and lights out (ticks). */
@@ -45,11 +46,13 @@ public class RaceCountdown {
     public RaceCountdown(FormulaRacing plugin, Heats heat, int seconds, Runnable onComplete) {
         this.lightsOn = 0;
         this.completed = false;
-        this.maxLights = 5;
+        this.totalSeconds = seconds;
         this.plugin = plugin;
         this.heat = heat;
-        this.maxLights = seconds;
         this.onComplete = onComplete;
+        // Luzes só existem no modo "lights" (padrão). No modo "normal" a contagem
+        // é 100% numérica, então maxLights = 0 (sem fase de luzes).
+        this.maxLights = this.isF1Start() ? Math.min(seconds, 5) : 0;
     }
 
     private boolean isF1Start() {
@@ -67,7 +70,7 @@ public class RaceCountdown {
 
             // F1 start: the hold after the last light is random (like real F1), so
             // drivers cannot time the launch — they must react to lights out.
-            this.lightsOutTick = this.maxLights * 20 + LIGHTS_OUT_DELAY;
+            this.lightsOutTick = this.totalSeconds * 20 + LIGHTS_OUT_DELAY;
             if (this.isF1Start()) {
                 this.lightsOutTick += ThreadLocalRandom.current().nextInt(F1_HOLD_MIN_TICKS, F1_HOLD_MAX_TICKS + 1);
             }
@@ -80,9 +83,18 @@ public class RaceCountdown {
                     }
                 } else {
                     tick[0]++;
-                    if (tick[0] % 20 == 0 && RaceCountdown.this.lightsOn < RaceCountdown.this.maxLights) {
-                        RaceCountdown.this.lightsOn++;
-                        RaceCountdown.this.onLightOn(RaceCountdown.this.lightsOn);
+
+                    if (tick[0] % 20 == 0) {
+                        int step = tick[0] / 20;
+                        int numericCount = RaceCountdown.this.totalSeconds - RaceCountdown.this.maxLights;
+                        if (step <= numericCount) {
+                            // Normal countdown: show the number instead of lights.
+                            int number = RaceCountdown.this.totalSeconds - step + 1;
+                            RaceCountdown.this.showNumeric(number);
+                        } else if (RaceCountdown.this.lightsOn < RaceCountdown.this.maxLights) {
+                            RaceCountdown.this.lightsOn++;
+                            RaceCountdown.this.onLightOn(RaceCountdown.this.lightsOn);
+                        }
                     }
 
                     if (RaceCountdown.this.isF1Start()) {
@@ -133,6 +145,20 @@ public class RaceCountdown {
         this.heat.getGridManager().penalizeJumpStart(uuid, penaltySeconds * 20L);
         this.plugin.sendMessage(player, "race_jump_start", new String[]{"{seconds}", String.valueOf(penaltySeconds)});
         this.plugin.getDebugManager().logRaceSystem(String.format("[Heat %d] JUMP START by %s — %ds penalty", this.heat.getId(), player.getName(), penaltySeconds));
+    }
+
+    private void showNumeric(int number) {
+        String title = String.valueOf(number);
+        for (Driver driver : this.heat.getDrivers().values()) {
+            Player player = Bukkit.getPlayer(driver.getUuid());
+            if (player != null && player.isOnline()) {
+                String langCode = this.plugin.getDatabaseManager().getPlayerLanguage(player.getUniqueId());
+                String subtitle = this.plugin.getTranslation("race_title_prepare_sub", langCode, new String[0]);
+                TitleHelper.sendThemedTitle(player, title, subtitle, 0, 30, 5);
+                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1.0F, 0.5F);
+            }
+        }
+        this.plugin.getDebugManager().logRaceSystem(String.format("[Heat %d] Contagem %d", this.heat.getId(), number));
     }
 
     private void refreshLightsDisplay() {
