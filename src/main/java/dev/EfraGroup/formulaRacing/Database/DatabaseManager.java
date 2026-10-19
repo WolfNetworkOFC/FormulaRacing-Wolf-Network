@@ -54,6 +54,8 @@ public class DatabaseManager {
     private final Map<UUID, Boolean> ttEnabledCache = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> compactScoreboardCache =
         new ConcurrentHashMap<>();
+    private final Map<UUID, Boolean> raceProgressBarCache =
+        new ConcurrentHashMap<>();
     private final Map<UUID, String> playerColor1Cache =
         new ConcurrentHashMap<>();
     private final Map<UUID, String> playerColor2Cache =
@@ -656,6 +658,11 @@ public class DatabaseManager {
                     "ALTER TABLE fr_players ADD COLUMN selectedHeat INTEGER DEFAULT NULL;"
                 );
             } catch (SQLException ignored) {}
+            try {
+                stmt.execute(
+                    "ALTER TABLE fr_players ADD COLUMN raceProgressBar INTEGER DEFAULT 1;"
+                );
+            } catch (SQLException ignored) {}
 
             // Safe migration for the winner column
             try {
@@ -733,6 +740,7 @@ public class DatabaseManager {
                     announceCheckpoint INTEGER DEFAULT 1,
                     announceLap INTEGER DEFAULT 1,
                     compactScoreboard INTEGER DEFAULT 0,
+                    raceProgressBar INTEGER DEFAULT 1,
                     music INTEGER DEFAULT 1,
                     animation INTEGER DEFAULT 1,
                     horn INTEGER DEFAULT 1,
@@ -2689,6 +2697,48 @@ public class DatabaseManager {
                 ps.setString(2, uuid.toString());
                 ps.executeUpdate();
                 compactScoreboardCache.put(uuid, compact);
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+    }
+
+    public synchronized boolean getRaceProgressBar(UUID uuid) {
+        if (uuid == null) return true;
+        if (raceProgressBarCache.containsKey(uuid)) {
+            return raceProgressBarCache.get(uuid);
+        }
+
+        String sql = "SELECT raceProgressBar FROM fr_players WHERE uuid = ?";
+        boolean value = true;
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        value = rs.getInt("raceProgressBar") == 1;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            handleSqlError(e);
+        }
+
+        raceProgressBarCache.put(uuid, value);
+        return value;
+    }
+
+    public synchronized void setRaceProgressBar(UUID uuid, boolean value) {
+        String sql =
+            "UPDATE fr_players SET raceProgressBar = ? WHERE uuid = ?";
+        try {
+            Connection conn = getOrConnect();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, value ? 1 : 0);
+                ps.setString(2, uuid.toString());
+                ps.executeUpdate();
+                raceProgressBarCache.put(uuid, value);
             }
         } catch (SQLException e) {
             handleSqlError(e);

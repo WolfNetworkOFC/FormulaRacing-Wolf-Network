@@ -103,4 +103,15 @@ public class SettingsCommand extends BaseCommand {
         String var10001 = String.valueOf(ChatColor.GREEN);
         player.sendMessage(var10001 + "✅ Scoreboard " + (newValue ? "COMPACTO" : "NORMAL"));
     }
+
+    @Subcommand("raceprogressbar")
+    @CommandCompletion("true|false")
+    @Description("Ativa ou desativa a barra de progresso da corrida")
+    public void onRaceProgressBar(Player player, @Optional Boolean value) {
+        UUID uuid = player.getUniqueId();
+        boolean newValue = value != null ? value : !this.databaseManager.getRaceProgressBar(uuid);
+        this.databaseManager.setRaceProgressBar(uuid, newValue);
+        String var10001 = String.valueOf(ChatColor.GREEN);
+        player.sendMessage(var10001 + "✅ Barra de progresso da corrida " + (newValue ? "ATIVADA" : "DESATIVADA"));
+    }
 }
