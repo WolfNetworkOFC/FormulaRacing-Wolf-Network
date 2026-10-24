@@ -309,9 +309,21 @@ public class PacketSender {
         }
 
         // =============== 27. COLLISION MODE (27) ===============
+        // Fora de heat não remove colisão: aplica o modo da pista apenas se o
+        // jogador estiver em um heat ativo; caso contrário mantém vanilla (0).
+        boolean hasActiveHeat = false;
+        try {
+            if (FormulaRacing.getInstance().getRaceEventManager() != null) {
+                hasActiveHeat = FormulaRacing.getInstance().getRaceEventManager()
+                    .getPlayerActiveHeat(player.getUniqueId()).isPresent();
+            }
+        } catch (Exception ignored) {}
         short collisionMode = ((Number)data.get("collisionMode")).shortValue();
-        if (collisionMode != VANILLA_COLLISION_MODE) {
+        if (hasActiveHeat && collisionMode != VANILLA_COLLISION_MODE) {
             sendBoatSetting(player, (short)27, collisionMode);
+        } else if (!hasActiveHeat) {
+            // garante reset para vanilla fora de heat
+            sendBoatSetting(player, (short)27, (short) 0);
         }
 
         // =============== 28. AIR STEPPING (28) ===============

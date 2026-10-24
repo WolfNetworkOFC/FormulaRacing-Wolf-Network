@@ -1602,8 +1602,16 @@ public class HeatCommand extends BaseCommand {
             );
         } else {
             // Padrão = lights (largada F1). "normal" = contagem 100% numerica.
-            boolean f1Start = mode == null || mode.equalsIgnoreCase("lights");
-            heat.getHeatConfig().setF1StartEnabled(f1Start);
+            // Respeita a configuração salva do heat quando nenhum modo é informado.
+            boolean f1Start;
+            if (mode == null) {
+                f1Start = heat.getHeatConfig() != null && heat.getHeatConfig().isF1StartEnabled();
+            } else {
+                f1Start = mode.equalsIgnoreCase("lights");
+                if (heat.getHeatConfig() != null) {
+                    heat.getHeatConfig().setF1StartEnabled(f1Start);
+                }
+            }
             if (heat.startCountdown(seconds)) {
                 sender.sendMessage(
                     String.valueOf(ChatColor.GREEN) +

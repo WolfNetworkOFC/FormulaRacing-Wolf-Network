@@ -446,14 +446,9 @@ public class LonelyController implements Listener {
         boolean canNocol = NocolManager.playerHasMod(player);
 
         if (scopeOpt.isEmpty()) {
-            // Open-world: nocol if has mod and not lonely
-            if (canNocol && !personalLonely) {
-                setVanillaCollision(player, false);
-                NocolManager.setCollisionMode(player, false);
-            } else {
-                setVanillaCollision(player, false);
-                NocolManager.setCollisionMode(player, true);
-            }
+            // Fora de heat: mantém colisão vanilla (sem remoção de colisão)
+            setVanillaCollision(player, false);
+            NocolManager.setCollisionMode(player, true);
             return;
         }
 
@@ -594,6 +589,15 @@ public class LonelyController implements Listener {
     // -------------------------------------------------------------------------
 
     private void setVanillaCollision(Player player, boolean preventCollision) {
+        SchedulerHelper.runTaskFor(plugin, player, () -> {
+            Entity vehicle = player.getVehicle();
+            if (vehicle instanceof Boat || vehicle instanceof ChestBoat) {
+                dev.EfraGroup.formulaRacing.Collisionless.NMSHandlerImpl.setCollidable(
+                    vehicle,
+                    !preventCollision
+                );
+            }
+        });
     }
 
     // -------------------------------------------------------------------------

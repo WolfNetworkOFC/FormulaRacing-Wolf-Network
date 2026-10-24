@@ -801,7 +801,7 @@ public class RaceEventManager {
     public boolean isBoatCollidableForPlayer(UUID playerUUID) {
         return this.getPlayerActiveHeat(playerUUID)
             .map(heat -> heat.getCollisionMode() != CollisionMode.DISABLED)
-            .orElse(false);
+            .orElse(true);
     }
 
     public boolean addPlayerToEvent(UUID playerUUID, int eventId) {
