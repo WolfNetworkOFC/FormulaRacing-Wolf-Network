@@ -1664,8 +1664,14 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
         // Clean up per-player caches to prevent memory leaks
         this.clearLastTimeTrialTrack(uuid);
+        this.clearLastRandomTimeTrialTracks(uuid);
         this.clearLastDuelTrack(uuid);
         this.clearLastDuelLonelyStatus(uuid);
+        dev.EfraGroup.formulaRacing.Utils.LightningRodManager.removePlayer(uuid);
+        dev.EfraGroup.formulaRacing.Gui.LanguageGui.clearClickCooldown(uuid);
+        dev.EfraGroup.formulaRacing.Gui.BoatSelectGui.clearClickCooldown(uuid);
+        dev.EfraGroup.formulaRacing.BoatUtils.OpenBoatUtilsVersion.clearPlayer(uuid);
+        dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeResolver.invalidate(uuid);
 
         if (this.trackVisualizer != null) {
             this.trackVisualizer.stopView(player);

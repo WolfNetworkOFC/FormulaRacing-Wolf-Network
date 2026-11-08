@@ -180,6 +180,10 @@ public class LanguageGui extends BaseGui {
         initHeadDatabase();
     }
 
+    public static void clearClickCooldown(UUID uuid) {
+        clickCooldown.remove(uuid);
+    }
+
     private static record LanguageInfo(String code, String displayName, String headId) {
     }
 }
