@@ -1,5 +1,6 @@
 package dev.EfraGroup.formulaRacing.Listener;
 
+import dev.EfraGroup.formulaRacing.AI.AIOpponent;
 import dev.EfraGroup.formulaRacing.AI.AIOpponentManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
@@ -61,7 +62,7 @@ public class BoatKiller implements Listener {
         if (aiManager == null) {
             return aiBoats;
         }
-        for (AIOpponentManager.AIOpponent ai : aiManager.getAIOpponents().values()) {
+        for (AIOpponent ai : aiManager.getAIOpponents().values()) {
             Entity boat = ai.getControlledEntity();
             if (boat != null) {
                 aiBoats.add(boat.getUniqueId());

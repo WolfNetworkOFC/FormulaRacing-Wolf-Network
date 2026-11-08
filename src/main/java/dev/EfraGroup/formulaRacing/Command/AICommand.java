@@ -7,6 +7,8 @@ import co.aikar.commands.annotation.CommandPermission;
 import co.aikar.commands.annotation.Default;
 import co.aikar.commands.annotation.Description;
 import co.aikar.commands.annotation.Subcommand;
+import dev.EfraGroup.formulaRacing.AI.AIDifficulty;
+import dev.EfraGroup.formulaRacing.AI.AIOpponent;
 import dev.EfraGroup.formulaRacing.AI.AIOpponentManager;
 import dev.EfraGroup.formulaRacing.AI.AIRacingLine;
 import dev.EfraGroup.formulaRacing.AI.AIRacingLineManager;
@@ -217,15 +219,15 @@ public class AICommand extends BaseCommand {
     @CommandPermission("formularacing.admin")
     @Description("Define a dificuldade de um oponente IA")
     public void onDifficulty(CommandSender sender, String targetName, String difficultyStr) {
-        AIOpponentManager.AIDifficulty difficulty;
+        AIDifficulty difficulty;
         try {
-            difficulty = AIOpponentManager.AIDifficulty.valueOf(difficultyStr.toUpperCase());
+            difficulty = AIDifficulty.valueOf(difficultyStr.toUpperCase());
         } catch (IllegalArgumentException e) {
             sender.sendMessage(tr(sender, "ai_difficulty_invalid"));
             return;
         }
 
-        List<AIOpponentManager.AIOpponent> matches = new ArrayList<>(aiManager.findByDisplayName(targetName));
+        List<AIOpponent> matches = new ArrayList<>(aiManager.findByDisplayName(targetName));
         if (matches.isEmpty()) {
             sender.sendMessage(tr(sender, "ai_difficulty_not_found", "{name}", targetName));
             return;
@@ -235,7 +237,7 @@ public class AICommand extends BaseCommand {
             return;
         }
 
-        AIOpponentManager.AIOpponent ai = matches.get(0);
+        AIOpponent ai = matches.get(0);
         ai.setDifficulty(difficulty);
 
         sender.sendMessage(tr(sender, "ai_difficulty_set",
@@ -260,7 +262,7 @@ public class AICommand extends BaseCommand {
         if (aiManager.getAIOpponents().isEmpty()) {
             sender.sendMessage(tr(sender, "ai_list_empty"));
         } else {
-            for (AIOpponentManager.AIOpponent ai : aiManager.getAIOpponents().values()) {
+            for (AIOpponent ai : aiManager.getAIOpponents().values()) {
                 String difficultyName = ai.getDifficulty().getName();
                 double learningProgress = ai.getLearningProgress() * 100;
                 int lapsCompleted = ai.getLapsCompleted();
@@ -289,9 +291,9 @@ public class AICommand extends BaseCommand {
     @CommandPermission("formularacing.admin")
     @Description("Adiciona um oponente IA a um heat")
     public void onAdd(CommandSender sender, Heats heat, String difficultyStr, @Default("1") Integer count) {
-        AIOpponentManager.AIDifficulty difficulty;
+        AIDifficulty difficulty;
         try {
-            difficulty = AIOpponentManager.AIDifficulty.valueOf(difficultyStr.toUpperCase());
+            difficulty = AIDifficulty.valueOf(difficultyStr.toUpperCase());
         } catch (IllegalArgumentException e) {
             sender.sendMessage(tr(sender, "ai_difficulty_invalid"));
             return;
@@ -335,7 +337,7 @@ public class AICommand extends BaseCommand {
     }
 
     /** Short difficulty tag so "AI-<tag>-<8 hex>" stays within the 16-char tab-list username cap. */
-    private static String shortTag(AIOpponentManager.AIDifficulty difficulty) {
+    private static String shortTag(AIDifficulty difficulty) {
         return switch (difficulty) {
             case EASY -> "EAS";
             case MEDIUM -> "MED";
@@ -354,7 +356,7 @@ public class AICommand extends BaseCommand {
 
         int removed = 0;
         for (Driver driver : aiDrivers) {
-            AIOpponentManager.AIOpponent ai = aiManager.getAIOpponent(driver.getUuid());
+            AIOpponent ai = aiManager.getAIOpponent(driver.getUuid());
             String aiName = ai != null ? ai.getDisplayName() : String.valueOf(driver.getUuid());
             var result = heatDriverService.removeDriverSync(heat, driver.getUuid(), aiName);
             if (result.getStatus().name().equals("SUCCESS")) {

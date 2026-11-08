@@ -108,7 +108,11 @@ public final class AIBoatController {
             Location location = boat.getLocation();
             float yaw = location.getYaw() + appliedTurn;
             if (up) {
-                thrust += FORWARD_THRUST;
+                // Realistic-ish power curve: more thrust at low speed, less as
+                // speed rises (torque drops with RPM). Vanilla drag handles the
+                // rest. Prevents "linear forever" acceleration.
+                float speedFactor = (float) Math.max(0.3, 1.0 - (Math.sqrt(velocity.getX() * velocity.getX() + velocity.getZ() * velocity.getZ()) / 3.6));
+                thrust += FORWARD_THRUST * speedFactor;
             }
             if (down) {
                 thrust -= BACKWARD_THRUST;

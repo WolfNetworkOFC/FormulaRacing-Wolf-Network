@@ -1,5 +1,6 @@
 package dev.EfraGroup.formulaRacing.Listener;
 
+import dev.EfraGroup.formulaRacing.AI.AIOpponent;
 import dev.EfraGroup.formulaRacing.AI.AIOpponentManager;
 import dev.EfraGroup.formulaRacing.AI.FakePlayerNPC;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
@@ -50,7 +51,7 @@ public class AINpcListener implements Listener {
         if (aiManager == null) {
             return;
         }
-        for (AIOpponentManager.AIOpponent ai : aiManager.getAIOpponents().values()) {
+        for (AIOpponent ai : aiManager.getAIOpponents().values()) {
             FakePlayerNPC npc = ai.getFakePlayer();
             if (npc != null) {
                 npc.removeViewer(uuid);
@@ -63,7 +64,7 @@ public class AINpcListener implements Listener {
         if (aiManager == null) {
             return;
         }
-        for (AIOpponentManager.AIOpponent ai : aiManager.getAIOpponents().values()) {
+        for (AIOpponent ai : aiManager.getAIOpponents().values()) {
             FakePlayerNPC npc = ai.getFakePlayer();
             if (npc == null || !npc.isInWorld(player.getWorld())) {
                 continue;
