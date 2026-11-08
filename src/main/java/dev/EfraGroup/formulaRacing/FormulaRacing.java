@@ -98,8 +98,10 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -126,6 +128,7 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private static FormulaRacing instance;
     private boolean papiAvailable = false;
     private final Map<UUID, String> lastTimeTrialTrack = new HashMap();
+    private final Map<UUID, Deque<String>> lastRandomTimeTrialTracks = new ConcurrentHashMap<>();
     private final Map<UUID, String> lastDuelTrack = new HashMap();
     private final Map<UUID, Boolean> lastDuelLonelyStatus = new HashMap();
     private int eventIdCounter = 0;
@@ -1604,6 +1607,31 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     public void clearLastTimeTrialTrack(UUID playerId) {
         this.lastTimeTrialTrack.remove(playerId);
+    }
+
+    /** Returns the set of normalized track names the player was sorted into via /ttr recently (up to 5). */
+    public Set<String> getLastRandomTimeTrialTracks(UUID playerId) {
+        Deque<String> deque = this.lastRandomTimeTrialTracks.get(playerId);
+        if (deque == null) return Collections.emptySet();
+        synchronized (deque) {
+            return new java.util.HashSet<>(deque);
+        }
+    }
+
+    /** Records a track as recently sorted for the player, keeping only the last 5. */
+    public void addLastRandomTimeTrialTrack(UUID playerId, String normalizedTrack) {
+        if (playerId == null || normalizedTrack == null) return;
+        Deque<String> deque = this.lastRandomTimeTrialTracks.computeIfAbsent(playerId, k -> new ArrayDeque<>());
+        synchronized (deque) {
+            // Remove existing occurrence to avoid duplicates and keep recency.
+            deque.remove(normalizedTrack);
+            deque.addLast(normalizedTrack);
+            while (deque.size() > 5) deque.pollFirst();
+        }
+    }
+
+    public void clearLastRandomTimeTrialTracks(UUID playerId) {
+        this.lastRandomTimeTrialTracks.remove(playerId);
     }
 
     public void clearLastDuelLonelyStatus(UUID playerId) {

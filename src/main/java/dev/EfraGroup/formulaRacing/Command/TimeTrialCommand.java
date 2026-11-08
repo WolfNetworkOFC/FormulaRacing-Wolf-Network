@@ -333,10 +333,35 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                 }
 
                 List<String> validTracks = this.collectValidRandomTracks(openTracks, currentTrackWS);
+                // Exclude the last 5 tracks this player was sorted into, so /ttr does not
+                // repeat them. Fall back to the unfiltered pool if that leaves nothing.
+                java.util.Set<String> recentTracks = this.plugin.getLastRandomTimeTrialTracks(uuid);
+                if (!recentTracks.isEmpty()) {
+                    List<String> filtered = new ArrayList<>();
+                    for (String t : validTracks) {
+                        if (!recentTracks.contains(normalizeTrackName(t))) {
+                            filtered.add(t);
+                        }
+                    }
+                    if (!filtered.isEmpty()) {
+                        validTracks = filtered;
+                    }
+                }
                 if (validTracks.isEmpty() && currentTrackWS != null) {
                     // The player's current track is the only playable one: repeating it is
                     // better than telling them there is nothing left to race on.
                     validTracks = this.collectValidRandomTracks(openTracks, null);
+                    if (!recentTracks.isEmpty()) {
+                        List<String> filtered = new ArrayList<>();
+                        for (String t : validTracks) {
+                            if (!recentTracks.contains(normalizeTrackName(t))) {
+                                filtered.add(t);
+                            }
+                        }
+                        if (!filtered.isEmpty()) {
+                            validTracks = filtered;
+                        }
+                    }
                 }
 
                 // 3. Rerolling instead of pre-filtering keeps the player without the mod from
@@ -353,12 +378,34 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                     }
                 }
 
+                // Fallback: if excluding recent tracks left no compatible candidate, retry
+                // allowing repeats so the player is not stuck with "no compatible tracks".
+                if (trackName == null && !recentTracks.isEmpty()) {
+                    recentTracks = java.util.Collections.emptySet();
+                    validTracks = this.collectValidRandomTracks(openTracks, currentTrackWS);
+                    if (validTracks.isEmpty() && currentTrackWS != null) {
+                        validTracks = this.collectValidRandomTracks(openTracks, null);
+                    }
+                    while (trackName == null && !validTracks.isEmpty()) {
+                        int index = this.random.nextInt(validTracks.size());
+                        String candidate = validTracks.get(index);
+                        if (this.mysql.checkMcVersion(clientProtocol, candidate) && (hasBoatUtils || !this.mysql.trackHaveBoatUtils(candidate))) {
+                            trackName = candidate;
+                        } else {
+                            validTracks.remove(index);
+                        }
+                    }
+                }
+
                 if (trackName == null) {
                     SchedulerHelper.runTaskFor(this.plugin, player, () -> {
                         if (player.isOnline()) this.plugin.sendMessage(player, "tt_no_tracks_compatible");
                     });
                     return;
                 }
+
+                // Remember this track so /ttr does not repeat it in the next 5 rolls.
+                this.plugin.addLastRandomTimeTrialTrack(uuid, normalizeTrackName(trackName));
 
                 this.plugin.getDebugManager().logTimeTrialSystem(
                     "[TTR] " + playerName + " rolled '" + trackName + "' out of " + poolSize + " valid tracks"
