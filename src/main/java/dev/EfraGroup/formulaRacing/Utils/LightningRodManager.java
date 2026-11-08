@@ -30,6 +30,10 @@ public class LightningRodManager {
         return lightningRodsEnabled && isPlayerToggleEnabled(playerId);
     }
 
+    public static void removePlayer(UUID playerId) {
+        playerToggles.remove(playerId);
+    }
+
     public static void clearAllToggles() {
         playerToggles.clear();
     }
