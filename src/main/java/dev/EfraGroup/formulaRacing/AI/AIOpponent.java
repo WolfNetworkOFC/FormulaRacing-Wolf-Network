@@ -1,6 +1,6 @@
 package dev.EfraGroup.formulaRacing.AI;
 
-import dev.EfraGroup.formulaRacing.BoatUtils.NMSHandlerImpl;
+import dev.EfraGroup.formulaRacing.Collisionless.NMSHandlerImpl;
 import dev.EfraGroup.formulaRacing.Controllers.TrackIntegrationManager;
 import dev.EfraGroup.formulaRacing.Database.DatabaseManager;
 import dev.EfraGroup.formulaRacing.FormulaRacing;

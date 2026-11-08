@@ -107,6 +107,7 @@ public final class AIBoatController {
 
             Location location = boat.getLocation();
             float yaw = location.getYaw() + appliedTurn;
+            Vector velocity = boat.getVelocity();
             if (up) {
                 // Realistic-ish power curve: more thrust at low speed, less as
                 // speed rises (torque drops with RPM). Vanilla drag handles the
@@ -128,7 +129,6 @@ public final class AIBoatController {
                 double yawRad = yaw * DEG_TO_RAD;
                 double addX = Math.sin(-yawRad) * thrust;
                 double addZ = Math.cos(yawRad) * thrust;
-                Vector velocity = boat.getVelocity();
                 boat.setVelocity(new Vector(
                         velocity.getX() + addX,
                         velocity.getY(),
