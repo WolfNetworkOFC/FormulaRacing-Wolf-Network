@@ -258,6 +258,7 @@ public class JoinListener implements Listener {
         this.plugin.getTimerUtils().stopTimer(player);
         this.plugin.getTimerUtils().clearTempCheckpoints(uuid);
         this.plugin.setLastTimeTrialTrack(uuid, null);
+        this.plugin.clearLastRandomTimeTrialTracks(uuid);
         // Clean up ghost recording and replay on quit
         if (this.plugin.getGhostManager() != null) {
             this.plugin.getGhostManager().cleanupPlayer(uuid);
