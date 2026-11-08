@@ -13,13 +13,16 @@ import lombok.RequiredArgsConstructor;
  * ELO rating system for ranked duels. Uses the standard chess ELO formula with a
  * configurable K-factor and per-result change clamping (min/max).
  */
-@RequiredArgsConstructor
 @Getter
 public class EloManager {
 
     private final FormulaRacing plugin;
     private final DatabaseManager dm;
 
+    public EloManager(FormulaRacing plugin, DatabaseManager dm) {
+        this.plugin = plugin;
+        this.dm = dm;
+    }
     private int defaultElo = 1200;
     private int kFactor = 32;
     private int minChange = 1;

@@ -200,16 +200,31 @@ public class APIFormulaRacing {
     }
 
     public void releaseBoat(Player player) {
-        ArmorStand ar = (ArmorStand)lockedBoats.get(player.getUniqueId());
-        if (ar != null) {
-            lockedBoats.remove(player.getUniqueId());
-            // Use location-based scheduler to survive chunk unloads (Folia fix)
-            Location arLoc = ar.getLocation();
-            SchedulerHelper.runTaskAt(this.plugin, arLoc, () -> {
-                if (ar.isValid()) ar.remove();
-            });
-        }
+        UUID uuid = player.getUniqueId();
+        ArmorStand ar = (ArmorStand)lockedBoats.remove(uuid);
+        if (ar == null) return;
 
+        // Detach the boat from the anchor BEFORE removing the anchor. If the anchor
+        // is removed while the boat is still its passenger, Minecraft keeps a stale
+        // "controlling vehicle" reference (armor_stand) and logs
+        // "was expected to be controlling vehicle translation ... but was not.
+        // Resetting vehicle position." Detaching first keeps the player on the boat
+        // and clears the controller state cleanly.
+        Entity boat = playerBoats.get(uuid);
+        if (boat == null) {
+            for (Entity p : ar.getPassengers()) {
+                if (p instanceof Boat) { boat = p; break; }
+            }
+        }
+        final Entity finalBoat = boat;
+
+        Location arLoc = ar.getLocation();
+        SchedulerHelper.runTaskAt(this.plugin, arLoc, () -> {
+            if (finalBoat != null && finalBoat.isValid() && finalBoat.getVehicle() == ar) {
+                ar.removePassenger(finalBoat);
+            }
+            if (ar.isValid()) ar.remove();
+        });
     }
 
     public void deleteBoat(Entity boat) {

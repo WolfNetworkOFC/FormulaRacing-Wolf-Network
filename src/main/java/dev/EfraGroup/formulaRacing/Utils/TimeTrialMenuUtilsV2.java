@@ -508,7 +508,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                 case 45: {
                     if (session.page <= 0) break;
                     --session.page;
-                    this.openPage(player);
+                    SchedulerHelper.runTaskFor(this.plugin, player, () -> this.openPage(player));
                     break;
                 }
                 case 53: {
@@ -516,7 +516,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                     int maxPages = (int) Math.ceil((double) totalItems / 45.0);
                     if (session.page >= maxPages - 1) break;
                     ++session.page;
-                    this.openPage(player);
+                    SchedulerHelper.runTaskFor(this.plugin, player, () -> this.openPage(player));
                     break;
                 }
                 case 47: {
@@ -532,13 +532,13 @@ public class TimeTrialMenuUtilsV2 implements Listener {
                 case 48: {
                     session.sort = session.sort.next();
                     this.applySortAndFilter(session);
-                    this.openPage(player);
+                    SchedulerHelper.runTaskFor(this.plugin, player, () -> this.openPage(player));
                     break;
                 }
                 case 50: {
                     session.filter = session.filter.next();
                     this.applySortAndFilter(session);
-                    this.openPage(player);
+                    SchedulerHelper.runTaskFor(this.plugin, player, () -> this.openPage(player));
                     break;
                 }
                 case 52: {

@@ -219,6 +219,7 @@ public class PodiumManager implements Listener {
                 continue;
             }
 
+            this.plugin.getAPI().recoverPlayerBoatState(player);
             SchedulerHelper.teleport(player, audience);
             player.sendMessage(startMessage);
 
@@ -299,6 +300,7 @@ public class PodiumManager implements Listener {
             return;
         }
 
+        this.plugin.getAPI().recoverPlayerBoatState(podiumPlayer);
         SchedulerHelper.teleport(podiumPlayer, podiumLocation);
         if (this.config().getBoolean(CONFIG_ROOT + ".effects.particles", true)) {
             podiumPlayer.getWorld().spawnParticle(Particle.FIREWORK, podiumLocation.clone().add(0.0D, 1.0D, 0.0D), 50);
@@ -338,6 +340,7 @@ public class PodiumManager implements Listener {
             }
 
             p.sendMessage(endMessage);
+            this.plugin.getAPI().recoverPlayerBoatState(p);
             if (lobby != null) {
                 SchedulerHelper.teleport(p, lobby);
             }
