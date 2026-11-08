@@ -1351,6 +1351,11 @@ public class RaceEventManager {
             timeLimit = 10;
             lonely = true;
             startDelay = 5;
+        } else if (round.getType() == RoundType.PODIUM) {
+            totalLaps = 0;
+            timeLimit = 0;
+            lonely = true;
+            startDelay = 0;
         } else {
             lonely = false;
             startDelay = 5;

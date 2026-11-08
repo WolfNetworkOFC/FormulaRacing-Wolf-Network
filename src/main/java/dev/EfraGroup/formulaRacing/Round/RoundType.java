@@ -17,5 +17,6 @@ public enum RoundType {
     BLIND_RACE,
     MOVING_TARGET,
     TOTAL_CHAOS,
-    ROULETTE
+    ROULETTE,
+PODIUM
 }

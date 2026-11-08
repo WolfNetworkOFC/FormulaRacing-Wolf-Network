@@ -49,24 +49,40 @@ public class PodiumManager implements Listener {
     }
 
     public synchronized void startCeremony(Events event, List<Driver> results) {
+        this.startCeremony(event, results, null);
+    }
+
+    public synchronized void startCeremony(Events event, List<Driver> results, Runnable onComplete) {
         if (event == null || results == null || results.isEmpty()) {
             this.plugin.getDebugManager().logRaceSystem("Podium ceremony skipped: invalid event/results.");
+            if (onComplete != null) {
+                onComplete.run();
+            }
             return;
         }
 
         if (this.ceremonyActive) {
             this.plugin.getDebugManager().logRaceSystem("Podium ceremony already active. Ignoring new call for " + event.getDisplayName());
+            if (onComplete != null) {
+                onComplete.run();
+            }
             return;
         }
 
         if (!this.config().getBoolean(CONFIG_ROOT + ".enabled", true)) {
             this.plugin.getDebugManager().logRaceSystem("Podium ceremony disabled in config.yml.");
+            if (onComplete != null) {
+                onComplete.run();
+            }
             return;
         }
 
         for (String key : REQUIRED_LOCATIONS) {
             if (this.getConfiguredLocation(key) == null) {
                 this.plugin.getDebugManager().logRaceSystem("Podium ceremony aborted: invalid location in '" + CONFIG_ROOT + ".locations." + key + "'.");
+                if (onComplete != null) {
+                    onComplete.run();
+                }
                 return;
             }
         }
@@ -77,12 +93,18 @@ public class PodiumManager implements Listener {
         int topLimitUsed = Math.min(topLimit, sortedResults.size());
         if (topLimitUsed <= 0) {
             this.plugin.getDebugManager().logRaceSystem("Podium ceremony aborted: no positions to reveal.");
+            if (onComplete != null) {
+                onComplete.run();
+            }
             return;
         }
 
         Set<UUID> participants = this.resolveCeremonyParticipants(event);
         if (participants.isEmpty()) {
             this.plugin.getDebugManager().logRaceSystem("Podium ceremony aborted: no event participants.");
+            if (onComplete != null) {
+                onComplete.run();
+            }
             return;
         }
 
@@ -94,7 +116,8 @@ public class PodiumManager implements Listener {
                 Collections.unmodifiableList(sortedResults),
                 Collections.unmodifiableSet(participants),
                 topLimitUsed,
-                new AtomicInteger(topLimitUsed)
+                new AtomicInteger(topLimitUsed),
+                onComplete
         );
         this.activeSession = session;
 
@@ -348,6 +371,11 @@ public class PodiumManager implements Listener {
 
         this.ceremonyActive = false;
         this.activeSession = null;
+
+        Runnable cb = session.onComplete;
+        if (cb != null) {
+            SchedulerHelper.runTask(this.plugin, cb);
+        }
     }
 
     private String getDriverName(Driver driver) {
@@ -408,15 +436,17 @@ public class PodiumManager implements Listener {
         private final Set<UUID> participants;
         private final int topLimitUsed;
         private final AtomicInteger currentRevealPosition;
+        private final Runnable onComplete;
         private FRTask revealTask;
         private FRTask finalizeTask;
 
-        private PodiumCeremonySession(Events event, List<Driver> results, Set<UUID> participants, int topLimitUsed, AtomicInteger currentRevealPosition) {
+        private PodiumCeremonySession(Events event, List<Driver> results, Set<UUID> participants, int topLimitUsed, AtomicInteger currentRevealPosition, Runnable onComplete) {
             this.event = event;
             this.results = results;
             this.participants = participants;
             this.topLimitUsed = topLimitUsed;
             this.currentRevealPosition = currentRevealPosition;
+            this.onComplete = onComplete;
         }
     }
 }

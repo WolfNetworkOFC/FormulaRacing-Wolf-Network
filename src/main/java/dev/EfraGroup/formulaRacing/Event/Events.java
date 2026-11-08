@@ -123,7 +123,11 @@ public class Events {
                         this.plugin.getDebugManager().logRaceSystem("Vencedor do evento " + this.displayName + ": " + winnerName);
                     }
 
-                    if (this.plugin.getPodiumManager() != null) {
+                    // Auto-cerimonia apenas se nao houver round PODIUM no evento
+                    // (quando ha, a cerimonia roda via o heat do round PODIUM).
+                    boolean hasPodiumRound = this.eventSchedule.getRounds().values().stream()
+                            .anyMatch(r -> r.getType() == RoundType.PODIUM);
+                    if (!hasPodiumRound && this.plugin.getPodiumManager() != null) {
                         this.plugin.getPodiumManager().startCeremony(this, results);
                     }
 

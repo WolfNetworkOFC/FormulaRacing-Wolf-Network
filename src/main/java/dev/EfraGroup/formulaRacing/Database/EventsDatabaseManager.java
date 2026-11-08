@@ -18,6 +18,7 @@ import dev.EfraGroup.formulaRacing.Round.RaceRound;
 import dev.EfraGroup.formulaRacing.Round.RoundState;
 import dev.EfraGroup.formulaRacing.Round.RoundType;
 import dev.EfraGroup.formulaRacing.Round.Rounds;
+import dev.EfraGroup.formulaRacing.Round.PodiumRound;
 import dev.EfraGroup.formulaRacing.Round.SprintQualificationRound;
 import dev.EfraGroup.formulaRacing.Round.SprintRaceRound;
 import dev.EfraGroup.formulaRacing.Utils.DebugManager;
@@ -1569,6 +1570,9 @@ public class EventsDatabaseManager {
             }
             case FINAL -> {
                 return new RaceRound(plugin, id, event, index, type);
+            }
+            case PODIUM -> {
+                return new PodiumRound(plugin, id, event, index, type);
             }
             default -> throw new IllegalArgumentException(
                 "Unknown RoundType: " + String.valueOf(type)

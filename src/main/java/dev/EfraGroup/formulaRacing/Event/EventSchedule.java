@@ -15,6 +15,7 @@ import dev.EfraGroup.formulaRacing.Round.BlindRaceRound;
 import dev.EfraGroup.formulaRacing.Round.MovingTargetRound;
 import dev.EfraGroup.formulaRacing.Round.TotalChaosRound;
 import dev.EfraGroup.formulaRacing.Round.RouletteRound;
+import dev.EfraGroup.formulaRacing.Round.PodiumRound;
 import dev.EfraGroup.formulaRacing.Round.PracticeRound;
 import dev.EfraGroup.formulaRacing.Round.QualificationRound;
 import dev.EfraGroup.formulaRacing.Round.RaceRound;
@@ -97,6 +98,9 @@ public class EventSchedule {
                     break;
                 case ROULETTE:
                     round = new RouletteRound(this.plugin, 0, this.event, roundIndex, roundType);
+                    break;
+                case PODIUM:
+                    round = new PodiumRound(this.plugin, 0, this.event, roundIndex, roundType);
                     break;
                 case FINAL:
                 default:
