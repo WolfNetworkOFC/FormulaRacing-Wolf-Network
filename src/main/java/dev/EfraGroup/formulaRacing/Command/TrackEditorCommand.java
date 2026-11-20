@@ -414,7 +414,7 @@ public class TrackEditorCommand extends BaseCommand {
 
     @Subcommand("broadcast newtrack")
     @Description("Sends new track message to Discord")
-    @CommandCompletion("@nothing @tracks")
+    @CommandCompletion("imageUrl Tags Collaborators BoatMode @tracks")
     public void onBroadcastNewTrack(Player player, @Optional String imageUrl, @Optional String tags, @Optional String collaborators, @Optional String boatMode, @Optional String trackNameArg) {
         if (!DiscordUtils.isEnabled()) {
             player.sendMessage("§c❌ Discord webhook not configured! Set it up in the config.yml first.");
