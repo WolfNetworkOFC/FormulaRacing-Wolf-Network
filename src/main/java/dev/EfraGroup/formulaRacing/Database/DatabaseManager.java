@@ -2859,6 +2859,22 @@ public class DatabaseManager {
         }
     }
 
+    /**
+     * Remove os caches por jogador (idioma, cores e preferências de scoreboard).
+     * Chamado no quit para evitar que o mapa cresça indefinidamente conforme
+     * jogadores únicos entram e saem do servidor.
+     */
+    public void clearPlayerCaches(UUID playerUUID) {
+        if (playerUUID == null) return;
+        languageCache.remove(playerUUID);
+        playerColor1Cache.remove(playerUUID);
+        playerColor2Cache.remove(playerUUID);
+        ttScoreboardCache.remove(playerUUID);
+        ttEnabledCache.remove(playerUUID);
+        compactScoreboardCache.remove(playerUUID);
+        raceProgressBarCache.remove(playerUUID);
+    }
+
     public synchronized boolean addCheckpoint(
         int checkpointId,
         String trackNameWS,
