@@ -67,6 +67,10 @@ public class BoatSelectGui extends BaseGui {
         BOAT_TYPES = List.of(new BoatType(1, "Oak Boat", Material.OAK_BOAT), new BoatType(2, "Birch Boat", Material.BIRCH_BOAT), new BoatType(3, "Spruce Boat", Material.SPRUCE_BOAT), new BoatType(4, "Jungle Boat", Material.JUNGLE_BOAT), new BoatType(5, "Acacia Boat", Material.ACACIA_BOAT), new BoatType(6, "Dark Oak Boat", Material.DARK_OAK_BOAT), new BoatType(7, "Mangrove Boat", Material.MANGROVE_BOAT), new BoatType(8, "Cherry Boat", Material.CHERRY_BOAT), new BoatType(9, "Bamboo Raft", Material.BAMBOO_RAFT), new BoatType(10, "Oak Chest Boat", Material.OAK_CHEST_BOAT), new BoatType(11, "Birch Chest Boat", Material.BIRCH_CHEST_BOAT), new BoatType(12, "Spruce Chest Boat", Material.SPRUCE_CHEST_BOAT), new BoatType(13, "Jungle Chest Boat", Material.JUNGLE_CHEST_BOAT), new BoatType(14, "Acacia Chest Boat", Material.ACACIA_CHEST_BOAT), new BoatType(15, "Dark Oak Chest Boat", Material.DARK_OAK_CHEST_BOAT), new BoatType(16, "Mangrove Chest Boat", Material.MANGROVE_CHEST_BOAT), new BoatType(17, "Cherry Chest Boat", Material.CHERRY_CHEST_BOAT), new BoatType(18, "Bamboo Chest Raft", Material.BAMBOO_CHEST_RAFT));
     }
 
+    public static void clearClickCooldown(UUID uuid) {
+        if (clickCooldown != null) clickCooldown.remove(uuid);
+    }
+
     private static record BoatType(int id, String displayName, Material material) {
     }
 }
