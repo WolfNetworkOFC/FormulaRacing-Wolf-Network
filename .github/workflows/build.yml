@@ -73,7 +73,7 @@ jobs:
             -DbundlerRepoDir="$PWD/.paperclip-cache" \
             -jar "$PAPER_JAR"
 
-          SERVER_JAR="$(find .paperclip-cache/versions -type f -name 'server-*.jar' | head -n1)"
+          SERVER_JAR="$(find .paperclip-cache/versions -type f -name '*.jar' | head -n1)"
           if [ -z "$SERVER_JAR" ]; then
             echo "Paperclip did not produce a server jar." >&2
             find .paperclip-cache -maxdepth 4 -type f | sort >&2
