@@ -56,9 +56,9 @@ dependencies {
     implementation 'com.sparkjava:spark-core:2.9.4'
     implementation 'com.zaxxer:HikariCP:5.1.0'
     implementation 'org.bstats:bstats-bukkit:3.0.2'
-    // JitPack publishes commit 592fabf3e2 as master-592fabf3e2-1; the bare
-    // commit hash is not available as a resolvable artifact.
-    implementation 'com.github.SparklingComet:java-mojang-api:master-592fabf3e2-1'
+    // JitPack does not publish a resolvable artifact under the bare commit
+    // hash; master-SNAPSHOT resolves to the build for commit 592fabf3e2.
+    implementation 'com.github.SparklingComet:java-mojang-api:master-SNAPSHOT'
     implementation 'com.google.code.gson:gson:2.11.0'
     implementation 'com.googlecode.json-simple:json-simple:1.1.1'
     implementation 'org.apache.httpcomponents:httpclient:4.5.14'
