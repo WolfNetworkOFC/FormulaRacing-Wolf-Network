@@ -1732,6 +1732,10 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
             this.ghostManager.cleanupPlayer(uuid);
         }
 
+        if (this.dm != null) {
+            this.dm.clearPlayerCaches(uuid);
+        }
+
         if (this.medalManager != null) {
             this.medalManager.clearPending(uuid);
         }

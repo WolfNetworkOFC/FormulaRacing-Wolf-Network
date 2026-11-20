@@ -47,6 +47,9 @@ public class LivePositionCache {
     private final long intervalTicks;
     private FRTask task;
 
+    /** Snapshots mais antigos que isto são descartados (jogador saiu/parou de correr). */
+    private static final long STALE_MS = 1000L;
+
     public LivePositionCache(FormulaRacing plugin) {
         this.plugin = plugin;
         this.intervalTicks = 2L; // ~100ms a 20 TPS
@@ -71,6 +74,9 @@ public class LivePositionCache {
     private void refresh() {
         long now = System.currentTimeMillis();
         for (Events event : plugin.getRaceEventManager().getAllEvents()) {
+            if (!event.isActive()) {
+                continue;
+            }
             for (var round : event.getSchedule().getRoundsList()) {
                 for (Heats heat : round.getHeats().values()) {
                     if (heat.getHeatState() != HeatState.RACING && heat.getHeatState() != HeatState.STARTING) {
@@ -88,6 +94,9 @@ public class LivePositionCache {
                 }
             }
         }
+        // Remove quem saiu, terminou o heat ou parou de correr: sem isto o mapa
+        // retinha um Snapshot por UUID para sempre.
+        positions.entrySet().removeIf(entry -> now - entry.getValue().timestamp > STALE_MS);
     }
 
     public Snapshot get(UUID uuid) {
