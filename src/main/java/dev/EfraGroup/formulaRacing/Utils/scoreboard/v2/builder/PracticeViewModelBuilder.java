@@ -15,18 +15,8 @@ public class PracticeViewModelBuilder implements StateViewModelBuilder {
     @Override
     public ScoreboardViewModel build(ScoreboardContext context) {
         List<String> lines = new ArrayList<>();
-        int fixedLines = 6;
-        if (!context.spectator() && context.viewerDriver() != null) {
-            lines.add(BuilderSupport.formatBestLap(context, context.viewerDriver()));
-            fixedLines++;
-        }
-        lines.add(BuilderSupport.spacer(0));
-        lines.addAll(BuilderSupport.buildClassificationLines(context, true, fixedLines));
-        lines.add(BuilderSupport.spacer(1));
-        int minHeight = BuilderSupport.minHeightForPractice(context.heat().getDriverCount());
-        BuilderSupport.padToMinHeight(lines, minHeight);
-        lines.add(BuilderSupport.commonSeparator(context));
-        lines.add(BuilderSupport.commonFooter(context));
+        // TimingSystem parity: one row per driver, no extra header/footer.
+        lines.addAll(BuilderSupport.buildClassificationLines(context, true, 0));
         return new ScoreboardViewModel(
                 BuilderSupport.scoreboardTitle(context, "scoreboard_title_practice"),
                 lines,

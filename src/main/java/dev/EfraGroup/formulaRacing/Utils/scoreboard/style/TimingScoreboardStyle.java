@@ -32,12 +32,13 @@ public final class TimingScoreboardStyle {
 
     public static String teamMarker(String accentMarker, int pos) {
         String marker = normalizeAccentMarker(accentMarker);
-        return positionColor(pos) + "§l" + marker + marker + "§r";
+        // TimingSystem uses bold+italic "||" followed by one space.
+        return positionColor(pos) + "§l§o" + marker + marker + "§r ";
     }
 
     public static String normalizeAccentMarker(String accentMarker) {
         if (accentMarker == null || accentMarker.isBlank()) {
-            return "┃";
+            return "|";
         }
         return accentMarker;
     }

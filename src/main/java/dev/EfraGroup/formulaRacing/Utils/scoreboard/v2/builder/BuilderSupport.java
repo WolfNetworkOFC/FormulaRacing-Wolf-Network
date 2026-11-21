@@ -23,11 +23,12 @@ public final class BuilderSupport {
             "§0", "§1", "§2", "§3", "§4", "§5", "§6", "§7",
             "§8", "§9", "§a", "§b", "§c", "§d", "§e", "§f"
     };
-    // Pixel-based widths for precise alignment (~6px per char default)
-    private static final int MIDDLE_PIXEL_WIDTH = 66;  // ~11 chars
-    private static final int NAME_PIXEL_WIDTH = 78;    // ~13 chars
-    private static final int NAME_PIXEL_WIDTH_WITH_PITS = 66;  // ~11 chars
-    private static final int COMPACT_NAME_PIXEL_WIDTH = 18;    // ~3 chars (first 3 letters of the name)
+    // Pixel-based widths tuned to match TimingSystem's character-based fields:
+    // middle = 11 spaces (~44px), name = 16 chars (~96px), compact name = 4 chars (~24px).
+    private static final int MIDDLE_PIXEL_WIDTH = 44;   // 11 spaces
+    private static final int NAME_PIXEL_WIDTH = 96;     // 16 chars
+    private static final int NAME_PIXEL_WIDTH_WITH_PITS = 96;
+    private static final int COMPACT_NAME_PIXEL_WIDTH = 24; // 4 chars
 
     private BuilderSupport() {
     }
@@ -44,7 +45,9 @@ public final class BuilderSupport {
             return List.of(tr(context, "scoreboard_v2_no_active_drivers"));
         }
 
-        int availableLines = Math.max(4, context.maxRows() - fixedLines - 2);
+        // TimingSystem shows one row per driver with no separator/footer, so
+        // the whole row budget is available for drivers.
+        int availableLines = Math.max(4, context.maxRows() - fixedLines);
         int total = sorted.size();
 
         int start;
@@ -185,17 +188,18 @@ public final class BuilderSupport {
         String marker = teamMarker(accentMarker, pos);
         boolean showPits = hasRequiredPits(context);
         boolean compact = context.compact();
-        // Compact mode: pilot names shrink to their first 3 letters (Joka_10 → Jok);
-        // the offline placeholder is kept as-is.
-        if (compact && p != null && name != null && name.length() > 3) {
-            name = name.substring(0, 3);
+        // Compact mode: pilot names shrink to their first 4 letters, like TimingSystem.
+        if (compact && name != null && name.length() > 4) {
+            name = name.substring(0, 4);
         }
         int namePixelWidth = compact ? COMPACT_NAME_PIXEL_WIDTH : (showPits ? NAME_PIXEL_WIDTH_WITH_PITS : NAME_PIXEL_WIDTH);
         String pilotName = formatPilotName(name, namePixelWidth);
         String pits = formatPits(context, current);
-        String divider = compact ? " " : " &m| ";
+        // TimingSystem: no spaces around the "|" divider, and none at all in
+        // compact mode. The team marker already carries its trailing space.
+        String divider = compact ? "" : "&m|";
 
-        return rank + divider + middle + " " + marker + " " + pilotName + pits;
+        return rank + divider + middle + marker + pilotName + pits;
     }
 
     private static String formatPilotName(String name, int pixelWidth) {
@@ -418,9 +422,9 @@ public final class BuilderSupport {
     }
 
     private static String middleCell(String color, String content) {
-        // Pad to pixel width for consistent alignment
+        // 11-space wide middle field, matching TimingSystem's getDrsIndicatorOrSpacing().
         String padded = TimingScoreboardStyle.padRightPixels(content, MIDDLE_PIXEL_WIDTH);
-        return " " + color + padded;
+        return color + padded;
     }
 
     private static int latestComparableLap(Driver driver) {
@@ -488,6 +492,9 @@ public final class BuilderSupport {
         if (requiredPits == null || requiredPits <= 0) {
             return "";
         }
+        if (context.compact()) {
+            return " ";
+        }
         int pits = driver.getPitstops();
 
         String pitsColor = "&x";
@@ -499,27 +506,25 @@ public final class BuilderSupport {
             pitsColor = "&e";
         }
 
-        return " &mP: " + pitsColor + pits;
+        return "&mPits: " + pitsColor + pits;
     }
 
     static String scoreboardTitle(ScoreboardContext context, String baseKey) {
-        String base = context.plugin().getTranslationUtil().getTranslated(context.viewer(), baseKey);
-        if (context.compact() && base.length() > 8) {
-            base = base.substring(0, 8);
-        }
+        // TimingSystem title = "<heat> | <event>" (bold/theme colour applied by
+        // the adapter). Compact mode truncates the event name to 8 chars.
         String heatName = context.heat().getName();
         String eventName = "";
         if (context.heat().getRound() != null && context.heat().getRound().getEvent() != null) {
             eventName = normalizeEventName(context.heat().getRound().getEvent().getDisplayName());
         }
-        if (eventName.length() > 14) {
-            eventName = eventName.substring(0, 14);
+        if (context.compact() && eventName.length() > 8) {
+            eventName = eventName.substring(0, 8);
         }
 
         if (eventName.isEmpty()) {
-            return base + " &m| &x" + heatName;
+            return "&l&x" + heatName;
         }
-        return base + " &m| &x" + heatName + " &m| &x" + eventName;
+        return "&l&x" + heatName + " &m| &x" + eventName;
     }
 
     private static String normalizeEventName(String rawName) {

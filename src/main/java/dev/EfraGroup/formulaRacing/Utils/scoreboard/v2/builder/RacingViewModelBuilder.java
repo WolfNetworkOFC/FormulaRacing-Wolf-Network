@@ -15,12 +15,8 @@ public class RacingViewModelBuilder implements StateViewModelBuilder {
     @Override
     public ScoreboardViewModel build(ScoreboardContext context) {
         List<String> lines = new ArrayList<>();
-        lines.addAll(BuilderSupport.buildClassificationLines(context, false, 5));
-        lines.add(BuilderSupport.spacer(0));
-        int minHeight = BuilderSupport.minHeightForRacing(context.heat().getDriverCount());
-        BuilderSupport.padToMinHeight(lines, minHeight);
-        lines.add(BuilderSupport.commonSeparator(context));
-        lines.add(BuilderSupport.commonFooter(context));
+        // TimingSystem parity: one row per driver, no spacer/separator/footer.
+        lines.addAll(BuilderSupport.buildClassificationLines(context, false, 0));
         return new ScoreboardViewModel(
                 BuilderSupport.scoreboardTitle(context, "scoreboard_title_race"),
                 lines,
