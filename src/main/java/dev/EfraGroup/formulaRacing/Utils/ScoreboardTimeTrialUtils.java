@@ -20,6 +20,11 @@ import org.bukkit.entity.Player;
 public class ScoreboardTimeTrialUtils {
 
     private static final int MAX_LINES = 15;
+
+    /** Which TT board a player is currently viewing. */
+    private enum BoardMode { NORMAL, SESSION }
+
+    private final Map<UUID, BoardMode> boardModes = new ConcurrentHashMap<>();
     private final Map<UUID, String> playerTracks = new ConcurrentHashMap<>();
     private final Map<UUID, String> playerTrackOwners =
         new ConcurrentHashMap<>();
@@ -97,20 +102,45 @@ public class ScoreboardTimeTrialUtils {
         }, 0L, 20L);
     }
 
-    public void setPlayerTrack(
+    /** Keeps the player's current board mode (used by region/menu/reset callers). */
+    public void setPlayerTrack(Player player, String trackName, String ownerName) {
+        BoardMode mode = this.boardModes.getOrDefault(player.getUniqueId(), BoardMode.NORMAL);
+        setPlayerTrack(player, trackName, ownerName, mode);
+    }
+
+    /** Explicitly selects the classic leaderboard board. */
+    public void setNormalTrack(Player player, String trackName, String ownerName) {
+        setPlayerTrack(player, trackName, ownerName, BoardMode.NORMAL);
+    }
+
+    /** Explicitly selects the session-stats board (/t session). */
+    public void setSessionTrack(Player player, String trackName, String ownerName) {
+        setPlayerTrack(player, trackName, ownerName, BoardMode.SESSION);
+    }
+
+    private void setPlayerTrack(
         Player player,
         String trackName,
-        String ownerName
+        String ownerName,
+        BoardMode mode
     ) {
-        String lastTrack = this.playerTracks.get(player.getUniqueId());
-        if (lastTrack == null || !lastTrack.equalsIgnoreCase(trackName)) {
+        UUID uuid = player.getUniqueId();
+        String lastTrack = this.playerTracks.get(uuid);
+        BoardMode lastMode = this.boardModes.get(uuid);
+        boolean changed = lastTrack == null
+            || !lastTrack.equalsIgnoreCase(trackName)
+            || lastMode != mode;
+        if (changed) {
             this.clearSession(player);
         }
-        this.playerTracks.put(player.getUniqueId(), trackName);
+        this.boardModes.put(uuid, mode);
+        this.playerTracks.put(uuid, trackName);
         if (ownerName != null) {
-            this.playerTrackOwners.put(player.getUniqueId(), ownerName);
+            this.playerTrackOwners.put(uuid, ownerName);
         }
-        this.recordAttempt(player);
+        if (mode == BoardMode.SESSION) {
+            this.recordAttempt(player);
+        }
         this.show(player, trackName);
     }
 
@@ -188,6 +218,15 @@ public class ScoreboardTimeTrialUtils {
     }
 
     private void updateBoard(Player player, String trackName) {
+        BoardMode mode = this.boardModes.getOrDefault(player.getUniqueId(), BoardMode.NORMAL);
+        if (mode == BoardMode.SESSION) {
+            updateSessionBoard(player, trackName);
+        } else {
+            updateLeaderboardBoard(player, trackName);
+        }
+    }
+
+    private void updateSessionBoard(Player player, String trackName) {
         TranslationUtil tu = FormulaRacing.getInstance().getTranslationUtil();
         this.adapter.updateTitle(
             player,
@@ -256,6 +295,106 @@ public class ScoreboardTimeTrialUtils {
 
         lines.add("");
         lines.add("§ewolfnetwork.com.br");
+        this.adapter.updateLines(player, lines);
+    }
+
+    /** Classic TT board: track leaderboard around the viewer's position. */
+    private void updateLeaderboardBoard(Player player, String trackName) {
+        List<DatabaseManager.TrackRecord> allRecords;
+        CachedLeaderboard cached = this.leaderboardCache.get(trackName);
+
+        if (cached == null || cached.isExpired(10000L)) {
+            allRecords = this.mysql.getTopTimes(trackName);
+            if (allRecords == null) {
+                allRecords = new ArrayList<>();
+            }
+            allRecords.sort(ScoreboardTimeTrialUtils::compareBoardRecords);
+            this.leaderboardCache.put(trackName, new CachedLeaderboard(allRecords));
+        } else {
+            allRecords = cached.records;
+        }
+
+        int myPos = -1;
+        for (int i = 0; i < allRecords.size(); i++) {
+            if (allRecords.get(i).getPlayerName().equals(player.getName())) {
+                myPos = i;
+                break;
+            }
+        }
+
+        TranslationUtil tu = FormulaRacing.getInstance().getTranslationUtil();
+        this.adapter.updateTitle(
+            player,
+            this.boldTitle(tu.getTranslated(player, "scoreboard_tt_title"))
+        );
+
+        boolean compact = this.mysql.getPlayerCompactMode(player.getUniqueId());
+        String footer = "§ewolfnetwork.com.br";
+
+        List<String> lines = new ArrayList<>();
+        lines.add("§f§l" + tu.getTranslated(player, "scoreboard_tt_track", "{track}", trackName));
+
+        String creator = this.playerTrackOwners.getOrDefault(
+            player.getUniqueId(),
+            this.trackOwnerCache.get(trackName)
+        );
+        if (creator == null) {
+            creator = this.mysql.getTrackOwner(trackName);
+            if (creator != null) {
+                this.trackOwnerCache.put(trackName, creator);
+            }
+        }
+        if (creator != null) {
+            lines.add("§f§l" + tu.getTranslated(player, "scoreboard_tt_by", "{creator}", creator));
+        }
+
+        lines.add("");
+        lines.add(this.boldTitle("§e" + tu.getTranslated(player, "scoreboard_tt_leaderboard")));
+
+        List<Integer> neighborIndexes = new ArrayList<>();
+        DatabaseManager.TrackRecord firstPlace = null;
+        boolean includeSeparator = false;
+        int footerLines = 3;
+        int availableForEntries = Math.max(3, MAX_LINES - lines.size() - footerLines);
+
+        if (myPos == -1 || myPos < 5) {
+            int limit = Math.min(allRecords.size(), availableForEntries);
+            for (int i = 0; i < limit; i++) {
+                neighborIndexes.add(i);
+            }
+        } else {
+            boolean canShowLeaderAndStillCenter = availableForEntries >= 7;
+            int neighborsLimit = availableForEntries;
+            int minIndex = 0;
+            if (canShowLeaderAndStillCenter) {
+                firstPlace = allRecords.get(0);
+                includeSeparator = true;
+                neighborsLimit -= 2;
+                minIndex = 1;
+            }
+            int start = Math.max(minIndex, myPos - neighborsLimit / 2);
+            int end = Math.min(allRecords.size() - 1, start + neighborsLimit - 1);
+            start = Math.max(minIndex, end - neighborsLimit + 1);
+            for (int i = start; i <= end; i++) {
+                if (canShowLeaderAndStillCenter && i == 0) {
+                    continue;
+                }
+                neighborIndexes.add(i);
+            }
+        }
+
+        if (firstPlace != null) {
+            lines.add(formatRecordLine(firstPlace, 1, player.getName(), player, compact));
+        }
+        if (includeSeparator) {
+            lines.add("");
+        }
+        for (int index : neighborIndexes) {
+            lines.add(formatRecordLine(allRecords.get(index), index + 1, player.getName(), player, compact));
+        }
+
+        lines.add("");
+        lines.add(footer);
         this.adapter.updateLines(player, lines);
     }
 

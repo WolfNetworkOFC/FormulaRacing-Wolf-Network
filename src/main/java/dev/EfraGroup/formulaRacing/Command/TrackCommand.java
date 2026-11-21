@@ -97,7 +97,9 @@ public class TrackCommand extends BaseCommand {
         String[] args = (trackName == null || trackName.trim().isEmpty())
             ? new String[]{}
             : new String[]{trackName};
-        new TimeTrialCommand(this.plugin).onSolo(player, args);
+        TimeTrialCommand command = new TimeTrialCommand(this.plugin);
+        command.setSessionScoreboard(true);
+        command.onSolo(player, args);
     }
 
     @Subcommand("times")

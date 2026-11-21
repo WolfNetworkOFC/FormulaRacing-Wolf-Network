@@ -51,6 +51,12 @@ import dev.EfraGroup.formulaRacing.PacketSender;
         private final TimeTrialMenuUtilsV2 menuUtils;
         private final TimeTrialController timeTrialController;
         private final Random random = new Random();
+        private boolean sessionScoreboard;
+
+        /** Called by /track session to show the session-stats TT board. */
+        public void setSessionScoreboard(boolean sessionScoreboard) {
+            this.sessionScoreboard = sessionScoreboard;
+        }
 
         public TimeTrialCommand(FormulaRacing plugin) {
             this.plugin = plugin;
@@ -169,7 +175,11 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                     sendTimeTrialTeleportMessage(player, trackName);
 
                     try {
-                        this.stt.setPlayerTrack(player, trackName, ownerName);
+                        if (this.sessionScoreboard) {
+                            this.stt.setSessionTrack(player, trackName, ownerName);
+                        } else {
+                            this.stt.setNormalTrack(player, trackName, ownerName);
+                        }
                     } catch (Exception e) {
                         this.plugin.getDebugManager().logTimeTrialSystem("[ERROR] Failed to set player track for scoreboard: " + e.getMessage());
                         e.printStackTrace();

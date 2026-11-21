@@ -688,7 +688,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
 
         try {
             String ownerName = this.mysql.getTrackOwner(trackName);
-            this.stt.setPlayerTrack(player, trackName, ownerName);
+            this.stt.setNormalTrack(player, trackName, ownerName);
         } catch (Exception e) {
             this.plugin.getDebugManager().logTimeTrialSystem("[ERROR] Failed to set player track for scoreboard: " + e.getMessage());
         }
