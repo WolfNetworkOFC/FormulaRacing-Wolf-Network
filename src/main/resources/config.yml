@@ -68,9 +68,9 @@ database:
 # =========================================================#
 
 scoreboard:
-  max-rows: 30 # Máximo de linhas na scoreboard. Minecraft padrão é 15, mas com a Megavex Library pode ser maior (até 32 ou mais).
+  max-rows: 15 # Igual ao TimingSystem: uma linha por piloto, sem separador/footer.
   style:
-    accent-marker: "┃"
+    accent-marker: "|" # Igual ao TimingSystem (marcador "||").
   v2:
     # Unified scoreboard is always enabled (Race > Duel > TT ownership)
     interval: 500ms

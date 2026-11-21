@@ -13,7 +13,7 @@ public class ScoreboardRenderer {
 
     public ScoreboardViewModel render(ScoreboardContext context, ScoreboardViewModel viewModel) {
         List<String> fitted = this.lineBudgetPolicy.fit(viewModel.lines(), context.maxRows());
-        boolean compact = fitted.size() < viewModel.lines().size();
-        return new ScoreboardViewModel(viewModel.title(), fitted, compact || viewModel.compact());
+        // TimingSystem never auto-enables compact just because rows were cut.
+        return new ScoreboardViewModel(viewModel.title(), fitted, viewModel.compact());
     }
 }
