@@ -84,6 +84,11 @@ public class DriverSwapHandler {
         newDriverObj.setPitstops(oldPits + 1);
         heat.getDrivers().put(newDriver.getUniqueId(), newDriverObj);
 
+        // Preserve accumulated Push-to-Pass charge across the swap (TimingSystem parity).
+        if (plugin.getPTP() != null) {
+            plugin.getPTP().transferPlayer(currentDriver.getUniqueId(), newDriver.getUniqueId());
+        }
+
         plugin.getPitStopManager().markDriverSwapped(currentDriver.getUniqueId(), currentLap);
         plugin.getPitStopManager().markDriverSwapped(newDriver.getUniqueId(), currentLap);
 

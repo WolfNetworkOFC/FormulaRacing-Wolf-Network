@@ -198,28 +198,45 @@ public class TrackLeaderboard {
         }
     }
 
+    /** Comparator preserved from the former stream().sorted() leaderboard code. */
+    private static int comparePlayerTimes(DatabaseManager.PlayerTime p1, DatabaseManager.PlayerTime p2) {
+        if (p1.isFinished() != p2.isFinished()) {
+            return p2.isFinished() ? 1 : -1;
+        }
+        int byCheckpoints = Integer.compare(p2.getCheckpointsReached(), p1.getCheckpointsReached());
+        if (byCheckpoints != 0) {
+            return byCheckpoints;
+        }
+        return Double.compare(p1.getTime(), p2.getTime());
+    }
+
+    /** Keeps at most 10 best entries in one linear pass over the leaderboard. */
+    private static List<DatabaseManager.PlayerTime> selectTop10(List<DatabaseManager.PlayerTime> leaderboard) {
+        List<DatabaseManager.PlayerTime> top = new ArrayList<>(10);
+        for (DatabaseManager.PlayerTime candidate : leaderboard) {
+            int insertAt = top.size();
+            while (insertAt > 0 && comparePlayerTimes(candidate, top.get(insertAt - 1)) < 0) {
+                insertAt--;
+            }
+            if (insertAt < 10) {
+                top.add(insertAt, candidate);
+                if (top.size() > 10) {
+                    top.remove(10);
+                }
+            }
+        }
+        return top;
+    }
+
     private void processAndShow(List<DatabaseManager.PlayerTime> leaderboard, String type) {
         if (this.removed) return;
         if (type.equals("java") && !this.javaEnabled) return;
         if (type.equals("bedrock") && !this.bedrockEnabled) return;
         int totalCheckpoints = this.mySQLManager.getCheckpointCount(this.trackName);
 
-        List<DatabaseManager.PlayerTime> top10 = leaderboard.stream()
-                .sorted((p1, p2) -> {
-                    // Finished laps rank above partial checkpoint runs.
-                    if (p1.isFinished() != p2.isFinished()) {
-                        return p2.isFinished() ? 1 : -1;
-                    }
-                    // More checkpoints reached rank higher.
-                    int byCheckpoints = Integer.compare(p2.getCheckpointsReached(), p1.getCheckpointsReached());
-                    if (byCheckpoints != 0) {
-                        return byCheckpoints;
-                    }
-                    // Faster time ranks higher.
-                    return Double.compare(p1.getTime(), p2.getTime());
-                })
-                .limit(10)
-                .toList();
+        // Single-pass top-10 selection (TimingSystem PR #207 parity): avoid
+        // copying and sorting the whole leaderboard just to find the best rows.
+        List<DatabaseManager.PlayerTime> top10 = selectTop10(leaderboard);
 
         String configPath = "leaderboards.fastesttime-" + type + ".lines";
         List<String> configLines = this.plugin.getConfig().getStringList(configPath);

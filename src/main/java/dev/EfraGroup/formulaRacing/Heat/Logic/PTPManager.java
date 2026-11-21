@@ -7,10 +7,12 @@ import dev.EfraGroup.formulaRacing.Participant.Driver;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRTheme;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeParser;
 import dev.EfraGroup.formulaRacing.Utils.Theme.FRThemeResolver;
+import dev.EfraGroup.formulaRacing.Utils.scoreboard.v2.builder.BuilderSupport;
 import java.time.Instant;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
@@ -23,8 +25,8 @@ import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
 
 public class PTPManager {
     private final FormulaRacing plugin;
-    private final Map<UUID, PtpData> playerData = new HashMap<>();
-    private final Map<UUID, Long> toggleCooldowns = new HashMap<>();
+    private final Map<UUID, PtpData> playerData = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> toggleCooldowns = new ConcurrentHashMap<>();
     private static final long TOGGLE_COOLDOWN_MS = 500;
     private static final int MAX_USE_TIME_MS = 5000;
     private static final int FULL_CHARGE_TIME_MS = 15000;
@@ -70,7 +72,7 @@ public class PTPManager {
 
                     Player player = Bukkit.getPlayer(driver.getUuid());
                     if (player != null && player.isOnline()) {
-                        updatePTP(player, driver);
+                        updatePTP(player, driver, heat);
                     }
                 }
             }
@@ -85,13 +87,71 @@ public class PTPManager {
         }
     }
 
-    private void updatePTP(Player player, Driver driver) {
+    private void updatePTP(Player player, Driver driver, Heats heat) {
         UUID uuid = player.getUniqueId();
         PtpData data = playerData.computeIfAbsent(uuid, k -> new PtpData(player));
 
+        data.setCatchUpMultiplier(computeCatchUpMultiplier(driver, heat));
         data.updateCharge(driver);
         data.syncDriver(driver);
         data.updateBossBar(player, driver);
+    }
+
+    /**
+     * Parity with TimingSystem's PushToPass catch-up option: a driver further
+     * behind the heat leader charges faster. 0 disables it; max speedup caps
+     * the multiplier when greater than 1.
+     */
+    private double computeCatchUpMultiplier(Driver driver, Heats heat) {
+        double percent = plugin.getConfig().getDouble("pushtopass.catchUpPercent", 0.0);
+        if (percent <= 0.0) {
+            return 1.0;
+        }
+        try {
+            List<Driver> livePositions = heat.getLivePositions();
+            if (livePositions == null || livePositions.isEmpty()) {
+                return 1.0;
+            }
+            Driver leader = livePositions.get(0);
+            if (leader == null || leader.equals(driver)) {
+                return 1.0;
+            }
+            Long gapMs = BuilderSupport.computeGapAtCommonPoint(driver, leader);
+            if (gapMs == null || gapMs <= 0L) {
+                return 1.0;
+            }
+            double multiplier = 1.0 + (percent / 100.0) * (gapMs / 1000.0);
+            double maxSpeedup = plugin.getConfig().getDouble("pushtopass.catchUpMaxSpeedup", 0.0);
+            if (maxSpeedup > 1.0) {
+                multiplier = Math.min(multiplier, maxSpeedup);
+            }
+            return Math.max(1.0, multiplier);
+        } catch (Exception ignored) {
+            // Transitional heat state — keep normal charging.
+            return 1.0;
+        }
+    }
+
+    /**
+     * Move the accumulated P2P charge to the replacement driver during a
+     * driver swap. Mirrors TimingSystem's transferPushToPass bug fix: snapshot
+     * the charge BEFORE cleaning up both players.
+     */
+    public void transferPlayer(UUID from, UUID to) {
+        PtpData fromData = playerData.get(from);
+        double transferredCharge = fromData != null ? fromData.chargePercent : 0.0;
+
+        removePlayer(from);
+        removePlayer(to);
+
+        Player toPlayer = Bukkit.getPlayer(to);
+        if (toPlayer == null || !toPlayer.isOnline()) {
+            return;
+        }
+        PtpData toData = new PtpData(toPlayer);
+        toData.chargePercent = transferredCharge;
+        toData.lastUpdate = Instant.now();
+        playerData.put(to, toData);
     }
 
     public void togglePTP(Player player, Driver driver, Heats heat) {
@@ -183,6 +243,11 @@ public class PTPManager {
         private boolean active;
         private Instant lastUpdate;
         private BossBar bossBar;
+        private double catchUpMultiplier = 1.0;
+
+        void setCatchUpMultiplier(double catchUpMultiplier) {
+            this.catchUpMultiplier = Math.max(1.0, catchUpMultiplier);
+        }
 
         PtpData(Player player) {
             this.chargePercent = 0;
@@ -211,7 +276,7 @@ public class PTPManager {
                     chargePercent = 0;
                 }
             } else {
-                double chargeRate = 100.0 / FULL_CHARGE_TIME_MS;
+                double chargeRate = (100.0 / FULL_CHARGE_TIME_MS) * catchUpMultiplier;
                 double oldCharge = chargePercent;
                 chargePercent += chargeRate * elapsed;
                 if (chargePercent > 100) {

@@ -2,6 +2,7 @@ package dev.EfraGroup.formulaRacing.Command;
 
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.CommandAlias;
+import co.aikar.commands.annotation.CommandCompletion;
 import co.aikar.commands.annotation.CommandPermission;
 import co.aikar.commands.annotation.Description;
 import co.aikar.commands.annotation.Subcommand;
@@ -44,5 +45,33 @@ public class FormulaRacingCommand extends BaseCommand {
         sender.sendMessage("§7Java: §f" + System.getProperty("java.version"));
         sender.sendMessage("§7Folia: §f" + folia);
         sender.sendMessage("§7Autores: §f" + String.join(", ", plugin.getDescription().getAuthors()));
+    }
+
+    @Subcommand("pushtopass catchuppercent")
+    @CommandCompletion("<percent>")
+    @Description("Define o bonus de carga P2P para quem esta atras do lider (0 desliga)")
+    @CommandPermission("formularacing.admin")
+    public void onPushToPassCatchUpPercent(CommandSender sender, double value) {
+        if (value < 0) {
+            sender.sendMessage(ChatColor.RED + "O valor deve ser maior ou igual a 0.");
+            return;
+        }
+        plugin.getConfig().set("pushtopass.catchUpPercent", value);
+        plugin.saveConfig();
+        sender.sendMessage(ChatColor.GREEN + "P2P catchUpPercent definido para " + value);
+    }
+
+    @Subcommand("pushtopass catchupmaxspeedup")
+    @CommandCompletion("<multiplier>")
+    @Description("Define o limite maximo do multiplicador de carga P2P (0 sem limite)")
+    @CommandPermission("formularacing.admin")
+    public void onPushToPassCatchUpMaxSpeedup(CommandSender sender, double value) {
+        if (value < 0) {
+            sender.sendMessage(ChatColor.RED + "O valor deve ser maior ou igual a 0.");
+            return;
+        }
+        plugin.getConfig().set("pushtopass.catchUpMaxSpeedup", value);
+        plugin.saveConfig();
+        sender.sendMessage(ChatColor.GREEN + "P2P catchUpMaxSpeedup definido para " + value);
     }
 }
