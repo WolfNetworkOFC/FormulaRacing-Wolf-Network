@@ -46,6 +46,41 @@ jobs:
             exit 1
           fi
 
+      # JitPack publishes this commit only as master-592fabf3e2-1 (its POM says
+      # master-SNAPSHOT), so the bare hash in build.gradle cannot resolve.
+      # Install the published jar under the expected coordinates in mavenLocal.
+      - name: Install java-mojang-api into local Maven
+        run: |
+          set -euo pipefail
+          VERSION="592fabf3e2"
+          JITPACK_VERSION="master-592fabf3e2-1"
+          DEST="$HOME/.m2/repository/com/github/SparklingComet/java-mojang-api/$VERSION"
+          mkdir -p "$DEST"
+          BASE="https://jitpack.io/com/github/SparklingComet/java-mojang-api/$JITPACK_VERSION"
+          curl -fsSL --retry 3 -o "$DEST/java-mojang-api-$VERSION.jar" \
+            "$BASE/java-mojang-api-$JITPACK_VERSION.jar"
+          cat > "$DEST/java-mojang-api-$VERSION.pom" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0">
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>com.github.SparklingComet</groupId>
+            <artifactId>java-mojang-api</artifactId>
+            <version>$VERSION</version>
+            <dependencies>
+              <dependency>
+                <groupId>com.mashape.unirest</groupId>
+                <artifactId>unirest-java</artifactId>
+                <version>1.4.9</version>
+              </dependency>
+              <dependency>
+                <groupId>com.googlecode.json-simple</groupId>
+                <artifactId>json-simple</artifactId>
+                <version>1.1.1</version>
+              </dependency>
+            </dependencies>
+          </project>
+          EOF
+
       # build.gradle compiles the Collisionless/NMS classes against a remapped
       # Paper server jar plus its runtime libraries. The repository does not
       # commit those jars, so generate them here with Paperclip.
