@@ -119,15 +119,25 @@ jobs:
           # This avoids the server jar's org.bukkit API shadowing paper-api on
           # the compile classpath (file dependencies come first in this build).
           EXTRACT="$RUNNER_TEMP/nms-server"
-          rm -rf "$EXTRACT"
+          CRAFTBUKKIT="$RUNNER_TEMP/craftbukkit"
+          rm -rf "$EXTRACT" "$CRAFTBUKKIT"
           mkdir -p "$EXTRACT"
           (
             cd "$EXTRACT"
-            jar xf "$SERVER_JAR" net/minecraft
-            if jar tf "$SERVER_JAR" | grep -q '^org/bukkit/craftbukkit/'; then
-              jar xf "$SERVER_JAR" org/bukkit/craftbukkit
-            fi
+            jar xf "$SERVER_JAR"
           )
+          # Keep CraftBukkit, drop the server's copy of the Bukkit API so it
+          # cannot shadow the paper-api compileOnly dependency. Paper patches
+          # (ca.spottedleaf.moonrise, etc.) must stay: NMS extends them.
+          if [ -d "$EXTRACT/org/bukkit/craftbukkit" ]; then
+            mkdir -p "$CRAFTBUKKIT"
+            cp -a "$EXTRACT/org/bukkit/craftbukkit" "$CRAFTBUKKIT/"
+          fi
+          rm -rf "$EXTRACT/org/bukkit"
+          if [ -d "$CRAFTBUKKIT/craftbukkit" ]; then
+            mkdir -p "$EXTRACT/org/bukkit"
+            mv "$CRAFTBUKKIT/craftbukkit" "$EXTRACT/org/bukkit/craftbukkit"
+          fi
 
           mkdir -p libs/nms-libs
           jar --create --file libs/spigot-server-26.3.jar -C "$EXTRACT" .
