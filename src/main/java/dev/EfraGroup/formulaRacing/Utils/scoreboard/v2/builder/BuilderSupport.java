@@ -18,7 +18,7 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-final class BuilderSupport {
+public final class BuilderSupport {
     private static final String[] SPACERS = new String[]{
             "§0", "§1", "§2", "§3", "§4", "§5", "§6", "§7",
             "§8", "§9", "§a", "§b", "§c", "§d", "§e", "§f"
@@ -332,7 +332,7 @@ final class BuilderSupport {
      * Compute gap by comparing both drivers at the most recent common progress point.
      * Uses TimingSystem logic: evaluate at the trailing driver's current progress.
      */
-    private static Long computeGapAtCommonPoint(Driver current, Driver reference) {
+    public static Long computeGapAtCommonPoint(Driver current, Driver reference) {
         // Determine positions
         boolean currentIsBehind = current.getPosition() > reference.getPosition();
         Driver behind = currentIsBehind ? current : reference;

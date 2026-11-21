@@ -48,6 +48,8 @@ public class DatabaseManager {
         new ConcurrentHashMap<>();
     private final Map<String, Integer> checkpointCountCache =
         new ConcurrentHashMap<>();
+    /** Bulk-loaded once from getAllTrackTags(); avoids one query per track. */
+    private Map<String, List<String>> trackTagsCache;
     private final Map<UUID, Boolean> ttScoreboardCache =
         new ConcurrentHashMap<>();
     private final Map<UUID, String> languageCache = new ConcurrentHashMap<>();
@@ -3791,7 +3793,14 @@ public class DatabaseManager {
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, String.join("\n", tags));
                 ps.setString(2, trackName.replaceAll("\\s+", ""));
-                return ps.executeUpdate() > 0;
+                boolean updated = ps.executeUpdate() > 0;
+                if (updated && trackTagsCache != null) {
+                    trackTagsCache.put(
+                        trackName.replaceAll("\\s+", "").toLowerCase(),
+                        new ArrayList<>(tags)
+                    );
+                }
+                return updated;
             }
         } catch (SQLException e) {
             handleSqlError(e);
@@ -3800,32 +3809,13 @@ public class DatabaseManager {
     }
 
     public synchronized List<String> getTrackTags(String trackName) {
-        String sql = "SELECT TAGS FROM fr_tracks WHERE LOWER(trackNameWS) = LOWER(?) LIMIT 1";
-        try {
-            Connection conn = getOrConnect();
-            ensureTrackTagsColumn(conn);
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setString(1, trackName.replaceAll("\\s+", ""));
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (!rs.next()) {
-                        return new ArrayList<>();
-                    }
-
-                    String storedTags = rs.getString("TAGS");
-                    if (storedTags == null || storedTags.isBlank()) {
-                        return new ArrayList<>();
-                    }
-
-                    return new ArrayList<>(Arrays.stream(storedTags.split("\\R"))
-                            .map(String::trim)
-                            .filter(tag -> !tag.isEmpty())
-                            .toList());
-                }
-            }
-        } catch (SQLException e) {
-            handleSqlError(e);
-            return new ArrayList<>();
+        // Parity with TimingSystem PR #207: read all tags once instead of one
+        // query per track. Unknown keys trigger a single bulk refresh.
+        String key = trackName.replaceAll("\\s+", "").toLowerCase();
+        if (trackTagsCache == null || !trackTagsCache.containsKey(key)) {
+            getAllTrackTags();
         }
+        return new ArrayList<>(trackTagsCache.getOrDefault(key, Collections.emptyList()));
     }
 
     public synchronized Map<String, List<String>> getAllTrackTags() {
@@ -3850,6 +3840,7 @@ public class DatabaseManager {
         } catch (SQLException e) {
             handleSqlError(e);
         }
+        trackTagsCache = new LinkedHashMap<>(trackTags);
         return trackTags;
     }
 
