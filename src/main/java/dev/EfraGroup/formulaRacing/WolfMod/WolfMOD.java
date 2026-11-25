@@ -354,12 +354,10 @@ public class WolfMOD implements PluginMessageListener {
     }
 
     public void sendGhostStart(Player player) {
-        sendConfig(player, "2", "");        // Start Timer (needed by samplePose)
         sendConfig(player, "ghost_start", ""); // Start ghost playback
     }
 
     public void sendGhostStop(Player player) {
-        sendConfig(player, "3", "");         // Stop Timer
         sendConfig(player, "ghost_stop", "");  // Stop ghost playback
     }
 

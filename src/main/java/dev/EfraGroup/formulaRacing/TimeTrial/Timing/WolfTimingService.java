@@ -46,7 +46,7 @@ public final class WolfTimingService {
         );
         this.reportTimeoutMillis = Math.max(
             0,
-            plugin.getConfig().getInt("time-trial.wolf-timing.report-timeout-ms", 500)
+            plugin.getConfig().getInt("time-trial.wolf-timing.report-timeout-ms", 100)
         );
     }
 
@@ -189,7 +189,7 @@ public final class WolfTimingService {
         }
 
         ClientState client = this.clients.get(player.getUniqueId());
-        if (client == null || !client.capabilitiesAccepted || !client.clientReady) {
+        if (client == null || !client.capabilitiesAccepted || !client.clientReady || !client.rttValidated) {
             return this.completeResolution(player, attempt, observedMillis);
         }
 
@@ -503,8 +503,11 @@ public final class WolfTimingService {
 
     private void sendGeometry(Player player, UUID runId) {
         SoloTimingAttempt attempt = this.getAttempt(player.getUniqueId());
-        ClientState client = this.clients.get(player.getUniqueId());
-        if (attempt == null || client == null || !client.capabilitiesAccepted || !attempt.getRunId().equals(runId)) {
+        // No capabilities gate here: the payload only says where the start/finish lines are,
+        // and the client needs it before it can start a lap. Waiting for CAPABILITIES meant a
+        // single lost client message left the HUD and the ghost dead for the whole session.
+        // Clients without the v1 protocol just ignore the unknown key.
+        if (attempt == null || !attempt.getRunId().equals(runId)) {
             return;
         }
         SchedulerHelper.runAsync(this.plugin, () -> {
