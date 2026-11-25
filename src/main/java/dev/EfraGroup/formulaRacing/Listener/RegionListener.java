@@ -152,7 +152,7 @@ public class RegionListener implements Listener {
 
     private void markJustTeleported(Player player) {
         this.justTeleported.add(player.getUniqueId());
-        SchedulerHelper.runTaskLater(this.plugin, () -> this.justTeleported.remove(player.getUniqueId()), 10L);
+        SchedulerHelper.runTaskLater(this.plugin, () -> this.justTeleported.remove(player.getUniqueId()), 5L);
     }
 
     @EventHandler
@@ -267,7 +267,7 @@ public class RegionListener implements Listener {
 
 
             double distSq = previous.distanceSquared(current);
-            if (!(distSq < 0.05)) {
+            if (!(distSq < 0.01)) {
                 if (distSq > 2500.0F) {
                     this.lastLocation.put(uuid, currentRaw);
                 } else {
@@ -833,7 +833,7 @@ public class RegionListener implements Listener {
         String lang_code = this.database.getPlayerLanguage(uuid);
         long now = System.currentTimeMillis();
         Long lastCross = (Long)this.lastStartEndCross.get(uuid);
-        if (lastCross != null && now - lastCross < 2000L) {
+        if (lastCross != null && now - lastCross < START_END_DEBOUNCE_MS) {
             this.plugin.getDebugManager().logTimeTrialSystem("Ignorando cruz de " + type + " por debounce (< 2s) para " + player.getName());
             this.reportTTBlocked(player, "DEBOUNCE", "cruzamento ignorado por debounce (< 2s)");
         } else {
@@ -1558,7 +1558,7 @@ public class RegionListener implements Listener {
                     }
                 });
             }
-        }, 0L, 2L);
+        }, 0L, 1L);
     }
 
     public void shutdown() {

@@ -346,6 +346,6 @@ holograms:
 # Only 'primary' and 'accent' are applied — all body text / success / warning /
 # error / info / award / broadcast colours are fixed semantic constants in code
 # and are not overridable here (they are always legible on a dark background).
-theme:
-  primary: "#7bf200"   # server default colour-1 (player brand / highlight)
-  accent:  "#00CC99"   # server default colour-2 (secondary highlight)
+time-trial:
+  wolf-timing:
+    report-timeout-ms: 100
