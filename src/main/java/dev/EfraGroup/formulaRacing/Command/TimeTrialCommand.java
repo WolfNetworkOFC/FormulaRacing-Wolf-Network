@@ -295,6 +295,8 @@ import dev.EfraGroup.formulaRacing.PacketSender;
             }
             if (this.plugin.getWolfTimingService() != null) {
                 this.plugin.getWolfTimingService().abort(player.getUniqueId(), true);
+                // /ttc leaves the track: unload it on the client too (DISARM only ends a lap).
+                this.plugin.getWolfTimingService().clearTrack(player);
             }
             // NOTE: o /ttc NÃO faz resetTrackGameTime — o tempo do jogador
             // permanece como está (aplica-se apenas ao sair para spawn/mudar de modo).
@@ -629,11 +631,12 @@ import dev.EfraGroup.formulaRacing.PacketSender;
 
                                 this.stt.setPlayerTrack(player, trackName, owner);
                             }
-                            // Clear WolfMOD ghost when resetting
+                            // Hide the WolfMOD ghost while resetting, but keep the payload:
+                            // it comes back on the next START crossing (ghost_clear would
+                            // throw the PB trajectory away until the next /tt).
                             var wolfMod = this.plugin.getWolfMod();
                             if (wolfMod != null) {
                                 wolfMod.sendGhostStop(player);
-                                wolfMod.sendGhostClear(player);
                             }
 
                         }

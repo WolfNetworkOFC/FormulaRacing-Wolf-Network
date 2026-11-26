@@ -113,6 +113,8 @@ public class SpawnCommand extends BaseCommand {
         try {
             if (plugin.getWolfTimingService() != null) {
                 plugin.getWolfTimingService().abort(uuid, true);
+                // Going to spawn leaves the track: make the mod unload it as well.
+                plugin.getWolfTimingService().clearTrack(player);
             }
         } catch (Exception ignored) {
         }

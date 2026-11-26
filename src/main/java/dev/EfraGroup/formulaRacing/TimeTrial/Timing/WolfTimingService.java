@@ -88,6 +88,8 @@ public final class WolfTimingService {
                 player,
                 WolfTimingProtocol.TRACK,
                 WolfTimingProtocol.track(normalizedTrack));
+        // Reference lap for the live HUD delta (best lap that has checkpoint times saved).
+        this.sendCompare(player, normalizedTrack);
         SoloTimingAttempt attempt = this.getAttempt(player.getUniqueId());
         if (attempt == null || !normalizedTrack.equalsIgnoreCase(attempt.getTrackName())) {
             this.armForTrack(player, normalizedTrack);
@@ -259,6 +261,29 @@ public final class WolfTimingService {
     public void cleanupPlayer(UUID uuid) {
         this.abort(uuid, false);
         this.clients.remove(uuid);
+    }
+
+    /**
+     * The player left the track (cancelled the TT, went to spawn, joined a race): drop the
+     * attempt and tell the client to unload the geometry, the ghost and any run in progress.
+     * Without this the client kept the track armed after a plain DISARM and could start a
+     * local timer on a crossing the server is not timing.
+     */
+    public void clearTrack(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        UUID uuid = player.getUniqueId();
+        ClientState client = this.clients.get(uuid);
+        if (client != null) {
+            client.activeRunId = null;
+        }
+        this.abort(uuid, false);
+        this.plugin.getWolfMod().sendConfig(
+            player,
+            WolfTimingProtocol.TRACK_REMOVE,
+            WolfTimingProtocol.trackRemove()
+        );
     }
 
     public void shutdown() {
@@ -522,6 +547,10 @@ public final class WolfTimingService {
                     .getTrackRegionsByType(attempt.getTrackName(), "LAGSTART"));
             guardRegions.addAll(this.plugin.getTrackIntegrationManager()
                     .getTrackRegionsByType(attempt.getTrackName(), "LAGEND"));
+            // Checkpoint regions come from fr_checkpoint (ordered by checkpointId) and carry
+            // their id as the index the client must follow.
+            List<DatabaseManager.RegionData> checkpointRegions =
+                    this.plugin.getDatabaseManager().getCheckpoints(attempt.getTrackName());
             SchedulerHelper.runTaskFor(this.plugin, player, () -> {
                 SoloTimingAttempt current = this.getAttempt(player.getUniqueId());
                 if (
@@ -539,9 +568,47 @@ public final class WolfTimingService {
                         startRegions.isEmpty() ? null : startRegions.get(0).getWorld(),
                         startRegions,
                         endRegions,
-                        guardRegions
+                        guardRegions,
+                        checkpointRegions
                     )
                 );
+            });
+        });
+    }
+
+    /**
+     * Sends the reference lap the client compares against while timing: the player's best
+     * finish that has checkpoint times recorded. The delta is purely client-side; the server
+     * never uses it for the official result.
+     */
+    private void sendCompare(Player player, String trackName) {
+        if (player == null || trackName == null || !player.isOnline()) {
+            return;
+        }
+        UUID uuid = player.getUniqueId();
+        SchedulerHelper.runAsync(this.plugin, () -> {
+            java.util.Map<Integer, Double> checkpointTimes;
+            long lapMillis = 0L;
+            try {
+                checkpointTimes = this.plugin.getDatabaseManager()
+                        .getCheckpointTimes(uuid, trackName);
+                OfficialTime best = this.plugin.getDatabaseManager()
+                        .getPlayerBestOfficialTime(uuid, trackName);
+                if (best != null) {
+                    lapMillis = best.getOfficialMillis();
+                }
+            } catch (RuntimeException ignored) {
+                return;
+            }
+            if ((checkpointTimes == null || checkpointTimes.isEmpty()) && lapMillis <= 0L) {
+                return;
+            }
+            String payload = WolfTimingProtocol.compare(lapMillis, checkpointTimes);
+            SchedulerHelper.runTaskFor(this.plugin, player, () -> {
+                if (player.isOnline()) {
+                    this.plugin.getWolfMod().sendConfig(
+                            player, WolfTimingProtocol.COMPARE, payload);
+                }
             });
         });
     }

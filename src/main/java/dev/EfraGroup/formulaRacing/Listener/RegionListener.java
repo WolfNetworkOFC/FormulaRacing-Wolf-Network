@@ -1123,6 +1123,7 @@ public class RegionListener implements Listener {
                 session,
                 checkpoints,
                 shouldLoop,
+                finishNanos,
                 officialTime,
                 ghostFrames
             )
@@ -1136,6 +1137,7 @@ public class RegionListener implements Listener {
         TimeTrialSession session,
         int checkpoints,
         boolean shouldLoop,
+        long finishNanos,
         OfficialTime officialTime,
         List<dev.EfraGroup.formulaRacing.Ghost.GhostFrame> ghostFrames
     ) {
@@ -1201,13 +1203,18 @@ public class RegionListener implements Listener {
             }
             this.timeTrialController.endSession(player);
             if (shouldLoop) {
+                // Anchor the next lap on the crossing that ended the last one. Using "now"
+                // here would add the async persistence latency to every looped lap and push
+                // the server clock out of step with the mod's HUD and ghost.
+                long wallStart = System.currentTimeMillis()
+                        - Math.max(0L, System.nanoTime() - finishNanos) / 1_000_000L;
                 this.startSoloTimer(
                     player,
                     regionTrackDisplayName,
                     regionTrackWS,
                     "START",
-                    System.currentTimeMillis(),
-                    System.nanoTime()
+                    wallStart,
+                    finishNanos
                 );
             } else if (this.plugin.getScoreboardTimeTrialUtils() != null) {
                 this.plugin.getScoreboardTimeTrialUtils().clearSession(player);

@@ -21,6 +21,16 @@ public final class WolfTimingProtocol {
     public static final String RESULT = "tt_v1_result";
     public static final String DISARM = "tt_v1_disarm";
     public static final String TRACK = "tt_v1_track";
+    /**
+     * Reference lap the client draws its live delta against: the player's best lap that has
+     * checkpoint times saved. Sent once per track preparation.
+     */
+    public static final String COMPARE = "tt_v1_compare";
+    /**
+     * The player left the track: the client must drop the geometry, the ghost and any run in
+     * progress. Distinct from DISARM, which only ends the current lap.
+     */
+    public static final String TRACK_REMOVE = "tt_v1_track_remove";
 
     private WolfTimingProtocol() {}
 
@@ -32,6 +42,13 @@ public final class WolfTimingProtocol {
     public static String track(String trackName) {
         JsonObject json = base();
         json.addProperty("track", trackName == null ? "" : trackName);
+        return json.toString();
+    }
+
+    /** Empty payload announcing that the client should unload the track. */
+    public static String trackRemove() {
+        JsonObject json = base();
+        json.addProperty("remove", true);
         return json.toString();
     }
 
@@ -60,7 +77,8 @@ public final class WolfTimingProtocol {
         String worldName,
         List<DatabaseManager.RegionData> startRegions,
         List<DatabaseManager.RegionData> endRegions,
-        List<DatabaseManager.RegionData> guardRegions
+        List<DatabaseManager.RegionData> guardRegions,
+        List<DatabaseManager.RegionData> checkpointRegions
     ) {
         JsonObject json = base();
         json.addProperty("runId", runId.toString());
@@ -96,7 +114,42 @@ public final class WolfTimingProtocol {
                 }
             }
         }
+        // Checkpoints carry their DB id as `index`: the client only accepts them in that
+        // order and will not close a lap before all of them were crossed.
+        if (checkpointRegions != null) {
+            int index = 0;
+            for (DatabaseManager.RegionData region : checkpointRegions) {
+                if (region != null) {
+                    regions.add(region("checkpoint-" + index++, region, region.getId()));
+                }
+            }
+        }
         json.add("regions", regions);
+        return json.toString();
+    }
+
+    /**
+     * Reference lap for the live delta. {@code checkpointSeconds} comes straight from
+     * {@code fr_checkpoint_times} (seconds since the start); the client works in millis.
+     */
+    public static String compare(long lapMillis, java.util.Map<Integer, Double> checkpointSeconds) {
+        JsonObject json = base();
+        json.addProperty("lapMillis", Math.max(0L, lapMillis));
+        JsonArray checkpoints = new JsonArray();
+        if (checkpointSeconds != null) {
+            checkpointSeconds.entrySet().stream()
+                .sorted(java.util.Map.Entry.comparingByKey())
+                .forEach(entry -> {
+                    JsonObject checkpoint = new JsonObject();
+                    checkpoint.addProperty("id", entry.getKey());
+                    checkpoint.addProperty(
+                        "millis",
+                        Math.round(entry.getValue() * 1000.0)
+                    );
+                    checkpoints.add(checkpoint);
+                });
+        }
+        json.add("checkpoints", checkpoints);
         return json.toString();
     }
 
@@ -163,15 +216,28 @@ public final class WolfTimingProtocol {
         String role,
         DatabaseManager.RegionData region
     ) {
+        return region(role, region, -1);
+    }
+
+    private static JsonObject region(
+        String role,
+        DatabaseManager.RegionData region,
+        int index
+    ) {
         JsonObject json = new JsonObject();
         // "guard" is a non-timing region: the server validates the crossing, the client only
         // draws it. Older clients ignore unknown roles, so this stays additive.
         if (role.startsWith("guard")) {
             json.addProperty("role", "GUARD");
+        } else if (role.startsWith("checkpoint")) {
+            json.addProperty("role", "CHECKPOINT");
         } else {
             json.addProperty("role", role.startsWith("start") ? "START" : "END");
         }
         json.addProperty("id", role);
+        if (index >= 0) {
+            json.addProperty("index", index);
+        }
         json.addProperty("shape", region.isPoly() ? "POLY" : "AABB");
         json.addProperty("minX", Math.min(region.getMinX(), region.getMaxX()));
         json.addProperty("minY", Math.min(region.getMinY(), region.getMaxY()));

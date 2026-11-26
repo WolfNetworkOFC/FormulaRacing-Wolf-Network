@@ -248,8 +248,12 @@ public class WolfMOD implements PluginMessageListener {
         if (player == null || !player.isOnline() || trackName == null) return;
         if (frames == null || frames.size() < 2) return;
 
-        List<GhostFrame> sampled = downsample(frames, MAX_GHOST_FRAMES);
-        int frameCount = sampled.size();
+        int[] keptIndices = downsampleIndices(frames.size(), MAX_GHOST_FRAMES);
+        int frameCount = keptIndices.length;
+        List<GhostFrame> sampled = new ArrayList<>(frameCount);
+        for (int index : keptIndices) {
+            sampled.add(frames.get(index));
+        }
 
         ByteArrayDataOutput out = ByteStreams.newDataOutput();
         out.writeByte(1);
@@ -262,7 +266,9 @@ public class WolfMOD implements PluginMessageListener {
 
         for (int i = 0; i < frameCount; i++) {
             GhostFrame frame = sampled.get(i);
-            writeVarInt(out, i * GHOST_SAMPLE_INTERVAL_TICKS);
+            // Stamp the ORIGINAL elapsed tick: thinning a long lap must not compress its
+            // timeline, or the ghost reaches the finish long before the player does.
+            writeVarInt(out, keptIndices[i] * GHOST_SAMPLE_INTERVAL_TICKS);
             out.writeFloat((float) frame.getX());
             out.writeFloat((float) frame.getY());
             out.writeFloat((float) frame.getZ());
@@ -281,16 +287,23 @@ public class WolfMOD implements PluginMessageListener {
     }
 
     /**
-     * Evenly thins {@code frames} to at most {@code maxFrames}, always preserving the
-     * first and last entries. Returns the original list when it already fits.
+     * Indices of the frames kept when thinning to at most {@code maxFrames}, preserving the
+     * first and last entries. The indices are what keep the real tick stamps intact.
      */
-    private static List<GhostFrame> downsample(List<GhostFrame> frames, int maxFrames) {
-        int size = frames.size();
-        if (size <= maxFrames) {
-            return frames;
+    private static int[] downsampleIndices(int size, int maxFrames) {
+        if (size <= 0 || maxFrames <= 0) {
+            return new int[0];
         }
-        List<GhostFrame> sampled = new ArrayList<>(maxFrames);
+        if (size <= maxFrames) {
+            int[] all = new int[size];
+            for (int i = 0; i < size; i++) {
+                all[i] = i;
+            }
+            return all;
+        }
+        int[] kept = new int[maxFrames];
         double step = (size - 1.0D) / (maxFrames - 1.0D);
+        int count = 0;
         int lastIndex = -1;
         for (int i = 0; i < maxFrames; i++) {
             int index = (i == maxFrames - 1) ? size - 1 : (int) Math.round(i * step);
@@ -298,9 +311,11 @@ public class WolfMOD implements PluginMessageListener {
                 continue;
             }
             lastIndex = index;
-            sampled.add(frames.get(index));
+            kept[count++] = index;
         }
-        return sampled;
+        int[] result = new int[count];
+        System.arraycopy(kept, 0, result, 0, count);
+        return result;
     }
 
     /**
