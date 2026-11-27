@@ -129,6 +129,8 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
     private boolean papiAvailable = false;
     private final Map<UUID, String> lastTimeTrialTrack = new HashMap();
     private final Map<UUID, Deque<String>> lastRandomTimeTrialTracks = new ConcurrentHashMap<>();
+    // Tracks each player started since the last server restart (in-memory only).
+    private final Map<UUID, Set<String>> visitedTracksSinceRestart = new ConcurrentHashMap<>();
     private final Map<UUID, String> lastDuelTrack = new HashMap();
     private final Map<UUID, Boolean> lastDuelLonelyStatus = new HashMap();
     private int eventIdCounter = 0;
@@ -1566,6 +1568,80 @@ public final class FormulaRacing extends JavaPlugin implements Listener {
 
     public String getLastTimeTrialTrack(UUID playerId) {
         return (String) this.lastTimeTrialTrack.get(playerId);
+    }
+
+    /**
+     * Records that the player started {@code trackName} since the last restart and
+     * returns true when it was not in the set yet (first time since restart). Purely
+     * in-memory: the set is empty again after a server restart.
+     */
+    public boolean markTrackVisitedSinceRestart(UUID playerId, String trackName) {
+        if (playerId == null || trackName == null || trackName.isBlank()) {
+            return false;
+        }
+        Set<String> visited = this.visitedTracksSinceRestart.computeIfAbsent(
+                playerId, k -> ConcurrentHashMap.newKeySet());
+        String key = normalizeTrackKey(trackName);
+        for (String existing : visited) {
+            if (normalizeTrackKey(existing).equals(key)) {
+                return false;
+            }
+        }
+        visited.add(trackName);
+        return true;
+    }
+
+    public boolean hasVisitedTrackSinceRestart(UUID playerId, String trackName) {
+        if (playerId == null || trackName == null) {
+            return false;
+        }
+        Set<String> visited = this.visitedTracksSinceRestart.get(playerId);
+        if (visited == null) {
+            return false;
+        }
+        String key = normalizeTrackKey(trackName);
+        for (String existing : visited) {
+            if (normalizeTrackKey(existing).equals(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Display names of the tracks the player started since the last restart, sorted. */
+    public Set<String> getVisitedTracksSinceRestart(UUID playerId) {
+        Set<String> visited = this.visitedTracksSinceRestart.get(playerId);
+        if (visited == null) {
+            return Collections.emptySet();
+        }
+        return new TreeSet<>(visited);
+    }
+
+    public void clearVisitedTracksSinceRestart(UUID playerId) {
+        this.visitedTracksSinceRestart.remove(playerId);
+    }
+
+    /**
+     * Marks the track as visited for the player and, on the first time since the last
+     * restart, sends the private "new track" notice. Works no matter how the player
+     * started the track (/tt, /ttr or the track menu).
+     */
+    public void notifyNewTrackSinceRestartIfFirst(Player player, String trackName) {
+        if (player == null || !markTrackVisitedSinceRestart(player.getUniqueId(), trackName)) {
+            return;
+        }
+        String lang = this.dm.getPlayerLanguage(player.getUniqueId());
+        String message = getTranslation("tt_new_track_since_restart", lang);
+        if (message == null || message.contains("[Lang Error]")) {
+            message = getTranslation("tt_new_track_since_restart", "en_US");
+        }
+        if (message != null && !message.contains("[Lang Error]")) {
+            player.sendMessage(message);
+        }
+    }
+
+    private static String normalizeTrackKey(String trackName) {
+        return trackName.replaceAll("\\s+", "").toLowerCase(java.util.Locale.ROOT);
     }
 
     public void setLastDuelTrack(UUID playerId, String track) {

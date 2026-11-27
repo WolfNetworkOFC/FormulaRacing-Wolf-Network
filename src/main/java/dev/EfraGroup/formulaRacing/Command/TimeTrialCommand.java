@@ -123,6 +123,20 @@ import dev.EfraGroup.formulaRacing.PacketSender;
             this.onDefault(player, args);
         }
 
+        @Subcommand("visited|history|pistas|visitadas")
+        @Description("Lists the tracks you have started since the last server restart")
+        public void onVisited(Player player) {
+            Set<String> visited = this.plugin.getVisitedTracksSinceRestart(player.getUniqueId());
+            if (visited.isEmpty()) {
+                player.sendMessage("§7Você ainda não correu nenhuma pista desde o restart do servidor.");
+                return;
+            }
+            player.sendMessage("§ePistas desde o restart §7(" + visited.size() + "§7):");
+            for (String track : visited) {
+                player.sendMessage("§7- §f" + track);
+            }
+        }
+
         private void startTrack(Player player, String trackName, String ownerName) {
             if (isBusy(player)) return;
 
@@ -173,6 +187,9 @@ import dev.EfraGroup.formulaRacing.PacketSender;
                     this.plugin.setLastTimeTrialTrack(player.getUniqueId(), trackName);
                     this.plugin.getDebugManager().logTimeTrialSystem("[TT] Starting track '" + trackName + "' for player " + player.getName());
                     sendTimeTrialTeleportMessage(player, trackName);
+                    // First time the player starts this track since the last restart:
+                    // mark it as visited and let them know.
+                    this.plugin.notifyNewTrackSinceRestartIfFirst(player, trackName);
 
                     try {
                         if (this.sessionScoreboard) {

@@ -13,6 +13,7 @@ wait_before_click: "&cWait half a second before clicking again!"
 
 # Time Trial Messages
 timetrial_teleport: "&eTeleported to [&f{track}&e]&7 {position}"
+tt_new_track_since_restart: "&aYou haven't raced this track since the server restarted."
 timetrial_menu_title: "&aChoose a track"
 timetrial_menu_owner: "&eOwner: &f{owner}"
 timetrial_menu_pb: "&eYour PB: &f{time}"

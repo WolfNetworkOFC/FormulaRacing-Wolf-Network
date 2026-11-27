@@ -678,6 +678,7 @@ public class TimeTrialMenuUtilsV2 implements Listener {
         }
 
         this.plugin.setLastTimeTrialTrack(uuid, trackName);
+        this.plugin.notifyNewTrackSinceRestartIfFirst(player, trackName);
         this.plugin.getDebugManager().logTimeTrialSystem(
             "[TT] Starting track '" +
                 trackName +
