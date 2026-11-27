@@ -6,10 +6,10 @@ import com.google.gson.reflect.TypeToken;
 import dev.EfraGroup.formulaRacing.FormulaRacing;
 import dev.EfraGroup.formulaRacing.Utils.FRTask;
 import dev.EfraGroup.formulaRacing.Utils.SchedulerHelper;
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.World;
-import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
@@ -26,8 +26,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>
  * - Grava a posição do jogador a cada 2 ticks durante uma volta de Time Trial.
  * - Salva apenas quando a volta é um novo PB (Personal Best).
- * - Reproduz a melhor volta com um ArmorStand invisível que percorre a linha
- *   gravada e spawna 1 partícula de coração por tick (movimento interpolado).
+ * - Reproduz a melhor volta desenhando uma linha contínua de partículas DUST
+ *   interpoladas entre os frames (sem corações, que dispersam e nunca formam
+ *   uma linha) e sem entidades: nada de ArmorStand nem teleport assíncrono.
  * <p>
  * Otimizado para Folia: gravação usa runTaskTimerAtEntity, replay usa
  * runTaskTimer global com operações de entidade via runTaskAt (RegionScheduler).
@@ -59,6 +60,39 @@ public class GhostManager {
 
     // Minimum valid frames for a ghost to be saved
     private static final int MIN_FRAMES = 5;
+
+    // PB line colour: a static DUST so the line is continuous and crisp instead
+    // of drifting HEART particles, which scatter and never align into a line.
+    private static final Particle.DustOptions PB_LINE_DUST =
+            new Particle.DustOptions(Color.fromRGB(255, 64, 64), 1.0f);
+
+    // Spacing between interpolated line points, in blocks. Smaller = denser line.
+    private static final double SEGMENT_POINT_SPACING = 0.35;
+
+    // Cap the points drawn for one recorded segment (guards against lag gaps).
+    private static final int MAX_POINTS_PER_SEGMENT = 48;
+
+    // Segments longer than this are teleports/lag, not real driving line, so
+    // they are not painted as a false straight line.
+    private static final double MAX_SEGMENT_DISTANCE = 8.0;
+
+    // Height of the line above the recorded (boat) position. Kept small so the
+    // trail sits on the driving line instead of floating above it.
+    private static final double LINE_Y_OFFSET = 0.2;
+
+    // Amount to lift a point that fell inside a solid block, so the line does
+    // not get swallowed by terrain.
+    private static final double OCCLUSION_EPSILON = 0.05;
+
+    // Viewer render radius for the line: points farther than this from the player
+    // are not visible, so they are not sent (performance).
+    private static final double MAX_LINE_DISTANCE_SQ = 64.0 * 64.0; // 64 blocks
+
+    // Largest plausible gap between two recorded frames (2 ticks apart). Kept well
+    // above real boat speeds so a fast lap is never rejected; only teleports/lag
+    // spikes exceed it. Such a recording replays with wrong timing and a false
+    // straight line, so it is discarded instead of saved.
+    private static final double MAX_RECORD_FRAME_STEP = 16.0;
 
     public GhostManager(FormulaRacing plugin) {
         this.plugin = plugin;
@@ -136,9 +170,17 @@ public class GhostManager {
                 "[GHOST-REC] Recording stopped for " + player.getName()
                         + " — " + frames.size() + " frames captured");
 
+        List<GhostFrame> snapshot;
         synchronized (frames) {
-            return new ArrayList<>(frames);
+            snapshot = new ArrayList<>(frames);
         }
+        if (hasTeleportSpike(snapshot)) {
+            plugin.getDebugManager().logTimeTrialSystem(
+                    "[GHOST-REC] Recording discarded for " + player.getName()
+                            + " — teleport/lag spike in frames");
+            return null;
+        }
+        return snapshot;
     }
 
     public void cancelRecording(Player player) {
@@ -167,6 +209,15 @@ public class GhostManager {
     public void saveGhostAsync(UUID playerUuid, String trackName, List<GhostFrame> frames) {
         if (playerUuid == null || trackName == null || frames == null || frames.isEmpty()) return;
 
+        // Central validation: whatever the source (server recording or client
+        // upload), never persist a ghost whose path jumps impossibly.
+        if (hasTeleportSpike(frames)) {
+            plugin.getDebugManager().logTimeTrialSystem(
+                    "[GHOST-SAVE] Ghost rejected for " + playerUuid + " on track " + trackName
+                            + " — teleport/lag spike in frames");
+            return;
+        }
+
         ghostCache.put(cacheKey(playerUuid, trackName), frames);
 
         String safeTrackName = sanitizeFileName(trackName);
@@ -186,6 +237,31 @@ public class GhostManager {
                         "[GHOST-SAVE] Failed to save ghost for " + playerUuid + ": " + e.getMessage());
             }
         });
+    }
+
+    /**
+     * True when two consecutive frames are impossibly far apart for a 2-tick
+     * recording window — i.e. the recording contains a teleport/lag gap. Replaying
+     * such frames advances by index at a fixed cadence, which would desync the
+     * ghost from the real lap time and paint a false straight line, so the whole
+     * recording is rejected.
+     */
+    private static boolean hasTeleportSpike(List<GhostFrame> frames) {
+        if (frames == null || frames.size() < 2) {
+            return false;
+        }
+        double maxSq = MAX_RECORD_FRAME_STEP * MAX_RECORD_FRAME_STEP;
+        for (int i = 1; i < frames.size(); i++) {
+            GhostFrame a = frames.get(i - 1);
+            GhostFrame b = frames.get(i);
+            double dx = b.getX() - a.getX();
+            double dy = b.getY() - a.getY();
+            double dz = b.getZ() - a.getZ();
+            if (dx * dx + dy * dy + dz * dz > maxSq) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void loadGhostAsync(UUID playerUuid, String trackName, GhostLoadCallback callback) {
@@ -290,7 +366,7 @@ public class GhostManager {
     }
 
     // ========================
-    //  REPLAY (ArmorStand + Heart Particles)
+    //  REPLAY (Interpolated Dust Line)
     // ========================
 
     public void startReplay(Player player, List<GhostFrame> frames) {
@@ -300,9 +376,10 @@ public class GhostManager {
     /**
      * Starts a replay for the given frames.
      *
-     * @param particle particle type; when {@code dust} is provided this is ignored
-     *                 (always DUST). When both are null, falls back to HEART.
-     * @param dust     colored dust for medal lines (e.g. diamond = blue); null = hearts
+     * @param particle custom particle type used only when {@code dust} is null and
+     *                 the particle is not HEART; HEART is ignored (PB lines use DUST).
+     * @param dust     colored dust for medal lines (e.g. diamond = blue); when null
+     *                 the PB line uses {@link #PB_LINE_DUST}
      */
     public void startReplay(Player player, List<GhostFrame> frames, Particle particle, Particle.DustOptions dust) {
         if (player == null || !player.isOnline() || frames == null || frames.size() < MIN_FRAMES) return;
@@ -311,7 +388,7 @@ public class GhostManager {
         String key = (dust != null || particle != null) ? uuid + ":medal" : uuid + ":pb";
 
         GhostPlaybackSession old = activeReplays.remove(key);
-        if (old != null) old.removeStand();
+        if (old != null) old.stop();
 
         GhostPlaybackSession session = new GhostPlaybackSession(plugin, player, frames, particle, dust);
         activeReplays.put(key, session);
@@ -335,7 +412,7 @@ public class GhostManager {
             String key = it.next();
             if (key.startsWith(uuid + ":")) {
                 GhostPlaybackSession session = activeReplays.remove(key);
-                if (session != null) session.removeStand();
+                if (session != null) session.stop();
             }
         }
     }
@@ -343,7 +420,7 @@ public class GhostManager {
     /**
      * Global tick task that advances all active replays.
      * Runs every PLAYBACK_INTERVAL_TICKS (same as recording interval) on the global region scheduler.
-     * ArmorStand operations are delegated to the correct region via runTaskAt.
+     * Particle spawning is delegated to the correct region via runTaskAt.
      */
     private void startReplayTickTask() {
         replayTickTask = SchedulerHelper.runTaskTimer(plugin, () -> {
@@ -386,9 +463,9 @@ public class GhostManager {
         recordingTasks.clear();
         activeRecordings.clear();
 
-        // Remove all ghost armor stands and cancel replay
+        // Stop all active replays
         for (GhostPlaybackSession session : activeReplays.values()) {
-            session.removeStand();
+            session.stop();
         }
         if (replayTickTask != null && !replayTickTask.isCancelled()) {
             replayTickTask.cancel();
@@ -408,9 +485,11 @@ public class GhostManager {
 
     /**
      * A single ghost playback session.
-     * Uses an invisible, no-gravity ArmorStand that is teleported frame-by-frame
-     * along the recorded path at the same rate it was recorded.
-     * Each tick spawns heart particles at the stand's position.
+     *
+     * <p>Paints the recorded racing line as a continuous, owner-only DUST trail
+     * interpolated between frames. It creates no entity and teleports nothing:
+     * particles are sent straight from the region thread, so frames cannot be
+     * reordered by an async teleport and there is no ArmorStand to track/clean up.
      */
     private static class GhostPlaybackSession {
         private final FormulaRacing plugin;
@@ -419,9 +498,9 @@ public class GhostManager {
         private final World world;
         private final Particle particle;
         private final Particle.DustOptions dust;
-        private volatile ArmorStand ghostStand;
-        private volatile boolean standRemoved;
+        private volatile boolean stopped;
         private int frameIndex;
+        private Location lastDrawn;
 
         GhostPlaybackSession(FormulaRacing plugin, Player player, List<GhostFrame> frames,
                              Particle particle, Particle.DustOptions dust) {
@@ -431,79 +510,137 @@ public class GhostManager {
             this.world = player.getWorld();
             this.particle = particle;
             this.dust = dust;
+            this.stopped = false;
             this.frameIndex = 0;
-            this.ghostStand = null;
-            this.standRemoved = false;
+            this.lastDrawn = null;
         }
 
         /**
-         * Advances one playback step: teleports the armor stand to the current frame
-         * position and spawns heart particles.
+         * Advances one playback step: paints the line segment leading to the current
+         * frame, visible only to the owner.
          *
          * @return true if playback is still active, false if finished
          */
         boolean tick() {
-            if (standRemoved) return false;
+            if (stopped) return false;
             if (frameIndex >= frames.size()) {
-                removeStand();
+                stop();
                 return false;
             }
 
             GhostFrame frame = frames.get(frameIndex);
-            Location targetLoc = new Location(world, frame.getX(), frame.getY() + 0.5, frame.getZ());
-            // Face the recorded heading so the trail reads as a driving line, not just dots.
-            targetLoc.setYaw(frame.getYaw());
+            Location targetLoc = new Location(world, frame.getX(), frame.getY() + LINE_Y_OFFSET, frame.getZ());
+            final Location fromLoc = lastDrawn;
 
-            // Schedule armor stand + particle on the correct region thread
-            SchedulerHelper.runTaskAt(plugin, targetLoc, () -> {
-                if (standRemoved || !player.isOnline()) {
-                    removeStand();
+            // Player particle packets must run on the player's region thread under
+            // Folia (getLocation/spawnParticle are player-entity access). Tasks for
+            // the same region run in order, so frames stay ordered without teleport.
+            SchedulerHelper.runTaskFor(plugin, player, () -> {
+                if (stopped || !player.isOnline()) {
+                    stop();
                     return;
                 }
-
-                // Create armor stand on first tick
-                if (ghostStand == null || !ghostStand.isValid()) {
-                    if (world == null) return;
-                    ghostStand = world.spawn(targetLoc, ArmorStand.class, stand -> {
-                        stand.setInvisible(true);
-                        stand.setGravity(false);
-                        stand.setMarker(true);
-                        stand.setSmall(true);
-                        stand.setInvulnerable(true);
-                    });
-                }
-
-                // Teleport stand to frame position (must use teleportAsync in Folia region threading)
-                if (ghostStand != null && ghostStand.isValid()) {
-                    ghostStand.teleportAsync(targetLoc);
-                }
-
-                // Spawn particles visible only to the owner.
-                // Medal lines use colored dust; PB lines use heart particles.
-                if (dust != null) {
-                    player.spawnParticle(Particle.DUST,
-                            targetLoc.getX(), targetLoc.getY(), targetLoc.getZ(), 1, dust);
+                Location viewerLoc = player.getLocation();
+                Particle.DustOptions lineDust = resolveLineDust();
+                if (fromLoc != null && fromLoc.getWorld() == targetLoc.getWorld()) {
+                    drawSegment(viewerLoc, fromLoc, targetLoc, lineDust);
                 } else {
-                    player.spawnParticle(particle != null ? particle : Particle.HEART,
-                            targetLoc.getX(), targetLoc.getY(), targetLoc.getZ(),
-                            2, 0.15, 0.15, 0.15, 0);
+                    spawnLinePoint(viewerLoc, targetLoc.getX(), targetLoc.getY(), targetLoc.getZ(), lineDust);
                 }
             });
 
+            lastDrawn = targetLoc;
             frameIndex++;
             return true;
         }
 
-        void removeStand() {
-            standRemoved = true;
-            ArmorStand stand = ghostStand;
-            ghostStand = null;
-            if (stand != null && stand.isValid()) {
-                Location standLoc = stand.getLocation();
-                SchedulerHelper.runTaskAt(plugin, standLoc, () -> {
-                    if (stand.isValid()) stand.remove();
-                });
+        /**
+         * Colour for this line: medal dust when supplied, otherwise a static PB colour.
+         * HEART is deliberately never used — it drifts and never forms a line. A
+         * non-HEART custom particle (no dust) is returned as {@code null} so callers
+         * fall back to spawning that particle type directly.
+         */
+        private Particle.DustOptions resolveLineDust() {
+            if (dust != null) {
+                return dust;
             }
+            if (particle == null || particle == Particle.HEART) {
+                return PB_LINE_DUST;
+            }
+            return null;
+        }
+
+        /**
+         * Fills the gap between two consecutive frames with evenly spaced line points,
+         * so a 2-tick recording cadence still reads as a continuous line. Segments long
+         * enough to be lag/teleports are skipped instead of painted straight.
+         */
+        private void drawSegment(Location viewerLoc, Location from, Location to, Particle.DustOptions lineDust) {
+            double dx = to.getX() - from.getX();
+            double dy = to.getY() - from.getY();
+            double dz = to.getZ() - from.getZ();
+            double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (distance <= 0.0 || distance > MAX_SEGMENT_DISTANCE) {
+                spawnLinePoint(viewerLoc, to.getX(), to.getY(), to.getZ(), lineDust);
+                return;
+            }
+            int points = (int) Math.ceil(distance / SEGMENT_POINT_SPACING);
+            points = Math.min(points, MAX_POINTS_PER_SEGMENT);
+            for (int i = 1; i <= points; i++) {
+                double t = (double) i / points;
+                spawnLinePoint(viewerLoc,
+                        from.getX() + dx * t,
+                        from.getY() + dy * t,
+                        from.getZ() + dz * t,
+                        lineDust);
+            }
+        }
+
+        private void spawnLinePoint(Location viewerLoc, double x, double y, double z, Particle.DustOptions lineDust) {
+            if (viewerLoc == null || viewerLoc.getWorld() != world) {
+                return;
+            }
+            // Performance: only send points the viewer can actually see. Beyond the
+            // render radius even forced packets are wasted work.
+            double ddx = viewerLoc.getX() - x;
+            double ddy = viewerLoc.getY() - y;
+            double ddz = viewerLoc.getZ() - z;
+            if (ddx * ddx + ddy * ddy + ddz * ddz > MAX_LINE_DISTANCE_SQ) {
+                return;
+            }
+            double visibleY = resolveVisibleY(x, y, z);
+            // force=true disables the ~32 block view-distance cull, so the line stays
+            // visible from behind the player instead of vanishing at range.
+            if (lineDust != null) {
+                player.spawnParticle(Particle.DUST, x, visibleY, z,
+                        1, 0.0, 0.0, 0.0, 0.0, lineDust, true);
+            } else if (particle != null) {
+                player.spawnParticle(particle, x, visibleY, z,
+                        1, 0.0, 0.0, 0.0, 0.0, null, true);
+            }
+        }
+
+        /**
+         * Lifts a line point out of a solid block so the trail does not disappear
+         * inside terrain (slopes, slabs, clipped ground). Points already above the
+         * surface are left untouched.
+         */
+        private double resolveVisibleY(double x, double y, double z) {
+            World w = world;
+            if (w == null) return y;
+            int bx = (int) Math.floor(x);
+            int by = (int) Math.floor(y);
+            int bz = (int) Math.floor(z);
+            if (by < w.getMinHeight() || by >= w.getMaxHeight()) return y;
+            if (!w.isChunkLoaded(bx >> 4, bz >> 4)) return y;
+            org.bukkit.block.Block block = w.getBlockAt(bx, by, bz);
+            if (!block.getType().isOccluding()) return y;
+            double top = block.getBoundingBox().getMaxY();
+            return Math.max(y, top + OCCLUSION_EPSILON);
+        }
+
+        void stop() {
+            stopped = true;
         }
     }
 
